@@ -12,6 +12,8 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@jak-swarm/shared": "workspace:*",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/supabase-js": "^2.101.1",
     "@xyflow/react": "^12.10.2",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
