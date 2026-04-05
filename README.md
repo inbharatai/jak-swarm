@@ -194,11 +194,25 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 
 ## 📸 Screenshots
 
-> *Screenshots coming soon — [star the repo](https://github.com/inbharatai/jak-swarm) to get notified!*
+### Landing Page
+![JAK Swarm Hero](docs/screenshots/01-hero.png)
 
-| Workspace with DAG Graph | Integration Hub | Scheduling |
-|:------------------------:|:---------------:|:----------:|
-| Real-time agent execution visualization | Connect Slack, GitHub, Notion, Gmail | Cron-based recurring workflows |
+### Agent Network — 6 Specialist Roles
+![Agent Network](docs/screenshots/02-agents.png)
+
+### Workflow — From Command to Result in Seconds
+![Workflow](docs/screenshots/03-workflow.png)
+
+### Pricing — Free / Pro ($49/mo) / Enterprise
+![Pricing](docs/screenshots/04-pricing.png)
+
+### Onboarding Wizard — 4-Step Setup
+![Onboarding](docs/screenshots/07-onboarding.png)
+
+### Login & Registration
+| Login | Registration |
+|:-----:|:------------:|
+| ![Login](docs/screenshots/05-login.png) | ![Register](docs/screenshots/06-register.png) |
 
 ---
 
