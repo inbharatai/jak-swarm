@@ -151,7 +151,42 @@ export function getMemoryAdapter(): MemoryAdapter {
     const dbModule = require('@jak-swarm/db');
     const prisma = dbModule.prisma;
     if (prisma?.tenantMemory) {
-      _cachedAdapter = new DbMemoryAdapter(prisma as PrismaLike);
+      // Wrap DbMemoryAdapter with auto-fallback to InMemoryAdapter on connection failure
+      const dbAdapter = new DbMemoryAdapter(prisma as PrismaLike);
+      const inMemoryFallback = new InMemoryAdapter();
+      let useDb = true;
+
+      const fallbackAdapter: MemoryAdapter = {
+        async get(key: string, tenantId?: string): Promise<unknown> {
+          if (!useDb) return inMemoryFallback.get(key, tenantId);
+          try {
+            return await dbAdapter.get(key, tenantId);
+          } catch {
+            useDb = false;
+            return inMemoryFallback.get(key, tenantId);
+          }
+        },
+        async set(key: string, value: unknown, tenantId?: string, opts?: MemorySetOptions): Promise<void> {
+          if (!useDb) return inMemoryFallback.set(key, value, tenantId, opts);
+          try {
+            return await dbAdapter.set(key, value, tenantId, opts);
+          } catch {
+            useDb = false;
+            return inMemoryFallback.set(key, value, tenantId, opts);
+          }
+        },
+        async delete(key: string, tenantId?: string): Promise<void> {
+          if (!useDb) return inMemoryFallback.delete(key, tenantId);
+          try {
+            return await dbAdapter.delete(key, tenantId);
+          } catch {
+            useDb = false;
+            return inMemoryFallback.delete(key, tenantId);
+          }
+        },
+      };
+
+      _cachedAdapter = fallbackAdapter;
       return _cachedAdapter;
     }
   } catch {
