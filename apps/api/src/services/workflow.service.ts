@@ -1,0 +1,362 @@
+import type { PrismaClient } from '@jak-swarm/db';
+import type { FastifyBaseLogger } from 'fastify';
+import type {
+  Workflow,
+  AgentTrace,
+  ApprovalRequest,
+  WorkflowStatus,
+  PaginatedResult,
+  ApprovalDecision,
+} from '../types.js';
+import {
+  NotFoundError,
+  WorkflowStateError,
+  ForbiddenError,
+} from '../errors.js';
+
+const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
+
+export interface ListWorkflowsOptions {
+  page: number;
+  limit: number;
+  status?: WorkflowStatus;
+}
+
+export interface SaveTraceInput {
+  workflowId: string;
+  tenantId: string;
+  traceId: string;
+  runId: string;
+  agentRole: string;
+  stepIndex: number;
+  startedAt: Date;
+  completedAt?: Date;
+  durationMs?: number;
+  inputJson?: Record<string, unknown>;
+  outputJson?: Record<string, unknown>;
+  toolCallsJson?: Record<string, unknown>;
+  handoffsJson?: Record<string, unknown>;
+  tokenUsage?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface CreateApprovalInput {
+  workflowId: string;
+  tenantId: string;
+  taskId: string;
+  agentRole: string;
+  action: string;
+  rationale: string;
+  proposedDataJson?: Record<string, unknown>;
+  riskLevel: string;
+}
+
+export class WorkflowService {
+  constructor(
+    private readonly db: PrismaClient,
+    private readonly log: FastifyBaseLogger,
+  ) {}
+
+  /**
+   * Create a new workflow record in PENDING state.
+   */
+  async createWorkflow(
+    tenantId: string,
+    userId: string,
+    goal: string,
+    industry?: string,
+  ): Promise<Workflow> {
+    const workflow = await this.db.workflow.create({
+      data: {
+        tenantId,
+        userId,
+        goal,
+        industry: industry ?? null,
+        status: 'PENDING',
+      },
+    });
+
+    this.log.info({ workflowId: workflow.id, tenantId }, 'Workflow created');
+
+    return this.mapWorkflow(workflow);
+  }
+
+  /**
+   * Fetch a single workflow with tenant ownership check.
+   */
+  async getWorkflow(tenantId: string, workflowId: string): Promise<Workflow> {
+    const workflow = await this.db.workflow.findUnique({
+      where: { id: workflowId },
+    });
+
+    if (!workflow) {
+      throw new NotFoundError('Workflow', workflowId);
+    }
+
+    if (workflow.tenantId !== tenantId) {
+      throw new ForbiddenError('Access to workflow in another tenant is not allowed');
+    }
+
+    return this.mapWorkflow(workflow);
+  }
+
+  /**
+   * Return a paginated list of workflows for a tenant.
+   */
+  async listWorkflows(
+    tenantId: string,
+    options: ListWorkflowsOptions,
+  ): Promise<PaginatedResult<Workflow>> {
+    const { page, limit, status } = options;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      tenantId,
+      ...(status ? { status } : {}),
+    };
+
+    const [total, rows] = await Promise.all([
+      this.db.workflow.count({ where }),
+      this.db.workflow.findMany({
+        where,
+        orderBy: { startedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: rows.map(this.mapWorkflow),
+      total,
+      page,
+      limit,
+      hasMore: skip + rows.length < total,
+    };
+  }
+
+  /**
+   * Cancel a workflow — only allowed when not already in a terminal state.
+   */
+  async cancelWorkflow(tenantId: string, workflowId: string): Promise<Workflow> {
+    const existing = await this.getWorkflow(tenantId, workflowId);
+
+    if (TERMINAL_STATUSES.includes(existing.status)) {
+      throw new WorkflowStateError(
+        `Cannot cancel workflow with status '${existing.status}'`,
+      );
+    }
+
+    const updated = await this.db.workflow.update({
+      where: { id: workflowId },
+      data: { status: 'CANCELLED', completedAt: new Date() },
+    });
+
+    this.log.info({ workflowId }, 'Workflow cancelled');
+    return this.mapWorkflow(updated);
+  }
+
+  /**
+   * Internal status update used by the Temporal worker callbacks.
+   */
+  async updateWorkflowStatus(
+    workflowId: string,
+    status: WorkflowStatus,
+    error?: string,
+  ): Promise<Workflow> {
+    const data: Record<string, unknown> = { status };
+
+    if (status === 'RUNNING') {
+      data['startedAt'] = new Date();
+    }
+
+    if (TERMINAL_STATUSES.includes(status)) {
+      data['completedAt'] = new Date();
+    }
+
+    if (error) {
+      data['error'] = error;
+    }
+
+    const updated = await this.db.workflow.update({
+      where: { id: workflowId },
+      data,
+    });
+
+    this.log.info({ workflowId, status }, 'Workflow status updated');
+    return this.mapWorkflow(updated);
+  }
+
+  /**
+   * Persist an agent trace from a workflow execution.
+   */
+  async saveTrace(input: SaveTraceInput): Promise<AgentTrace> {
+    const trace = await this.db.agentTrace.create({
+      data: {
+        workflowId: input.workflowId,
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+        runId: input.runId,
+        agentRole: input.agentRole,
+        stepIndex: input.stepIndex,
+        startedAt: input.startedAt,
+        completedAt: input.completedAt ?? null,
+        durationMs: input.durationMs ?? null,
+        inputJson: input.inputJson ? (input.inputJson as object) : undefined,
+        outputJson: input.outputJson ? (input.outputJson as object) : undefined,
+        toolCallsJson: input.toolCallsJson ? (input.toolCallsJson as object) : undefined,
+        handoffsJson: input.handoffsJson ? (input.handoffsJson as object) : undefined,
+        tokenUsage: input.tokenUsage ? (input.tokenUsage as object) : undefined,
+        error: input.error ?? null,
+      },
+    });
+
+    return this.mapTrace(trace);
+  }
+
+  /**
+   * Create a human-in-the-loop approval request.
+   */
+  async createApprovalRequest(input: CreateApprovalInput): Promise<ApprovalRequest> {
+    const approval = await this.db.approvalRequest.create({
+      data: {
+        workflowId: input.workflowId,
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        agentRole: input.agentRole,
+        action: input.action,
+        rationale: input.rationale,
+        proposedDataJson: input.proposedDataJson ? (input.proposedDataJson as object) : undefined,
+        riskLevel: input.riskLevel,
+        status: 'PENDING',
+      },
+    });
+
+    this.log.info(
+      { approvalId: approval.id, workflowId: input.workflowId },
+      'Approval request created',
+    );
+
+    return this.mapApproval(approval);
+  }
+
+  /**
+   * Resolve an approval with a decision.
+   */
+  async resolveApproval(
+    tenantId: string,
+    approvalId: string,
+    decision: ApprovalDecision,
+    reviewedBy: string,
+    comment?: string,
+  ): Promise<ApprovalRequest> {
+    const existing = await this.db.approvalRequest.findUnique({
+      where: { id: approvalId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('ApprovalRequest', approvalId);
+    }
+
+    if (existing.tenantId !== tenantId) {
+      throw new ForbiddenError('Access to approval request in another tenant is not allowed');
+    }
+
+    if (existing.status !== 'PENDING') {
+      throw new WorkflowStateError(
+        `Cannot decide approval with status '${existing.status}'`,
+      );
+    }
+
+    const updated = await this.db.approvalRequest.update({
+      where: { id: approvalId },
+      data: {
+        status: decision,
+        reviewedBy,
+        comment: comment ?? null,
+        reviewedAt: new Date(),
+      },
+    });
+
+    this.log.info({ approvalId, decision, reviewedBy }, 'Approval resolved');
+    return this.mapApproval(updated);
+  }
+
+  /**
+   * List agent traces for a workflow, with optional tenant check.
+   */
+  async getWorkflowTraces(tenantId: string, workflowId: string): Promise<AgentTrace[]> {
+    // Verify ownership first
+    await this.getWorkflow(tenantId, workflowId);
+
+    const traces = await this.db.agentTrace.findMany({
+      where: { workflowId, tenantId },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    return traces.map(this.mapTrace);
+  }
+
+  /**
+   * List approval requests for a workflow.
+   */
+  async getWorkflowApprovals(tenantId: string, workflowId: string): Promise<ApprovalRequest[]> {
+    await this.getWorkflow(tenantId, workflowId);
+
+    const approvals = await this.db.approvalRequest.findMany({
+      where: { workflowId, tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return approvals.map(this.mapApproval);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private mapping helpers
+  // ---------------------------------------------------------------------------
+
+  private mapWorkflow = (row: Record<string, unknown>): Workflow => ({
+    id: row['id'] as string,
+    tenantId: row['tenantId'] as string,
+    createdBy: (row['userId'] as string) ?? '',
+    goal: row['goal'] as string,
+    industry: (row['industry'] as string | null) ?? null,
+    status: row['status'] as WorkflowStatus,
+    result: null,
+    finalOutput: (row['finalOutput'] as string | null) ?? null,
+    error: (row['error'] as string | null) ?? null,
+    startedAt: (row['startedAt'] as Date | null) ?? null,
+    completedAt: (row['completedAt'] as Date | null) ?? null,
+    createdAt: (row['startedAt'] as Date) ?? new Date(),
+    updatedAt: row['updatedAt'] as Date,
+  });
+
+  private mapTrace = (row: Record<string, unknown>): AgentTrace => ({
+    id: row['id'] as string,
+    workflowId: row['workflowId'] as string,
+    tenantId: row['tenantId'] as string,
+    agentRole: row['agentRole'] as string,
+    status: 'COMPLETED',
+    steps: [],
+    startedAt: row['startedAt'] as Date,
+    completedAt: (row['completedAt'] as Date | null) ?? null,
+    createdAt: (row['startedAt'] as Date) ?? new Date(),
+  });
+
+  private mapApproval = (row: Record<string, unknown>): ApprovalRequest => ({
+    id: row['id'] as string,
+    workflowId: row['workflowId'] as string,
+    tenantId: row['tenantId'] as string,
+    requestedBy: '',
+    reviewedBy: (row['reviewedBy'] as string | null) ?? null,
+    action: row['action'] as string,
+    context: {},
+    riskLevel: row['riskLevel'] as ApprovalRequest['riskLevel'],
+    status: row['status'] as ApprovalRequest['status'],
+    decision: null,
+    comment: (row['comment'] as string | null) ?? null,
+    expiresAt: null,
+    decidedAt: (row['reviewedAt'] as Date | null) ?? null,
+    createdAt: row['createdAt'] as Date,
+    updatedAt: row['updatedAt'] as Date,
+  });
+}

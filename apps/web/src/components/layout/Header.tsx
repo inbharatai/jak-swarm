@@ -1,0 +1,168 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import {
+  Sun,
+  Moon,
+  Bell,
+  StopCircle,
+  ChevronDown,
+  User,
+  LogOut,
+  Settings,
+} from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { useAuth } from '@/lib/auth';
+import { useApprovals } from '@/hooks/useWorkflow';
+import { workflowApi } from '@/lib/api-client';
+import { Avatar, Badge, Button } from '@/components/ui';
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/workspace': 'Workspace',
+  '/swarm': 'Swarm Inspector',
+  '/traces': 'Trace Viewer',
+  '/knowledge': 'Knowledge Console',
+  '/admin': 'Admin Console',
+  '/settings': 'Settings',
+};
+
+export function Header() {
+  const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const { pendingCount } = useApprovals();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isKilling, setIsKilling] = useState(false);
+
+  const pageTitle = ROUTE_LABELS[pathname] ?? 'JAK Swarm';
+
+  const handleKillAll = async () => {
+    if (!confirm('Stop ALL running workflows? This cannot be undone.')) return;
+    setIsKilling(true);
+    try {
+      await workflowApi.stopAll();
+    } catch {
+      // ignore
+    } finally {
+      setIsKilling(false);
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 md:px-6">
+      {/* Page title / breadcrumb */}
+      <div className="flex-1 min-w-0">
+        <h1 className="text-sm font-semibold truncate">{pageTitle}</h1>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* Emergency Kill All */}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleKillAll}
+          disabled={isKilling}
+          className="gap-1.5 font-semibold"
+          title="Stop all running workflows immediately"
+        >
+          <StopCircle className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Kill All</span>
+        </Button>
+
+        {/* Notifications Bell */}
+        <Link
+          href="/workspace"
+          className="relative flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+          title="Pending approvals"
+        >
+          <Bell className="h-4 w-4" />
+          {pendingCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              {pendingCount > 9 ? '9+' : pendingCount}
+            </span>
+          )}
+        </Link>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          title="Toggle theme"
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </button>
+
+        {/* User Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+          >
+            <Avatar name={user?.name} size="sm" />
+            <span className="hidden md:block max-w-[120px] truncate text-xs font-medium">
+              {user?.name}
+            </span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          </button>
+
+          {userMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setUserMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border bg-card shadow-lg">
+                <div className="border-b px-3 py-2">
+                  <p className="text-xs font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  {user?.role && (
+                    <Badge variant="secondary" className="mt-1 text-[10px]">
+                      {user.role}
+                    </Badge>
+                  )}
+                </div>
+                <div className="p-1">
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <User className="h-3.5 w-3.5" />
+                    Profile
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    Settings
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      logout();
+                    }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors',
+                    )}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

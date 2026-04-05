@@ -1,0 +1,94 @@
+// Registry
+export { ToolRegistry, toolRegistry } from './registry/tool-registry.js';
+export type { RegisteredTool, ToolExecutor } from './registry/tool-registry.js';
+
+// Email adapter
+export type {
+  EmailAdapter,
+  EmailMessage,
+  EmailFilter,
+  EmailDraft,
+  EmailAttachment,
+} from './adapters/email/email.interface.js';
+export { MockEmailAdapter } from './adapters/email/mock-email.adapter.js';
+export { GmailImapAdapter } from './adapters/email/gmail-imap.adapter.js';
+
+// Calendar adapter
+export type {
+  CalendarAdapter,
+  CalendarEvent,
+  CalendarEventFilter,
+  CreateEventParams,
+  UpdateEventParams,
+  AvailabilitySlot,
+} from './adapters/calendar/calendar.interface.js';
+export { MockCalendarAdapter } from './adapters/calendar/mock-calendar.adapter.js';
+export { CalDAVCalendarAdapter } from './adapters/calendar/caldav-calendar.adapter.js';
+
+// Adapter factory
+export { getEmailAdapter, getCalendarAdapter, hasRealAdapters } from './adapters/adapter-factory.js';
+
+// CRM adapter
+export type {
+  CRMAdapter,
+  CRMContact,
+  CRMNote,
+  CRMDeal,
+  ContactFilter,
+} from './adapters/crm/crm.interface.js';
+export { MockCRMAdapter } from './adapters/crm/mock-crm.adapter.js';
+
+// Browser adapter
+export type {
+  BrowserAdapter,
+  BrowserContext,
+  NavigateResult,
+  ExtractResult,
+  FillResult,
+  ClickResult,
+  BrowserError,
+} from './adapters/browser/browser.interface.js';
+export { PlaywrightBrowserAdapter } from './adapters/browser/playwright.adapter.js';
+
+// Playwright engine (singleton)
+export { playwrightEngine } from './adapters/browser/playwright-engine.js';
+export type {
+  NavigateResult as EngineNavigateResult,
+  BrowserErrorResult,
+} from './adapters/browser/playwright-engine.js';
+
+// Memory adapter
+export type { MemoryAdapter, MemorySetOptions } from './adapters/memory/db-memory.adapter.js';
+export {
+  InMemoryAdapter,
+  DbMemoryAdapter,
+  getMemoryAdapter,
+  resetMemoryAdapter,
+} from './adapters/memory/db-memory.adapter.js';
+
+// MCP Bridge
+export {
+  toMcpTool,
+  fromMcpTool,
+  toMcpToolList,
+  fromMcpToolList,
+} from './mcp/mcp-tool-bridge.js';
+export type { McpToolSpec, McpToolAnnotations, McpInputSchema } from './mcp/mcp-tool-bridge.js';
+
+// MCP Client Manager
+export { McpClientManager, mcpClientManager } from './mcp/mcp-client.js';
+export { MCP_PROVIDERS } from './mcp/mcp-providers.js';
+export type { McpProviderDef, McpServerConfig, ProviderCredentialField } from './mcp/mcp-providers.js';
+
+// Built-in tool registration
+export { registerBuiltinTools } from './builtin/index.js';
+
+// Auto-register built-in tools on first import
+import { registerBuiltinTools as _autoRegister } from './builtin/index.js';
+import { toolRegistry as _registry } from './registry/tool-registry.js';
+
+let _initialized = false;
+if (!_initialized && _registry.list().length === 0) {
+  _autoRegister();
+  _initialized = true;
+}

@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  status                  String   @default("ACTIVE") // TenantStatus enum
+  plan                    String   @default("FREE")   // TenantPlan enum
+  industry                String?  // Industry enum
+  requireApprovals        Boolean  @default(true)
+  approvalThreshold       String   @default("HIGH")   // RiskLevel
+  allowedDomains          String[] @default([])
+  maxConcurrentWorkflows  Int      @default(5)
+  enableVoice             Boolean  @default(true)
+  enableBrowserAutomation Boolean  @default(false)
+  logRetentionDays        Int      @default(90)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  users            User[]
+  workflows        Workflow[]
+  skills           Skill[]
+  auditLogs        AuditLog[]
+  memory           TenantMemory[]
+  apiKeys          ApiKey[]
+  integrations    Integration[]
+  onboardingState OnboardingState?
+  schedules       WorkflowSchedule[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  name         String?
+  passwordHash String?
+  role         String   @default("END_USER") // UserRole enum
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobFunction  String?
+  avatarUrl    String?
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions  Session[]
+  workflows Workflow[]
+  approvals ApprovalRequest[] @relation("reviewer")
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  keyHash    String    @unique
+  scopes     String[]  @default([])
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model Workflow {
+  id            String    @id @default(cuid())
+  tenantId      String
+  userId        String
+  goal          String
+  industry      String?
+  status        String    @default("PENDING") // WorkflowStatus
+  planJson      Json?     // WorkflowPlan serialized
+  currentTaskId String?
+  error         String?
+  stateJson     Json?
+  finalOutput   String?   @db.Text
+  totalCostUsd  Float     @default(0)
+  maxCostUsd    Float?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id])
+  traces           AgentTrace[]
+  approvalRequests ApprovalRequest[]
+
+  @@index([tenantId, status])
+  @@map("workflows")
+}
+
+model AgentTrace {
+  id            String    @id @default(cuid())
+  traceId       String
+  runId         String
+  workflowId    String
+  tenantId      String
+  agentRole     String    // AgentRole enum
+  stepIndex     Int
+  inputJson     Json?
+  outputJson    Json?
+  toolCallsJson Json?
+  handoffsJson  Json?
+  startedAt     DateTime
+  completedAt   DateTime?
+  durationMs    Int?
+  tokenUsage    Json?
+  error         String?
+
+  workflow      Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([traceId])
+  @@map("agent_traces")
+}
+
+model ApprovalRequest {
+  id               String    @id @default(cuid())
+  workflowId       String
+  tenantId         String
+  taskId           String
+  agentRole        String
+  action           String
+  rationale        String
+  proposedDataJson Json?
+  riskLevel        String    @default("HIGH")
+  status           String    @default("PENDING") // PENDING | APPROVED | REJECTED | DEFERRED
+  comment          String?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  workflow         Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  reviewer         User?     @relation("reviewer", fields: [reviewedBy], references: [id])
+
+  @@index([workflowId, status])
+  @@index([tenantId, status])
+  @@map("approval_requests")
+}
+
+model Skill {
+  id               String    @id @default(cuid())
+  tenantId         String?   // null = global built-in
+  name             String
+  description      String
+  tier             Int       @default(1) // SkillTier
+  status           String    @default("PROPOSED") // SkillStatus
+  inputSchemaJson  Json?
+  outputSchemaJson Json?
+  permissions      String[]  @default([])
+  riskLevel        String    @default("MEDIUM")
+  testCasesJson    Json?
+  implementation   String?   // source code — only for sandbox
+  sandboxResult    Json?
+  approvedBy       String?
+  approvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id])
+
+  @@map("skills")
+}
+
+model TenantMemory {
+  id         String    @id @default(cuid())
+  tenantId   String
+  key        String
+  value      Json
+  source     String    // who/what wrote it
+  memoryType String    // WORKFLOW | USER_PREF | KNOWLEDGE | POLICY | SKILL_REGISTRY
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, memoryType])
+  @@map("tenant_memory")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, action])
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+model Integration {
+  id          String    @id @default(cuid())
+  tenantId    String
+  provider    String
+  status      String    @default("CONNECTED")
+  displayName String?
+  scopes      String[]  @default([])
+  metadata    Json?
+  lastUsedAt  DateTime?
+  connectedBy String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credentials IntegrationCredential?
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, status])
+  @@map("integrations")
+}
+
+model IntegrationCredential {
+  id              String      @id @default(cuid())
+  integrationId   String      @unique
+  accessTokenEnc  String
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("integration_credentials")
+}
+
+model OnboardingState {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  completedSteps String[] @default([])
+  dismissed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_states")
+}
+
+model WorkflowSchedule {
+  id              String    @id @default(cuid())
+  tenantId        String
+  userId          String
+  name            String
+  description     String?
+  goal            String
+  industry        String?
+  cronExpression  String
+  enabled         Boolean   @default(true)
+  maxCostUsd      Float?
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  lastRunStatus   String?
+  lastRunId       String?
+  runCount        Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, enabled])
+  @@index([nextRunAt])
+  @@map("workflow_schedules")
+}
