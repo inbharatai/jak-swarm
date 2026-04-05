@@ -479,6 +479,286 @@ pnpm --filter @jak-swarm/swarm test
 
 ---
 
+## API Reference
+
+All endpoints are prefixed with `/api`. Responses follow the envelope format `{ success: true, data: ... }` or `{ success: false, error: { code, message } }`.
+
+### Authentication
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/auth/register` | None | Create tenant + admin user, returns JWT |
+| POST | `/auth/login` | None | Authenticate with email + password, returns JWT |
+| POST | `/auth/logout` | JWT | Invalidate session (client discards token) |
+| GET | `/auth/me` | JWT | Get current user profile |
+
+Auth endpoints are rate-limited to 10 requests per minute per IP.
+
+### Workflows
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/workflows` | JWT | Create workflow and start async execution (returns 202) |
+| GET | `/workflows` | JWT | List workflows (paginated, filterable by status) |
+| GET | `/workflows/:workflowId` | JWT | Get workflow details with traces and approvals |
+| POST | `/workflows/:workflowId/pause` | JWT | Pause a running workflow between nodes |
+| POST | `/workflows/:workflowId/unpause` | JWT | Resume a paused workflow |
+| POST | `/workflows/:workflowId/stop` | JWT | Stop workflow immediately (marks CANCELLED) |
+| POST | `/workflows/:workflowId/resume` | JWT + Reviewer | Resume after human-in-the-loop approval decision |
+| DELETE | `/workflows/:workflowId` | JWT | Cancel a running or pending workflow |
+| GET | `/workflows/:workflowId/traces` | JWT | Get agent traces for a workflow |
+| GET | `/workflows/:workflowId/approvals` | JWT | Get approval requests for a workflow |
+| GET | `/workflows/:workflowId/stream` | JWT (query) | SSE event stream for real-time updates |
+| GET | `/workflows/:workflowId/output` | JWT | Download final output as markdown |
+
+### Approvals
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/approvals` | JWT + Reviewer | List approval requests (filterable by status) |
+| GET | `/approvals/:approvalId` | JWT + Reviewer | Get a single approval request |
+| POST | `/approvals/:approvalId/decide` | JWT + Reviewer | Submit decision (APPROVED/REJECTED/DEFERRED) |
+| POST | `/approvals/:approvalId/defer` | JWT + Reviewer | Convenience shortcut to defer an approval |
+
+### Integrations
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/integrations` | JWT | List connected MCP integrations for tenant |
+| GET | `/integrations/providers/:provider` | JWT | Get provider setup info (credential fields, instructions) |
+| POST | `/integrations/connect` | JWT | Connect an MCP integration with credentials |
+| POST | `/integrations/:id/test` | JWT | Test an integration connection |
+| DELETE | `/integrations/:id` | JWT | Disconnect and remove an integration |
+
+### Schedules
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/schedules` | JWT | List all schedules for tenant |
+| GET | `/schedules/:id` | JWT | Get a single schedule |
+| POST | `/schedules` | JWT | Create a new cron schedule |
+| PATCH | `/schedules/:id` | JWT | Update schedule (cron, name, enabled, etc.) |
+| DELETE | `/schedules/:id` | JWT | Delete a schedule |
+| POST | `/schedules/:id/run` | JWT | Trigger an immediate run of a schedule |
+
+### Memory
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/memory` | JWT | List memory entries (filterable by type, searchable) |
+| GET | `/memory/:key` | JWT | Get a specific memory entry by key |
+| PUT | `/memory/:key` | JWT + Operator | Upsert a memory entry (FACT/PREFERENCE/CONTEXT/SKILL_RESULT) |
+| DELETE | `/memory/:key` | JWT + Admin | Delete a memory entry |
+
+### Tools
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/tools` | JWT | List all registered tools with metadata |
+| GET | `/tools/:toolName` | JWT | Get full tool detail (risk class, schemas) |
+
+### Traces
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/traces` | JWT | List agent traces (filterable by workflowId, agentRole) |
+| GET | `/traces/:traceId` | JWT | Get full trace by ID |
+| GET | `/traces/:traceId/replay` | JWT | Get replay-friendly trace data with timing |
+
+### Analytics
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/analytics/usage` | JWT | Tenant usage summary (tokens, cost, time series) |
+| GET | `/analytics/usage/workflow/:workflowId` | JWT | Per-workflow usage report (cost by provider/model/agent) |
+| GET | `/analytics/cost` | JWT | Cost breakdown for current billing period (last 30 days) |
+
+### LLM Settings
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/settings/llm` | JWT | List configured LLM providers (masked key previews) |
+| GET | `/settings/llm/status` | JWT | Health check all providers |
+| PUT | `/settings/llm/:provider` | JWT + Operator | Set or update API key for a provider (AES-256-GCM encrypted) |
+| DELETE | `/settings/llm/:provider` | JWT + Admin | Remove a stored API key |
+
+### Voice
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/voice/sessions` | JWT | Create voice session (returns WebRTC config) |
+| GET | `/voice/sessions/:sessionId/token` | JWT | Get ephemeral WebRTC token from OpenAI Realtime API |
+| DELETE | `/voice/sessions/:sessionId` | JWT | End a voice session |
+| GET | `/voice/sessions/:sessionId/transcript` | JWT | Retrieve transcript for a voice session |
+
+### Tenants
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/tenants/:tenantId` | JWT | Get tenant info |
+| PATCH | `/tenants/:tenantId` | JWT + Admin | Update tenant settings |
+| GET | `/tenants/:tenantId/users` | JWT + Admin | List users in tenant |
+| POST | `/tenants/:tenantId/users` | JWT + Admin | Invite a new user to the tenant |
+| PATCH | `/tenants/:tenantId/users/:userId` | JWT + Admin | Update user role or active status |
+| PATCH | `/tenants/current/users/:userId` | JWT | Update own profile (name, jobFunction, avatarUrl) |
+
+### Skills
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/skills` | JWT | List skills (filterable by tier and status) |
+| GET | `/skills/:skillId` | JWT | Get skill by ID |
+| POST | `/skills/propose` | JWT | Propose a new tenant skill |
+| POST | `/skills/:skillId/approve` | JWT + Admin | Approve a proposed skill |
+| POST | `/skills/:skillId/reject` | JWT + Admin | Reject a proposed skill |
+| POST | `/skills/:skillId/sandbox` | JWT + Admin | Trigger sandbox test run for a proposed skill |
+
+### Onboarding
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/onboarding/state` | JWT | Get current onboarding state |
+| POST | `/onboarding/state` | JWT | Update onboarding progress (completedSteps, dismissed) |
+
+---
+
+## Contributing
+
+### Adding a New Agent
+
+1. Create `packages/agents/src/workers/your-agent.ts` following the pattern in `growth.agent.ts`
+2. Export from `packages/agents/src/index.ts`
+3. Add `AgentRole.WORKER_YOUR_ROLE` to `packages/shared/src/types/agent.ts`
+4. Add case to `createWorkerAgent()` in `packages/swarm/src/graph/nodes/worker-node.ts`
+5. Add case to `buildTaskInput()` in the same file
+6. Add `infer*Action()` function at the end of the same file
+7. Add role description to `packages/agents/src/roles/planner.agent.ts`
+8. Run `pnpm turbo build` to verify
+
+### Adding a New Tool
+
+1. Add `toolRegistry.register(metadata, executor)` in `packages/tools/src/builtin/index.ts`
+2. Define `inputSchema` and `outputSchema` (JSON Schema format)
+3. Set `riskClass` (`READ_ONLY`, `WRITE`, `DESTRUCTIVE`, `EXTERNAL_SIDE_EFFECT`)
+4. Set `requiresApproval: true` for write/destructive operations
+5. Run `pnpm turbo build` to verify
+
+### Running Tests
+
+```bash
+pnpm --filter @jak-swarm/tests test                              # Unit tests
+OPENAI_API_KEY=sk-... pnpm --filter @jak-swarm/tests test        # Live tests
+OPENAI_API_KEY=sk-... node tests/human-simulator/run-all.js      # Human simulator
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `Playwright times out` | Chromium not installed | `cd packages/tools && npx playwright install chromium` |
+| `Email agent says "not connected"` | No Gmail credentials | Set `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` in `.env` |
+| `Workflow stuck in RUNNING` | Server crashed mid-execution | Restart API -- `recoverStaleWorkflows` runs on startup |
+| `Budget exceeded` | `maxCostUsd` too low | Increase budget or remove limit |
+| `MCP connection failed` | Wrong token/API key | Verify credentials in integration settings |
+| `Database connection error` | PostgreSQL not running | Start PostgreSQL: `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres` |
+| `Module not found` | Stale build | Run `pnpm turbo build --force` |
+| `Tool validation error` | Wrong input format | Check tool's `inputSchema` in source code |
+| `SSE stream disconnects` | Proxy buffering | Set `X-Accel-Buffering: no` on your reverse proxy |
+| `JWT expired` | Token older than 7 days | Re-authenticate via `POST /auth/login` |
+
+---
+
+## Security
+
+### Tool Risk Classification
+
+| Risk Level | Examples | Approval Required |
+|-----------|---------|------------------|
+| READ_ONLY | web_search, file_read, list_calendar | Never |
+| WRITE | file_write, create_event, update_crm | Based on tenant `DEFAULT_APPROVAL_REQUIRED` setting |
+| DESTRUCTIVE | delete records, clear data | Always |
+| EXTERNAL_SIDE_EFFECT | send_email, send_webhook, post_slack | Always |
+
+### Approval Gates
+
+- Tasks above the tenant's `approvalThreshold` require human review
+- Set `DEFAULT_APPROVAL_REQUIRED=false` for maximum autonomy (low-risk only)
+- Set `DEFAULT_APPROVAL_REQUIRED=true` to require approval for all write+ operations
+- Reviewers, Tenant Admins, and System Admins can approve/reject/defer
+
+### Data Protection
+
+- OAuth tokens and LLM API keys encrypted with AES-256-GCM at rest (derived via scrypt from `AUTH_SECRET`)
+- JWT tokens are signed with `AUTH_SECRET` and verified on every request
+- Per-tenant data isolation enforced at middleware level (`enforceTenantIsolation`)
+- Passwords hashed with bcrypt (12 rounds)
+- Auth endpoints rate-limited to 10 requests/minute per IP
+- RBAC roles: `SYSTEM_ADMIN` > `TENANT_ADMIN` > `OPERATOR` > `REVIEWER` > `VIEWER`
+
+---
+
+## Performance
+
+| Operation | Time | Cost (GPT-4o) |
+|-----------|------|--------------|
+| Simple research task | 10-30s | $0.01-0.05 |
+| Multi-agent workflow (5 tasks) | 30-90s | $0.05-0.20 |
+| Complex pipeline (10+ tasks) | 2-5min | $0.20-1.00 |
+| Voice session (per minute) | Real-time | ~$0.06 |
+
+### Limits
+
+| Resource | Default | Configurable |
+|----------|---------|-------------|
+| Max concurrent workflows | 20 | Constructor param in SwarmRunner |
+| Max concurrent tasks per workflow | 5 | `MAX_CONCURRENT_TASKS` |
+| Max tool iterations per agent | 10 | `maxIterations` param |
+| Per-node timeout | 120s | `NODE_TIMEOUT_MS` |
+| Max replan attempts | 1 | `MAX_REPLAN_ATTEMPTS` |
+| State store TTL | 5 minutes | Hardcoded in SwarmState |
+| SSE heartbeat interval | 15s | Hardcoded in stream handler |
+| Voice session TTL | 1 hour | `VOICE_SESSION_TTL_SECONDS` |
+| Auth rate limit | 10 req/min per IP | `AUTH_RATE_LIMIT` config |
+| Pagination max per page | 100 | Query param `limit` (max 100) |
+
+---
+
+## FAQ
+
+**Q: Is JAK Swarm production-ready?**
+A: The architecture is production-grade (multi-tenant, RBAC, cost controls, state persistence, error recovery). It's v0.1.0 -- test thoroughly before production deployment.
+
+**Q: How much does it cost?**
+A: JAK Swarm is free and open-source. You pay only for LLM API calls ($0.01-1.00 per workflow depending on complexity and provider).
+
+**Q: Can I use local LLMs?**
+A: Yes. Set `OLLAMA_URL` and `OLLAMA_MODEL` for Ollama, or `OPENROUTER_API_KEY` for OpenRouter access to 100+ models. Use `LLM_ROUTING_STRATEGY=local_first` to prefer local models.
+
+**Q: How do I connect Gmail without OAuth?**
+A: Enable 2FA on Gmail, generate an App Password at myaccount.google.com/apppasswords, then set `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` in `.env`.
+
+**Q: How do I connect Slack?**
+A: Go to Integrations in the dashboard, click Connect on Slack, and enter your Bot Token + Team ID from api.slack.com/apps.
+
+**Q: What happens if a task fails?**
+A: The workflow continues with other independent tasks (graceful failure). The Verifier can trigger auto-repair, which replans and retries failed tasks with alternative approaches (configurable max retries).
+
+**Q: Can agents see images and PDFs?**
+A: Yes. GPT-4o and Claude vision models process images via `analyzeImage()`. PDF tools (`pdf_extract_text`, `pdf_analyze`) handle document processing.
+
+**Q: How do I add a new LLM provider?**
+A: Implement the `LLMProvider` interface in `packages/agents/src/base/`, add it to the `ProviderRouter` tier configuration, and set the corresponding API key env variable.
+
+**Q: What RBAC roles are available?**
+A: Five roles in ascending privilege: `VIEWER` (read-only), `REVIEWER` (approve/reject), `OPERATOR` (run workflows, manage memory), `TENANT_ADMIN` (full tenant control), `SYSTEM_ADMIN` (cross-tenant).
+
+**Q: How does the SSE streaming work?**
+A: `GET /workflows/:id/stream` accepts a JWT via `?token=` query param (since EventSource cannot set headers). The server emits events for node transitions, task completions, and errors. A heartbeat every 15s keeps the connection alive.
+
+---
+
 ## License
 
 MIT

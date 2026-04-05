@@ -404,10 +404,24 @@ export class SwarmGraph extends EventEmitter {
     state: SwarmState,
     taskId?: string,
   ): Promise<Partial<SwarmState>> {
+    const NODE_TIMEOUT_MS = 120_000; // 2 minutes per node
     const enterTime = new Date();
     this.emit('node:enter', { node: nodeName, taskId, timestamp: enterTime });
 
-    const updates = await handler(state);
+    let updates: Partial<SwarmState>;
+    try {
+      updates = await Promise.race([
+        handler(state),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Node '${nodeName}' timed out after ${NODE_TIMEOUT_MS / 1000}s`)), NODE_TIMEOUT_MS)
+        ),
+      ]);
+    } catch (err) {
+      // Timeout or handler error — emit exit event, then rethrow so the caller's catch block handles it
+      const exitTime = new Date();
+      this.emit('node:exit', { node: nodeName, taskId, timestamp: exitTime, durationMs: exitTime.getTime() - enterTime.getTime() });
+      throw err;
+    }
 
     const exitTime = new Date();
     this.emit('node:exit', {

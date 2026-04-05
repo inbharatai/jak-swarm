@@ -58,9 +58,12 @@ function cleanupSignals(workflowId: string): void {
 export class SwarmRunner {
   private readonly graph = buildSwarmGraph();
   private readonly defaultTimeoutMs: number;
+  private readonly maxConcurrent: number;
+  private activeWorkflows = new Set<string>();
 
-  constructor(options?: { defaultTimeoutMs?: number }) {
+  constructor(options?: { defaultTimeoutMs?: number; maxConcurrentWorkflows?: number }) {
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 5 * 60 * 1000; // 5 minutes
+    this.maxConcurrent = options?.maxConcurrentWorkflows ?? 20;
 
     // Wire signal callbacks to graph
     this.graph.shouldStop = (wfId) => cancelledWorkflows.has(wfId);
@@ -91,6 +94,23 @@ export class SwarmRunner {
     const workflowId = params.workflowId ?? generateId('wf_');
     const startedAt = new Date();
 
+    // Enforce concurrent workflow limit
+    if (this.activeWorkflows.size >= this.maxConcurrent) {
+      return {
+        workflowId,
+        status: WorkflowStatus.FAILED,
+        error: `Server at capacity: ${this.activeWorkflows.size}/${this.maxConcurrent} workflows running. Try again shortly.`,
+        startedAt,
+        completedAt: new Date(),
+        durationMs: 0,
+        traces: [],
+        outputs: [],
+        pendingApprovals: [],
+        clarificationNeeded: false,
+      };
+    }
+    this.activeWorkflows.add(workflowId);
+
     logger.info(
       { workflowId, tenantId: params.tenantId, industry: params.industry },
       'Starting swarm workflow',
@@ -108,24 +128,37 @@ export class SwarmRunner {
 
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
+    // Track listeners so we can remove them after workflow completes
+    const listeners: Array<{ event: string; fn: (...args: any[]) => void }> = [];
+
     // Register state-change listener so callers can persist intermediate state
     if (params.onStateChange) {
-      this.graph.on('state:updated', (data: { workflowId: string; state: unknown }) => {
+      const fn = (data: { workflowId: string; state: unknown }) => {
         params.onStateChange!(data.workflowId, data.state).catch(() => {});
-      });
+      };
+      this.graph.on('state:updated', fn);
+      listeners.push({ event: 'state:updated', fn });
     }
 
     // Relay agent telemetry events to callers
     if (params.onAgentActivity) {
-      this.graph.on('agent:activity', (data: unknown) => {
+      const activityFn = (data: unknown) => {
         params.onAgentActivity!(data);
-      });
-      this.graph.on('node:enter', (data: unknown) => {
+      };
+      this.graph.on('agent:activity', activityFn);
+      listeners.push({ event: 'agent:activity', fn: activityFn });
+
+      const enterFn = (data: unknown) => {
         params.onAgentActivity!({ type: 'node_enter', ...(data as Record<string, unknown>) });
-      });
-      this.graph.on('node:exit', (data: unknown) => {
+      };
+      this.graph.on('node:enter', enterFn);
+      listeners.push({ event: 'node:enter', fn: enterFn });
+
+      const exitFn = (data: unknown) => {
         params.onAgentActivity!({ type: 'node_exit', ...(data as Record<string, unknown>) });
-      });
+      };
+      this.graph.on('node:exit', exitFn);
+      listeners.push({ event: 'node:exit', fn: exitFn });
     }
 
     let finalState: SwarmState;
@@ -141,6 +174,12 @@ export class SwarmRunner {
         workflowId,
       );
     } catch (err) {
+      // Remove event listeners to prevent memory leaks
+      for (const { event, fn } of listeners) {
+        this.graph.off(event, fn);
+      }
+      this.activeWorkflows.delete(workflowId);
+
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.error({ workflowId, err: errorMessage }, 'Swarm workflow failed');
 
@@ -159,8 +198,16 @@ export class SwarmRunner {
       };
     }
 
+    // Remove event listeners to prevent memory leaks
+    for (const { event, fn } of listeners) {
+      this.graph.off(event, fn);
+    }
+    this.activeWorkflows.delete(workflowId);
+
     // Persist state for resume/cancel
     workflowStateStore.set(workflowId, finalState);
+    // Clean up after 5 minutes (keep briefly for status queries)
+    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
 
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAt.getTime();
@@ -259,6 +306,8 @@ export class SwarmRunner {
     }
 
     workflowStateStore.set(workflowId, finalState);
+    // Clean up after 5 minutes (keep briefly for status queries)
+    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
 
     cleanupSignals(workflowId);
     const completedAt = new Date();
@@ -279,6 +328,8 @@ export class SwarmRunner {
     };
 
     workflowStateStore.set(workflowId, cancelledState);
+    // Clean up after 5 minutes (keep briefly for status queries)
+    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
 
     logger.info({ workflowId }, 'Workflow cancelled');
   }

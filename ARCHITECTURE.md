@@ -270,3 +270,101 @@ Key UI components:
 - **DAG Viewer** (React Flow): Renders the workflow plan as an interactive node graph. Nodes change color based on task status (pending/running/completed/failed).
 - **Trace Explorer**: Drill into any agent execution to see LLM prompts, tool calls, token counts, costs, and timing.
 - **Integration Manager**: Connect/disconnect MCP providers with credential forms and connection testing.
+
+---
+
+## Error Handling Strategy
+
+### Per-Layer Recovery
+
+| Layer | Error Type | Recovery |
+|-------|-----------|----------|
+| Tool | Tool execution fails | Agent receives error message, adapts approach and tries alternative tool or strategy |
+| Agent | LLM call fails (rate limit, network) | Exponential backoff retry (3 attempts) via ProviderRouter |
+| Node | Node execution hangs | 120s timeout (`NODE_TIMEOUT_MS`), node skipped, dependent tasks cancelled |
+| Task | Task verification fails | Worker re-executes with Verifier feedback (2 attempts max) |
+| Workflow | Multiple tasks fail | Auto-repair: Replanner rewrites failed task subgraph, Router re-assigns (1 attempt) |
+| System | Server crash mid-workflow | State persisted to PostgreSQL after every node; stale workflows detected and marked FAILED on restart via `recoverStaleWorkflows` |
+| Approval | Approval timeout | Request expires to EXPIRED status; workflow remains PAUSED until manual intervention |
+
+### Error Propagation in the DAG
+
+When a task fails, the Task Scheduler determines the impact:
+
+1. **Independent tasks** continue executing -- failure does not cascade to unrelated branches
+2. **Dependent tasks** are marked SKIPPED -- they cannot proceed without their dependency's output
+3. **The Verifier** inspects all failed tasks and decides whether auto-repair is viable
+4. **Auto-repair** (if enabled) triggers the Replanner to generate alternative task definitions that avoid the failed approach
+
+### Graceful Degradation
+
+- If a preferred LLM provider is unavailable, the ProviderRouter falls back to the next available provider in the tier
+- If real adapters (Gmail, CalDAV) fail, the system logs the error but does not fall back to mock adapters at runtime
+- If an MCP server process crashes, `McpClientManager` detects the disconnection and reports it via the integration status API
+- If Redis is unavailable, voice sessions cannot be created but all other functionality continues (schedules fall back to polling)
+
+---
+
+## Scaling Considerations
+
+### Current Architecture Constraints
+
+| Resource | Limit | Notes |
+|----------|-------|-------|
+| Concurrent workflows per runner | 20 | Configurable in SwarmRunner constructor |
+| Concurrent tasks per workflow | 5 | Batched parallel execution via Task Scheduler |
+| In-memory state store TTL | 5 minutes | Workflow state evicted from memory after completion + TTL |
+| EventEmitter listeners | Cleaned per-workflow | Listeners removed after each workflow completes to prevent leaks |
+| SSE connections | 1 per workflow per client | Heartbeat every 15s, cleanup on disconnect |
+
+### Horizontal Scaling Path
+
+The current architecture runs as a single API process. To scale horizontally:
+
+1. **Database**: PostgreSQL handles concurrent reads/writes. All workflow state is persisted after every node, making the DB the source of truth.
+2. **Stateless API**: The Fastify API is stateless except for in-memory SwarmRunner state. Multiple API instances can serve reads, but workflow execution is currently pinned to the instance that started it.
+3. **Temporal integration**: For true distributed execution, enable the Temporal workflow engine (`packages/workflows/`). Temporal handles workflow scheduling, retry, and state persistence across multiple worker processes.
+4. **Redis**: Required for scheduling, voice sessions, and (future) cross-instance workflow event pub/sub.
+
+### Memory Management
+
+- `SwarmState` is immutable -- each node produces a new state object rather than mutating shared state
+- Tool results and agent traces are streamed to the database incrementally, not accumulated in memory
+- Browser adapter (Playwright) uses a singleton engine pattern to avoid spawning multiple browser processes
+- MCP server processes are spawned per-provider (not per-request) and reused across workflows
+
+---
+
+## Security Architecture
+
+### Authentication Flow
+
+```
+Client                    API (Fastify)                 Database
+  |                           |                            |
+  |-- POST /auth/login ------>|                            |
+  |                           |-- Verify password (bcrypt)->|
+  |                           |<-- User + Tenant -----------|
+  |                           |                            |
+  |                           |-- Sign JWT (AUTH_SECRET) --|
+  |<-- 200 { token } --------|                            |
+  |                           |                            |
+  |-- GET /workflows -------->|                            |
+  |   Authorization: Bearer   |-- Verify JWT --------------|
+  |                           |-- enforceTenantIsolation --|
+  |                           |-- Check RBAC role ---------|
+  |<-- 200 { data } ---------|                            |
+```
+
+### Encryption at Rest
+
+LLM API keys stored via the dashboard are encrypted using AES-256-GCM:
+
+1. Key derivation: `scryptSync(AUTH_SECRET, 'jak-swarm-llm-keys', 32)` produces a 256-bit key
+2. Each value is encrypted with a random 12-byte IV
+3. Storage format: `base64(iv):base64(authTag):base64(ciphertext)`
+4. Decryption requires the same `AUTH_SECRET` -- rotating the secret invalidates all stored keys
+
+### Tenant Isolation
+
+Every database query is scoped by `tenantId`. The `enforceTenantIsolation` middleware verifies that the `tenantId` in the JWT matches the resource being accessed. Cross-tenant access is only permitted for `SYSTEM_ADMIN` role.

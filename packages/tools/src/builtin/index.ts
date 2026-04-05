@@ -1238,6 +1238,336 @@ export function registerBuiltinTools(): void {
     },
   );
 
+  // ─── ADVANCED BROWSER TOOLS (OpenClaw/Claude-compatible) ─────────────────
+
+  // Tool 1: browser_wait_for
+  toolRegistry.register(
+    {
+      name: 'browser_wait_for',
+      description: 'Wait for an element to appear, disappear, or become visible on the page. Essential before interacting with dynamic content.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS selector to wait for' },
+          state: { type: 'string', description: '"visible" (default), "hidden", "attached", "detached"' },
+          timeout: { type: 'number', description: 'Max wait time in ms (default 10000)' },
+        },
+        required: ['selector'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { selector, state = 'visible', timeout = 10000 } = input as { selector: string; state?: string; timeout?: number };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        await page.waitForSelector(selector, { state: state as 'visible' | 'hidden' | 'attached' | 'detached', timeout });
+        return { success: true, data: { selector, state, found: true } };
+      } catch (err) {
+        return { success: false, error: `Wait failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 2: browser_select_option
+  toolRegistry.register(
+    {
+      name: 'browser_select_option',
+      description: 'Select an option from a dropdown/select element. Specify by value, label text, or index.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS selector of the <select> element' },
+          value: { type: 'string', description: 'Option value to select' },
+          label: { type: 'string', description: 'Option visible text to select (alternative to value)' },
+        },
+        required: ['selector'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { selector, value, label } = input as { selector: string; value?: string; label?: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        const selected = value
+          ? await page.selectOption(selector, { value })
+          : label ? await page.selectOption(selector, { label }) : [];
+        return { success: true, data: { selector, selected } };
+      } catch (err) {
+        return { success: false, error: `Select failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 3: browser_upload_file
+  toolRegistry.register(
+    {
+      name: 'browser_upload_file',
+      description: 'Upload a file to a file input element. Provide the CSS selector of the input[type=file] and the file path.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS selector of the file input' },
+          filePath: { type: 'string', description: 'Path to the file to upload (relative to workspace)' },
+        },
+        required: ['selector', 'filePath'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { selector, filePath } = input as { selector: string; filePath: string };
+      try {
+        const nodePath = await import('node:path');
+        const workspaceDir = process.env['JAK_WORKSPACE_DIR'] ?? process.cwd();
+        const fullPath = nodePath.resolve(workspaceDir, filePath);
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        await page.setInputFiles(selector, fullPath);
+        return { success: true, data: { selector, filePath: fullPath } };
+      } catch (err) {
+        return { success: false, error: `Upload failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 4: browser_evaluate_js
+  toolRegistry.register(
+    {
+      name: 'browser_evaluate_js',
+      description: 'Execute JavaScript code in the browser page context. Returns the result. Use to read DOM values, modify page state, or extract data.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          code: { type: 'string', description: 'JavaScript code to execute in page context' },
+        },
+        required: ['code'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { code } = input as { code: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        const result = await page.evaluate(code);
+        return { success: true, data: { result: typeof result === 'object' ? JSON.stringify(result) : String(result) } };
+      } catch (err) {
+        return { success: false, error: `Evaluate failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 5: browser_hover
+  toolRegistry.register(
+    {
+      name: 'browser_hover',
+      description: 'Hover over an element to trigger hover menus, tooltips, or dropdown reveals.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS selector of element to hover over' },
+        },
+        required: ['selector'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { selector } = input as { selector: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        await page.locator(selector).hover({ timeout: 5000 });
+        return { success: true, data: { selector, hovered: true } };
+      } catch (err) {
+        return { success: false, error: `Hover failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 6: browser_get_cookies
+  toolRegistry.register(
+    {
+      name: 'browser_get_cookies',
+      description: 'Get all cookies from the browser context. Useful for inspecting auth state, session tokens, or login status.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          urls: { type: 'array', items: { type: 'string' }, description: 'Optional: filter cookies by URLs' },
+        },
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { urls } = input as { urls?: string[] };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const ctx = await playwrightEngine.getContext();
+        const cookies = await ctx.cookies(urls ?? []);
+        return {
+          success: true,
+          data: {
+            cookies: cookies.map((c) => ({
+              name: c.name,
+              domain: c.domain,
+              path: c.path,
+              secure: c.secure,
+              httpOnly: c.httpOnly,
+              expires: c.expires,
+            })),
+            count: cookies.length,
+          },
+        };
+      } catch (err) {
+        return { success: false, error: `Get cookies failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 7: browser_set_cookies
+  toolRegistry.register(
+    {
+      name: 'browser_set_cookies',
+      description: 'Set cookies in the browser context. Useful for restoring login sessions or auth state.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cookies: { type: 'array', items: { type: 'object' }, description: 'Array of cookie objects with name, value, domain, path' },
+        },
+        required: ['cookies'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { cookies } = input as { cookies: Array<{ name: string; value: string; domain: string; path: string; [key: string]: unknown }> };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const ctx = await playwrightEngine.getContext();
+        await ctx.addCookies(cookies as Parameters<typeof ctx.addCookies>[0]);
+        return { success: true, data: { cookiesSet: cookies.length } };
+      } catch (err) {
+        return { success: false, error: `Set cookies failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 8: browser_save_as_pdf
+  toolRegistry.register(
+    {
+      name: 'browser_save_as_pdf',
+      description: 'Export the current page as a PDF file. Saves to the workspace directory. Only works when browser is running in headless mode.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filename: { type: 'string', description: 'Output filename (default: page-export.pdf)' },
+          format: { type: 'string', description: 'Paper format: A4 (default), Letter, Legal' },
+        },
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { filename = 'page-export.pdf', format = 'A4' } = input as { filename?: string; format?: string };
+      try {
+        const nodePath = await import('node:path');
+        const workspaceDir = process.env['JAK_WORKSPACE_DIR'] ?? process.cwd();
+        const outPath = nodePath.resolve(workspaceDir, filename);
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+        await page.pdf({ path: outPath, format: format as 'A4' | 'Letter' | 'Legal', printBackground: true });
+        return { success: true, data: { path: outPath, format } };
+      } catch (err) {
+        return { success: false, error: `PDF export failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // Tool 9: browser_manage_tabs
+  toolRegistry.register(
+    {
+      name: 'browser_manage_tabs',
+      description: 'List all open browser tabs, switch to a tab, or close a tab. Use for multi-tab workflows.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: '"list" (default), "switch", "close", "new"' },
+          tabIndex: { type: 'number', description: 'Tab index for switch/close (0-based)' },
+          url: { type: 'string', description: 'URL for new tab' },
+        },
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      const { action = 'list', tabIndex, url } = input as { action?: string; tabIndex?: number; url?: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const ctx = await playwrightEngine.getContext();
+        const pages = ctx.pages();
+        if (action === 'list') {
+          const tabs = await Promise.all(
+            pages.map(async (p, i) => ({
+              index: i,
+              url: p.url(),
+              title: await p.title().catch(() => ''),
+            })),
+          );
+          return { success: true, data: { tabs, count: tabs.length } };
+        }
+        if (action === 'switch' && tabIndex != null && pages[tabIndex]) {
+          await pages[tabIndex].bringToFront();
+          return { success: true, data: { switchedTo: tabIndex, url: pages[tabIndex].url() } };
+        }
+        if (action === 'close' && tabIndex != null && pages[tabIndex]) {
+          await pages[tabIndex].close();
+          return { success: true, data: { closed: tabIndex } };
+        }
+        if (action === 'new') {
+          const newPage = await ctx.newPage();
+          if (url) await newPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          return { success: true, data: { newTabIndex: ctx.pages().length - 1, url: url ?? 'about:blank' } };
+        }
+        return { success: false, error: `Unknown action: ${action}` };
+      } catch (err) {
+        return { success: false, error: `Tab management failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
   // ─── PDF TOOLS ──────────────────────────────────────────────────────────
 
   toolRegistry.register(
@@ -1278,11 +1608,13 @@ export function registerBuiltinTools(): void {
         }
 
         const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
-        const infoResult = await parser.getInfo();
+        const parser: any = new PDFParse(new Uint8Array(buffer));
+        if (typeof parser.load === 'function') await parser.load();
+        const text = await parser.getText();
+        let info: unknown = null;
+        try { info = await parser.getInfo(); } catch { /* optional */ }
         await parser.destroy();
-        const data = { text: textResult.text, numpages: textResult.total, info: infoResult, metadata: null as unknown };
+        const data = { text: text?.text ?? '', numpages: text?.total ?? 0, info, metadata: null };
 
         return {
           success: true,
@@ -1335,11 +1667,13 @@ export function registerBuiltinTools(): void {
         }
 
         const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
-        const infoResult = await parser.getInfo();
+        const parser: any = new PDFParse(new Uint8Array(buffer));
+        if (typeof parser.load === 'function') await parser.load();
+        const text = await parser.getText();
+        let info: unknown = null;
+        try { info = await parser.getInfo(); } catch { /* optional */ }
         await parser.destroy();
-        const data = { text: textResult.text, numpages: textResult.total, info: infoResult, metadata: null as unknown };
+        const data = { text: text?.text ?? '', numpages: text?.total ?? 0, info, metadata: null };
 
         const apiKey = process.env['OPENAI_API_KEY'];
         if (!apiKey) {

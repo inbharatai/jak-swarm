@@ -45,6 +45,7 @@ describe('Tool Registry', () => {
     const tools = toolRegistry.list();
     console.log(`Total tools registered: ${tools.length}`);
 
+    // Core tools that must always be present
     const expected = [
       'web_search', 'web_fetch', 'file_read', 'file_write', 'list_directory',
       'code_execute', 'memory_store', 'memory_retrieve', 'search_knowledge',
@@ -53,12 +54,25 @@ describe('Tool Registry', () => {
       'read_email', 'draft_email', 'send_email',
       'parse_spreadsheet', 'compute_statistics', 'generate_report',
       'gmail_read_inbox', 'gmail_send_email',
+      // New browser tools
+      'browser_type_text', 'browser_press_key', 'browser_mouse_click',
+      'browser_scroll', 'browser_analyze_page',
+      'browser_wait_for', 'browser_select_option', 'browser_upload_file',
+      'browser_evaluate_js', 'browser_hover', 'browser_get_cookies',
+      'browser_set_cookies', 'browser_save_as_pdf', 'browser_manage_tabs',
+      // PDF tools
+      'pdf_extract_text', 'pdf_analyze',
+      // Phoring tools
+      'phoring_forecast', 'phoring_graph_query', 'phoring_validate', 'phoring_simulate',
     ];
 
     for (const name of expected) {
       expect(toolRegistry.has(name), `Tool '${name}' should be registered`).toBe(true);
     }
-  });
+
+    // Verify minimum tool count (74 as of v0.1.0)
+    expect(tools.length).toBeGreaterThanOrEqual(70);
+  }, 30_000);
 
   it('code_execute runs JavaScript safely', async () => {
     const { registerBuiltinTools, toolRegistry } = await import('@jak-swarm/tools');

@@ -242,6 +242,14 @@ class PlaywrightEngine {
   }
 
   /**
+   * Get all open pages (tabs) in the browser context.
+   */
+  async getAllPages(): Promise<Page[]> {
+    const ctx = await this.getContext();
+    return ctx.pages();
+  }
+
+  /**
    * Get cleaned visible text content from a page.
    */
   async getPageContent(page: Page): Promise<string> {
