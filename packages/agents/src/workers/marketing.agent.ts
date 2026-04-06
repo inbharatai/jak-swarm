@@ -12,7 +12,10 @@ export type MarketingAction =
   | 'SEO_ANALYSIS'
   | 'SOCIAL_STRATEGY'
   | 'COMPETITIVE_MESSAGING'
-  | 'CUSTOMER_SEGMENTATION';
+  | 'CUSTOMER_SEGMENTATION'
+  | 'EXECUTE_CAMPAIGN'
+  | 'MONITOR_BRAND'
+  | 'ENGAGE_COMMUNITY';
 
 export interface MarketingTask {
   action: MarketingAction;
@@ -115,10 +118,36 @@ For CUSTOMER_SEGMENTATION:
 4. Prioritize segments by fit, revenue potential, and acquisition difficulty.
 5. Create persona narratives for the top 3 segments.
 
+For EXECUTE_CAMPAIGN:
+1. Define campaign objectives, target audience, and success metrics.
+2. Select channels and allocate budget across each.
+3. Create campaign timeline with milestones and checkpoints.
+4. Design A/B testing framework for creative and messaging.
+5. Set up tracking and attribution for real-time optimization.
+
+For MONITOR_BRAND:
+1. Track brand mentions across Reddit, Twitter, Hacker News, and news outlets.
+2. Analyze sentiment trends and identify emerging narratives.
+3. Flag potential PR crises or viral moments early.
+4. Benchmark share of voice against competitors.
+5. Generate actionable insights from brand perception data.
+
+For ENGAGE_COMMUNITY:
+1. Identify high-value community discussions on Reddit, Twitter, and forums.
+2. Draft contextual, value-first replies that build authority (not spam).
+3. Monitor engagement metrics and response effectiveness.
+4. Build relationships with key influencers and community leaders.
+5. Track community sentiment and feedback loops back to product.
+
 You have access to these tools:
 - web_search: search the web for market data, competitor content, and industry trends
 - search_knowledge: search the internal knowledge base for brand assets and past campaigns
 - generate_report: compile your marketing strategy into a structured report
+- monitor_brand_mentions: track brand mentions across Reddit, Twitter, HN, and news
+- auto_reply_reddit: find Reddit threads and draft contextual replies
+- auto_reply_twitter: find Twitter discussions and draft engagement replies
+- generate_seo_report: generate comprehensive SEO report combining audit, keywords, and SERP analysis
+- track_content_performance: track published content URLs and performance over time
 
 Respond with JSON:
 {
@@ -194,6 +223,11 @@ export class MarketingAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'monitor_brand_mentions', description: 'Track brand mentions across Reddit, Twitter, HN, and news', parameters: { type: 'object', properties: { brand: { type: 'string' }, platforms: { type: 'array', items: { type: 'string' } } }, required: ['brand'] } } },
+      { type: 'function' as const, function: { name: 'auto_reply_reddit', description: 'Find Reddit threads and draft contextual replies', parameters: { type: 'object', properties: { topic: { type: 'string' }, product: { type: 'string' }, tone: { type: 'string' } }, required: ['topic'] } } },
+      { type: 'function' as const, function: { name: 'auto_reply_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { topic: { type: 'string' }, product: { type: 'string' } }, required: ['topic'] } } },
+      { type: 'function' as const, function: { name: 'generate_seo_report', description: 'Generate comprehensive SEO report combining audit, keywords, and SERP analysis', parameters: { type: 'object', properties: { url: { type: 'string' }, keywords: { type: 'array', items: { type: 'string' } } }, required: ['url'] } } },
+      { type: 'function' as const, function: { name: 'track_content_performance', description: 'Track published content URLs and performance over time', parameters: { type: 'object', properties: { url: { type: 'string' }, title: { type: 'string' }, platform: { type: 'string' }, action: { type: 'string' } }, required: ['url', 'title', 'platform', 'action'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

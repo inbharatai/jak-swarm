@@ -11,7 +11,9 @@ export type SuccessAction =
   | 'RENEWAL_STRATEGY'
   | 'IDENTIFY_UPSELL'
   | 'QUARTERLY_REVIEW'
-  | 'SUCCESS_PLAYBOOK';
+  | 'SUCCESS_PLAYBOOK'
+  | 'TRACK_HEALTH_OVER_TIME'
+  | 'GENERATE_QBR';
 
 export interface SuccessTask {
   action: SuccessAction;
@@ -222,6 +224,8 @@ export class SuccessAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'track_customer_health', description: 'Track customer health scores over time with trend detection', parameters: { type: 'object', properties: { action: { type: 'string' }, customerId: { type: 'string' }, healthScore: { type: 'number' }, factors: { type: 'object' } }, required: ['action', 'customerId'] } } },
+      { type: 'function' as const, function: { name: 'generate_qbr_deck', description: 'Compile customer data into QBR format', parameters: { type: 'object', properties: { customerName: { type: 'string' }, period: { type: 'string' }, metrics: { type: 'object' }, wins: { type: 'array', items: { type: 'string' } } }, required: ['customerName', 'period'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

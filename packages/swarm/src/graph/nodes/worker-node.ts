@@ -523,6 +523,8 @@ function inferStrategyAction(task: import('@jak-swarm/shared').WorkflowTask): st
   if (desc.includes('swot')) return 'SWOT';
   if (desc.includes('okr') || desc.includes('objective') || desc.includes('goal')) return 'OKR_SETTING';
   if (desc.includes('decision') || desc.includes('framework') || desc.includes('evaluate option')) return 'DECISION_FRAMEWORK';
+  if (desc.includes('track') || desc.includes('execution') || desc.includes('progress')) return 'TRACK_EXECUTION';
+  if (desc.includes('alert') || desc.includes('monitor competitor')) return 'COMPETITIVE_ALERT';
   return 'STRATEGIC_ANALYSIS';
 }
 
@@ -535,6 +537,9 @@ function inferMarketingAction(task: import('@jak-swarm/shared').WorkflowTask): s
   if (desc.includes('seo') || desc.includes('search engine') || desc.includes('keyword')) return 'SEO_ANALYSIS';
   if (desc.includes('social') || desc.includes('linkedin') || desc.includes('twitter')) return 'SOCIAL_STRATEGY';
   if (desc.includes('segment') || desc.includes('persona') || desc.includes('audience')) return 'CUSTOMER_SEGMENTATION';
+  if (desc.includes('monitor') || desc.includes('track brand') || desc.includes('mentions')) return 'MONITOR_BRAND';
+  if (desc.includes('engage') || desc.includes('community') || desc.includes('reply')) return 'ENGAGE_COMMUNITY';
+  if (desc.includes('execute') || desc.includes('run campaign') || desc.includes('launch')) return 'EXECUTE_CAMPAIGN';
   return 'COMPETITIVE_MESSAGING';
 }
 
@@ -546,6 +551,8 @@ function inferTechnicalAction(task: import('@jak-swarm/shared').WorkflowTask): s
   if (desc.includes('security') || desc.includes('vulnerab') || desc.includes('pentest')) return 'SECURITY_AUDIT';
   if (desc.includes('tech debt') || desc.includes('refactor') || desc.includes('legacy')) return 'TECH_DEBT_ASSESSMENT';
   if (desc.includes('infra') || desc.includes('cloud') || desc.includes('deploy') || desc.includes('devops')) return 'INFRASTRUCTURE_PLANNING';
+  if (desc.includes('repo') || desc.includes('github') || desc.includes('repository')) return 'ANALYZE_REPO';
+  if (desc.includes('depend') || desc.includes('package') || desc.includes('vulnerab')) return 'DEPENDENCY_AUDIT';
   return 'ARCHITECTURE_REVIEW';
 }
 
@@ -558,6 +565,8 @@ function inferFinanceAction(task: import('@jak-swarm/shared').WorkflowTask): str
   if (desc.includes('unit economics') || desc.includes('cac') || desc.includes('ltv')) return 'UNIT_ECONOMICS';
   if (desc.includes('valuation') || desc.includes('dcf') || desc.includes('worth')) return 'VALUATION';
   if (desc.includes('cash flow') || desc.includes('liquidity') || desc.includes('runway')) return 'CASH_FLOW_ANALYSIS';
+  if (desc.includes('budget') && desc.includes('track')) return 'TRACK_BUDGET';
+  if (desc.includes('parse') || desc.includes('import') || desc.includes('statement') || desc.includes('csv')) return 'PARSE_STATEMENTS';
   return 'RISK_ASSESSMENT';
 }
 
@@ -570,6 +579,8 @@ function inferHRAction(task: import('@jak-swarm/shared').WorkflowTask): string {
   if (desc.includes('performance') || desc.includes('review') || desc.includes('feedback')) return 'PERFORMANCE_REVIEW';
   if (desc.includes('culture') || desc.includes('engagement') || desc.includes('survey')) return 'CULTURE_ASSESSMENT';
   if (desc.includes('onboarding') || desc.includes('new hire')) return 'ONBOARDING_PLAN';
+  if (desc.includes('screen') || desc.includes('resume') || desc.includes('candidate')) return 'SCREEN_CANDIDATES';
+  if (desc.includes('offer') || desc.includes('letter')) return 'GENERATE_OFFER';
   return 'TRAINING_PROGRAM';
 }
 
@@ -591,6 +602,9 @@ function inferGrowthAction(task: import('@jak-swarm/shared').WorkflowTask): stri
   if (desc.includes('win back') || desc.includes('winback') || desc.includes('re-engage')) return 'WINBACK_CAMPAIGN';
   if (desc.includes('signal') || desc.includes('funding') || desc.includes('hiring')) return 'SIGNAL_MONITORING';
   if (desc.includes('decision maker') || desc.includes('stakeholder')) return 'DECISION_MAKER_SEARCH';
+  if (desc.includes('reddit') && (desc.includes('engage') || desc.includes('reply'))) return 'REDDIT_ENGAGEMENT';
+  if (desc.includes('twitter') && (desc.includes('engage') || desc.includes('reply'))) return 'TWITTER_ENGAGEMENT';
+  if (desc.includes('pipeline') || desc.includes('track lead')) return 'PIPELINE_TRACKING';
   if (desc.includes('lead') || desc.includes('prospect')) return 'LEAD_ENRICHMENT';
   return 'LEAD_ENRICHMENT';
 }
@@ -638,6 +652,9 @@ function inferLegalAction(task: import('@jak-swarm/shared').WorkflowTask): strin
   if (desc.includes('compliance') || desc.includes('checklist') || desc.includes('audit')) return 'COMPLIANCE_CHECKLIST';
   if (desc.includes('risk')) return 'RISK_ASSESSMENT';
   if (desc.includes('regulat')) return 'REGULATORY_RESEARCH';
+  if (desc.includes('compare') && desc.includes('contract')) return 'COMPARE_CONTRACTS';
+  if (desc.includes('obligation') || desc.includes('deadline') || desc.includes('extract term')) return 'EXTRACT_OBLIGATIONS';
+  if (desc.includes('monitor') && desc.includes('regulat')) return 'MONITOR_REGULATIONS';
   return 'REVIEW_CONTRACT';
 }
 
@@ -650,6 +667,8 @@ function inferSuccessAction(task: import('@jak-swarm/shared').WorkflowTask): str
   if (desc.includes('upsell') || desc.includes('expand') || desc.includes('cross-sell')) return 'IDENTIFY_UPSELL';
   if (desc.includes('qbr') || desc.includes('quarterly') || desc.includes('review')) return 'QUARTERLY_REVIEW';
   if (desc.includes('playbook')) return 'SUCCESS_PLAYBOOK';
+  if (desc.includes('track health') || desc.includes('health over time') || desc.includes('health trend')) return 'TRACK_HEALTH_OVER_TIME';
+  if (desc.includes('qbr') || desc.includes('quarterly business')) return 'GENERATE_QBR';
   return 'SCORE_HEALTH';
 }
 

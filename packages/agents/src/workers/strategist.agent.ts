@@ -11,7 +11,9 @@ export type StrategistAction =
   | 'VISION_PLANNING'
   | 'SWOT'
   | 'OKR_SETTING'
-  | 'DECISION_FRAMEWORK';
+  | 'DECISION_FRAMEWORK'
+  | 'TRACK_EXECUTION'
+  | 'COMPETITIVE_ALERT';
 
 export interface StrategistTask {
   action: StrategistAction;
@@ -181,6 +183,9 @@ export class StrategistAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'track_okrs', description: 'Track OKR progress in persistent memory', parameters: { type: 'object', properties: { action: { type: 'string' }, objective: { type: 'string' }, keyResults: { type: 'array', items: { type: 'object' } } }, required: ['action'] } } },
+      { type: 'function' as const, function: { name: 'monitor_competitors', description: 'Search for recent competitor news and changes', parameters: { type: 'object', properties: { competitors: { type: 'array', items: { type: 'string' } }, timeframe: { type: 'string' } }, required: ['competitors'] } } },
+      { type: 'function' as const, function: { name: 'generate_board_report', description: 'Compile a board-level executive summary report', parameters: { type: 'object', properties: { companyName: { type: 'string' }, period: { type: 'string' }, metrics: { type: 'object' }, highlights: { type: 'array', items: { type: 'string' } } }, required: ['companyName', 'period'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

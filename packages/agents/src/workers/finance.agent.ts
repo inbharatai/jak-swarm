@@ -12,7 +12,9 @@ export type FinanceAction =
   | 'UNIT_ECONOMICS'
   | 'VALUATION'
   | 'RISK_ASSESSMENT'
-  | 'CASH_FLOW_ANALYSIS';
+  | 'CASH_FLOW_ANALYSIS'
+  | 'TRACK_BUDGET'
+  | 'PARSE_STATEMENTS';
 
 export interface FinanceTask {
   action: FinanceAction;
@@ -209,6 +211,9 @@ export class FinanceAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'parse_financial_csv', description: 'Parse CSV financial data into structured format', parameters: { type: 'object', properties: { csvContent: { type: 'string' }, type: { type: 'string' } }, required: ['csvContent'] } } },
+      { type: 'function' as const, function: { name: 'track_budget', description: 'Track budget vs actuals in persistent memory', parameters: { type: 'object', properties: { action: { type: 'string' }, category: { type: 'string' }, amount: { type: 'number' }, period: { type: 'string' } }, required: ['action'] } } },
+      { type: 'function' as const, function: { name: 'forecast_cashflow', description: 'Forecast cashflow based on historical data', parameters: { type: 'object', properties: { historicalData: { type: 'array', items: { type: 'number' } }, periods: { type: 'number' } }, required: ['historicalData', 'periods'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

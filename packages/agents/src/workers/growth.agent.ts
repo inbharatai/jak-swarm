@@ -19,7 +19,10 @@ export type GrowthAction =
   | 'CHURN_PREDICTION'
   | 'WINBACK_CAMPAIGN'
   | 'SIGNAL_MONITORING'
-  | 'DECISION_MAKER_SEARCH';
+  | 'DECISION_MAKER_SEARCH'
+  | 'REDDIT_ENGAGEMENT'
+  | 'TWITTER_ENGAGEMENT'
+  | 'PIPELINE_TRACKING';
 
 export interface GrowthTask {
   action: GrowthAction;
@@ -375,6 +378,9 @@ export class GrowthAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'auto_engage_reddit', description: 'Find Reddit threads about keywords and draft helpful replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' }, maxThreads: { type: 'number' } }, required: ['keywords'] } } },
+      { type: 'function' as const, function: { name: 'auto_engage_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' } }, required: ['keywords'] } } },
+      { type: 'function' as const, function: { name: 'track_lead_pipeline', description: 'Store and manage leads with stage tracking', parameters: { type: 'object', properties: { action: { type: 'string' }, lead: { type: 'object' }, leadId: { type: 'string' } }, required: ['action'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

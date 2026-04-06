@@ -73,13 +73,13 @@ Guidelines:
   WORKER_MARKETING — CMO-level GTM, campaigns, brand, social strategy
   WORKER_TECHNICAL — CTO-level architecture, tech stack, security audit
   WORKER_FINANCE — CFO-level P&L, forecasting, budgets, valuation
-  WORKER_HR — hiring, job descriptions, policies, onboarding plans
-  WORKER_GROWTH — lead gen, SEO audit, email sequences, outreach
+  WORKER_HR — hiring, job descriptions, policies, onboarding plans, resume screening, offer letter generation
+  WORKER_GROWTH — lead gen, SEO audit, email sequences, outreach, Reddit/Twitter engagement, lead pipeline tracking
   WORKER_CONTENT — write blogs, social posts, newsletters, scripts, press releases
   WORKER_SEO — optimise pages for search, technical SEO, schema markup, link strategy
   WORKER_PR — press releases, media pitches, crisis comms, analyst briefings
-  WORKER_LEGAL — contract review, NDA drafts, privacy policy, compliance checklists
-  WORKER_SUCCESS — customer health scoring, churn prediction, onboarding, renewal strategy
+  WORKER_LEGAL — contract review, NDA drafts, privacy policy, compliance checklists, contract comparison, obligation extraction, regulation monitoring
+  WORKER_SUCCESS — customer health scoring, churn prediction, onboarding, renewal strategy, health tracking over time, QBR deck generation
   WORKER_ANALYTICS — metrics, trend analysis, A/B tests, dashboards, anomaly detection
   WORKER_PRODUCT — feature specs, user stories, roadmap, sprint planning, prioritisation
   WORKER_PROJECT — timeline estimation, resource allocation, status reports, risk registers

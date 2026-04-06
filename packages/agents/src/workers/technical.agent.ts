@@ -11,7 +11,9 @@ export type TechnicalAction =
   | 'SCALABILITY_ANALYSIS'
   | 'SECURITY_AUDIT'
   | 'TECH_DEBT_ASSESSMENT'
-  | 'INFRASTRUCTURE_PLANNING';
+  | 'INFRASTRUCTURE_PLANNING'
+  | 'ANALYZE_REPO'
+  | 'DEPENDENCY_AUDIT';
 
 export interface TechnicalTask {
   action: TechnicalAction;
@@ -196,6 +198,9 @@ export class TechnicalAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'analyze_github_repo', description: 'Analyze a GitHub repository for stats and health', parameters: { type: 'object', properties: { owner: { type: 'string' }, repo: { type: 'string' } }, required: ['owner', 'repo'] } } },
+      { type: 'function' as const, function: { name: 'check_dependencies', description: 'Parse package.json and check for vulnerabilities', parameters: { type: 'object', properties: { packageJson: { type: 'string' } }, required: ['packageJson'] } } },
+      { type: 'function' as const, function: { name: 'estimate_tech_debt', description: 'Analyze code files for tech debt indicators', parameters: { type: 'object', properties: { files: { type: 'array', items: { type: 'object' } } }, required: ['files'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

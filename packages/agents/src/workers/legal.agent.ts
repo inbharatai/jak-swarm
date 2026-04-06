@@ -11,7 +11,10 @@ export type LegalAction =
   | 'DRAFT_PRIVACY_POLICY'
   | 'COMPLIANCE_CHECKLIST'
   | 'RISK_ASSESSMENT'
-  | 'REGULATORY_RESEARCH';
+  | 'REGULATORY_RESEARCH'
+  | 'COMPARE_CONTRACTS'
+  | 'EXTRACT_OBLIGATIONS'
+  | 'MONITOR_REGULATIONS';
 
 export interface LegalTask {
   action: LegalAction;
@@ -188,6 +191,9 @@ export class LegalAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'compare_contracts', description: 'Compare two contract texts and highlight differences', parameters: { type: 'object', properties: { contractA: { type: 'string' }, contractB: { type: 'string' }, focus: { type: 'array', items: { type: 'string' } } }, required: ['contractA', 'contractB'] } } },
+      { type: 'function' as const, function: { name: 'extract_obligations', description: 'Extract key dates, obligations, and terms from contract', parameters: { type: 'object', properties: { contractText: { type: 'string' } }, required: ['contractText'] } } },
+      { type: 'function' as const, function: { name: 'monitor_regulations', description: 'Search for recent regulatory changes in an industry', parameters: { type: 'object', properties: { industry: { type: 'string' }, jurisdiction: { type: 'string' }, topics: { type: 'array', items: { type: 'string' } } }, required: ['industry'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

@@ -12,7 +12,9 @@ export type HRAction =
   | 'PERFORMANCE_REVIEW'
   | 'CULTURE_ASSESSMENT'
   | 'ONBOARDING_PLAN'
-  | 'TRAINING_PROGRAM';
+  | 'TRAINING_PROGRAM'
+  | 'SCREEN_CANDIDATES'
+  | 'GENERATE_OFFER';
 
 export interface HRTask {
   action: HRAction;
@@ -205,6 +207,9 @@ export class HRAgent extends BaseAgent {
           },
         },
       },
+      { type: 'function' as const, function: { name: 'screen_resume', description: 'Score a resume against job requirements', parameters: { type: 'object', properties: { resumeText: { type: 'string' }, jobDescription: { type: 'string' }, requiredSkills: { type: 'array', items: { type: 'string' } } }, required: ['resumeText', 'jobDescription'] } } },
+      { type: 'function' as const, function: { name: 'post_job_listing', description: 'Generate formatted job posting for multiple platforms', parameters: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' }, requirements: { type: 'array', items: { type: 'string' } }, location: { type: 'string' } }, required: ['title', 'description', 'location'] } } },
+      { type: 'function' as const, function: { name: 'generate_offer_letter', description: 'Create offer letter from template data', parameters: { type: 'object', properties: { candidateName: { type: 'string' }, position: { type: 'string' }, salary: { type: 'number' }, startDate: { type: 'string' } }, required: ['candidateName', 'position', 'salary', 'startDate'] } } },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
