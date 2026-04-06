@@ -3249,6 +3249,304 @@ export function registerBuiltinTools(): void {
     },
   );
 
+  // ─── DALL-E Image Generation ────────────────────────────────────────────
+  toolRegistry.register(
+    {
+      name: 'generate_image',
+      description: 'Generate an image using DALL-E 3. Returns a URL to the generated image. Use for social media posts, blog headers, presentations.',
+      category: 'DOCUMENT' as any,
+      riskClass: 'WRITE' as any,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'Detailed description of the image to generate' },
+          size: { type: 'string', description: '1024x1024 (default), 1792x1024 (landscape), 1024x1792 (portrait)' },
+          style: { type: 'string', description: 'vivid (default) or natural' },
+        },
+        required: ['prompt'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { prompt, size = '1024x1024', style = 'vivid' } = input as { prompt: string; size?: string; style?: string };
+      const apiKey = process.env['OPENAI_API_KEY'];
+      if (!apiKey) {
+        return { success: false, error: 'OPENAI_API_KEY not set. Required for DALL-E image generation.' };
+      }
+      try {
+        const OpenAI = (await import('openai')).default;
+        const openai = new OpenAI({ apiKey });
+        const response = await openai.images.generate({
+          model: 'dall-e-3',
+          prompt,
+          n: 1,
+          size: size as '1024x1024' | '1792x1024' | '1024x1792',
+          style: style as 'vivid' | 'natural',
+        });
+        const imageData = response.data?.[0];
+        const imageUrl = imageData?.url;
+        if (!imageUrl) throw new Error('No image URL returned');
+
+        // Download and save to workspace
+        const fs = await import('node:fs/promises');
+        const path = await import('node:path');
+        const workspaceDir = process.env['JAK_WORKSPACE_DIR'] ?? process.cwd();
+        const filename = `dalle-${Date.now()}.png`;
+        const filepath = path.join(workspaceDir, filename);
+
+        const imgResponse = await fetch(imageUrl);
+        const buffer = Buffer.from(await imgResponse.arrayBuffer());
+        await fs.writeFile(filepath, buffer);
+
+        return {
+          success: true,
+          data: {
+            url: imageUrl,
+            localPath: filepath,
+            filename,
+            prompt: imageData?.revised_prompt ?? prompt,
+            size,
+            style,
+          },
+        };
+      } catch (err) {
+        return { success: false, error: `DALL-E generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── Social Media Auto-Posting ────────────────────────────────────────────
+  toolRegistry.register(
+    {
+      name: 'post_to_twitter',
+      description: 'Post a tweet to Twitter/X using browser automation. Requires being logged into Twitter in the browser profile. Can include text and optionally attach an image.',
+      category: 'BROWSER' as any,
+      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Tweet text (max 280 characters)' },
+          imagePath: { type: 'string', description: 'Optional: path to image file to attach' },
+        },
+        required: ['text'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { text, imagePath } = input as { text: string; imagePath?: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+
+        // Navigate to Twitter compose
+        await page.goto('https://x.com/compose/post', { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(2000);
+
+        // Type the tweet
+        const tweetBox = page.locator('[data-testid="tweetTextarea_0"]').or(page.locator('[role="textbox"]')).first();
+        await tweetBox.click();
+        await tweetBox.fill(text);
+
+        // Attach image if provided
+        if (imagePath) {
+          const fs = await import('node:fs');
+          if (fs.existsSync(imagePath)) {
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(2000); // Wait for upload
+          }
+        }
+
+        // Click post button
+        const postBtn = page.locator('[data-testid="tweetButton"]').or(page.locator('button:has-text("Post")')).first();
+        await postBtn.click();
+        await page.waitForTimeout(3000);
+
+        return { success: true, data: { platform: 'twitter', text: text.slice(0, 50) + '...', posted: true } };
+      } catch (err) {
+        return { success: false, error: `Twitter post failed: ${err instanceof Error ? err.message : String(err)}. Make sure you're logged into Twitter in the browser profile.` };
+      }
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'post_to_linkedin',
+      description: 'Post content to LinkedIn using browser automation. Requires being logged into LinkedIn in the browser profile.',
+      category: 'BROWSER' as any,
+      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Post content text' },
+          imagePath: { type: 'string', description: 'Optional: path to image file to attach' },
+        },
+        required: ['text'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { text, imagePath } = input as { text: string; imagePath?: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+
+        await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(2000);
+
+        // Click "Start a post" button
+        const startPost = page.locator('button:has-text("Start a post")').or(page.locator('.share-box-feed-entry__trigger')).first();
+        await startPost.click();
+        await page.waitForTimeout(1500);
+
+        // Type in the post editor
+        const editor = page.locator('[role="textbox"]').or(page.locator('.ql-editor')).first();
+        await editor.click();
+        await editor.fill(text);
+
+        // Attach image if provided
+        if (imagePath) {
+          const fs = await import('node:fs');
+          if (fs.existsSync(imagePath)) {
+            const imgBtn = page.locator('button[aria-label="Add a photo"]').or(page.locator('button:has-text("Photo")')).first();
+            await imgBtn.click();
+            await page.waitForTimeout(1000);
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(3000);
+          }
+        }
+
+        // Click Post button
+        const postBtn = page.locator('button:has-text("Post")').last();
+        await postBtn.click();
+        await page.waitForTimeout(3000);
+
+        return { success: true, data: { platform: 'linkedin', text: text.slice(0, 50) + '...', posted: true } };
+      } catch (err) {
+        return { success: false, error: `LinkedIn post failed: ${err instanceof Error ? err.message : String(err)}. Make sure you're logged into LinkedIn in the browser profile.` };
+      }
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'post_to_reddit',
+      description: 'Create a Reddit post in a specified subreddit using browser automation. Requires being logged into Reddit in the browser profile.',
+      category: 'BROWSER' as any,
+      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          subreddit: { type: 'string', description: 'Subreddit name without r/ prefix (e.g. "artificial")' },
+          title: { type: 'string', description: 'Post title' },
+          body: { type: 'string', description: 'Post body text' },
+          imagePath: { type: 'string', description: 'Optional: path to image file' },
+        },
+        required: ['subreddit', 'title', 'body'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { subreddit, title, body, imagePath } = input as { subreddit: string; title: string; body: string; imagePath?: string };
+      try {
+        const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
+        const page = await playwrightEngine.getActivePage();
+
+        // Navigate to subreddit submit page
+        await page.goto(`https://www.reddit.com/r/${subreddit}/submit`, { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(2000);
+
+        // Fill title
+        const titleInput = page.locator('input[name="title"]').or(page.locator('[placeholder*="Title"]')).first();
+        await titleInput.fill(title);
+
+        // Fill body
+        const bodyInput = page.locator('textarea').or(page.locator('[data-testid="post-composer"]')).first();
+        await bodyInput.click();
+        await bodyInput.fill(body);
+
+        // Attach image if provided
+        if (imagePath) {
+          const fs = await import('node:fs');
+          if (fs.existsSync(imagePath)) {
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(3000);
+          }
+        }
+
+        // Submit
+        const submitBtn = page.locator('button:has-text("Post")').or(page.locator('button[type="submit"]')).first();
+        await submitBtn.click();
+        await page.waitForTimeout(3000);
+
+        return { success: true, data: { platform: 'reddit', subreddit, title, posted: true } };
+      } catch (err) {
+        return { success: false, error: `Reddit post failed: ${err instanceof Error ? err.message : String(err)}. Make sure you're logged into Reddit in the browser profile.` };
+      }
+    },
+  );
+
+  // ─── Platform Discovery ────────────────────────────────────────────────────
+  toolRegistry.register(
+    {
+      name: 'discover_posting_platforms',
+      description: 'Search the web for new platforms, forums, and communities where JAK Swarm content should be posted to grow the community.',
+      category: 'RESEARCH' as any,
+      riskClass: 'READ_ONLY' as any,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Topic to find communities for (e.g. "AI agents", "automation tools")' },
+        },
+        required: ['topic'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { topic } = input as { topic: string };
+      // Use the existing web_search tool internally
+      try {
+        const searchResult = await toolRegistry.execute('web_search', {
+          query: `best communities forums to share ${topic} tools 2024 2025`,
+        }, { tenantId: '', userId: '', workflowId: '', runId: '' });
+
+        return {
+          success: true,
+          data: {
+            query: topic,
+            suggestions: [
+              'Reddit: r/artificial, r/MachineLearning, r/SideProject, r/startups',
+              'Hacker News: Show HN post',
+              'Product Hunt: Launch page',
+              'Dev.to: Technical blog post',
+              'Hashnode: Blog post',
+              'IndieHackers: Product showcase',
+              'Twitter/X: Thread with #AIAgents #Automation tags',
+              'LinkedIn: Article + post',
+              'Discord: AI/ML servers',
+              'Slack: AI communities',
+            ],
+            searchResults: searchResult.data,
+          },
+        };
+      } catch (err) {
+        return { success: false, error: `Discovery failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
   // ─── PHORING.AI INTEGRATION TOOLS ───────────────────────────────────────────
   registerPhoringTools();
 }
