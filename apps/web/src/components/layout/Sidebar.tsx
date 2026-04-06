@@ -60,6 +60,13 @@ const GROUP_LABELS: Record<NavGroup, string> = {
   ADMIN: 'Admin',
 };
 
+const GROUP_DOT_COLORS: Record<NavGroup, string> = {
+  WORK: 'bg-blue-500',
+  OBSERVE: 'bg-emerald-500',
+  CONFIGURE: 'bg-purple-500',
+  ADMIN: 'bg-amber-500',
+};
+
 const GROUP_ORDER: NavGroup[] = ['WORK', 'OBSERVE', 'CONFIGURE', 'ADMIN'];
 
 const INDUSTRY_LABELS: Record<string, string> = {
@@ -99,12 +106,12 @@ export function Sidebar() {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className={cn('flex items-center border-b p-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]">
           <Zap className="h-4 w-4 text-primary-foreground" />
         </div>
         {!collapsed && (
           <div>
-            <span className="text-sm font-bold">JAK Swarm</span>
+            <span className="text-sm font-bold text-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]">JAK Swarm</span>
             <p className="text-xs text-muted-foreground">Agent Platform</p>
           </div>
         )}
@@ -118,7 +125,8 @@ export function Sidebar() {
           return (
             <div key={group}>
               {!collapsed && (
-                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="flex items-center px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-2', GROUP_DOT_COLORS[group])} />
                   {GROUP_LABELS[group]}
                 </p>
               )}
@@ -132,10 +140,10 @@ export function Sidebar() {
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                         collapsed ? 'justify-center' : '',
                         isActive
-                          ? 'bg-primary text-primary-foreground'
+                          ? 'nav-active bg-primary/10 text-primary font-medium'
                           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                       )}
                       title={collapsed ? item.label : undefined}
@@ -276,7 +284,7 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          'relative hidden flex-shrink-0 border-r bg-card transition-all duration-300 md:block',
+          'relative hidden flex-shrink-0 border-r border-border/50 bg-background/95 backdrop-blur-sm transition-all duration-300 md:block',
           collapsed ? 'w-16' : 'w-64',
         )}
       >

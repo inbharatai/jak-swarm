@@ -206,7 +206,7 @@ const PRICING = [
 function StatCard({ value, label }: { value: number; label: string; suffix: string }) {
   const { count, ref } = useCountUp(value, 1800);
   return (
-    <div ref={ref} className="text-center">
+    <div ref={ref} className="glass-card rounded-xl p-6 text-center">
       <div className="text-5xl sm:text-6xl font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
         {count}
       </div>
@@ -334,7 +334,7 @@ export default function HomePage() {
 
       <main className="min-h-screen bg-[#09090b] text-white overflow-x-hidden">
         {/* ── Nav ──────────────────────────────────────────────────────────── */}
-        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5" style={{ background: 'rgba(9,9,11,0.8)', backdropFilter: 'blur(20px)' }}>
+        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(9,9,11,0.6)' }}>
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
               <JakLogo size={32} />
@@ -413,7 +413,7 @@ export default function HomePage() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4" style={{ transitionDelay: '0.8s' }}>
               {/* Gradient border CTA */}
-              <Link href="/register" className="group relative inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg, #3B82F6, #7C3AED)', boxShadow: '0 0 30px rgba(59,130,246,0.3), 0 10px 40px rgba(59,130,246,0.15)' }}>
+              <Link href="/register" className="group relative inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 btn-glow hover:scale-105 transition-transform" style={{ background: 'linear-gradient(135deg, #3B82F6, #7C3AED)', boxShadow: '0 0 30px rgba(59,130,246,0.3), 0 10px 40px rgba(59,130,246,0.15)' }}>
                 Start Free
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
@@ -458,11 +458,13 @@ export default function HomePage() {
                 <line x1="50%" y1="70%" x2="75%" y2="70%" className="connection-line" stroke="rgba(16,185,129,0.12)" strokeWidth="1" />
               </svg>
 
-              <div className="relative grid gap-6 sm:grid-cols-2 lg:grid-cols-3" style={{ zIndex: 1 }}>
+              <div className="relative grid gap-6 sm:grid-cols-2 lg:grid-cols-3 stagger-children" style={{ zIndex: 1 }}>
                 {AGENTS.map((agent, i) => (
                   <div
                     key={agent.label}
-                    className="agent-node group relative rounded-2xl border border-white/5 p-6 transition-all duration-300 cursor-default"
+                    className={`agent-node group relative rounded-2xl border border-white/5 p-6 transition-all duration-300 cursor-default glass-card card-lift animate-fade-up ${
+                      ['border-l-4 border-l-purple-500', 'border-l-4 border-l-blue-500', 'border-l-4 border-l-pink-500', 'border-l-4 border-l-emerald-500', 'border-l-4 border-l-amber-500', 'border-l-4 border-l-cyan-500'][i]
+                    }`}
                     style={{
                       background: hoveredAgent === i
                         ? `linear-gradient(135deg, ${agent.color}10, ${agent.color}05)`
@@ -495,7 +497,7 @@ export default function HomePage() {
         </section>
 
         {/* ── 4. Workflow Animation ────────────────────────────────────────── */}
-        <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, transparent, rgba(59,130,246,0.02), transparent)' }}>
+        <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 dot-pattern" style={{ background: 'linear-gradient(180deg, transparent, rgba(59,130,246,0.02), transparent)' }}>
           <div ref={workflowSection.ref} className={`fade-section ${workflowSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-blue-400 mb-3">How It Works</p>
@@ -574,7 +576,7 @@ export default function HomePage() {
                   key={tier.name}
                   className={`relative rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 ${
                     tier.highlighted
-                      ? 'lg:scale-105'
+                      ? 'lg:scale-105 gradient-border-wrap glow-blue'
                       : ''
                   }`}
                   style={{
@@ -680,7 +682,7 @@ export default function HomePage() {
         </section>
 
         {/* ── 8. CTA ───────────────────────────────────────────────────────── */}
-        <section className="relative px-4 py-24 sm:px-6 lg:px-8 overflow-hidden">
+        <section className="relative px-4 py-24 sm:px-6 lg:px-8 overflow-hidden dot-pattern">
           {/* Background glow */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.1) 0%, transparent 60%)' }} />
 
@@ -698,8 +700,8 @@ export default function HomePage() {
             </p>
 
             {/* Animated gradient border button */}
-            <div className="inline-block rounded-xl p-[2px]" style={{ background: 'linear-gradient(135deg, #3B82F6, #8B5CF6, #EC4899, #3B82F6)', backgroundSize: '300% 300%', animation: 'gradient-shift 4s ease infinite' }}>
-              <Link href="/register" className="group inline-flex items-center gap-2 rounded-[10px] bg-[#09090b] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-transparent">
+            <div className="inline-block rounded-xl p-[2px] gradient-border-wrap" style={{ background: 'linear-gradient(135deg, #3B82F6, #8B5CF6, #EC4899, #3B82F6)', backgroundSize: '300% 300%', animation: 'gradient-shift 4s ease infinite' }}>
+              <Link href="/register" className="group inline-flex items-center gap-2 rounded-[10px] bg-[#09090b] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-transparent btn-glow">
                 Get Started Free
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
@@ -708,6 +710,7 @@ export default function HomePage() {
         </section>
 
         {/* ── 9. Footer ────────────────────────────────────────────────────── */}
+        <div className="h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
         <footer className="border-t border-white/5 px-4 py-16 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="grid gap-12 md:grid-cols-4">

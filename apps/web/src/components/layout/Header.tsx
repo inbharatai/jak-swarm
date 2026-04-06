@@ -52,10 +52,10 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 md:px-6">
       {/* Page title / breadcrumb */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-sm font-semibold truncate">{pageTitle}</h1>
+        <h1 className="text-lg font-bold tracking-tight truncate">{pageTitle}</h1>
       </div>
 
       <div className="flex items-center gap-2">
@@ -80,7 +80,7 @@ export function Header() {
         >
           <Bell className="h-4 w-4" />
           {pendingCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive animate-pulse text-[10px] font-bold text-destructive-foreground">
               {pendingCount > 9 ? '9+' : pendingCount}
             </span>
           )}
