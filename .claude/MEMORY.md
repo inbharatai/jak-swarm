@@ -1,18 +1,20 @@
 # JAK Swarm — Project Memory
 
-## Platform Stats (verified April 6, 2026)
+## Platform Stats (verified April 6, 2026 — LATEST)
 - **Agents:** 33 (6 orchestrators + 27 workers)
-- **Tools:** 79 (74 core + 5 social media/image)
+- **Tools:** 104 (79 core + 25 C-suite execution tools)
+- **Agent Actions:** ~114 total across all agents
 - **Pages:** 15 UI pages
 - **LLM Providers:** 6 (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, Ollama)
 - **Integration Connectors:** 8 (Gmail, Calendar, Slack, GitHub, Notion, HubSpot, Drive, Phoring)
 - **MCP Providers:** 3 (Slack, GitHub, Notion)
 - **Browser Tools:** 22 Playwright tools
 - **Build:** 11/11 packages
-- **Tests:** 64/64 with real OpenAI
-- **Human Simulator:** 38/40 (95%) with 5 test agents
+- **Tests:** 56/56 unit + 40/40 human simulator (100%)
+- **Human Simulator:** 40/40 (100%) with 5 test agents (Sarah CEO, Dev Engineer, Maya Marketing, Alex Ops, BrowserBot)
 - **README:** 953 lines with 7 screenshots
-- **Git Commits:** 10 on main branch
+- **Git Commits:** 14 on main branch
+- **GitHub:** github.com/inbharatai/jak-swarm (public)
 - **GitHub:** github.com/inbharatai/jak-swarm (public)
 
 ## Key Architecture Decisions
