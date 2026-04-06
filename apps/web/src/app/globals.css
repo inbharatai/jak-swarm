@@ -159,10 +159,10 @@
 
   /* Enhanced glassmorphism */
   .glass-card {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .glass-card-light {
@@ -260,15 +260,14 @@
     box-shadow: 0 0 25px rgba(59, 130, 246, 0.4), 0 0 50px rgba(59, 130, 246, 0.15);
   }
 
-  /* Subtle entrance animation */
+  /* Subtle entrance animation — visible by default, enhanced with animation */
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
   .animate-fade-up {
-    animation: fade-up 0.5s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-    opacity: 0;
+    animation: fade-up 0.6s cubic-bezier(0.33, 1, 0.68, 1) both;
   }
 
   /* Staggered children */

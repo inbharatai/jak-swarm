@@ -581,15 +581,15 @@ export default function HomePage() {
                   }`}
                   style={{
                     background: tier.highlighted
-                      ? 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))'
+                      ? 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.08))'
                       : tier.accent === 'gold'
-                      ? 'linear-gradient(135deg, rgba(245,158,11,0.05), rgba(217,119,6,0.02))'
-                      : 'rgba(255,255,255,0.02)',
+                      ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.04))'
+                      : 'rgba(255,255,255,0.05)',
                     border: tier.highlighted
-                      ? '1px solid rgba(59,130,246,0.3)'
+                      ? '1px solid rgba(59,130,246,0.4)'
                       : tier.accent === 'gold'
-                      ? '1px solid rgba(245,158,11,0.15)'
-                      : '1px solid rgba(255,255,255,0.05)',
+                      ? '1px solid rgba(245,158,11,0.2)'
+                      : '1px solid rgba(255,255,255,0.1)',
                     boxShadow: tier.highlighted
                       ? '0 0 40px rgba(59,130,246,0.1), 0 20px 60px rgba(59,130,246,0.05)'
                       : 'none',
