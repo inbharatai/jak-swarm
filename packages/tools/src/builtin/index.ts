@@ -3547,6 +3547,1200 @@ export function registerBuiltinTools(): void {
     },
   );
 
+  // ─── CMO / MARKETING EXECUTION TOOLS ───────────────────────────────────────
+
+  // 1. monitor_brand_mentions
+  toolRegistry.register(
+    {
+      name: 'monitor_brand_mentions',
+      description: 'Search the web for brand mentions across Reddit, Twitter/X, Hacker News, and news sites. Returns structured results with sentiment.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          brand: { type: 'string', description: 'Brand or product name to monitor' },
+          platforms: { type: 'array', items: { type: 'string' }, description: 'Platforms to search (default: reddit, twitter, hackernews, news)' },
+        },
+        required: ['brand'],
+      },
+      outputSchema: { type: 'object', properties: { mentions: { type: 'array' }, totalMentions: { type: 'number' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { brand, platforms = ['reddit', 'twitter', 'hackernews', 'news'] } = input as { brand: string; platforms?: string[] };
+        const siteMap: Record<string, string> = {
+          reddit: 'site:reddit.com',
+          twitter: 'site:twitter.com',
+          hackernews: 'site:news.ycombinator.com',
+          news: '',
+        };
+        const mentions: Array<{ platform: string; url: string; snippet: string; sentiment: string }> = [];
+        for (const platform of platforms) {
+          const siteFilter = siteMap[platform] ?? '';
+          const query = `${brand} ${siteFilter}`.trim();
+          const { results } = await searchDuckDuckGo(query, 5);
+          for (const r of results) {
+            const lowerSnippet = r.snippet.toLowerCase();
+            let sentiment: string = 'neutral';
+            if (/love|great|awesome|amazing|best|excellent|fantastic/.test(lowerSnippet)) sentiment = 'positive';
+            else if (/hate|bad|worst|terrible|awful|broken|sucks/.test(lowerSnippet)) sentiment = 'negative';
+            mentions.push({ platform, url: r.url, snippet: r.snippet, sentiment });
+          }
+        }
+        return { success: true, data: { mentions, totalMentions: mentions.length } };
+      } catch (err) {
+        return { success: false, error: `Brand monitoring failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 2. auto_reply_reddit
+  toolRegistry.register(
+    {
+      name: 'auto_reply_reddit',
+      description: 'Find relevant Reddit threads for a topic and draft contextual, helpful, non-spammy replies.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Topic to find threads about' },
+          product: { type: 'string', description: 'Product or service to subtly mention' },
+          tone: { type: 'string', description: 'Tone of reply: helpful, casual, expert (default: helpful)' },
+        },
+        required: ['topic'],
+      },
+      outputSchema: { type: 'object', properties: { threads: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { topic, product, tone = 'helpful' } = input as { topic: string; product?: string; tone?: string };
+        const { results } = await searchDuckDuckGo(`site:reddit.com ${topic}`, 5);
+        const threads = results.map(r => {
+          const context = r.snippet.slice(0, 200);
+          let suggestedReply = `Great question about ${topic}. `;
+          if (tone === 'expert') suggestedReply += `Based on my experience, `;
+          else if (tone === 'casual') suggestedReply += `Hey! `;
+          suggestedReply += `Here's what I'd recommend: [provide value based on "${context.slice(0, 80)}..."]. `;
+          if (product) suggestedReply += `I've also found ${product} helpful for this.`;
+          return { url: r.url, title: r.title, snippet: r.snippet, suggestedReply };
+        });
+        return { success: true, data: { threads } };
+      } catch (err) {
+        return { success: false, error: `Reddit reply generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 3. auto_reply_twitter
+  toolRegistry.register(
+    {
+      name: 'auto_reply_twitter',
+      description: 'Find niche Twitter/X discussions about a topic and draft engagement replies.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Topic to find discussions about' },
+          product: { type: 'string', description: 'Product or service to subtly mention' },
+          hashtags: { type: 'array', items: { type: 'string' }, description: 'Hashtags to include in search' },
+        },
+        required: ['topic'],
+      },
+      outputSchema: { type: 'object', properties: { discussions: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { topic, product, hashtags = [] } = input as { topic: string; product?: string; hashtags?: string[] };
+        const hashtagStr = hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ');
+        const { results } = await searchDuckDuckGo(`site:twitter.com ${topic} ${hashtagStr}`.trim(), 5);
+        const discussions = results.map(r => {
+          let suggestedReply = `Interesting thread on ${topic}! `;
+          suggestedReply += `[Add insight based on "${r.snippet.slice(0, 60)}..."]. `;
+          if (product) suggestedReply += `Worth checking out ${product} for this. `;
+          if (hashtags.length > 0) suggestedReply += hashtags.slice(0, 2).map(h => h.startsWith('#') ? h : `#${h}`).join(' ');
+          return { url: r.url, snippet: r.snippet, suggestedReply };
+        });
+        return { success: true, data: { discussions } };
+      } catch (err) {
+        return { success: false, error: `Twitter reply generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 4. generate_seo_report
+  toolRegistry.register(
+    {
+      name: 'generate_seo_report',
+      description: 'Generate a comprehensive SEO report by combining audit_seo, research_keywords, and analyze_serp results.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Website URL to audit' },
+          keywords: { type: 'array', items: { type: 'string' }, description: 'Target keywords to research' },
+        },
+        required: ['url'],
+      },
+      outputSchema: { type: 'object', properties: { audit: { type: 'object' }, keywords: { type: 'object' }, serp: { type: 'object' }, recommendations: { type: 'array' }, score: { type: 'number' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { url, keywords = [] } = input as { url: string; keywords?: string[] };
+        const auditResult = await toolRegistry.execute('audit_seo', { url }, context);
+        let keywordsResult = null;
+        if (keywords.length > 0) {
+          keywordsResult = await toolRegistry.execute('research_keywords', { seed: keywords[0] }, context);
+        }
+        const serpResult = await toolRegistry.execute('analyze_serp', { query: keywords[0] ?? new URL(url).hostname }, context);
+        const recommendations: string[] = [];
+        if (auditResult && typeof auditResult === 'object') {
+          const audit = auditResult as unknown as Record<string, unknown>;
+          if (!audit['hasTitle']) recommendations.push('Add a descriptive title tag');
+          if (!audit['hasMetaDescription']) recommendations.push('Add a meta description');
+          if (!audit['hasH1']) recommendations.push('Add an H1 heading');
+        }
+        if (keywords.length === 0) recommendations.push('Define target keywords for better SEO tracking');
+        const score = Math.max(0, 100 - recommendations.length * 15);
+        return { success: true, data: { audit: auditResult, keywords: keywordsResult, serp: serpResult, recommendations, score } };
+      } catch (err) {
+        return { success: false, error: `SEO report generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 5. track_content_performance
+  toolRegistry.register(
+    {
+      name: 'track_content_performance',
+      description: 'Store content URLs with publish date in persistent memory. Track and report on content performance over time.',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Content URL to track' },
+          title: { type: 'string', description: 'Content title' },
+          platform: { type: 'string', description: 'Publishing platform (e.g. blog, twitter, linkedin)' },
+          action: { type: 'string', description: "'track' to add new content, 'report' to get all tracked content" },
+        },
+        required: ['action'],
+      },
+      outputSchema: { type: 'object', properties: { tracked: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { url, title, platform, action } = input as { url?: string; title?: string; platform?: string; action: 'track' | 'report' };
+        const adapter = getMemoryAdapter();
+        const storageKey = 'CONTENT_PERFORMANCE:tracked_content';
+        const existing = await adapter.get(storageKey, context.tenantId);
+        const tracked: Array<{ url: string; title: string; platform: string; trackedSince: string }> = (existing as Array<{ url: string; title: string; platform: string; trackedSince: string }>) ?? [];
+        if (action === 'track' && url && title && platform) {
+          tracked.push({ url, title, platform, trackedSince: new Date().toISOString() });
+          await adapter.set(storageKey, tracked, context.tenantId, { type: 'KNOWLEDGE', source: 'track_content_performance' });
+          return { success: true, data: { message: `Now tracking "${title}"`, tracked } };
+        }
+        return { success: true, data: { tracked } };
+      } catch (err) {
+        return { success: false, error: `Content tracking failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── CEO / STRATEGIST EXECUTION TOOLS ──────────────────────────────────────
+
+  // 6. track_okrs
+  toolRegistry.register(
+    {
+      name: 'track_okrs',
+      description: 'Store and track OKR (Objectives & Key Results) progress in persistent memory.',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: "'set' to create OKR, 'update' to update progress, 'report' to get all OKRs" },
+          objective: { type: 'string', description: 'Objective description' },
+          keyResults: { type: 'array', items: { type: 'object', properties: { metric: { type: 'string' }, target: { type: 'number' }, current: { type: 'number' } } }, description: 'Key results with metric, target, and current values' },
+        },
+        required: ['action'],
+      },
+      outputSchema: { type: 'object', properties: { okrs: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { action, objective, keyResults } = input as { action: 'set' | 'update' | 'report'; objective?: string; keyResults?: Array<{ metric: string; target: number; current: number }> };
+        const adapter = getMemoryAdapter();
+        const storageKey = 'OKR_TRACKER:okrs';
+        const existing = await adapter.get(storageKey, context.tenantId);
+        const okrs: Array<{ objective: string; keyResults: Array<{ metric: string; target: number; current: number }>; progress: number; createdAt: string }> = (existing as typeof okrs) ?? [];
+        if (action === 'set' && objective && keyResults) {
+          const progress = keyResults.length > 0 ? Math.round(keyResults.reduce((sum, kr) => sum + Math.min(100, (kr.current / kr.target) * 100), 0) / keyResults.length) : 0;
+          okrs.push({ objective, keyResults, progress, createdAt: new Date().toISOString() });
+          await adapter.set(storageKey, okrs, context.tenantId, { type: 'POLICY', source: 'track_okrs' });
+          return { success: true, data: { message: `OKR set: "${objective}"`, okrs } };
+        }
+        if (action === 'update' && objective && keyResults) {
+          const idx = okrs.findIndex(o => o.objective === objective);
+          if (idx >= 0) {
+            okrs[idx]!.keyResults = keyResults;
+            okrs[idx]!.progress = keyResults.length > 0 ? Math.round(keyResults.reduce((sum, kr) => sum + Math.min(100, (kr.current / kr.target) * 100), 0) / keyResults.length) : 0;
+            await adapter.set(storageKey, okrs, context.tenantId, { type: 'POLICY', source: 'track_okrs' });
+            return { success: true, data: { message: `OKR updated: "${objective}"`, okrs } };
+          }
+          return { success: false, error: `OKR not found: "${objective}"` };
+        }
+        return { success: true, data: { okrs } };
+      } catch (err) {
+        return { success: false, error: `OKR tracking failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 7. monitor_competitors
+  toolRegistry.register(
+    {
+      name: 'monitor_competitors',
+      description: 'Search for recent competitor news, launches, funding, and updates.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          competitors: { type: 'array', items: { type: 'string' }, description: 'List of competitor names to monitor' },
+          timeframe: { type: 'string', description: 'Timeframe for news (e.g. "this week", "this month")' },
+        },
+        required: ['competitors'],
+      },
+      outputSchema: { type: 'object', properties: { competitors: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { competitors, timeframe = 'recent' } = input as { competitors: string[]; timeframe?: string };
+        const competitorData: Array<{ name: string; recentNews: Array<{ title: string; url: string; snippet: string }> }> = [];
+        for (const name of competitors) {
+          const { results } = await searchDuckDuckGo(`${name} news OR launch OR funding OR update ${timeframe}`, 5);
+          competitorData.push({
+            name,
+            recentNews: results.map(r => ({ title: r.title, url: r.url, snippet: r.snippet })),
+          });
+        }
+        return { success: true, data: { competitors: competitorData } };
+      } catch (err) {
+        return { success: false, error: `Competitor monitoring failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 8. generate_board_report
+  toolRegistry.register(
+    {
+      name: 'generate_board_report',
+      description: 'Compile a board-level summary report from provided company data, metrics, and highlights.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          companyName: { type: 'string', description: 'Company name' },
+          period: { type: 'string', description: 'Reporting period (e.g. "Q1 2026")' },
+          metrics: { type: 'object', description: 'Key metrics as key-value pairs' },
+          highlights: { type: 'array', items: { type: 'string' }, description: 'Key highlights and achievements' },
+        },
+        required: ['companyName', 'period'],
+      },
+      outputSchema: { type: 'object', properties: { report: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { companyName, period, metrics = {}, highlights = [] } = input as { companyName: string; period: string; metrics?: Record<string, unknown>; highlights?: string[] };
+        const reportResult = await toolRegistry.execute('generate_report', {
+          reportType: 'custom',
+          title: `${companyName} Board Report - ${period}`,
+          data: { companyName, period, metrics, highlights },
+        }, context);
+        return { success: true, data: { report: (reportResult as unknown as Record<string, unknown>)?.['content'] ?? JSON.stringify(reportResult) } };
+      } catch (err) {
+        return { success: false, error: `Board report generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── CTO / TECHNICAL EXECUTION TOOLS ───────────────────────────────────────
+
+  // 9. analyze_github_repo
+  toolRegistry.register(
+    {
+      name: 'analyze_github_repo',
+      description: 'Analyze a public GitHub repository using the GitHub API. Returns stars, forks, issues, language, and more.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string', description: 'GitHub repository owner/org' },
+          repo: { type: 'string', description: 'Repository name' },
+        },
+        required: ['owner', 'repo'],
+      },
+      outputSchema: { type: 'object', properties: { stars: { type: 'number' }, forks: { type: 'number' }, openIssues: { type: 'number' }, language: { type: 'string' }, lastPush: { type: 'string' }, description: { type: 'string' }, license: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { owner, repo } = input as { owner: string; repo: string };
+        const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
+          headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JAK-Swarm/1.0' },
+        });
+        if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
+        const data = await response.json() as Record<string, unknown>;
+        return {
+          success: true,
+          data: {
+            stars: data['stargazers_count'],
+            forks: data['forks_count'],
+            openIssues: data['open_issues_count'],
+            language: data['language'],
+            lastPush: data['pushed_at'],
+            description: data['description'],
+            license: (data['license'] as Record<string, unknown>)?.['spdx_id'] ?? null,
+            fullName: data['full_name'],
+            defaultBranch: data['default_branch'],
+          },
+        };
+      } catch (err) {
+        return { success: false, error: `GitHub analysis failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 10. check_dependencies
+  toolRegistry.register(
+    {
+      name: 'check_dependencies',
+      description: 'Parse package.json content and check for known vulnerability issues in top dependencies.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          packageJson: { type: 'string', description: 'The content of package.json as a string (not a file path)' },
+        },
+        required: ['packageJson'],
+      },
+      outputSchema: { type: 'object', properties: { dependencies: { type: 'array' }, totalDeps: { type: 'number' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { packageJson } = input as { packageJson: string };
+        const parsed = JSON.parse(packageJson) as Record<string, unknown>;
+        const deps = { ...(parsed['dependencies'] as Record<string, string> ?? {}), ...(parsed['devDependencies'] as Record<string, string> ?? {}) };
+        const depEntries = Object.entries(deps);
+        const topDeps = depEntries.slice(0, 10);
+        const results: Array<{ name: string; version: string; hasKnownIssues: boolean; note: string }> = [];
+        for (const [name, version] of topDeps) {
+          try {
+            const { results: searchResults } = await searchDuckDuckGo(`${name} npm vulnerability security issue`, 2);
+            const hasIssues = searchResults.some(r => /vulnerability|CVE|security|exploit/i.test(r.snippet));
+            results.push({ name, version, hasKnownIssues: hasIssues, note: hasIssues ? 'Potential security concerns found in search results' : 'No obvious issues found' });
+          } catch {
+            results.push({ name, version, hasKnownIssues: false, note: 'Could not check (search failed)' });
+          }
+        }
+        return { success: true, data: { dependencies: results, totalDeps: depEntries.length, checkedDeps: results.length } };
+      } catch (err) {
+        return { success: false, error: `Dependency check failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 11. estimate_tech_debt
+  toolRegistry.register(
+    {
+      name: 'estimate_tech_debt',
+      description: 'Analyze code files for tech debt indicators like TODO, FIXME, HACK, @deprecated, and any/unknown usage.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          files: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] }, description: 'Array of files with path and content' },
+        },
+        required: ['files'],
+      },
+      outputSchema: { type: 'object', properties: { score: { type: 'number' }, indicators: { type: 'array' }, recommendations: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { files } = input as { files: Array<{ path: string; content: string }> };
+        const patterns: Array<{ type: string; regex: RegExp; weight: number }> = [
+          { type: 'TODO', regex: /\/\/\s*TODO/gi, weight: 1 },
+          { type: 'FIXME', regex: /\/\/\s*FIXME/gi, weight: 2 },
+          { type: 'HACK', regex: /\/\/\s*HACK/gi, weight: 3 },
+          { type: '@deprecated', regex: /@deprecated/gi, weight: 2 },
+          { type: 'any_type', regex: /:\s*any\b/g, weight: 1 },
+          { type: 'ts_ignore', regex: /@ts-ignore|@ts-nocheck/g, weight: 2 },
+          { type: 'console_log', regex: /console\.log\(/g, weight: 0.5 },
+          { type: 'empty_catch', regex: /catch\s*\([^)]*\)\s*\{\s*\}/g, weight: 3 },
+        ];
+        const indicators: Array<{ type: string; count: number; locations: string[] }> = [];
+        let totalScore = 0;
+        for (const pattern of patterns) {
+          const locations: string[] = [];
+          let totalCount = 0;
+          for (const file of files) {
+            const matches = file.content.match(pattern.regex);
+            if (matches) {
+              totalCount += matches.length;
+              locations.push(`${file.path} (${matches.length})`);
+            }
+          }
+          if (totalCount > 0) {
+            indicators.push({ type: pattern.type, count: totalCount, locations });
+            totalScore += totalCount * pattern.weight;
+          }
+        }
+        const maxScore = files.length * 10;
+        const normalizedScore = Math.min(100, Math.round((totalScore / Math.max(maxScore, 1)) * 100));
+        const recommendations: string[] = [];
+        if (indicators.find(i => i.type === 'FIXME')) recommendations.push('Address FIXME comments as they indicate known bugs');
+        if (indicators.find(i => i.type === 'HACK')) recommendations.push('Refactor HACK workarounds into proper solutions');
+        if (indicators.find(i => i.type === 'any_type')) recommendations.push('Replace `any` types with proper TypeScript types');
+        if (indicators.find(i => i.type === 'empty_catch')) recommendations.push('Add proper error handling in empty catch blocks');
+        if (indicators.find(i => i.type === 'ts_ignore')) recommendations.push('Remove @ts-ignore comments and fix underlying type errors');
+        return { success: true, data: { score: normalizedScore, indicators, recommendations, totalFiles: files.length } };
+      } catch (err) {
+        return { success: false, error: `Tech debt estimation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── CFO / FINANCE EXECUTION TOOLS ─────────────────────────────────────────
+
+  // 12. parse_financial_csv
+  toolRegistry.register(
+    {
+      name: 'parse_financial_csv',
+      description: 'Parse CSV financial data into structured format with computed totals and summary statistics.',
+      category: ToolCategory.SPREADSHEET,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          csvContent: { type: 'string', description: 'Raw CSV content string' },
+          type: { type: 'string', description: "Financial document type: 'p&l', 'balance_sheet', or 'bank_statement'" },
+        },
+        required: ['csvContent'],
+      },
+      outputSchema: { type: 'object', properties: { rows: { type: 'array' }, totals: { type: 'object' }, summary: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { csvContent, type = 'general' } = input as { csvContent: string; type?: string };
+        const lines = csvContent.trim().split('\n');
+        if (lines.length < 2) return { success: false, error: 'CSV must have at least a header row and one data row' };
+        const headers = lines[0]!.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        const rows: Array<Record<string, string | number>> = [];
+        const numericColumns: Record<string, number[]> = {};
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i]!.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+          const row: Record<string, string | number> = {};
+          headers.forEach((header, idx) => {
+            const val = values[idx] ?? '';
+            const num = parseFloat(val.replace(/[$,]/g, ''));
+            if (!isNaN(num) && val !== '') {
+              row[header] = num;
+              if (!numericColumns[header]) numericColumns[header] = [];
+              numericColumns[header]!.push(num);
+            } else {
+              row[header] = val;
+            }
+          });
+          rows.push(row);
+        }
+        const totals: Record<string, { sum: number; mean: number; min: number; max: number }> = {};
+        for (const [col, vals] of Object.entries(numericColumns)) {
+          const sum = vals.reduce((a, b) => a + b, 0);
+          totals[col] = { sum: Math.round(sum * 100) / 100, mean: Math.round((sum / vals.length) * 100) / 100, min: Math.min(...vals), max: Math.max(...vals) };
+        }
+        return { success: true, data: { rows, totals, rowCount: rows.length, headers, documentType: type, summary: `Parsed ${rows.length} rows with ${headers.length} columns. ${Object.keys(numericColumns).length} numeric columns detected.` } };
+      } catch (err) {
+        return { success: false, error: `CSV parsing failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 13. track_budget
+  toolRegistry.register(
+    {
+      name: 'track_budget',
+      description: 'Store and track budget vs actual spending in persistent memory. Supports setting budgets, recording actuals, and generating variance reports.',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: "'set_budget' to define budget, 'add_actual' to record spending, 'report' to get variance report" },
+          category: { type: 'string', description: 'Budget category (e.g. "Marketing", "Engineering")' },
+          amount: { type: 'number', description: 'Budget or actual amount' },
+          period: { type: 'string', description: 'Budget period (e.g. "2026-Q1")' },
+        },
+        required: ['action'],
+      },
+      outputSchema: { type: 'object', properties: { budget: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { action, category, amount, period = 'current' } = input as { action: 'set_budget' | 'add_actual' | 'report'; category?: string; amount?: number; period?: string };
+        const adapter = getMemoryAdapter();
+        const storageKey = `BUDGET_TRACKER:${period}`;
+        const existing = await adapter.get(storageKey, context.tenantId);
+        const budget: Record<string, { budgeted: number; actual: number }> = (existing as typeof budget) ?? {};
+        if (action === 'set_budget' && category && amount !== undefined) {
+          if (!budget[category]) budget[category] = { budgeted: 0, actual: 0 };
+          budget[category]!.budgeted = amount;
+          await adapter.set(storageKey, budget, context.tenantId, { type: 'KNOWLEDGE', source: 'track_budget' });
+          return { success: true, data: { message: `Budget set: ${category} = $${amount}`, budget: Object.entries(budget).map(([cat, v]) => ({ category: cat, ...v, variance: v.budgeted - v.actual })) } };
+        }
+        if (action === 'add_actual' && category && amount !== undefined) {
+          if (!budget[category]) budget[category] = { budgeted: 0, actual: 0 };
+          budget[category]!.actual += amount;
+          await adapter.set(storageKey, budget, context.tenantId, { type: 'KNOWLEDGE', source: 'track_budget' });
+          return { success: true, data: { message: `Actual recorded: ${category} += $${amount}`, budget: Object.entries(budget).map(([cat, v]) => ({ category: cat, ...v, variance: v.budgeted - v.actual })) } };
+        }
+        return { success: true, data: { budget: Object.entries(budget).map(([cat, v]) => ({ category: cat, ...v, variance: v.budgeted - v.actual })), period } };
+      } catch (err) {
+        return { success: false, error: `Budget tracking failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 14. forecast_cashflow
+  toolRegistry.register(
+    {
+      name: 'forecast_cashflow',
+      description: 'Time-series forecasting based on historical data using linear regression or moving average.',
+      category: ToolCategory.SPREADSHEET,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          historicalData: { type: 'array', items: { type: 'number' }, description: 'Array of historical numeric values (ordered by time period)' },
+          periods: { type: 'number', description: 'Number of future periods to forecast' },
+          method: { type: 'string', description: "'linear' for linear regression, 'average' for moving average (default: linear)" },
+        },
+        required: ['historicalData', 'periods'],
+      },
+      outputSchema: { type: 'object', properties: { forecast: { type: 'array' }, trend: { type: 'string' }, confidence: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { historicalData, periods, method = 'linear' } = input as { historicalData: number[]; periods: number; method?: 'linear' | 'average' };
+        if (historicalData.length < 2) return { success: false, error: 'Need at least 2 historical data points' };
+        const forecast: number[] = [];
+        if (method === 'linear') {
+          const n = historicalData.length;
+          const xs = historicalData.map((_, i) => i);
+          const sumX = xs.reduce((a, b) => a + b, 0);
+          const sumY = historicalData.reduce((a, b) => a + b, 0);
+          const sumXY = xs.reduce((acc, x, i) => acc + x * historicalData[i]!, 0);
+          const sumXX = xs.reduce((acc, x) => acc + x * x, 0);
+          const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+          const intercept = (sumY - slope * sumX) / n;
+          for (let i = 0; i < periods; i++) {
+            forecast.push(Math.round((slope * (n + i) + intercept) * 100) / 100);
+          }
+        } else {
+          const windowSize = Math.min(3, historicalData.length);
+          const lastWindow = historicalData.slice(-windowSize);
+          const avg = lastWindow.reduce((a, b) => a + b, 0) / windowSize;
+          for (let i = 0; i < periods; i++) {
+            forecast.push(Math.round(avg * 100) / 100);
+          }
+        }
+        const firstVal = historicalData[0]!;
+        const lastVal = historicalData[historicalData.length - 1]!;
+        const trend = lastVal > firstVal * 1.05 ? 'increasing' : lastVal < firstVal * 0.95 ? 'decreasing' : 'stable';
+        const dataPoints = historicalData.length;
+        const confidence = dataPoints >= 12 ? 'high' : dataPoints >= 6 ? 'medium' : 'low';
+        return { success: true, data: { forecast, trend, confidence, method, historicalPoints: dataPoints } };
+      } catch (err) {
+        return { success: false, error: `Cashflow forecast failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── HR EXECUTION TOOLS ────────────────────────────────────────────────────
+
+  // 15. screen_resume
+  toolRegistry.register(
+    {
+      name: 'screen_resume',
+      description: 'Score a resume against job requirements using pattern matching and skill extraction. Returns match score, matched/missing skills, and recommendation.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          resumeText: { type: 'string', description: 'Full text content of the resume' },
+          jobDescription: { type: 'string', description: 'Job description text' },
+          requiredSkills: { type: 'array', items: { type: 'string' }, description: 'List of required skills to match against' },
+        },
+        required: ['resumeText', 'jobDescription'],
+      },
+      outputSchema: { type: 'object', properties: { score: { type: 'number' }, matchedSkills: { type: 'array' }, missingSkills: { type: 'array' }, recommendation: { type: 'string' }, flags: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { resumeText, jobDescription, requiredSkills = [] } = input as { resumeText: string; jobDescription: string; requiredSkills?: string[] };
+        const resumeLower = resumeText.toLowerCase();
+        const jobLower = jobDescription.toLowerCase();
+        const skills = requiredSkills.length > 0 ? requiredSkills : jobLower.match(/\b(?:javascript|typescript|python|react|node|aws|docker|kubernetes|sql|java|go|rust|c\+\+|graphql|rest|api|git|ci\/cd|agile|scrum)\b/gi) ?? [];
+        const uniqueSkills = [...new Set(skills.map(s => s.toLowerCase()))];
+        const matched = uniqueSkills.filter(skill => resumeLower.includes(skill.toLowerCase()));
+        const missing = uniqueSkills.filter(skill => !resumeLower.includes(skill.toLowerCase()));
+        const score = uniqueSkills.length > 0 ? Math.round((matched.length / uniqueSkills.length) * 100) : 50;
+        const flags: string[] = [];
+        if (resumeText.length < 200) flags.push('Resume appears very short');
+        if (!/\d{4}/.test(resumeText)) flags.push('No dates/years detected — work history may be missing');
+        if (!/education|university|degree|bachelor|master|phd/i.test(resumeText)) flags.push('No education section detected');
+        const yearsMatch = resumeText.match(/(\d+)\+?\s*years?\s*(?:of\s*)?experience/i);
+        if (yearsMatch) flags.push(`Candidate claims ${yearsMatch[1]}+ years experience`);
+        let recommendation: string;
+        if (score >= 75) recommendation = 'Strong match — recommend for interview';
+        else if (score >= 50) recommendation = 'Moderate match — consider for phone screen';
+        else recommendation = 'Weak match — may not meet minimum requirements';
+        return { success: true, data: { score, matchedSkills: matched, missingSkills: missing, recommendation, flags } };
+      } catch (err) {
+        return { success: false, error: `Resume screening failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 16. post_job_listing
+  toolRegistry.register(
+    {
+      name: 'post_job_listing',
+      description: 'Generate formatted job postings for multiple platforms (LinkedIn, Indeed, generic) and save to memory.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Job title' },
+          description: { type: 'string', description: 'Job description' },
+          requirements: { type: 'array', items: { type: 'string' }, description: 'List of requirements' },
+          location: { type: 'string', description: 'Job location (e.g. "Remote", "New York, NY")' },
+          salary: { type: 'string', description: 'Salary range (e.g. "$120k-$160k")' },
+        },
+        required: ['title', 'description', 'requirements', 'location'],
+      },
+      outputSchema: { type: 'object', properties: { listings: { type: 'object' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { title, description, requirements, location, salary } = input as { title: string; description: string; requirements: string[]; location: string; salary?: string };
+        const reqList = requirements.map(r => `- ${r}`).join('\n');
+        const salaryLine = salary ? `\nCompensation: ${salary}` : '';
+        const linkedin = `**${title}**\n${location}${salaryLine}\n\n${description}\n\n**Requirements:**\n${reqList}\n\n#hiring #${title.replace(/\s+/g, '')}`;
+        const indeed = `${title}\nLocation: ${location}${salaryLine}\n\nJob Description:\n${description}\n\nRequirements:\n${reqList}`;
+        const generic = `# ${title}\n\n**Location:** ${location}${salaryLine}\n\n## About the Role\n${description}\n\n## Requirements\n${reqList}`;
+        const adapter = getMemoryAdapter();
+        await adapter.set(`JOB_LISTINGS:${title.replace(/\s+/g, '_').toLowerCase()}`, { title, location, salary, createdAt: new Date().toISOString() }, context.tenantId, { type: 'KNOWLEDGE', source: 'post_job_listing' });
+        return { success: true, data: { listings: { linkedin, indeed, generic }, title, location } };
+      } catch (err) {
+        return { success: false, error: `Job listing generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 17. generate_offer_letter
+  toolRegistry.register(
+    {
+      name: 'generate_offer_letter',
+      description: 'Generate a formal offer letter from template data with candidate name, position, salary, start date, and benefits.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          candidateName: { type: 'string', description: 'Full name of the candidate' },
+          position: { type: 'string', description: 'Job title/position offered' },
+          salary: { type: 'number', description: 'Annual salary (numeric)' },
+          startDate: { type: 'string', description: 'Proposed start date' },
+          benefits: { type: 'array', items: { type: 'string' }, description: 'List of benefits' },
+        },
+        required: ['candidateName', 'position', 'salary', 'startDate'],
+      },
+      outputSchema: { type: 'object', properties: { letter: { type: 'string' }, filename: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { candidateName, position, salary, startDate, benefits = [] } = input as { candidateName: string; position: string; salary: number; startDate: string; benefits?: string[] };
+        const benefitsList = benefits.length > 0 ? `\n\nBenefits Package:\n${benefits.map(b => `  - ${b}`).join('\n')}` : '';
+        const formattedSalary = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(salary);
+        const letter = `OFFER OF EMPLOYMENT
+
+Date: ${new Date().toISOString().split('T')[0]}
+
+Dear ${candidateName},
+
+We are pleased to offer you the position of ${position} at our company.
+
+Position: ${position}
+Annual Salary: ${formattedSalary}
+Start Date: ${startDate}
+Employment Type: Full-Time${benefitsList}
+
+This offer is contingent upon successful completion of background verification and any other pre-employment requirements.
+
+Please confirm your acceptance of this offer by signing below and returning this letter by ${new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]}.
+
+We look forward to having you join our team.
+
+Sincerely,
+Human Resources Department
+
+____________________________
+Accepted by: ${candidateName}
+Date: _______________`;
+        const filename = `offer_letter_${candidateName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.txt`;
+        return { success: true, data: { letter, filename } };
+      } catch (err) {
+        return { success: false, error: `Offer letter generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── LEGAL EXECUTION TOOLS ─────────────────────────────────────────────────
+
+  // 18. compare_contracts
+  toolRegistry.register(
+    {
+      name: 'compare_contracts',
+      description: 'Compare two contract texts and highlight key differences with risk assessment.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          contractA: { type: 'string', description: 'First contract text' },
+          contractB: { type: 'string', description: 'Second contract text' },
+          focus: { type: 'array', items: { type: 'string' }, description: 'Specific sections to focus on (e.g. ["indemnification", "termination"])' },
+        },
+        required: ['contractA', 'contractB'],
+      },
+      outputSchema: { type: 'object', properties: { differences: { type: 'array' }, summary: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { contractA, contractB, focus = [] } = input as { contractA: string; contractB: string; focus?: string[] };
+        const sectionsA = contractA.split(/\n{2,}/);
+        const sectionsB = contractB.split(/\n{2,}/);
+        const differences: Array<{ section: string; changeType: string; textA: string; textB: string; risk: string }> = [];
+        const maxSections = Math.max(sectionsA.length, sectionsB.length);
+        for (let i = 0; i < maxSections; i++) {
+          const a = (sectionsA[i] ?? '').trim();
+          const b = (sectionsB[i] ?? '').trim();
+          if (a !== b) {
+            const sectionLabel = `Section ${i + 1}`;
+            let risk = 'low';
+            const combined = (a + b).toLowerCase();
+            if (/indemnif|liability|penalty|damages|warrant/i.test(combined)) risk = 'high';
+            else if (/terminat|renewal|payment|confidential/i.test(combined)) risk = 'medium';
+            if (focus.length === 0 || focus.some(f => combined.includes(f.toLowerCase()))) {
+              differences.push({
+                section: sectionLabel,
+                changeType: !a ? 'added' : !b ? 'removed' : 'modified',
+                textA: a.slice(0, 300),
+                textB: b.slice(0, 300),
+                risk,
+              });
+            }
+          }
+        }
+        const highRisk = differences.filter(d => d.risk === 'high').length;
+        const summary = `Found ${differences.length} differences. ${highRisk} high-risk changes detected. Review carefully before signing.`;
+        return { success: true, data: { differences, summary, totalDifferences: differences.length, highRiskCount: highRisk } };
+      } catch (err) {
+        return { success: false, error: `Contract comparison failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 19. extract_obligations
+  toolRegistry.register(
+    {
+      name: 'extract_obligations',
+      description: 'Extract key dates, obligations, terms, renewal dates, and termination clauses from contract text.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          contractText: { type: 'string', description: 'Full contract text to analyze' },
+        },
+        required: ['contractText'],
+      },
+      outputSchema: { type: 'object', properties: { obligations: { type: 'array' }, renewalDate: { type: 'string' }, terminationClause: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { contractText } = input as { contractText: string };
+        const text = contractText;
+        const obligations: Array<{ type: string; description: string; deadline: string | null; party: string }> = [];
+        const datePattern = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+ \d{1,2},?\s*\d{4})/g;
+        const dates = text.match(datePattern) ?? [];
+        const paymentMatches = text.match(/(?:payment|pay|fee|invoice|billing)[^.]*\./gi) ?? [];
+        for (const match of paymentMatches) {
+          const dateInMatch = match.match(datePattern);
+          obligations.push({ type: 'payment', description: match.trim().slice(0, 200), deadline: dateInMatch?.[0] ?? null, party: 'unspecified' });
+        }
+        const deliveryMatches = text.match(/(?:deliver|provide|submit|complete|perform)[^.]*\./gi) ?? [];
+        for (const match of deliveryMatches.slice(0, 10)) {
+          const dateInMatch = match.match(datePattern);
+          obligations.push({ type: 'delivery', description: match.trim().slice(0, 200), deadline: dateInMatch?.[0] ?? null, party: 'unspecified' });
+        }
+        const renewalMatch = text.match(/(?:renewal|renew)[^.]*\./i);
+        const terminationMatch = text.match(/(?:termination|terminate)[^.]*(?:\.[^.]*){0,2}\./i);
+        return {
+          success: true,
+          data: {
+            obligations,
+            dates: dates.slice(0, 20),
+            renewalDate: renewalMatch?.[0]?.trim().slice(0, 300) ?? null,
+            terminationClause: terminationMatch?.[0]?.trim().slice(0, 500) ?? null,
+            totalObligations: obligations.length,
+          },
+        };
+      } catch (err) {
+        return { success: false, error: `Obligation extraction failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 20. monitor_regulations
+  toolRegistry.register(
+    {
+      name: 'monitor_regulations',
+      description: 'Search for recent regulatory changes and compliance updates in a specific industry and jurisdiction.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          industry: { type: 'string', description: 'Industry to monitor (e.g. "fintech", "healthcare", "AI")' },
+          jurisdiction: { type: 'string', description: 'Jurisdiction (e.g. "US", "EU", "California")' },
+          topics: { type: 'array', items: { type: 'string' }, description: 'Specific regulatory topics to search' },
+        },
+        required: ['industry'],
+      },
+      outputSchema: { type: 'object', properties: { updates: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { industry, jurisdiction, topics = [] } = input as { industry: string; jurisdiction?: string; topics?: string[] };
+        const queries: string[] = [];
+        queries.push(`${industry} regulation change 2026`);
+        if (jurisdiction) queries.push(`${jurisdiction} ${industry} compliance update`);
+        for (const topic of topics.slice(0, 3)) {
+          queries.push(`${industry} ${topic} regulation`);
+        }
+        const updates: Array<{ title: string; url: string; summary: string; impact: string }> = [];
+        for (const query of queries) {
+          const { results } = await searchDuckDuckGo(query, 3);
+          for (const r of results) {
+            const lowerSnippet = r.snippet.toLowerCase();
+            let impact = 'informational';
+            if (/mandatory|required|must comply|penalty|fine|enforcement/i.test(lowerSnippet)) impact = 'high';
+            else if (/proposed|draft|comment period|recommended/i.test(lowerSnippet)) impact = 'medium';
+            updates.push({ title: r.title, url: r.url, summary: r.snippet, impact });
+          }
+        }
+        return { success: true, data: { updates, industry, jurisdiction: jurisdiction ?? 'global', totalUpdates: updates.length } };
+      } catch (err) {
+        return { success: false, error: `Regulation monitoring failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── GROWTH EXECUTION TOOLS ────────────────────────────────────────────────
+
+  // 21. auto_engage_reddit
+  toolRegistry.register(
+    {
+      name: 'auto_engage_reddit',
+      description: 'Find Reddit threads mentioning specific keywords and draft helpful replies for community engagement.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for on Reddit' },
+          productName: { type: 'string', description: 'Product name to subtly reference in replies' },
+          maxThreads: { type: 'number', description: 'Maximum threads to return (default: 5)' },
+        },
+        required: ['keywords'],
+      },
+      outputSchema: { type: 'object', properties: { threads: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { keywords, productName, maxThreads = 5 } = input as { keywords: string[]; productName?: string; maxThreads?: number };
+        const threads: Array<{ subreddit: string; title: string; url: string; suggestedReply: string }> = [];
+        for (const keyword of keywords) {
+          if (threads.length >= maxThreads) break;
+          const { results } = await searchDuckDuckGo(`site:reddit.com ${keyword}`, 3);
+          for (const r of results) {
+            if (threads.length >= maxThreads) break;
+            const subredditMatch = r.url.match(/reddit\.com\/r\/([^/]+)/);
+            const subreddit = subredditMatch?.[1] ?? 'unknown';
+            let reply = `Here's what I've found works well for ${keyword}: [share genuine insight]. `;
+            if (productName) reply += `${productName} also addresses this — might be worth looking into.`;
+            threads.push({ subreddit, title: r.title, url: r.url, suggestedReply: reply });
+          }
+        }
+        return { success: true, data: { threads } };
+      } catch (err) {
+        return { success: false, error: `Reddit engagement failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 22. auto_engage_twitter
+  toolRegistry.register(
+    {
+      name: 'auto_engage_twitter',
+      description: 'Find Twitter/X discussions about specific topics and draft engagement replies.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for on Twitter/X' },
+          productName: { type: 'string', description: 'Product name to reference in replies' },
+        },
+        required: ['keywords'],
+      },
+      outputSchema: { type: 'object', properties: { tweets: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { keywords, productName } = input as { keywords: string[]; productName?: string };
+        const tweets: Array<{ url: string; author: string; snippet: string; suggestedReply: string }> = [];
+        for (const keyword of keywords) {
+          const { results } = await searchDuckDuckGo(`site:twitter.com ${keyword}`, 3);
+          for (const r of results) {
+            const authorMatch = r.url.match(/twitter\.com\/([^/]+)/);
+            const author = authorMatch?.[1] ?? 'unknown';
+            let reply = `Great point about ${keyword}! `;
+            reply += `[Add valuable insight here]. `;
+            if (productName) reply += `We built ${productName} to tackle exactly this.`;
+            tweets.push({ url: r.url, author, snippet: r.snippet, suggestedReply: reply });
+          }
+        }
+        return { success: true, data: { tweets } };
+      } catch (err) {
+        return { success: false, error: `Twitter engagement failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 23. track_lead_pipeline
+  toolRegistry.register(
+    {
+      name: 'track_lead_pipeline',
+      description: 'Store and manage leads with stage tracking in persistent memory. Add leads, update stages, and generate pipeline reports.',
+      category: ToolCategory.CRM,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: "'add' to add a lead, 'update_stage' to change stage, 'report' to get pipeline" },
+          lead: { type: 'object', properties: { name: { type: 'string' }, company: { type: 'string' }, email: { type: 'string' }, stage: { type: 'string' } }, description: 'Lead data (for add action)' },
+          leadId: { type: 'string', description: 'Lead identifier for update_stage (use email)' },
+        },
+        required: ['action'],
+      },
+      outputSchema: { type: 'object', properties: { pipeline: { type: 'array' }, stageBreakdown: { type: 'object' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { action, lead, leadId } = input as { action: 'add' | 'update_stage' | 'report'; lead?: { name: string; company: string; email: string; stage: string }; leadId?: string };
+        const adapter = getMemoryAdapter();
+        const storageKey = 'LEAD_PIPELINE:leads';
+        const existing = await adapter.get(storageKey, context.tenantId);
+        const pipeline: Array<{ name: string; company: string; email: string; stage: string; addedAt: string }> = (existing as typeof pipeline) ?? [];
+        if (action === 'add' && lead) {
+          pipeline.push({ ...lead, addedAt: new Date().toISOString() });
+          await adapter.set(storageKey, pipeline, context.tenantId, { type: 'WORKFLOW', source: 'track_lead_pipeline' });
+          return { success: true, data: { message: `Lead added: ${lead.name}`, pipeline } };
+        }
+        if (action === 'update_stage' && leadId && lead?.stage) {
+          const idx = pipeline.findIndex(l => l.email === leadId);
+          if (idx >= 0) {
+            pipeline[idx]!.stage = lead.stage;
+            await adapter.set(storageKey, pipeline, context.tenantId, { type: 'WORKFLOW', source: 'track_lead_pipeline' });
+            return { success: true, data: { message: `Lead stage updated: ${pipeline[idx]!.name} -> ${lead.stage}`, pipeline } };
+          }
+          return { success: false, error: `Lead not found: ${leadId}` };
+        }
+        const stageBreakdown: Record<string, number> = {};
+        for (const l of pipeline) {
+          stageBreakdown[l.stage] = (stageBreakdown[l.stage] ?? 0) + 1;
+        }
+        return { success: true, data: { pipeline, stageBreakdown, totalLeads: pipeline.length } };
+      } catch (err) {
+        return { success: false, error: `Lead pipeline tracking failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // ─── CUSTOMER SUCCESS EXECUTION TOOLS ──────────────────────────────────────
+
+  // 24. track_customer_health
+  toolRegistry.register(
+    {
+      name: 'track_customer_health',
+      description: 'Store customer health scores over time, detect trends, and generate risk alerts.',
+      category: ToolCategory.CRM,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: "'score' to record a health score, 'history' to get score history, 'alerts' to get risk alerts" },
+          customerId: { type: 'string', description: 'Unique customer identifier' },
+          healthScore: { type: 'number', description: 'Health score (0-100) to record' },
+          factors: { type: 'object', description: 'Contributing factors as key-value pairs (e.g. { "usage": 80, "satisfaction": 90 })' },
+        },
+        required: ['action', 'customerId'],
+      },
+      outputSchema: { type: 'object', properties: { current: { type: 'object' }, history: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { action, customerId, healthScore, factors } = input as { action: 'score' | 'history' | 'alerts'; customerId: string; healthScore?: number; factors?: Record<string, unknown> };
+        const adapter = getMemoryAdapter();
+        const storageKey = `CUSTOMER_HEALTH:${customerId}`;
+        const existing = await adapter.get(storageKey, context.tenantId);
+        const history: Array<{ date: string; score: number; factors?: Record<string, unknown> }> = (existing as typeof history) ?? [];
+        if (action === 'score' && healthScore !== undefined) {
+          history.push({ date: new Date().toISOString(), score: healthScore, factors });
+          await adapter.set(storageKey, history, context.tenantId, { type: 'KNOWLEDGE', source: 'track_customer_health' });
+          const trend = history.length >= 2 ? (healthScore > history[history.length - 2]!.score ? 'improving' : healthScore < history[history.length - 2]!.score ? 'declining' : 'stable') : 'new';
+          const riskLevel = healthScore >= 70 ? 'healthy' : healthScore >= 40 ? 'at_risk' : 'critical';
+          return { success: true, data: { current: { score: healthScore, trend, riskLevel, customerId }, history } };
+        }
+        if (action === 'alerts') {
+          const latestScore = history.length > 0 ? history[history.length - 1]!.score : null;
+          const alerts: string[] = [];
+          if (latestScore !== null && latestScore < 40) alerts.push(`CRITICAL: Customer ${customerId} health score is ${latestScore}`);
+          if (history.length >= 3) {
+            const recent = history.slice(-3);
+            if (recent.every((h, i) => i === 0 || h.score < recent[i - 1]!.score)) {
+              alerts.push(`WARNING: ${customerId} shows declining trend over last ${recent.length} measurements`);
+            }
+          }
+          return { success: true, data: { alerts, customerId, latestScore } };
+        }
+        return { success: true, data: { history, customerId, dataPoints: history.length } };
+      } catch (err) {
+        return { success: false, error: `Customer health tracking failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  // 25. generate_qbr_deck
+  toolRegistry.register(
+    {
+      name: 'generate_qbr_deck',
+      description: 'Compile customer data into a Quarterly Business Review (QBR) format with metrics, wins, and challenges.',
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          customerName: { type: 'string', description: 'Customer/account name' },
+          period: { type: 'string', description: 'Review period (e.g. "Q1 2026")' },
+          metrics: { type: 'object', description: 'Key performance metrics as key-value pairs' },
+          wins: { type: 'array', items: { type: 'string' }, description: 'Key wins and achievements during the period' },
+          challenges: { type: 'array', items: { type: 'string' }, description: 'Challenges and areas for improvement' },
+        },
+        required: ['customerName', 'period'],
+      },
+      outputSchema: { type: 'object', properties: { qbr: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      try {
+        const { customerName, period, metrics = {}, wins = [], challenges = [] } = input as { customerName: string; period: string; metrics?: Record<string, unknown>; wins?: string[]; challenges?: string[] };
+        const reportResult = await toolRegistry.execute('generate_report', {
+          reportType: 'custom',
+          title: `Quarterly Business Review: ${customerName} - ${period}`,
+          data: { customerName, period, metrics, wins, challenges },
+        }, context);
+        const metricsSection = Object.entries(metrics).map(([k, v]) => `  - ${k}: ${v}`).join('\n');
+        const winsSection = wins.map(w => `  - ${w}`).join('\n');
+        const challengesSection = challenges.map(c => `  - ${c}`).join('\n');
+        const qbr = `# Quarterly Business Review\n## ${customerName} | ${period}\n\n### Key Metrics\n${metricsSection || '  (No metrics provided)'}\n\n### Wins & Achievements\n${winsSection || '  (No wins recorded)'}\n\n### Challenges & Action Items\n${challengesSection || '  (No challenges noted)'}\n\n### Next Steps\n  - Review action items from previous QBR\n  - Set goals for next quarter\n  - Schedule follow-up meeting\n\nGenerated: ${new Date().toISOString()}`;
+        return { success: true, data: { qbr, reportMeta: reportResult } };
+      } catch (err) {
+        return { success: false, error: `QBR generation failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
   // ─── PHORING.AI INTEGRATION TOOLS ───────────────────────────────────────────
   registerPhoringTools();
 }
