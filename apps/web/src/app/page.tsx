@@ -143,7 +143,7 @@ const AGENTS = [
 
 const STATS = [
   { value: 33, label: 'Agents', suffix: '' },
-  { value: 74, label: 'Tools', suffix: '' },
+  { value: 105, label: 'Tools', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
   { value: 22, label: 'Browser Tools', suffix: '' },
 ];

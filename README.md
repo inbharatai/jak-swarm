@@ -5,11 +5,11 @@
 ### The Autonomous AI Company — 33 Agents That Run Your Business
 
 [![Agents](https://img.shields.io/badge/AI_Agents-33-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-104-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tools](https://img.shields.io/badge/Tools-105-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-40%2F40_Human_Sim-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-80%2F80_Human_Sim-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
 **Open-source multi-agent AI platform that replaces entire departments.**
 **CEO • CTO • CMO • Engineer • Legal • Finance • HR • Marketing — all autonomous.**
