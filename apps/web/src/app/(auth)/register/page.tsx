@@ -7,20 +7,19 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Zap, Loader2, CheckCircle2 } from 'lucide-react';
-import { authApi } from '@/lib/api-client';
-import { setToken } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 
 const INDUSTRY_OPTIONS = [
-  { value: 'TECHNOLOGY', label: '💻 Technology' },
-  { value: 'FINANCE', label: '💰 Finance' },
-  { value: 'HEALTHCARE', label: '🏥 Healthcare' },
-  { value: 'LEGAL', label: '⚖️ Legal' },
-  { value: 'RETAIL', label: '🛒 Retail' },
-  { value: 'LOGISTICS', label: '🚚 Logistics' },
-  { value: 'MANUFACTURING', label: '🏭 Manufacturing' },
-  { value: 'REAL_ESTATE', label: '🏠 Real Estate' },
-  { value: 'EDUCATION', label: '🎓 Education' },
-  { value: 'HOSPITALITY', label: '🏨 Hospitality' },
+  { value: 'TECHNOLOGY', label: 'Technology' },
+  { value: 'FINANCE', label: 'Finance' },
+  { value: 'HEALTHCARE', label: 'Healthcare' },
+  { value: 'LEGAL', label: 'Legal' },
+  { value: 'RETAIL', label: 'Retail' },
+  { value: 'LOGISTICS', label: 'Logistics' },
+  { value: 'MANUFACTURING', label: 'Manufacturing' },
+  { value: 'REAL_ESTATE', label: 'Real Estate' },
+  { value: 'EDUCATION', label: 'Education' },
+  { value: 'HOSPITALITY', label: 'Hospitality' },
 ];
 
 const registerSchema = z.object({
@@ -45,9 +44,11 @@ const PASSWORD_STRENGTH_CHECKS = [
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register: registerUser } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
 
   const {
     register,
@@ -61,19 +62,48 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setServerError(null);
     try {
-      const response = await authApi.register({
+      await registerUser({
         email: data.email,
         password: data.password,
         name: data.name,
         tenantName: data.tenantName,
         industry: data.industry,
-      }) as { token: string };
-      setToken(response.token);
-      router.push('/onboarding');
+      });
+      // Supabase may require email confirmation
+      setEmailSent(true);
+      // If auto-confirm is enabled, redirect immediately
+      setTimeout(() => {
+        router.push('/workspace');
+        router.refresh();
+      }, 1000);
     } catch (err: unknown) {
       setServerError((err as { message?: string })?.message ?? 'Registration failed. Please try again.');
     }
   };
+
+  if (emailSent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-primary/5 to-background px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mb-6 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold">Account created!</h1>
+          <p className="mt-3 text-muted-foreground">
+            Check your email for a confirmation link, or you&apos;ll be redirected shortly.
+          </p>
+          <Link
+            href="/login"
+            className="mt-6 inline-block text-sm text-primary hover:underline"
+          >
+            Go to Sign In
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-primary/5 to-background px-4 py-8">
@@ -233,7 +263,7 @@ export default function RegisterPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating account…
+                  Creating account...
                 </>
               ) : (
                 'Create Account'

@@ -1,68 +1,58 @@
 'use client';
 
-import { decodeJwt } from 'jose';
 import { useState, useEffect, useCallback } from 'react';
-import type { AuthSession, AuthUser } from '@/types';
-import { authApi } from './api-client';
+import type { AuthUser } from '@/types';
+import { createClient } from './supabase';
+import type { User as SupabaseUser, SupabaseClient } from '@supabase/supabase-js';
 
-const TOKEN_KEY = 'jak_token';
+let _supabase: SupabaseClient | null = null;
+function getClient(): SupabaseClient {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
-// ─── Token helpers ────────────────────────────────────────────────────────────
+// ─── Map Supabase user to JAK AuthUser ──────────────────────────────────────
 
-export function setToken(token: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TOKEN_KEY, token);
+function mapSupabaseUser(user: SupabaseUser): AuthUser {
+  const meta = user.user_metadata ?? {};
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    name: meta['name'] ?? meta['full_name'] ?? user.email?.split('@')[0] ?? '',
+    role: meta['role'] ?? 'END_USER',
+    tenantId: meta['tenantId'] ?? '',
+    tenantName: meta['tenantName'] ?? '',
+    industry: meta['industry'] ?? 'TECHNOLOGY',
+    avatarUrl: meta['avatar_url'] ?? undefined,
+    jobFunction: meta['jobFunction'] ?? undefined,
+  };
+}
+
+// ─── Token helpers (backward compat) ─────────────────────────────────────────
+
+export function setToken(_token: string): void {
+  // No-op: Supabase manages tokens via cookies automatically
 }
 
 export function clearToken(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(TOKEN_KEY);
+  // No-op: Supabase manages tokens via cookies automatically
 }
 
 export function getRawToken(): string | null {
+  // For backward compat with api-client.ts
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  // Supabase stores the session — we can get the access token from it
+  return null; // Will be handled asynchronously
 }
 
-// ─── Session decode ───────────────────────────────────────────────────────────
-
-export function getSession(): AuthSession | null {
-  const token = getRawToken();
-  if (!token) return null;
-
-  try {
-    const payload = decodeJwt(token);
-
-    const expiresAt = typeof payload.exp === 'number' ? payload.exp * 1000 : 0;
-    if (expiresAt && Date.now() > expiresAt) {
-      clearToken();
-      return null;
-    }
-
-    const user: AuthUser = {
-      id: payload.sub ?? (payload['id'] as string) ?? '',
-      email: (payload['email'] as string) ?? '',
-      name: (payload['name'] as string) ?? '',
-      role: (payload['role'] as AuthUser['role']) ?? 'VIEWER',
-      tenantId: (payload['tenantId'] as string) ?? '',
-      tenantName: (payload['tenantName'] as string) ?? '',
-      industry: (payload['industry'] as AuthUser['industry']) ?? 'TECHNOLOGY',
-      avatarUrl: (payload['avatarUrl'] as string) ?? undefined,
-      jobFunction: (payload['jobFunction'] as AuthUser['jobFunction']) ?? undefined,
-    };
-
-    return { user, token, expiresAt };
-  } catch {
-    clearToken();
-    return null;
-  }
-}
+// ─── Session check ───────────────────────────────────────────────────────────
 
 export function isAuthenticated(): boolean {
-  return getSession() !== null;
+  // This is a sync check — for actual auth state, use the useAuth hook
+  return false;
 }
 
-// ─── useAuth hook ─────────────────────────────────────────────────────────────
+// ─── useAuth hook (Supabase-powered) ────────────────────────────────────────
 
 interface AuthState {
   user: AuthUser | null;
@@ -72,7 +62,14 @@ interface AuthState {
 
 interface UseAuthReturn extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  register: (data: {
+    email: string;
+    password: string;
+    name: string;
+    tenantName: string;
+    industry: string;
+  }) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -84,37 +81,79 @@ export function useAuth(): UseAuthReturn {
   });
 
   useEffect(() => {
-    const session = getSession();
-    setState({
-      user: session?.user ?? null,
-      isLoading: false,
-      error: null,
+    // Get initial session
+    getClient().auth.getUser().then((result) => {
+      const user = result.data?.user;
+      setState({
+        user: user ? mapSupabaseUser(user) : null,
+        isLoading: false,
+        error: null,
+      });
     });
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = getClient().auth.onAuthStateChange((_event, session) => {
+      setState({
+        user: session?.user ? mapSupabaseUser(session.user) : null,
+        isLoading: false,
+        error: null,
+      });
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    try {
-      const response = await authApi.login(email, password) as { token: string; user: AuthUser };
-      setToken(response.token);
-      setState({
-        user: response.user,
-        isLoading: false,
-        error: null,
-      });
-    } catch (err: unknown) {
-      const message = (err as { message?: string })?.message ?? 'Login failed';
+    const { error } = await getClient().auth.signInWithPassword({ email, password });
+    if (error) {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: message,
+        error: error.message,
       }));
-      throw err;
+      throw new Error(error.message);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    clearToken();
+  const register = useCallback(
+    async (data: {
+      email: string;
+      password: string;
+      name: string;
+      tenantName: string;
+      industry: string;
+    }) => {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      const { error } = await getClient().auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            full_name: data.name,
+            tenantName: data.tenantName,
+            industry: data.industry,
+            role: 'ADMIN',
+          },
+        },
+      });
+      if (error) {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error.message,
+        }));
+        throw new Error(error.message);
+      }
+    },
+    [],
+  );
+
+  const logout = useCallback(async () => {
+    await getClient().auth.signOut();
     setState({ user: null, isLoading: false, error: null });
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
@@ -124,6 +163,7 @@ export function useAuth(): UseAuthReturn {
   return {
     ...state,
     login,
+    register,
     logout,
     isAuthenticated: state.user !== null,
   };

@@ -1,12 +1,25 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Space_Grotesk, Syne, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AppShell } from '@/components/layout/AppShell';
 import './globals.css';
 
-const inter = Inter({
+const syne = Syne({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-display',
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800'],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
@@ -21,6 +34,10 @@ export const metadata: Metadata = {
     description: 'Deploy intelligent multi-agent workflows across any industry.',
     type: 'website',
   },
+  other: {
+    'theme-color': '#09090b',
+    'color-scheme': 'dark',
+  },
 };
 
 export default function RootLayout({
@@ -29,7 +46,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning className={`${syne.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`} style={{ colorScheme: 'dark' }}>
+      <head>
+        <meta name="theme-color" content="#09090b" />
+      </head>
       <body>
         <ThemeProvider
           attribute="class"

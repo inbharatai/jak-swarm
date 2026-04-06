@@ -19,13 +19,13 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-6 space-y-6">
+    <div className="relative flex-1 overflow-auto p-6 space-y-6 grain-overlay">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
+      <div className="relative z-10">
+        <h1 className="text-2xl font-display font-bold">
+          {greeting()}{user?.name ? <><span className="text-muted-foreground">,</span> <span className="gradient-text">{user.name.split(' ')[0]}</span></> : ''}
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1 font-sans">
           Here&apos;s what&apos;s happening with your workspace
         </p>
       </div>

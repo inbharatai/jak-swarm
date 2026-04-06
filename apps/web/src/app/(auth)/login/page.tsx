@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,9 +18,13 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const redirectTo = searchParams.get('redirectTo') ?? '/workspace';
+  const authError = searchParams.get('error');
 
   const {
     register,
@@ -34,7 +38,8 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(data.email, data.password);
-      router.push('/workspace');
+      router.push(redirectTo);
+      router.refresh();
     } catch (err: unknown) {
       setServerError((err as { message?: string })?.message ?? 'Login failed. Please try again.');
     }
@@ -59,13 +64,12 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="rounded-2xl border bg-card shadow-sm p-8">
-          {/* Demo credentials banner */}
-          <div className="mb-6 rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 text-sm">
-            <p className="font-medium text-primary">Demo credentials</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Email: <code className="font-mono">admin@demo.com</code> · Password: <code className="font-mono">demo1234</code>
-            </p>
-          </div>
+          {/* Auth error from callback */}
+          {authError && (
+            <div className="mb-6 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+              Authentication failed. Please try again.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Email */}
@@ -141,7 +145,7 @@ export default function LoginPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
+                  Signing in...
                 </>
               ) : (
                 'Sign In'

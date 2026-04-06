@@ -1,15 +1,23 @@
 import type { ApiError, Integration } from '@/types';
+import { createClient } from './supabase';
 
 const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000';
 
-function getToken(): string | null {
+async function getToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('jak_token');
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function clearSession(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem('jak_token');
+  const supabase = createClient();
+  supabase.auth.signOut();
   window.location.href = '/login';
 }
 
@@ -19,7 +27,7 @@ async function request<T>(
   body?: unknown,
 ): Promise<T> {
   const url = `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-  const token = getToken();
+  const token = await getToken();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

@@ -61,10 +61,10 @@ const GROUP_LABELS: Record<NavGroup, string> = {
 };
 
 const GROUP_DOT_COLORS: Record<NavGroup, string> = {
-  WORK: 'bg-blue-500',
-  OBSERVE: 'bg-emerald-500',
-  CONFIGURE: 'bg-purple-500',
-  ADMIN: 'bg-amber-500',
+  WORK: 'bg-emerald-500',
+  OBSERVE: 'bg-amber-500',
+  CONFIGURE: 'bg-pink-400',
+  ADMIN: 'bg-red-500',
 };
 
 const GROUP_ORDER: NavGroup[] = ['WORK', 'OBSERVE', 'CONFIGURE', 'ADMIN'];
@@ -106,13 +106,13 @@ export function Sidebar() {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className={cn('flex items-center border-b p-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
           <Zap className="h-4 w-4 text-primary-foreground" />
         </div>
         {!collapsed && (
           <div>
-            <span className="text-sm font-bold text-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]">JAK Swarm</span>
-            <p className="text-xs text-muted-foreground">Agent Platform</p>
+            <span className="text-sm font-display font-bold text-primary drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">JAK Swarm</span>
+            <p className="text-xs text-muted-foreground font-sans">Agent Platform</p>
           </div>
         )}
       </div>
@@ -284,7 +284,7 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          'relative hidden flex-shrink-0 border-r border-border/50 bg-background/95 backdrop-blur-sm transition-all duration-300 md:block',
+          'relative hidden flex-shrink-0 border-r border-border/50 bg-background/95 backdrop-blur-sm transition-all duration-300 md:block grain-overlay',
           collapsed ? 'w-16' : 'w-64',
         )}
       >

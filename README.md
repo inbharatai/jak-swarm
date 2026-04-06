@@ -209,6 +209,9 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 ### Onboarding Wizard — 4-Step Setup
 ![Onboarding](docs/screenshots/07-onboarding.png)
 
+### Dashboard Home
+![Dashboard](docs/screenshots/08-dashboard.png)
+
 ### Login & Registration
 | Login | Registration |
 |:-----:|:------------:|

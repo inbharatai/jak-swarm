@@ -38,6 +38,7 @@ export function Header() {
   const [isKilling, setIsKilling] = useState(false);
 
   const pageTitle = ROUTE_LABELS[pathname] ?? 'JAK Swarm';
+  const showBreadcrumb = pathname !== '/home' && ROUTE_LABELS[pathname];
 
   const handleKillAll = async () => {
     if (!confirm('Stop ALL running workflows? This cannot be undone.')) return;
@@ -55,7 +56,15 @@ export function Header() {
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 md:px-6">
       {/* Page title / breadcrumb */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-lg font-bold tracking-tight truncate">{pageTitle}</h1>
+        <h1 className="text-lg font-display font-bold tracking-tight truncate">
+          {showBreadcrumb && (
+            <>
+              <Link href="/home" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+              <span className="text-muted-foreground mx-2 font-sans text-sm">/</span>
+            </>
+          )}
+          {pageTitle}
+        </h1>
       </div>
 
       <div className="flex items-center gap-2">
@@ -80,7 +89,7 @@ export function Header() {
         >
           <Bell className="h-4 w-4" />
           {pendingCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive animate-pulse text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 animate-pulse text-[10px] font-bold text-white">
               {pendingCount > 9 ? '9+' : pendingCount}
             </span>
           )}
@@ -118,7 +127,7 @@ export function Header() {
                 className="fixed inset-0 z-10"
                 onClick={() => setUserMenuOpen(false)}
               />
-              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border bg-card shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border bg-card shadow-lg glass-card">
                 <div className="border-b px-3 py-2">
                   <p className="text-xs font-medium">{user?.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
