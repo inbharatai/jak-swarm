@@ -4592,6 +4592,54 @@ Date: _______________`;
     },
   );
 
+  // 22b. auto_engage_linkedin
+  toolRegistry.register(
+    {
+      name: 'auto_engage_linkedin',
+      description: 'Find LinkedIn discussions and posts about specific topics and draft professional engagement comments. Searches for relevant LinkedIn content and suggests thoughtful, value-adding replies.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for on LinkedIn' },
+          productName: { type: 'string', description: 'Product name to reference in comments' },
+          tone: { type: 'string', description: 'Tone: professional (default), thought-leadership, casual-professional' },
+        },
+        required: ['keywords'],
+      },
+      outputSchema: { type: 'object', properties: { posts: { type: 'array' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown, _context: ToolExecutionContext) => {
+      try {
+        const { keywords, productName, tone = 'professional' } = input as { keywords: string[]; productName?: string; tone?: string };
+        const posts: Array<{ url: string; author: string; snippet: string; suggestedComment: string }> = [];
+        for (const keyword of keywords) {
+          const { results } = await searchDuckDuckGo(`site:linkedin.com/posts ${keyword}`, 3);
+          for (const r of results) {
+            const authorMatch = r.url.match(/linkedin\.com\/(?:in|posts)\/([^/]+)/);
+            const author = authorMatch?.[1]?.replace(/-/g, ' ') ?? 'unknown';
+            let comment = '';
+            if (tone === 'thought-leadership') {
+              comment = `This resonates deeply. ${keyword} is reshaping how we think about automation. `;
+              comment += `I have been exploring this space and found that the key differentiator is execution, not just strategy. `;
+            } else {
+              comment = `Great insights on ${keyword}! `;
+              comment += `This aligns with what we are seeing in the market. `;
+            }
+            if (productName) comment += `At ${productName}, we have been building tools to address exactly this challenge.`;
+            posts.push({ url: r.url, author, snippet: r.snippet, suggestedComment: comment });
+          }
+        }
+        return { success: true, data: { posts, tone } };
+      } catch (err) {
+        return { success: false, error: `LinkedIn engagement failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
   // 23. track_lead_pipeline
   toolRegistry.register(
     {
