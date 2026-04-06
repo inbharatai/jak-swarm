@@ -263,6 +263,12 @@ export default function HomePage() {
         @keyframes dash-flow {
           to { stroke-dashoffset: -20; }
         }
+        @keyframes flow-travel {
+          0% { left: -5%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
+        }
         @keyframes flow-pulse {
           0% { opacity: 0.3; transform: scale(0.95); }
           50% { opacity: 1; transform: scale(1); }
@@ -496,6 +502,18 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Flow indicator */}
+        <div className="flex justify-center py-8">
+          <div className="flex items-center gap-2 text-slate-500">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <div className="w-8 h-px bg-gradient-to-r from-blue-500 to-purple-500" />
+            <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" style={{ animationDelay: '0.5s' }} />
+            <div className="w-8 h-px bg-gradient-to-r from-purple-500 to-emerald-500" />
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" style={{ animationDelay: '1s' }} />
+            <span className="text-xs text-slate-500 ml-2">Agents collaborate autonomously</span>
+          </div>
+        </div>
+
         {/* ── 4. Workflow Animation ────────────────────────────────────────── */}
         <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 dot-pattern" style={{ background: 'linear-gradient(180deg, transparent, rgba(59,130,246,0.02), transparent)' }}>
           <div ref={workflowSection.ref} className={`fade-section ${workflowSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
@@ -504,33 +522,55 @@ export default function HomePage() {
               <h2 className="text-3xl font-bold sm:text-4xl tracking-tight">From command to result in seconds</h2>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-2">
-              {WORKFLOW_STEPS.map((step, i) => (
-                <div key={step.label} className="flex items-center gap-2 md:gap-0 w-full md:w-auto">
-                  <div className="flow-step flex flex-col items-center text-center flex-shrink-0" style={{ minWidth: 120 }}>
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3 border border-white/10" style={{ background: 'rgba(59,130,246,0.08)' }}>
-                      <svg className="w-7 h-7 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            {/* Animated workflow pipeline */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Connection line running through all steps */}
+              <div className="absolute top-1/2 left-0 right-0 h-0.5 -translate-y-1/2 hidden lg:block">
+                <div className="h-full bg-gradient-to-r from-blue-500/0 via-blue-500/50 to-purple-500/0" />
+                {/* Animated pulse traveling along the line */}
+                <div className="absolute top-0 h-full w-20 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
+                  style={{ animation: 'flow-travel 3s ease-in-out infinite' }} />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 lg:gap-0">
+                {WORKFLOW_STEPS.map((step, i) => (
+                  <div key={i} className="flex flex-col items-center text-center relative group"
+                    style={{ animationDelay: `${i * 0.6}s` }}>
+
+                    {/* Step number badge */}
+                    <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {i + 1}
+                    </div>
+
+                    {/* Icon circle with glow */}
+                    <div className={`relative w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition-all duration-500 ${
+                      i === 0 ? 'bg-blue-500/15 border border-blue-500/30' :
+                      i === 1 ? 'bg-violet-500/15 border border-violet-500/30' :
+                      i === 2 ? 'bg-cyan-500/15 border border-cyan-500/30' :
+                      i === 3 ? 'bg-emerald-500/15 border border-emerald-500/30' :
+                      'bg-amber-500/15 border border-amber-500/30'
+                    }`} style={{ animation: `flow-pulse 3s ease-in-out infinite`, animationDelay: `${i * 0.6}s` }}>
+                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
+                        style={{ color: i===0?'#3B82F6':i===1?'#8B5CF6':i===2?'#06B6D4':i===3?'#10B981':'#F59E0B' }}>
                         <path strokeLinecap="round" strokeLinejoin="round" d={step.icon} />
                       </svg>
                     </div>
-                    <span className="text-sm font-semibold text-white">{step.label}</span>
-                    <span className="text-xs text-slate-500 mt-1">{step.desc}</span>
-                  </div>
 
-                  {/* Arrow between steps */}
-                  {i < WORKFLOW_STEPS.length - 1 && (
-                    <div className="hidden md:block flex-1 mx-2">
-                      <svg className="w-full h-4" viewBox="0 0 100 16">
-                        <line x1="0" y1="8" x2="85" y2="8" className="connection-line" stroke="rgba(59,130,246,0.3)" strokeWidth="1.5" />
-                        <polygon points="90,8 82,4 82,12" fill="rgba(59,130,246,0.3)" />
-                      </svg>
-                    </div>
-                  )}
-                  {i < WORKFLOW_STEPS.length - 1 && (
-                    <div className="md:hidden w-px h-8 mx-auto" style={{ background: 'linear-gradient(180deg, rgba(59,130,246,0.3), transparent)' }} />
-                  )}
-                </div>
-              ))}
+                    {/* Label */}
+                    <span className="text-sm font-semibold text-white mb-0.5">{step.label}</span>
+                    <span className="text-xs text-slate-400 max-w-[120px]">{step.desc}</span>
+
+                    {/* Arrow between steps (desktop only) */}
+                    {i < 4 && (
+                      <div className="hidden lg:block absolute top-1/2 -right-2 -translate-y-1/2 text-slate-600">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -547,8 +587,8 @@ export default function HomePage() {
               {INTEGRATIONS.map((int) => (
                 <div
                   key={int.name}
-                  className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium border border-white/5 transition-all duration-200 hover:border-white/15 hover:scale-105"
-                  style={{ background: int.bg, color: int.color }}
+                  className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105"
+                  style={{ backgroundColor: int.bg, borderColor: int.color + '40' }}
                 >
                   <span className="w-2 h-2 rounded-full" style={{ background: int.color, boxShadow: `0 0 6px ${int.color}40` }} />
                   {int.name}
