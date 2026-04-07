@@ -189,7 +189,7 @@ const PRICING = [
     price: '$49',
     period: '/mo',
     description: 'For teams shipping with AI at scale.',
-    features: ['Unlimited workflows', '5 team members', 'All 33 agents', 'All integrations', 'Priority support', 'Custom templates', 'API access'],
+    features: ['Unlimited workflows', '5 team members', 'All 38 agents', 'All integrations', 'Priority support', 'Custom templates', 'API access'],
     cta: 'Start Pro',
     href: '/register',
     highlighted: true,
@@ -652,27 +652,196 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 5. Integrations ──────────────────────────────────────────────── */}
+        {/* ── 5. Tools & Capabilities ──────────────────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
-          <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
-            <div className="text-center mb-12">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">Integrations</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Connects to your entire stack</h2>
+          <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
+            <div className="text-center mb-16">
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">112 Tools</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {INTEGRATIONS.map((int) => (
-                <div
-                  key={int.name}
-                  className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans"
-                  style={{ backgroundColor: int.bg, borderColor: int.color + '40' }}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: int.color, boxShadow: `0 0 6px ${int.color}40` }} aria-hidden="true" />
-                  {int.name}
+            {/* Tool Categories Grid */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
+              {[
+                { icon: '📧', category: 'Email', count: 8, tools: 'Read, draft, send, search, archive, thread', color: '#EA4335' },
+                { icon: '📅', category: 'Calendar', count: 5, tools: 'List events, create, update, delete, find availability', color: '#4285F4' },
+                { icon: '🌐', category: 'Browser', count: 22, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
+                { icon: '🏗️', category: 'Sandbox', count: 7, tools: 'Create VM, write files, exec commands, dev server, deploy', color: '#fbbf24' },
+                { icon: '📄', category: 'Document', count: 8, tools: 'Read, write, summarize, extract data, export, PDF analysis', color: '#8B5CF6' },
+                { icon: '📊', category: 'Spreadsheet', count: 6, tools: 'Parse CSV, compute stats, formulas, charts, export', color: '#10B981' },
+                { icon: '👤', category: 'CRM', count: 10, tools: 'Contacts, deals, activities, enrichment, lead scoring', color: '#F59E0B' },
+                { icon: '🔍', category: 'Research', count: 6, tools: 'Web search, news, academic, citations, deep research', color: '#06B6D4' },
+                { icon: '🧠', category: 'Knowledge', count: 10, tools: 'Memory store, retrieve, search, Q&A, index, summarize', color: '#c084fc' },
+                { icon: '⚙️', category: 'Ops', count: 8, tools: 'Webhooks, API calls, file I/O, code execute, health checks', color: '#fb923c' },
+                { icon: '🎤', category: 'Voice', count: 4, tools: 'Transcribe, synthesize, detect intent, real-time sessions', color: '#f472b6' },
+                { icon: '🔌', category: 'MCP', count: 18, tools: 'Slack, GitHub, Notion, HubSpot, Jira + any MCP server', color: '#38bdf8' },
+              ].map((cat) => (
+                <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">{cat.icon}</span>
+                    <h3 className="font-display font-semibold text-sm text-white">{cat.category}</h3>
+                    <span className="ml-auto text-xs font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{cat.count}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-sans">{cat.tools}</p>
                 </div>
               ))}
-              <div className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-white/10 font-sans">
-                + 68 more tools
+            </div>
+
+            {/* Connected Services */}
+            <div className="text-center">
+              <p className="text-xs text-slate-500 mb-4 font-sans uppercase tracking-widest">Connected Services</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {INTEGRATIONS.map((int) => (
+                  <div
+                    key={int.name}
+                    className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans"
+                    style={{ backgroundColor: int.bg, borderColor: int.color + '40' }}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ background: int.color, boxShadow: `0 0 6px ${int.color}40` }} aria-hidden="true" />
+                    {int.name}
+                  </div>
+                ))}
+                {[
+                  { name: 'HubSpot', color: '#FF7A59', bg: 'rgba(255,122,89,0.1)' },
+                  { name: 'Jira', color: '#0052CC', bg: 'rgba(0,82,204,0.1)' },
+                  { name: 'Notion', color: '#FFFFFF', bg: 'rgba(255,255,255,0.06)' },
+                  { name: 'Salesforce', color: '#00A1E0', bg: 'rgba(0,161,224,0.1)' },
+                  { name: 'Stripe', color: '#635BFF', bg: 'rgba(99,91,255,0.1)' },
+                  { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
+                ].map((svc) => (
+                  <div key={svc.name} className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans" style={{ backgroundColor: svc.bg, borderColor: svc.color + '40' }}>
+                    <span className="w-2 h-2 rounded-full" style={{ background: svc.color, boxShadow: `0 0 6px ${svc.color}40` }} aria-hidden="true" />
+                    {svc.name}
+                  </div>
+                ))}
+                <div className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-white/10 font-sans">
+                  + any MCP server
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 5b. Vibe Coding Deep Dive ────────────────────────────────────── */}
+        <section className="px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
+          <div className="mx-auto max-w-6xl relative z-10">
+            <div className="text-center mb-16">
+              <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">How Vibe Coding Works</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From Idea to Live App in 5 Steps</h2>
+            </div>
+
+            {/* Pipeline Steps */}
+            <div className="grid gap-6 md:grid-cols-5 mb-16">
+              {[
+                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', icon: '💬', color: '#34d399' },
+                { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', icon: '🏛️', color: '#fbbf24' },
+                { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', icon: '⚡', color: '#38bdf8' },
+                { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', icon: '🔧', color: '#f472b6' },
+                { step: '05', title: 'Preview', desc: 'Live preview in browser. Iterate via chat. Deploy.', icon: '🚀', color: '#c084fc' },
+              ].map((s, i) => (
+                <div key={s.step} className="text-center">
+                  <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl" style={{ background: `${s.color}15`, border: `1px solid ${s.color}30` }}>
+                    {s.icon}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-500 mb-1 uppercase tracking-widest">Step {s.step}</div>
+                  <h3 className="font-display font-semibold text-white text-sm mb-1">{s.title}</h3>
+                  <p className="text-xs text-slate-400 font-sans">{s.desc}</p>
+                  {i < 4 && <div className="hidden md:block absolute mt-2 text-slate-600" aria-hidden="true" />}
+                </div>
+              ))}
+            </div>
+
+            {/* Cost Comparison */}
+            <div className="glass-card rounded-2xl p-8 max-w-3xl mx-auto mb-16">
+              <h3 className="font-display font-semibold text-white text-center mb-6">Cost Per Generated App</h3>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-display font-bold gradient-text">$0.50</div>
+                  <div className="text-xs text-slate-500 mt-1 font-sans">Simple app<br />Tier 1-2 models</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-display font-bold gradient-text">$1.50</div>
+                  <div className="text-xs text-slate-500 mt-1 font-sans">Medium app<br />With debug loop</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-display font-bold gradient-text">$0.10</div>
+                  <div className="text-xs text-slate-500 mt-1 font-sans">Per iteration<br />Only changed files</div>
+                </div>
+              </div>
+              <p className="text-center text-[10px] text-slate-600 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug. 10x cheaper than single-model platforms.</p>
+            </div>
+
+            {/* Builder IDE Preview */}
+            <div className="glass-card rounded-2xl overflow-hidden max-w-4xl mx-auto">
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-amber-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500/60" />
+                </div>
+                <span className="text-xs text-slate-500 font-mono ml-2">JAK Builder — My Task Manager</span>
+              </div>
+              <div className="grid grid-cols-12 min-h-[300px]">
+                {/* File tree */}
+                <div className="col-span-3 border-r border-white/5 p-3 text-xs text-slate-400 font-mono space-y-1">
+                  <div className="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Files</div>
+                  <div className="text-emerald-400">{'>'} src/</div>
+                  <div className="pl-3">{'>'} app/</div>
+                  <div className="pl-6 text-white">page.tsx</div>
+                  <div className="pl-6">layout.tsx</div>
+                  <div className="pl-3">{'>'} components/</div>
+                  <div className="pl-6">TaskBoard.tsx</div>
+                  <div className="pl-6">TaskCard.tsx</div>
+                  <div className="pl-3">{'>'} lib/</div>
+                  <div>package.json</div>
+                  <div>tailwind.config.ts</div>
+                </div>
+                {/* Editor */}
+                <div className="col-span-5 border-r border-white/5 p-3">
+                  <div className="flex gap-2 mb-3 text-xs">
+                    <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400">Code</span>
+                    <span className="px-2 py-1 rounded text-slate-500">Preview</span>
+                  </div>
+                  <pre className="text-xs font-mono text-slate-400 leading-relaxed">
+{`export default function Home() {
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-3xl font-bold">
+        Task Manager
+      </h1>
+      <TaskBoard />
+    </main>
+  );
+}`}
+                  </pre>
+                </div>
+                {/* Chat */}
+                <div className="col-span-4 p-3 text-xs space-y-3">
+                  <div className="text-[10px] text-slate-600 uppercase tracking-widest">Chat</div>
+                  <div className="rounded-lg bg-emerald-500/10 px-3 py-2 text-emerald-300">
+                    Build a task manager with drag-and-drop boards and dark mode
+                  </div>
+                  <div className="rounded-lg bg-white/5 px-3 py-2 text-slate-300">
+                    Generated 12 files: pages, components, API routes, Prisma schema, Tailwind config.
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <div className="flex-1 rounded-lg border border-white/10 px-3 py-2 text-slate-500">Add user authentication...</div>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">{'>'}</div>
+                  </div>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div className="border-t border-white/5 px-4 py-2 flex items-center gap-3 text-xs">
+                <span className="text-emerald-400">{'✓'} Architect</span>
+                <span className="text-emerald-400">{'✓'} Generate</span>
+                <span className="text-emerald-400">{'✓'} Build</span>
+                <span className="text-amber-400 animate-pulse">{'◉'} Preview</span>
+                <span className="text-slate-600">{'○'} Deploy</span>
+                <div className="ml-auto flex-1 max-w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full w-3/4 bg-gradient-to-r from-emerald-400 to-amber-400 rounded-full" />
+                </div>
+                <span className="text-slate-500 font-mono">75%</span>
               </div>
             </div>
           </div>
