@@ -149,8 +149,8 @@ const AGENTS = [
 ];
 
 const STATS = [
-  { value: 33, label: 'Agents', suffix: '' },
-  { value: 105, label: 'Tools', suffix: '' },
+  { value: 38, label: 'Agents', suffix: '' },
+  { value: 112, label: 'Tools', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
   { value: 22, label: 'Browser Tools', suffix: '' },
 ];
@@ -393,7 +393,7 @@ export default function HomePage() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">33 Agents Live</span>
+                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents + Vibe Coding</span>
               </div>
 
               <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[0.95]">
@@ -617,6 +617,41 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── 4b. Vibe Coding Feature Highlight ──────────────────────────── */}
+        <section className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, rgba(251,191,36,0.03), rgba(52,211,153,0.02), transparent)' }}>
+          <div className="mx-auto max-w-6xl relative z-10">
+            <div className="text-center mb-16">
+              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Vibe Coding</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Build Full-Stack Apps with AI</h2>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Describe your app in plain English. Watch 5 specialized agents architect, generate, debug, and deploy it&nbsp;&mdash; in minutes, not months.</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { icon: '🏛️', title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
+                { icon: '⚡', title: 'Code Generator', desc: 'Generates production-grade Next.js, React, Tailwind CSS, and Prisma code — complete files, not stubs', color: '#fbbf24' },
+                { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors, diagnoses root cause, applies surgical fixes, rebuilds — up to 3 retries automatically', color: '#f472b6' },
+                { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI replicates it with pixel-accurate Tailwind components', color: '#38bdf8' },
+                { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with environment variables, custom domains, and zero-downtime updates', color: '#c084fc' },
+                { icon: '🔀', title: 'Version Control', desc: 'Every change creates a snapshot. Roll back to any version instantly. GitHub sync built-in.', color: '#fb923c' },
+              ].map((feature) => (
+                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
+                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-12 text-center">
+              <Link href="/builder" className="inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', touchAction: 'manipulation' }}>
+                Try the Builder
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* ── 5. Integrations ──────────────────────────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
@@ -803,7 +838,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 33 agents, 105 tools, infinite possibilities.
+                  The autonomous AI workforce platform. 38 agents, 112 tools, vibe coding built in.
                 </p>
               </div>
 

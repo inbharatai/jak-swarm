@@ -4,8 +4,9 @@
 
 ### The Autonomous AI Company — 33 Agents That Run Your Business
 
-[![Agents](https://img.shields.io/badge/AI_Agents-33-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-105-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tools](https://img.shields.io/badge/Tools-112-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
@@ -13,6 +14,7 @@
 
 **Open-source multi-agent AI platform that replaces entire departments.**
 **CEO • CTO • CMO • Engineer • Legal • Finance • HR • Marketing — all autonomous.**
+**Now with Vibe Coding: describe an app, watch it build, deploy in minutes.**
 
 [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [API Reference](#-api-reference) • [Documentation](ARCHITECTURE.md)
 
@@ -78,18 +80,22 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **33 AI Agents** | 6 orchestrators + 27 specialized workers covering every company role |
-| 🔧 | **74 Tools** | Web search, browser control, email, calendar, code execution, PDF, vision |
+| 🤖 | **38 AI Agents** | 6 orchestrators + 27 workers + 5 vibe coding specialists |
+| 🔧 | **112 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision |
+| ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
-| 👁️ | **Multi-Modal Vision** | GPT-4o + Claude analyze screenshots and images |
+| 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, get pixel-accurate React + Tailwind components |
 | 📧 | **Real Gmail/Calendar** | IMAP/SMTP + CalDAV — no OAuth needed, just app password |
 | 🔌 | **MCP Gateway** | Slack, GitHub, Notion via official MCP servers |
 | ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
-| 💰 | **Cost Controls** | Per-workflow budgets, auto-approve low-risk tasks |
+| 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
 | 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
 | 🌐 | **22 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
 | 📊 | **React Flow DAG Graph** | Real-time visualization of agent execution |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, onboarding wizard |
+| 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel with env vars and custom domains |
+| 🔀 | **Version Control** | Every change creates a snapshot. Rollback to any version instantly |
+| 📸 | **Image-to-Code** | Drag-drop a Figma screenshot, AI replicates the design |
 
 ---
 
@@ -114,6 +120,12 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 ### 🏢 Company Operations (8)
 
 > ✏️ **Content** • 📈 **SEO** • 📰 **PR** • ⚖️ **Legal** • 🤝 **Success** • 📉 **Analytics** • 🗺️ **Product** • 📌 **Project**
+
+### ⚡ Vibe Coding Agents (5) — NEW
+
+> 🏛️ **App Architect** • ⚡ **Code Generator** • 🔧 **Auto-Debugger** • 🚀 **Deployer** • 📸 **Screenshot-to-Code**
+>
+> *The AI app builder. Describe what you want, these agents design the architecture, generate production code, auto-fix build errors, and deploy to Vercel.*
 
 ### ⚙️ Core Workers (11)
 
@@ -167,6 +179,16 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 | `WORKER_PRODUCT` | ProductAgent | web_search, classify_text, generate_report |
 | `WORKER_PROJECT` | ProjectAgent | list_calendar_events, send_webhook, generate_report |
 
+#### Vibe Coding Agents
+
+| Role | Agent | Primary Tools |
+|------|-------|---------------|
+| `WORKER_APP_ARCHITECT` | AppArchitectAgent | Architecture blueprints, file tree planning, data model design |
+| `WORKER_APP_GENERATOR` | AppGeneratorAgent | Full file code generation (React, Next.js, Tailwind, Prisma) |
+| `WORKER_APP_DEBUGGER` | AppDebuggerAgent | Self-debugging loop: diagnose build errors, auto-fix, rebuild |
+| `WORKER_APP_DEPLOYER` | AppDeployerAgent | Vercel deployment, GitHub sync, custom domain config |
+| `WORKER_SCREENSHOT_TO_CODE` | ScreenshotToCodeAgent | Vision analysis, UI replication from screenshots |
+
 </details>
 
 ---
@@ -216,6 +238,71 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 | Login | Registration |
 |:-----:|:------------:|
 | ![Login](docs/screenshots/05-login.png) | ![Register](docs/screenshots/06-register.png) |
+
+---
+
+## ⚡ Vibe Coding — AI App Builder
+
+JAK Swarm includes a full **Vibe Coding** module that lets you build complete web applications by describing them in plain English. Think Emergent.sh / Lovable / Bolt.new, but integrated into a multi-agent platform with 3-tier cost optimization.
+
+### How It Works
+
+```
+"Build a task manager with user auth, drag-and-drop boards, and dark mode"
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  🏛️ App Architect Agent (Tier 3)                    │
+│  Creates: file tree, data models, API endpoints,    │
+│  component hierarchy, dependency list               │
+└─────────────────┬───────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────┐
+│  ⚡ Code Generator Agent (Tier 2)                    │
+│  Generates: React pages, API routes, Prisma schema, │
+│  Tailwind styles — complete, working files           │
+└─────────────────┬───────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────┐
+│  🔧 Auto-Debugger Agent (Tier 1)                     │
+│  Runs: npm install → next build → fix errors →       │
+│  rebuild (max 3 retries before escalating to user)   │
+└─────────────────┬───────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────┐
+│  👁️ Live Preview                                     │
+│  Preview in iframe, iterate via chat, deploy to      │
+│  Vercel when ready                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+### Builder IDE Features
+
+| Feature | Description |
+|---------|-------------|
+| **3-Panel IDE** | File explorer + Monaco editor + chat panel |
+| **Live Preview** | Iframe preview via sandbox dev server |
+| **Screenshot-to-Code** | Upload a UI screenshot, AI replicates it |
+| **Version History** | Every change creates a snapshot, one-click rollback |
+| **Deploy to Vercel** | One-click deployment with env vars and custom domains |
+| **GitHub Sync** | Push/pull to any GitHub repository |
+| **Self-Debugging** | Build errors auto-detected and auto-fixed (3 retries) |
+| **Cost Optimization** | Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug loops |
+| **Iterative Chat** | Describe changes in natural language, only affected files regenerated |
+| **Template Library** | Next.js App, SaaS Starter, React SPA scaffolds |
+
+### Estimated Cost Per App
+
+| Operation | LLM Tier | Cost |
+|-----------|----------|------|
+| Initial architecture | Tier 3 (Claude/GPT-4o) | $0.20-0.50 |
+| Code generation | Tier 2 (Sonnet/Flash) | $0.15-0.40 |
+| Debug iterations | Tier 1 (DeepSeek/GPT-4o-mini) | $0.02-0.05/iter |
+| **Total (new app)** | | **$0.50-2.00** |
+| **Per iteration** | | **$0.05-0.30** |
 
 ---
 
