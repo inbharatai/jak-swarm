@@ -700,7 +700,7 @@ export default function HomePage() {
                 { icon: '🧠', category: 'Knowledge', count: 10, tools: 'Memory store, retrieve, search, Q&A, index, summarize', color: '#c084fc' },
                 { icon: '⚙️', category: 'Ops', count: 8, tools: 'Webhooks, API calls, file I/O, code execute, health checks', color: '#fb923c' },
                 { icon: '🎤', category: 'Voice', count: 4, tools: 'Transcribe, synthesize, detect intent, real-time sessions', color: '#f472b6' },
-                { icon: '🔌', category: 'MCP', count: 18, tools: 'Slack, GitHub, Notion, HubSpot, Jira + any MCP server', color: '#38bdf8' },
+                { icon: '🔌', category: 'MCP', count: 20, tools: 'Slack, GitHub, Notion, HubSpot, Salesforce, Jira, Linear, Stripe + 12 more', color: '#38bdf8' },
               ].map((cat) => (
                 <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
                   <div className="flex items-center gap-2 mb-2">
@@ -729,11 +729,17 @@ export default function HomePage() {
                 ))}
                 {[
                   { name: 'HubSpot', color: '#FF7A59', bg: 'rgba(255,122,89,0.1)' },
-                  { name: 'Jira', color: '#0052CC', bg: 'rgba(0,82,204,0.1)' },
-                  { name: 'Notion', color: '#FFFFFF', bg: 'rgba(255,255,255,0.06)' },
                   { name: 'Salesforce', color: '#00A1E0', bg: 'rgba(0,161,224,0.1)' },
+                  { name: 'Pipedrive', color: '#017737', bg: 'rgba(1,119,55,0.1)' },
+                  { name: 'Jira', color: '#0052CC', bg: 'rgba(0,82,204,0.1)' },
+                  { name: 'Linear', color: '#5E6AD2', bg: 'rgba(94,106,210,0.1)' },
                   { name: 'Stripe', color: '#635BFF', bg: 'rgba(99,91,255,0.1)' },
                   { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
+                  { name: 'Asana', color: '#F06A6A', bg: 'rgba(240,106,106,0.1)' },
+                  { name: 'Airtable', color: '#18BFFF', bg: 'rgba(24,191,255,0.1)' },
+                  { name: 'Twilio', color: '#F22F46', bg: 'rgba(242,47,70,0.1)' },
+                  { name: 'Google Drive', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
+                  { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
                 ].map((svc) => (
                   <div key={svc.name} className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans" style={{ backgroundColor: svc.bg, borderColor: svc.color + '40' }}>
                     <span className="w-2 h-2 rounded-full" style={{ background: svc.color, boxShadow: `0 0 6px ${svc.color}40` }} aria-hidden="true" />
@@ -741,7 +747,7 @@ export default function HomePage() {
                   </div>
                 ))}
                 <div className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-white/10 font-sans">
-                  + any MCP server
+                  + 20 MCP providers &amp; growing
                 </div>
               </div>
             </div>

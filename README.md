@@ -132,7 +132,8 @@ flowchart LR
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
 | 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, get pixel-accurate React + Tailwind components |
 | 📧 | **Real Gmail/Calendar** | IMAP/SMTP + CalDAV — no OAuth needed, just app password |
-| 🔌 | **MCP Gateway** | Slack, GitHub, Notion via official MCP servers |
+| 🔌 | **20 MCP Integrations** | HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics |
+| 🧩 | **Skills Marketplace** | Browse, install, and create custom skills with sandbox testing and approval workflow |
 | ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
 | 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
 | 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
