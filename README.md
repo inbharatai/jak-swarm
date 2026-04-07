@@ -2,7 +2,7 @@
 
 # 🐝 JAK Swarm
 
-### The Autonomous AI Company — 33 Agents That Run Your Business
+### The Autonomous AI Company — 38 Agents That Run Your Business
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Tools](https://img.shields.io/badge/Tools-112-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
@@ -20,7 +20,7 @@
 
 ---
 
-*Give it a goal in plain English. Watch 33 agents plan, execute, and deliver — in real time.*
+*Give it a goal in plain English. Watch 38 agents plan, execute, and deliver — in real time.*
 
 </div>
 
@@ -46,7 +46,7 @@ flowchart TD
         F["🔀 Router Agent\nAssign agents • Select LLM tier • Enable parallelism"]
     end
 
-    subgraph WORKERS["⚡ Worker Layer — 32 Specialists"]
+    subgraph WORKERS["⚡ Worker Layer — 32 Specialists + 5 Vibe Coding"]
         direction LR
         G["📧 Email\n📅 Calendar\n👤 CRM"]
         H["📄 Document\n📊 Spreadsheet\n🌐 Browser"]
@@ -565,7 +565,7 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (74 Tools)
+## 🔧 Tool Inventory (112 Tools)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
@@ -586,7 +586,7 @@ http://localhost:3000
 | **Phoring.ai** | 4 | phoring_forecast, phoring_graph_query, phoring_validate, phoring_simulate | ✅ Real (needs API key) |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion tools loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 65 built-in tools + dynamic MCP tools**
+**Total: 112 tools (built-in + sandbox + MCP integrations)**
 
 ---
 
@@ -791,7 +791,7 @@ jak-swarm/
 │           ├── settings/       # LLM & approval config
 │           └── admin/          # Tenant management
 ├── packages/
-│   ├── agents/                 # 33 agent implementations
+│   ├── agents/                 # 38 agent implementations
 │   │   └── src/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
@@ -799,7 +799,7 @@ jak-swarm/
 │   ├── tools/                  # 65 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
-│   │       ├── builtin/        # 65 built-in tools
+│   │       ├── builtin/        # 112 tools (built-in + sandbox + MCP)
 │   │       ├── adapters/       # Email, Calendar, CRM, Browser, Memory
 │   │       └── mcp/            # MCP client, bridge, provider configs
 │   ├── swarm/                  # Orchestration engine
