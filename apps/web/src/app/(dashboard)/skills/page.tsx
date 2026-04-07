@@ -28,20 +28,25 @@ const TIER_LABELS: Record<number, { label: string; icon: React.ReactNode; desc: 
   3: { label: 'Custom', icon: <Code2 className="h-3.5 w-3.5" />, desc: 'Your custom skills with sandboxed code' },
 };
 
-// Pre-built skill templates users can install
+// Pre-built skill templates — ONLY skills backed by REAL tools in the codebase
 const SKILL_MARKETPLACE = [
-  { id: 'web-scraper', name: 'Web Scraper', description: 'Extract structured data from any webpage using CSS selectors', tier: 2, riskLevel: 'LOW', category: 'Data' },
-  { id: 'pdf-analyzer', name: 'PDF Analyzer', description: 'Extract text, tables, and metadata from PDF documents', tier: 2, riskLevel: 'LOW', category: 'Document' },
-  { id: 'email-templates', name: 'Email Templates', description: 'Pre-built email templates for outreach, follow-ups, and newsletters', tier: 2, riskLevel: 'LOW', category: 'Email' },
-  { id: 'data-enrichment', name: 'Data Enrichment', description: 'Enrich contact data with company info, social profiles, and technographics', tier: 2, riskLevel: 'MEDIUM', category: 'CRM' },
-  { id: 'seo-audit', name: 'SEO Audit', description: 'Analyze page SEO, meta tags, headings, images, and performance', tier: 2, riskLevel: 'LOW', category: 'Marketing' },
-  { id: 'contract-review', name: 'Contract Review', description: 'Extract key terms, obligations, and risks from legal contracts', tier: 2, riskLevel: 'LOW', category: 'Legal' },
-  { id: 'financial-model', name: 'Financial Model', description: 'Build revenue projections, unit economics, and scenario analysis', tier: 2, riskLevel: 'LOW', category: 'Finance' },
-  { id: 'code-review', name: 'Code Review', description: 'Automated code review with security, performance, and style checks', tier: 2, riskLevel: 'LOW', category: 'Engineering' },
-  { id: 'social-media', name: 'Social Media Manager', description: 'Draft posts, analyze engagement, and schedule content across platforms', tier: 2, riskLevel: 'MEDIUM', category: 'Marketing' },
-  { id: 'customer-health', name: 'Customer Health Score', description: 'Calculate customer health scores from usage, support, and engagement data', tier: 2, riskLevel: 'LOW', category: 'Success' },
-  { id: 'competitive-intel', name: 'Competitive Intelligence', description: 'Monitor competitor websites, pricing, features, and positioning changes', tier: 2, riskLevel: 'LOW', category: 'Strategy' },
-  { id: 'api-connector', name: 'Custom API Connector', description: 'Connect to any REST API with configurable auth, headers, and mapping', tier: 3, riskLevel: 'HIGH', category: 'Integration' },
+  // ── VERIFIED: Backed by real tool implementations ──────────────────────
+  { id: 'pdf-analyzer', name: 'PDF Analyzer', description: 'Extract text from PDFs and analyze content with AI vision (pdf_extract_text + pdf_analyze tools)', tier: 1, riskLevel: 'LOW', category: 'Document' },
+  { id: 'seo-audit', name: 'SEO Audit', description: 'Audit page SEO: title, meta description, H1 tags, images, viewport, canonical URLs, JSON-LD schema (audit_seo tool)', tier: 1, riskLevel: 'LOW', category: 'Marketing' },
+  { id: 'customer-health', name: 'Customer Health Tracker', description: 'Track customer health scores over time, detect trends, and flag at-risk accounts (track_customer_health tool)', tier: 1, riskLevel: 'LOW', category: 'Success' },
+  { id: 'web-extract', name: 'Web Content Extractor', description: 'Navigate to any URL and extract text content using CSS selectors via Playwright (browser_extract + browser_navigate tools)', tier: 1, riskLevel: 'LOW', category: 'Browser' },
+  { id: 'social-poster', name: 'Social Media Poster', description: 'Post content to Twitter, LinkedIn, and Reddit via browser automation. Requires logged-in browser sessions. (post_to_twitter/linkedin/reddit tools)', tier: 1, riskLevel: 'MEDIUM', category: 'Marketing' },
+  { id: 'email-sequences', name: 'Email Sequence Builder', description: 'Create multi-step email sequences with template variables like {{name}}, {{company}} and track engagement (create_email_sequence + personalize_email tools)', tier: 1, riskLevel: 'MEDIUM', category: 'Email' },
+  { id: 'contact-enrichment', name: 'Contact Enrichment', description: 'Enrich contact records with company info and LinkedIn URLs via web search. Note: does not access social APIs directly. (enrich_contact + enrich_company tools)', tier: 1, riskLevel: 'LOW', category: 'CRM' },
+  { id: 'tech-debt-scanner', name: 'Tech Debt Scanner', description: 'Scan code for TODO/FIXME/HACK comments, empty catch blocks, @ts-ignore directives, and deprecated API usage (estimate_tech_debt tool)', tier: 1, riskLevel: 'LOW', category: 'Engineering' },
+  { id: 'competitor-news', name: 'Competitor News Monitor', description: 'Search for recent news and updates about competitors via DuckDuckGo. Returns news snippets, not feature/pricing tracking. (monitor_competitors tool)', tier: 1, riskLevel: 'LOW', category: 'Strategy' },
+  { id: 'contract-compare', name: 'Contract Comparison', description: 'Compare two contracts side-by-side and extract key dates, obligations, and terms using pattern matching (compare_contracts + extract_obligations tools)', tier: 1, riskLevel: 'LOW', category: 'Legal' },
+  { id: 'financial-csv', name: 'Financial CSV Parser', description: 'Parse financial CSV files into structured rows with column sums and averages. Note: not a modeling tool. (parse_financial_csv tool)', tier: 1, riskLevel: 'LOW', category: 'Finance' },
+  { id: 'image-generator', name: 'AI Image Generator', description: 'Generate images using DALL-E 3 from text descriptions for social media, marketing, and design (generate_image tool)', tier: 1, riskLevel: 'LOW', category: 'Creative' },
+  { id: 'keyword-research', name: 'SEO Keyword Research', description: 'Research keywords, analyze search intent, and find content opportunities with volume estimates (research_keywords + analyze_serp tools)', tier: 1, riskLevel: 'LOW', category: 'Marketing' },
+  { id: 'lead-scoring', name: 'Lead Scoring', description: 'Score leads based on engagement, fit criteria, and behavioral signals for sales prioritization (score_lead + predict_churn tools)', tier: 1, riskLevel: 'LOW', category: 'Sales' },
+  { id: 'sandbox-runner', name: 'Code Sandbox', description: 'Execute code in isolated E2B or Docker sandboxes with file system access, npm install, and dev server preview (sandbox_create + sandbox_exec tools)', tier: 1, riskLevel: 'HIGH', category: 'Engineering' },
+  { id: 'webhook-sender', name: 'Webhook Sender', description: 'Send HTTP webhooks to any URL with custom headers, body, and method. Supports JSON and form-encoded payloads. (send_webhook + api_call tools)', tier: 1, riskLevel: 'MEDIUM', category: 'Integration' },
 ];
 
 interface Skill {
