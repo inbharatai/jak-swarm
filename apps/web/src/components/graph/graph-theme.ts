@@ -34,6 +34,12 @@ export const AGENT_COLORS: Record<string, { bg: string; border: string; text: st
   WORKER_ANALYTICS:   { bg: 'bg-indigo-50 dark:bg-indigo-950/40',   border: 'border-indigo-300',  text: 'text-indigo-700 dark:text-indigo-300' },
   WORKER_PRODUCT:     { bg: 'bg-violet-50 dark:bg-violet-950/40',   border: 'border-violet-300',  text: 'text-violet-700 dark:text-violet-300' },
   WORKER_PROJECT:     { bg: 'bg-sky-50 dark:bg-sky-950/40',         border: 'border-sky-300',     text: 'text-sky-700 dark:text-sky-300' },
+  // Vibe Coding agents
+  WORKER_APP_ARCHITECT:      { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-400', text: 'text-emerald-700 dark:text-emerald-300' },
+  WORKER_APP_GENERATOR:      { bg: 'bg-lime-50 dark:bg-lime-950/40',      border: 'border-lime-400',    text: 'text-lime-700 dark:text-lime-300' },
+  WORKER_APP_DEBUGGER:       { bg: 'bg-red-50 dark:bg-red-950/40',        border: 'border-red-400',     text: 'text-red-700 dark:text-red-300' },
+  WORKER_APP_DEPLOYER:       { bg: 'bg-cyan-50 dark:bg-cyan-950/40',      border: 'border-cyan-400',    text: 'text-cyan-700 dark:text-cyan-300' },
+  WORKER_SCREENSHOT_TO_CODE: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', border: 'border-fuchsia-400', text: 'text-fuchsia-700 dark:text-fuchsia-300' },
 };
 
 export const DEFAULT_COLOR = { bg: 'bg-slate-50 dark:bg-slate-950/40', border: 'border-slate-400', text: 'text-slate-700 dark:text-slate-300' };
@@ -81,4 +87,10 @@ export const ROLE_EMOJIS: Record<string, string> = {
   WORKER_ANALYTICS:   '📉',
   WORKER_PRODUCT:     '🗺️',
   WORKER_PROJECT:     '📌',
+  // Vibe Coding agents
+  WORKER_APP_ARCHITECT:      '🏛️',
+  WORKER_APP_GENERATOR:      '⚡',
+  WORKER_APP_DEBUGGER:       '🔧',
+  WORKER_APP_DEPLOYER:       '🚀',
+  WORKER_SCREENSHOT_TO_CODE: '📸',
 };

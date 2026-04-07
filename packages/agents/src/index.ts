@@ -154,3 +154,19 @@ export type { ProductAction, ProductTask, ProductResult } from './workers/produc
 
 export { ProjectAgent } from './workers/project.agent.js';
 export type { ProjectAction, ProjectTask, ProjectResult } from './workers/project.agent.js';
+
+// Vibe Coding agents
+export { AppArchitectAgent } from './workers/app-architect.agent.js';
+export type { AppArchitectAction, AppArchitectTask, AppArchitectResult } from './workers/app-architect.agent.js';
+
+export { AppGeneratorAgent } from './workers/app-generator.agent.js';
+export type { AppGeneratorAction, AppGeneratorTask, AppGeneratorResult } from './workers/app-generator.agent.js';
+
+export { AppDebuggerAgent } from './workers/app-debugger.agent.js';
+export type { AppDebuggerAction, AppDebuggerTask, AppDebuggerResult } from './workers/app-debugger.agent.js';
+
+export { AppDeployerAgent } from './workers/app-deployer.agent.js';
+export type { AppDeployerAction, AppDeployerTask, AppDeployerResult } from './workers/app-deployer.agent.js';
+
+export { ScreenshotToCodeAgent } from './workers/screenshot-to-code.agent.js';
+export type { ScreenshotToCodeAction, ScreenshotToCodeTask, ScreenshotToCodeResult } from './workers/screenshot-to-code.agent.js';

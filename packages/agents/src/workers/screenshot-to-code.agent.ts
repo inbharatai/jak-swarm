@@ -144,9 +144,27 @@ export class ScreenshotToCodeAgent extends BaseAgent {
       },
     ];
 
+    const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'search_knowledge',
+          description: 'Search for UI component patterns, design system references, and existing component examples',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query for component patterns or design references' },
+              category: { type: 'string', description: 'Category: components, design-systems, patterns, layouts' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+    ];
+
     let loopResult: ToolLoopResult;
     try {
-      loopResult = await this.executeWithTools(messages, [], context, {
+      loopResult = await this.executeWithTools(messages, tools, context, {
         maxTokens: 8192,
         temperature: 0.2,
         maxIterations: 2,

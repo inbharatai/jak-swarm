@@ -28,6 +28,11 @@ import {
   AnalyticsAgent,
   ProductAgent,
   ProjectAgent,
+  AppArchitectAgent,
+  AppGeneratorAgent,
+  AppDebuggerAgent,
+  AppDeployerAgent,
+  ScreenshotToCodeAgent,
 } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
@@ -185,6 +190,17 @@ function createWorkerAgent(role: AgentRole) {
       return new ProductAgent();
     case AgentRole.WORKER_PROJECT:
       return new ProjectAgent();
+    // Vibe Coding agents
+    case AgentRole.WORKER_APP_ARCHITECT:
+      return new AppArchitectAgent();
+    case AgentRole.WORKER_APP_GENERATOR:
+      return new AppGeneratorAgent();
+    case AgentRole.WORKER_APP_DEBUGGER:
+      return new AppDebuggerAgent();
+    case AgentRole.WORKER_APP_DEPLOYER:
+      return new AppDeployerAgent();
+    case AgentRole.WORKER_SCREENSHOT_TO_CODE:
+      return new ScreenshotToCodeAgent();
     default:
       return null;
   }
@@ -384,6 +400,44 @@ function buildTaskInput(
         action: inferProjectAction(task),
         projectName: task.name,
         description: task.description,
+        dependencyResults,
+      };
+    // Vibe Coding agents
+    case AgentRole.WORKER_APP_ARCHITECT:
+      return {
+        action: inferAppArchitectAction(task),
+        description: task.description,
+        framework: 'nextjs',
+        features: task.description ? [task.description] : [],
+        industry: state.industry,
+        dependencyResults,
+      };
+    case AgentRole.WORKER_APP_GENERATOR:
+      return {
+        action: inferAppGeneratorAction(task),
+        architecture: dependencyResults ? JSON.stringify(dependencyResults) : undefined,
+        framework: 'nextjs',
+        dependencyResults,
+      };
+    case AgentRole.WORKER_APP_DEBUGGER:
+      return {
+        action: inferAppDebuggerAction(task),
+        errorLog: task.description,
+        errorType: 'build' as const,
+        dependencyResults,
+      };
+    case AgentRole.WORKER_APP_DEPLOYER:
+      return {
+        action: inferAppDeployerAction(task),
+        projectName: task.name ?? 'jak-project',
+        framework: 'nextjs',
+        dependencyResults,
+      };
+    case AgentRole.WORKER_SCREENSHOT_TO_CODE:
+      return {
+        action: 'ANALYZE_SCREENSHOT' as const,
+        targetFramework: 'nextjs',
+        additionalInstructions: task.description,
         dependencyResults,
       };
     default:
@@ -722,4 +776,40 @@ function extractKeywordFromDescription(description: string): string | undefined 
 function extractUrlFromDescription(description: string): string | undefined {
   const match = description.match(/https?:\/\/[^\s]+/);
   return match?.[0];
+}
+
+// ─── Vibe Coding Action Inference ──────────────────────────────────────────
+
+function inferAppArchitectAction(task: import('@jak-swarm/shared').WorkflowTask): string {
+  const desc = task.description.toLowerCase();
+  if (desc.includes('schema') || desc.includes('database') || desc.includes('model')) return 'DESIGN_SCHEMA';
+  if (desc.includes('route') || desc.includes('page') || desc.includes('navigation')) return 'PLAN_ROUTES';
+  if (desc.includes('component') || desc.includes('ui') || desc.includes('layout')) return 'PLAN_COMPONENTS';
+  if (desc.includes('change') || desc.includes('modify') || desc.includes('update') || desc.includes('add')) return 'PLAN_CHANGES';
+  return 'ARCHITECT_APP';
+}
+
+function inferAppGeneratorAction(task: import('@jak-swarm/shared').WorkflowTask): string {
+  const desc = task.description.toLowerCase();
+  if (desc.includes('modify') || desc.includes('change') || desc.includes('update') || desc.includes('fix')) return 'MODIFY_FILE';
+  if (desc.includes('component') || desc.includes('button') || desc.includes('form')) return 'GENERATE_COMPONENT';
+  if (desc.includes('batch') || desc.includes('multiple') || desc.includes('all files')) return 'GENERATE_BATCH';
+  return 'GENERATE_FILE';
+}
+
+function inferAppDebuggerAction(task: import('@jak-swarm/shared').WorkflowTask): string {
+  const desc = task.description.toLowerCase();
+  if (desc.includes('type') || desc.includes('typescript') || desc.includes('ts')) return 'FIX_TYPE_ERROR';
+  if (desc.includes('runtime') || desc.includes('crash') || desc.includes('undefined')) return 'FIX_RUNTIME_ERROR';
+  if (desc.includes('loop') || desc.includes('auto') || desc.includes('self')) return 'SELF_DEBUG_LOOP';
+  return 'DIAGNOSE_BUILD_ERROR';
+}
+
+function inferAppDeployerAction(task: import('@jak-swarm/shared').WorkflowTask): string {
+  const desc = task.description.toLowerCase();
+  if (desc.includes('github') || desc.includes('repo') || desc.includes('push') || desc.includes('sync')) return 'SYNC_GITHUB';
+  if (desc.includes('domain') || desc.includes('dns') || desc.includes('custom')) return 'CONFIGURE_DOMAIN';
+  if (desc.includes('preview') || desc.includes('staging')) return 'DEPLOY_PREVIEW';
+  if (desc.includes('status') || desc.includes('check')) return 'CHECK_DEPLOYMENT_STATUS';
+  return 'DEPLOY_VERCEL';
 }

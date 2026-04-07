@@ -129,9 +129,27 @@ export class AppDebuggerAgent extends BaseAgent {
       },
     ];
 
+    const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'search_knowledge',
+          description: 'Search the knowledge base for known error patterns, previous fixes, and debugging strategies',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query for error patterns or fix strategies' },
+              category: { type: 'string', description: 'Category: errors, fixes, patterns, dependencies' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+    ];
+
     let loopResult: ToolLoopResult;
     try {
-      loopResult = await this.executeWithTools(messages, [], context, {
+      loopResult = await this.executeWithTools(messages, tools, context, {
         maxTokens: 4096,
         temperature: 0.1,
         maxIterations: 2,
