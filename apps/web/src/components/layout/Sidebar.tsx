@@ -22,6 +22,7 @@ import {
   Zap,
   Plug,
   Clock,
+  Code2,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Home',         href: '/home',         icon: Home,          group: 'WORK' },
   { label: 'Workspace',    href: '/workspace',    icon: LayoutDashboard, group: 'WORK' },
   { label: 'Schedules',    href: '/schedules',    icon: Clock,           group: 'WORK' },
+  { label: 'Builder',      href: '/builder',      icon: Code2,           group: 'WORK' },
   // OBSERVE
   { label: 'Swarm',        href: '/swarm',        icon: Network,       group: 'OBSERVE' },
   { label: 'Traces',       href: '/traces',       icon: FileText,      group: 'OBSERVE' },

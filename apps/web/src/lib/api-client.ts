@@ -394,3 +394,27 @@ export const scheduleApi = {
   delete: (id: string) => apiClient.delete<unknown>(`/schedules/${id}`),
   runNow: (id: string) => apiClient.post<unknown>(`/schedules/${id}/run`),
 };
+
+// ─── Projects (Vibe Coding) ─────────────────────────────────────────
+
+export const projectApi = {
+  list: (params?: { page?: number; status?: string }) =>
+    apiClient.get<unknown>(`/projects${params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ''}`),
+  get: (id: string) => apiClient.get<unknown>(`/projects/${id}`),
+  create: (body: { name: string; description?: string; framework?: string; templateId?: string }) =>
+    apiClient.post<unknown>('/projects', body),
+  generate: (id: string, body: { description: string; framework?: string; templateId?: string; imageBase64?: string }) =>
+    apiClient.post<unknown>(`/projects/${id}/generate`, body),
+  iterate: (id: string, body: { message: string; imageBase64?: string }) =>
+    apiClient.post<unknown>(`/projects/${id}/iterate`, body),
+  deploy: (id: string) =>
+    apiClient.post<unknown>(`/projects/${id}/deploy`),
+  rollback: (id: string, version: number) =>
+    apiClient.post<unknown>(`/projects/${id}/rollback`, { version }),
+  files: (id: string) => apiClient.get<unknown>(`/projects/${id}/files`),
+  updateFile: (id: string, path: string, content: string) =>
+    apiClient.put<unknown>(`/projects/${id}/files/${path}`, { content }),
+  versions: (id: string) => apiClient.get<unknown>(`/projects/${id}/versions`),
+  conversations: (id: string) => apiClient.get<unknown>(`/projects/${id}/conversations`),
+  delete: (id: string) => apiClient.delete<unknown>(`/projects/${id}`),
+};

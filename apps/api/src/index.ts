@@ -31,6 +31,7 @@ import llmSettingsRoutes from './routes/llm-settings.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
 import { onboardingRoutes } from './routes/onboarding.routes.js';
 import { integrationRoutes } from './routes/integrations.routes.js';
+import projectsRoutes from './routes/projects.routes.js';
 
 async function buildApp() {
   const fastify = Fastify({
@@ -129,6 +130,7 @@ async function buildApp() {
   await fastify.register(schedulesRoutes, { prefix: '/schedules' });
   await fastify.register(onboardingRoutes);
   await fastify.register(integrationRoutes);
+  await fastify.register(projectsRoutes, { prefix: '/projects' });
 
   // -------------------------------------------------------------------------
   // Health check
