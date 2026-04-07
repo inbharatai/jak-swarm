@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-build:
+    name: Lint, Typecheck & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @jak-swarm/db exec prisma generate
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/agents build
+
+      - name: Typecheck all packages
+        run: |
+          pnpm --filter @jak-swarm/shared exec tsc --noEmit
+          pnpm --filter @jak-swarm/agents exec tsc --noEmit
+          pnpm --filter @jak-swarm/swarm exec tsc --noEmit
+
+      - name: Build web app
+        run: pnpm --filter @jak-swarm/web exec next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_key
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint-typecheck-build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @jak-swarm/db exec prisma generate
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/agents build
+
+      - name: Run tests
+        run: pnpm --filter tests test
+        env:
+          NODE_ENV: test

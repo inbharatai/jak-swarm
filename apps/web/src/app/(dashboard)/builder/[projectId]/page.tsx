@@ -142,6 +142,8 @@ export default function BuilderIDEPage() {
   const [showGitHubSync, setShowGitHubSync] = useState(false);
   // FIX #9: Error state for user-visible error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSavingFile, setIsSavingFile] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
   const buildSteps = eventsToBuildSteps(streamEvents);
@@ -209,6 +211,24 @@ export default function BuilderIDEPage() {
     } finally {
       setIsDeploying(false);
     }
+  };
+
+  // Auto-save on editor change (debounced 1.5s)
+  const handleEditorChange = (value: string | undefined) => {
+    if (!value || !selectedFile || !currentFile || value === currentFile.content) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      setIsSavingFile(true);
+      try {
+        await projectApi.updateFile(projectId, selectedFile, value);
+        refresh();
+      } catch (e) {
+        setErrorMessage('Failed to save file');
+        setTimeout(() => setErrorMessage(null), 5000);
+      } finally {
+        setIsSavingFile(false);
+      }
+    }, 1500);
   };
 
   const handleRollback = async (version: number) => {
@@ -325,6 +345,9 @@ export default function BuilderIDEPage() {
             {selectedFile && (
               <span className="ml-2 text-xs text-muted-foreground truncate">{selectedFile}</span>
             )}
+            {isSavingFile && (
+              <span className="ml-2 text-[10px] text-amber-400 animate-pulse">Saving...</span>
+            )}
           </div>
 
           {/* Content */}
@@ -334,11 +357,12 @@ export default function BuilderIDEPage() {
                 <Suspense fallback={<div className="flex items-center justify-center h-full"><Spinner /></div>}>
                   <MonacoEditor
                     height="100%"
-                    language={currentFile.language === 'typescript' ? 'typescript' : currentFile.language === 'javascript' ? 'javascript' : currentFile.language === 'css' ? 'css' : currentFile.language === 'json' ? 'json' : currentFile.language === 'markdown' ? 'markdown' : currentFile.language === 'prisma' ? 'graphql' : currentFile.language === 'html' ? 'html' : 'plaintext'}
+                    language={({'typescript':'typescript','javascript':'javascript','css':'css','json':'json','markdown':'markdown','prisma':'graphql','html':'html','tsx':'typescriptreact','jsx':'javascriptreact','yaml':'yaml','sql':'sql','shell':'shell'} as Record<string,string>)[currentFile.language ?? ''] ?? 'plaintext'}
                     value={currentFile.content}
                     theme="vs-dark"
+                    onChange={handleEditorChange}
                     options={{
-                      readOnly: true,
+                      readOnly: false,
                       minimap: { enabled: false },
                       fontSize: 13,
                       lineNumbers: 'on',

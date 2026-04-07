@@ -18,8 +18,8 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   // Allow static assets and API routes
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) return true;
-  // Allow file extensions (images, etc.)
-  if (pathname.includes('.')) return true;
+  // Allow static file extensions only (not arbitrary dots in paths)
+  if (/\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|ttf|eot|map|txt|xml|json)$/i.test(pathname)) return true;
   return false;
 }
 

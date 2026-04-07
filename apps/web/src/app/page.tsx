@@ -228,6 +228,7 @@ export default function HomePage() {
   const router = useRouter();
   const [heroVisible, setHeroVisible] = useState(false);
   const [hoveredAgent, setHoveredAgent] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const agentGrid = useFadeIn();
   const workflowSection = useFadeIn();
@@ -338,6 +339,20 @@ export default function HomePage() {
               <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
             </div>
             <div className="flex items-center gap-3">
+              {/* Mobile hamburger */}
+              <button
+                className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+                aria-expanded={mobileMenuOpen}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  {mobileMenuOpen
+                    ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  }
+                </svg>
+              </button>
               <Link href="/login" className="text-sm font-medium text-slate-400 hover:text-white focus-visible:text-white transition-colors">
                 Sign In
               </Link>
@@ -347,6 +362,16 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+
+          {/* Mobile menu dropdown */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
+              <a href="#agents" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Agents</a>
+              <a href="#workflow" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
+              <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-emerald-400 hover:text-emerald-300 transition-colors">Builder</Link>
+            </div>
+          )}
         </nav>
 
         {/* ── 1. Hero ──────────────────────────────────────────────────────── */}
@@ -938,32 +963,29 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 7. Community ────────────────────────────────────────────────── */}
+        {/* ── 7. Open Source ────────────────────────────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={testimonialSection.ref} className={`fade-section ${testimonialSection.visible ? 'visible' : ''} mx-auto max-w-4xl text-center`}>
-            <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">Community</p>
-            <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-8">Join companies automating with JAK&nbsp;Swarm</h2>
+            <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">Open Source</p>
+            <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-4">Built in the Open</h2>
+            <p className="text-slate-400 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, deploy on your own infrastructure.</p>
 
-            {/* Placeholder avatars */}
-            <div className="flex items-center justify-center -space-x-3 mb-6" aria-hidden="true">
-              {[...Array(7)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-10 h-10 rounded-full border-2 border-[#09090b]"
-                  style={{
-                    background: `linear-gradient(135deg, ${
-                      ['#34d399', '#fbbf24', '#f472b6', '#38bdf8', '#c084fc', '#fb923c', '#ef4444'][i]
-                    }40, ${
-                      ['#34d399', '#fbbf24', '#f472b6', '#38bdf8', '#c084fc', '#fb923c', '#ef4444'][i]
-                    }15)`,
-                  }}
-                />
-              ))}
-              <div className="w-10 h-10 rounded-full border-2 border-[#09090b] bg-white/5 flex items-center justify-center text-xs font-bold text-slate-400">
-                +
-              </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+              <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Star JAK Swarm on GitHub">
+                <GitHubIcon className="h-5 w-5" />
+                Star on GitHub
+              </a>
+              <a href="https://github.com/inbharatai/jak-swarm/issues" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-white transition-colors font-sans">
+                Report an issue &rarr;
+              </a>
             </div>
-            <p className="text-slate-500 text-sm font-sans">Be among the first to transform your operations with AI</p>
+
+            {/* Tech stack badges */}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {['TypeScript', 'Next.js 14', 'Fastify', 'Prisma', 'PostgreSQL', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor'].map(tech => (
+                <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 font-sans">{tech}</span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -1026,9 +1048,9 @@ export default function HomePage() {
               <div>
                 <h4 className="text-sm font-display font-semibold text-white mb-4">Company</h4>
                 <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
-                  <li><span className="text-slate-600 cursor-default">About</span></li>
-                  <li><span className="text-slate-600 cursor-default">Blog</span></li>
-                  <li><span className="text-slate-600 cursor-default">Careers</span></li>
+                  <li><a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">About</a></li>
+                  <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Architecture</a></li>
+                  <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/AGENTS.md" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Agent Docs</a></li>
                   <li><a href="mailto:contact@inbharat.ai" className="hover:text-white focus-visible:text-white transition-colors">Contact</a></li>
                 </ul>
               </div>
@@ -1062,7 +1084,11 @@ export default function HomePage() {
             {/* Bottom bar */}
             <div className="mt-12 pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <span className="text-sm text-slate-600 font-sans">&copy; {new Date().getFullYear()} InBharat AI. All rights reserved.</span>
-              <span className="text-sm text-slate-600 font-sans">Built with purpose. Designed for scale.</span>
+              <div className="flex items-center gap-4 text-sm text-slate-600 font-sans">
+                <a href="/terms" className="hover:text-white transition-colors">Terms</a>
+                <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
+                <span>Built with purpose.</span>
+              </div>
             </div>
           </div>
         </footer>
