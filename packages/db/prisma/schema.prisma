@@ -34,6 +34,7 @@ model Tenant {
   integrations    Integration[]
   onboardingState OnboardingState?
   schedules       WorkflowSchedule[]
+  projects        Project[]
 
   @@map("tenants")
 }
@@ -298,4 +299,90 @@ model WorkflowSchedule {
   @@index([tenantId, enabled])
   @@index([nextRunAt])
   @@map("workflow_schedules")
+}
+
+// ─── Vibe Coding: Project Models ────────────────────────────────────────────
+
+model Project {
+  id              String    @id @default(cuid())
+  tenantId        String
+  userId          String
+  name            String
+  description     String?   @db.Text
+  framework       String    @default("nextjs") // nextjs | react-spa | react-native | fastify-api
+  status          String    @default("DRAFT")  // DRAFT | GENERATING | BUILDING | READY | DEPLOYED | FAILED
+  sandboxId       String?
+  previewUrl      String?
+  deploymentUrl   String?
+  deploymentId    String?
+  githubRepo      String?
+  githubBranch    String?   @default("main")
+  templateId      String?
+  currentVersion  Int       @default(0)
+  totalCostUsd    Float     @default(0)
+  metadata        Json?     // architecture, config, env vars, etc.
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  files           ProjectFile[]
+  versions        ProjectVersion[]
+  conversations   ProjectConversation[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, userId])
+  @@map("projects")
+}
+
+model ProjectFile {
+  id         String   @id @default(cuid())
+  projectId  String
+  path       String   // e.g. "src/app/page.tsx"
+  content    String   @db.Text
+  language   String?  // tsx, ts, css, json, md, etc.
+  size       Int      @default(0)
+  hash       String?  // SHA-256 for diffing
+  versionId  String?  // which version created/modified this
+  isDeleted  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("project_files")
+}
+
+model ProjectVersion {
+  id           String   @id @default(cuid())
+  projectId    String
+  version      Int
+  description  String?
+  snapshotJson Json?    // full file tree snapshot for rollback
+  diffJson     Json?    // files changed in this version
+  createdBy    String   @default("system") // "user" | "agent" | "system"
+  workflowId   String?  // optional link to the workflow that created this version
+  createdAt    DateTime @default(now())
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+  @@map("project_versions")
+}
+
+model ProjectConversation {
+  id         String   @id @default(cuid())
+  projectId  String
+  role       String   // "user" | "assistant" | "system"
+  content    String   @db.Text
+  metadata   Json?    // file references, agent info, cost, etc.
+  workflowId String?
+  createdAt  DateTime @default(now())
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("project_conversations")
 }

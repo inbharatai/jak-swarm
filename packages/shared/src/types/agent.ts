@@ -34,6 +34,12 @@ export enum AgentRole {
   WORKER_ANALYTICS = 'WORKER_ANALYTICS',     // Data Analytics/BI — metrics, trends, dashboards, A/B tests
   WORKER_PRODUCT = 'WORKER_PRODUCT',         // Product Manager — specs, roadmap, user stories, prioritization
   WORKER_PROJECT = 'WORKER_PROJECT',         // Project Manager — timelines, resources, status, milestones
+  // Vibe Coding — full-stack app generation agents
+  WORKER_APP_ARCHITECT = 'WORKER_APP_ARCHITECT',       // App architecture from natural language
+  WORKER_APP_GENERATOR = 'WORKER_APP_GENERATOR',       // Code file generation from architecture
+  WORKER_APP_DEBUGGER = 'WORKER_APP_DEBUGGER',         // Self-debugging loop for build errors
+  WORKER_APP_DEPLOYER = 'WORKER_APP_DEPLOYER',         // Deploy to Vercel, sync GitHub
+  WORKER_SCREENSHOT_TO_CODE = 'WORKER_SCREENSHOT_TO_CODE', // Image/screenshot to code conversion
 }
 
 export enum AgentStatus {

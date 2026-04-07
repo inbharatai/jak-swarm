@@ -34,6 +34,12 @@ export const AGENT_ROLE_DISPLAY_NAMES: Record<AgentRole, string> = {
   [AgentRole.WORKER_ANALYTICS]: 'Analytics Analyst',
   [AgentRole.WORKER_PRODUCT]: 'Product Manager',
   [AgentRole.WORKER_PROJECT]: 'Project Manager',
+  // Vibe Coding agents
+  [AgentRole.WORKER_APP_ARCHITECT]: 'App Architect',
+  [AgentRole.WORKER_APP_GENERATOR]: 'App Code Generator',
+  [AgentRole.WORKER_APP_DEBUGGER]: 'App Debugger',
+  [AgentRole.WORKER_APP_DEPLOYER]: 'App Deployer',
+  [AgentRole.WORKER_SCREENSHOT_TO_CODE]: 'Screenshot to Code',
 };
 
 export const WORKER_AGENT_ROLES: AgentRole[] = [
@@ -64,6 +70,12 @@ export const WORKER_AGENT_ROLES: AgentRole[] = [
   AgentRole.WORKER_ANALYTICS,
   AgentRole.WORKER_PRODUCT,
   AgentRole.WORKER_PROJECT,
+  // Vibe Coding agents
+  AgentRole.WORKER_APP_ARCHITECT,
+  AgentRole.WORKER_APP_GENERATOR,
+  AgentRole.WORKER_APP_DEBUGGER,
+  AgentRole.WORKER_APP_DEPLOYER,
+  AgentRole.WORKER_SCREENSHOT_TO_CODE,
 ];
 
 export const ORCHESTRATOR_ROLES: AgentRole[] = [
