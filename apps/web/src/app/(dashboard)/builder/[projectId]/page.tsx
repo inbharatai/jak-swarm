@@ -3,12 +3,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useProject, type ProjectFile } from '@/hooks/useProject';
+import { useProjectStream } from '@/hooks/useProjectStream';
 import { projectApi } from '@/lib/api-client';
 import { Button, Badge, Spinner, Card, CardContent, Input } from '@/components/ui';
+import { BuildProgress, eventsToBuildSteps } from '@/components/builder/BuildProgress';
+import { ImageUpload } from '@/components/builder/ImageUpload';
 import {
   ArrowLeft, Play, Rocket, GitBranch, Settings, Eye, Code2,
   ChevronRight, ChevronDown, FileText, FolderOpen, Folder, Send,
-  RotateCcw, ExternalLink, Loader2,
+  RotateCcw, ExternalLink, Loader2, Image as ImageIcon,
 } from 'lucide-react';
 
 // ─── File Tree Helpers ──────────────────────────────────────────────────
@@ -127,9 +130,12 @@ export default function BuilderIDEPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
   const [chatMessage, setChatMessage] = useState('');
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
+  const buildSteps = eventsToBuildSteps(streamEvents);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -161,10 +167,17 @@ export default function BuilderIDEPage() {
     setIsSending(true);
     try {
       if (project.status === 'DRAFT' && (!project.files || project.files.length === 0)) {
-        await projectApi.generate(projectId, { description: chatMessage });
+        await projectApi.generate(projectId, {
+          description: chatMessage,
+          imageBase64: imageBase64 ?? undefined,
+        });
       } else {
-        await projectApi.iterate(projectId, { message: chatMessage });
+        await projectApi.iterate(projectId, {
+          message: chatMessage,
+          imageBase64: imageBase64 ?? undefined,
+        });
       }
+      setImageBase64(null);
       setChatMessage('');
       refresh();
     } catch (e) {
@@ -348,9 +361,29 @@ export default function BuilderIDEPage() {
             <div ref={chatEndRef} />
           </div>
 
+          {/* Build Progress */}
+          {isGenerating && streamEvents.length > 0 && (
+            <div className="border-t px-3 py-2">
+              <BuildProgress steps={buildSteps} />
+            </div>
+          )}
+
           {/* Input */}
-          <div className="border-t p-3">
+          <div className="border-t p-3 space-y-2">
+            {imageBase64 && (
+              <ImageUpload
+                onImageSelected={setImageBase64}
+                onClear={() => setImageBase64(null)}
+              />
+            )}
             <div className="flex gap-2">
+              {!imageBase64 && (
+                <ImageUpload
+                  onImageSelected={setImageBase64}
+                  onClear={() => setImageBase64(null)}
+                  className="shrink-0"
+                />
+              )}
               <Input
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}

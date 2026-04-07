@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ProjectService } from '../services/project.service.js';
+import { VibeCodingExecutionService } from '../services/vibe-coding-execution.service.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
@@ -34,6 +35,7 @@ const updateFileSchema = z.object({
 
 const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   const projectService = new ProjectService(fastify.db, fastify.log);
+  const vibeCoding = new VibeCodingExecutionService(fastify.db, fastify.log);
   const preHandler = [fastify.authenticate, enforceTenantIsolation];
 
   // ─── POST /projects ──────────────────────────────────────────────────
@@ -106,21 +108,25 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const { description, framework, templateId, imageBase64 } = parseResult.data;
 
       try {
-        // Update project status
-        await projectService.updateProjectStatus(id, 'GENERATING');
-
         // Save user message to conversation
         await projectService.addConversation(id, 'user', description);
 
         // Fire-and-forget: run the vibe coding pipeline
         setImmediate(() => {
-          void fastify.swarm.executeAsync({
-            workflowId: `vibe-${id}-${Date.now()}`,
+          void vibeCoding.generateProject({
+            projectId: id,
             tenantId,
             userId,
-            goal: `[VIBE_CODING] Generate app for project ${id}: ${description}`,
-            industry: framework ?? 'TECHNOLOGY',
+            description,
+            framework,
+            templateId,
+            imageBase64,
           });
+        });
+
+        // Forward SSE events from vibeCoding to fastify.swarm for the stream endpoint
+        vibeCoding.on(`project:${id}`, (event: unknown) => {
+          fastify.swarm.emit(`project:${id}`, event);
         });
 
         await fastify.auditLog(request, 'GENERATE_PROJECT', 'Project', id, { description });
@@ -150,16 +156,18 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const { message } = parseResult.data;
 
       await projectService.addConversation(id, 'user', message);
-      await projectService.updateProjectStatus(id, 'GENERATING');
 
       setImmediate(() => {
-        void fastify.swarm.executeAsync({
-          workflowId: `vibe-iter-${id}-${Date.now()}`,
+        void vibeCoding.iterateProject({
+          projectId: id,
           tenantId,
           userId,
-          goal: `[VIBE_CODING_ITERATE] Modify project ${id}: ${message}`,
-          industry: 'TECHNOLOGY',
+          message,
         });
+      });
+
+      vibeCoding.on(`project:${id}`, (event: unknown) => {
+        fastify.swarm.emit(`project:${id}`, event);
       });
 
       return reply.status(202).send(ok({ projectId: id, status: 'GENERATING', message: 'Iteration started' }));
