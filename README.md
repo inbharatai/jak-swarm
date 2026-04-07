@@ -553,16 +553,18 @@ http://localhost:3000
 
 | Page | Description |
 |:-----|:------------|
-| 🏠 **Home** | Mission control overview |
-| 🐝 **Swarm** | Real-time workflow execution with DAG view |
+| 🏠 **Home** | Mission control with activity feed, approvals, quick actions |
+| 🏢 **Workspace** | Command center — text/voice input, DAG view, agent tracker |
+| ⚡ **Builder** | Vibe Coding IDE — Monaco editor, chat, preview, deploy |
+| 🐝 **Swarm** | Workflow inspector with agent timeline visualization |
 | 🔎 **Traces** | Full agent trace explorer with token/cost breakdown |
-| 📊 **Analytics** | Usage metrics, cost tracking, agent performance |
+| 📊 **Analytics** | Usage metrics, cost tracking, agent performance charts |
 | ⏰ **Schedules** | Cron-based recurring workflow management |
-| 🔌 **Integrations** | Connect Slack, GitHub, Notion via MCP |
-| 🧠 **Knowledge** | Knowledge base management |
-| 🏢 **Workspace** | Workspace/team settings |
-| ⚙️ **Settings** | LLM provider config, approval policies |
-| 👑 **Admin** | Tenant & user management |
+| 🔌 **Integrations** | 20 MCP providers — HubSpot, Salesforce, Slack, GitHub + more |
+| 🧩 **Skills** | Skill marketplace — browse, install, create custom skills |
+| 🧠 **Knowledge** | Memory store — facts, preferences, policies, learnings |
+| ⚙️ **Settings** | LLM provider config, approval thresholds |
+| 👑 **Admin** | Tenant management, users, API keys, tool toggles |
 
 ---
 

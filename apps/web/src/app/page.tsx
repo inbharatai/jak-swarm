@@ -427,7 +427,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, Engineer, Legal, Finance, HR&nbsp;&mdash; all autonomous. All working together. Deploy intelligent agent swarms that plan, execute, and deliver.
+                38 AI agents. 112 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
