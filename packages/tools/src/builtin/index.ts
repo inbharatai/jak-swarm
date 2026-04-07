@@ -4791,4 +4791,203 @@ Date: _______________`;
 
   // ─── PHORING.AI INTEGRATION TOOLS ───────────────────────────────────────────
   registerPhoringTools();
+
+  // ─── SANDBOX / VIBE CODING TOOLS ─────────────────────────────────────────
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_create',
+      description: 'Create an isolated sandbox environment for code execution. Returns sandbox ID and info.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          template: { type: 'string', description: 'Sandbox template: node, nextjs, python' },
+          timeoutMs: { type: 'number', description: 'Max lifetime in milliseconds (default 30 min)' },
+        },
+      },
+      outputSchema: { type: 'object', properties: { id: { type: 'string' }, status: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const opts = input as { template?: string; timeoutMs?: number } | undefined;
+      return adapter.create({ template: opts?.template, timeoutMs: opts?.timeoutMs });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_write_file',
+      description: 'Write a file to the sandbox filesystem.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sandboxId: { type: 'string', description: 'Sandbox ID' },
+          path: { type: 'string', description: 'File path within sandbox' },
+          content: { type: 'string', description: 'File content' },
+        },
+        required: ['sandboxId', 'path', 'content'],
+      },
+      outputSchema: { type: 'object', properties: { success: { type: 'boolean' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId, path, content } = input as { sandboxId: string; path: string; content: string };
+      await adapter.writeFile(sandboxId, path, content);
+      return { success: true };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_exec',
+      description: 'Execute a shell command in the sandbox. Returns stdout, stderr, and exit code.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sandboxId: { type: 'string', description: 'Sandbox ID' },
+          command: { type: 'string', description: 'Shell command to execute' },
+          cwd: { type: 'string', description: 'Working directory (default: /home/user/project)' },
+          timeoutMs: { type: 'number', description: 'Command timeout in ms (default 120s)' },
+        },
+        required: ['sandboxId', 'command'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          stdout: { type: 'string' },
+          stderr: { type: 'string' },
+          exitCode: { type: 'number' },
+          durationMs: { type: 'number' },
+        },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId, command, cwd, timeoutMs } = input as { sandboxId: string; command: string; cwd?: string; timeoutMs?: number };
+      return adapter.exec(sandboxId, command, { cwd, timeoutMs });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_install_deps',
+      description: 'Install npm dependencies in the sandbox.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sandboxId: { type: 'string', description: 'Sandbox ID' },
+          cwd: { type: 'string', description: 'Working directory' },
+        },
+        required: ['sandboxId'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: { stdout: { type: 'string' }, stderr: { type: 'string' }, exitCode: { type: 'number' } },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId, cwd } = input as { sandboxId: string; cwd?: string };
+      return adapter.installDeps(sandboxId, cwd);
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_start_dev_server',
+      description: 'Start a development server in the sandbox and return the preview URL.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sandboxId: { type: 'string', description: 'Sandbox ID' },
+          command: { type: 'string', description: 'Dev server command (default: npm run dev)' },
+          port: { type: 'number', description: 'Port to expose (default: 3000)' },
+        },
+        required: ['sandboxId'],
+      },
+      outputSchema: { type: 'object', properties: { previewUrl: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId, command, port } = input as { sandboxId: string; command?: string; port?: number };
+      const previewUrl = await adapter.startDevServer(sandboxId, { command, port });
+      return { previewUrl };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_get_preview_url',
+      description: 'Get the preview URL for a running sandbox dev server.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sandboxId: { type: 'string', description: 'Sandbox ID' },
+          port: { type: 'number', description: 'Port (default: 3000)' },
+        },
+        required: ['sandboxId'],
+      },
+      outputSchema: { type: 'object', properties: { previewUrl: { type: 'string' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId, port } = input as { sandboxId: string; port?: number };
+      const previewUrl = await adapter.getPreviewUrl(sandboxId, port);
+      return { previewUrl };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'sandbox_destroy',
+      description: 'Destroy a sandbox environment and release all resources.',
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.DESTRUCTIVE,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: { sandboxId: { type: 'string', description: 'Sandbox ID to destroy' } },
+        required: ['sandboxId'],
+      },
+      outputSchema: { type: 'object', properties: { success: { type: 'boolean' } } },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
+      const adapter = getSandboxAdapter();
+      const { sandboxId } = input as { sandboxId: string };
+      await adapter.destroy(sandboxId);
+      return { success: true };
+    },
+  );
 }

@@ -1,13 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+
+// Lazy-load Monaco to avoid SSR issues and reduce initial bundle
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(mod => ({ default: mod.default })));
 import { useProject, type ProjectFile } from '@/hooks/useProject';
 import { useProjectStream } from '@/hooks/useProjectStream';
 import { projectApi } from '@/lib/api-client';
 import { Button, Badge, Spinner, Card, CardContent, Input } from '@/components/ui';
 import { BuildProgress, eventsToBuildSteps } from '@/components/builder/BuildProgress';
 import { ImageUpload } from '@/components/builder/ImageUpload';
+import { DeployDialog } from '@/components/builder/DeployDialog';
+import { GitHubSync } from '@/components/builder/GitHubSync';
 import {
   ArrowLeft, Play, Rocket, GitBranch, Settings, Eye, Code2,
   ChevronRight, ChevronDown, FileText, FolderOpen, Folder, Send,
@@ -133,6 +138,8 @@ export default function BuilderIDEPage() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
+  const [showGitHubSync, setShowGitHubSync] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
   const buildSteps = eventsToBuildSteps(streamEvents);
@@ -234,8 +241,12 @@ export default function BuilderIDEPage() {
               </Button>
             </a>
           )}
-          <Button variant="outline" size="sm" disabled={isDeploying || isGenerating} onClick={handleDeploy} className="gap-1.5">
-            {isDeploying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+          <Button variant="outline" size="sm" onClick={() => setShowGitHubSync(true)} className="gap-1.5">
+            <GitBranch className="h-3.5 w-3.5" />
+            GitHub
+          </Button>
+          <Button variant="outline" size="sm" disabled={isGenerating} onClick={() => setShowDeployDialog(true)} className="gap-1.5">
+            <Rocket className="h-3.5 w-3.5" />
             Deploy
           </Button>
         </div>
@@ -297,9 +308,26 @@ export default function BuilderIDEPage() {
           <div className="flex-1 overflow-auto min-h-0">
             {activeTab === 'code' ? (
               currentFile ? (
-                <pre className="p-4 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words">
-                  <code>{currentFile.content}</code>
-                </pre>
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><Spinner /></div>}>
+                  <MonacoEditor
+                    height="100%"
+                    language={currentFile.language === 'typescript' ? 'typescript' : currentFile.language === 'javascript' ? 'javascript' : currentFile.language === 'css' ? 'css' : currentFile.language === 'json' ? 'json' : currentFile.language === 'markdown' ? 'markdown' : currentFile.language === 'prisma' ? 'graphql' : currentFile.language === 'html' ? 'html' : 'plaintext'}
+                    value={currentFile.content}
+                    theme="vs-dark"
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      lineNumbers: 'on',
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',
+                      padding: { top: 12 },
+                      renderLineHighlight: 'none',
+                      folding: true,
+                      automaticLayout: true,
+                    }}
+                  />
+                </Suspense>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                   Select a file to view its code
@@ -399,6 +427,23 @@ export default function BuilderIDEPage() {
           </div>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <DeployDialog
+        projectId={projectId}
+        projectName={project.name}
+        currentDeploymentUrl={project.deploymentUrl}
+        open={showDeployDialog}
+        onClose={() => setShowDeployDialog(false)}
+        onDeployed={() => { setShowDeployDialog(false); refresh(); }}
+      />
+      <GitHubSync
+        projectId={projectId}
+        currentRepo={project.githubRepo}
+        open={showGitHubSync}
+        onClose={() => setShowGitHubSync(false)}
+        onSynced={() => { setShowGitHubSync(false); refresh(); }}
+      />
     </div>
   );
 }
