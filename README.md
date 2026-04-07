@@ -30,49 +30,95 @@
 
 JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. You give it a high-level goal in natural language. A Commander agent interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers (in parallel where possible), and a Verifier checks every output before it ships. The entire pipeline is observable through a real-time DAG visualization dashboard.
 
-It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright -- so agents do actual work, not demos.
+It connects to real infrastructure — Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright — so agents do actual work, not demos.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      USER COMMAND                            │
-│              "Research competitors and write a report"        │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-                      ▼
-        ┌─────────────────────────────┐
-        │    🎯 COMMANDER AGENT       │
-        │    Parse goal → mission     │
-        └─────────────┬───────────────┘
-                      │
-                      ▼
-        ┌─────────────────────────────┐
-        │    📋 PLANNER AGENT         │
-        │    Decompose → task DAG     │
-        └─────────────┬───────────────┘
-                      │
-          ┌───────────┼───────────┐
-          ▼           ▼           ▼
-    ┌───────────┐ ┌───────────┐ ┌───────────┐
-    │🔍Research │ │✏️ Content │ │📧 Email   │
-    │  Agent    │ │  Agent    │ │  Agent    │
-    │ web_search│ │ write_blog│ │ draft_send│
-    └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
-          │             │             │
-          └─────────────┼─────────────┘
-                        ▼
-        ┌─────────────────────────────┐
-        │    ✅ VERIFIER AGENT        │
-        │    Quality check → approve  │
-        └─────────────┬───────────────┘
-                      │
-                      ▼
-        ┌─────────────────────────────┐
-        │    📊 RESULT DELIVERED      │
-        │    Compiled markdown output  │
-        └─────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph INPUT["🎤 Input Layer"]
+        A["💬 Natural Language Goal"]
+        B["🎤 Voice Command"]
+    end
+
+    subgraph ORCHESTRATION["🧠 Orchestration Layer"]
+        C["🎯 Commander Agent\nParse intent • Extract entities • Set mission context"]
+        D["📋 Planner Agent\nDecompose goal • Build dependency DAG • Estimate cost"]
+        E["🛡️ Guardrail Agent\nRisk assessment • PII detection • Policy enforcement"]
+        F["🔀 Router Agent\nAssign agents • Select LLM tier • Enable parallelism"]
+    end
+
+    subgraph WORKERS["⚡ Worker Layer — 32 Specialists"]
+        direction LR
+        G["📧 Email\n📅 Calendar\n👤 CRM"]
+        H["📄 Document\n📊 Spreadsheet\n🌐 Browser"]
+        I["🔍 Research\n🧠 Knowledge\n🎧 Support"]
+        J["💻 Coder\n🎨 Designer\n🚀 Growth"]
+        K["⚖️ Legal\n💰 Finance\n👔 HR"]
+        L["🏛️ App Architect\n⚡ Code Generator\n🔧 Auto-Debugger"]
+    end
+
+    subgraph VERIFY["✅ Quality Layer"]
+        M["✅ Verifier Agent\nValidate outputs • Check completeness • Score quality"]
+        N["⚠️ Approval Gate\nHuman review for high-risk actions"]
+    end
+
+    subgraph OUTPUT["📊 Output Layer"]
+        O["📊 Compiled Result\nMarkdown report • Generated app • Executed actions"]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    E -->|"✅ Pass"| F
+    E -->|"🚫 Block"| C
+    F --> G & H & I & J & K & L
+    G & H & I & J & K & L --> M
+    M -->|"✅ Pass"| O
+    M -->|"❌ Fail"| D
+    M -->|"⚠️ Risk"| N
+    N -->|"👍 Approved"| O
+    N -->|"👎 Rejected"| C
+
+    style INPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
+    style ORCHESTRATION fill:#0d1117,stroke:#fbbf24,color:#e6edf3
+    style WORKERS fill:#0d1117,stroke:#38bdf8,color:#e6edf3
+    style VERIFY fill:#0d1117,stroke:#c084fc,color:#e6edf3
+    style OUTPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
 ```
 
-> **Auto-Repair**: If the Verifier rejects output, the system re-plans and re-routes failed tasks without human intervention (configurable).
+> **Auto-Repair**: If the Verifier rejects output, the system re-plans and re-routes failed tasks — no human intervention needed (configurable).
+
+<details>
+<summary><b>🔄 LLM Routing Strategy</b></summary>
+
+```mermaid
+flowchart LR
+    subgraph TIER3["💎 Tier 3 — Premium"]
+        T3A["Claude Opus/Sonnet"]
+        T3B["GPT-4o"]
+    end
+
+    subgraph TIER2["⚡ Tier 2 — Balanced"]
+        T2A["Gemini Flash"]
+        T2B["GPT-4o-mini"]
+    end
+
+    subgraph TIER1["💰 Tier 1 — Cost Optimized"]
+        T1A["DeepSeek V3"]
+        T1B["Ollama (Local)"]
+        T1C["OpenRouter"]
+    end
+
+    CMD["Commander\nPlanner\nVerifier"] --> TIER3
+    GEN["Code Generator\nDesigner\nArchitect"] --> TIER2
+    WRK["Email • Calendar\nCRM • Debug\nResearch"] --> TIER1
+
+    style TIER3 fill:#1a0a2e,stroke:#c084fc,color:#e6edf3
+    style TIER2 fill:#0a1a15,stroke:#34d399,color:#e6edf3
+    style TIER1 fill:#1a150a,stroke:#fbbf24,color:#e6edf3
+```
+
+</details>
 
 ---
 
@@ -99,37 +145,81 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 
 ---
 
-## 🎭 Agent Roster
+## 🎭 Agent Roster — 38 Agents
+
+```mermaid
+graph LR
+    subgraph ORCH["🧠 Orchestrators"]
+        O1["🎯 Commander"]
+        O2["📋 Planner"]
+        O3["🔀 Router"]
+        O4["✅ Verifier"]
+        O5["🛡️ Guardrail"]
+        O6["⚠️ Approval"]
+    end
+
+    subgraph EXEC["💼 Executive Suite"]
+        E1["🎯 Strategist\n(CEO)"]
+        E2["🏗️ Technical\n(CTO)"]
+        E3["💰 Finance\n(CFO)"]
+        E4["📣 Marketing\n(CMO)"]
+        E5["👔 HR"]
+        E6["💻 Coder"]
+        E7["🎨 Designer"]
+        E8["🚀 Growth"]
+    end
+
+    subgraph VIBE["⚡ Vibe Coding — NEW"]
+        V1["🏛️ App\nArchitect"]
+        V2["⚡ Code\nGenerator"]
+        V3["🔧 Auto-\nDebugger"]
+        V4["🚀 Deployer"]
+        V5["📸 Screenshot\nto Code"]
+    end
+
+    subgraph OPS["🏢 Operations"]
+        P1["✏️ Content"]
+        P2["📈 SEO"]
+        P3["📰 PR"]
+        P4["⚖️ Legal"]
+        P5["🤝 Success"]
+        P6["📉 Analytics"]
+        P7["🗺️ Product"]
+        P8["📌 Project"]
+    end
+
+    subgraph CORE["⚙️ Core Workers"]
+        W1["📧 Email"]
+        W2["📅 Calendar"]
+        W3["👤 CRM"]
+        W4["📄 Document"]
+        W5["📊 Spreadsheet"]
+        W6["🌐 Browser"]
+        W7["🔍 Research"]
+        W8["🧠 Knowledge"]
+        W9["🎧 Support"]
+        W10["⚙️ Ops"]
+        W11["🎤 Voice"]
+    end
+
+    style ORCH fill:#1a0a2e,stroke:#c084fc,color:#e6edf3
+    style EXEC fill:#0a1a15,stroke:#34d399,color:#e6edf3
+    style VIBE fill:#1a150a,stroke:#fbbf24,color:#e6edf3
+    style OPS fill:#0d1117,stroke:#38bdf8,color:#e6edf3
+    style CORE fill:#0d1117,stroke:#fb923c,color:#e6edf3
+```
 
 <div align="center">
 
-### 🎯 Orchestrators (6)
-
-> **Commander** • **Planner** • **Router** • **Verifier** • **Guardrail** • **Approval**
->
-> *The brain of the swarm. Parse goals, build task DAGs, assign workers, verify quality, block risk, and gate approvals.*
+| Layer | Agents | Purpose |
+|:------|:------:|:--------|
+| **🧠 Orchestrators** | 6 | Parse goals, build DAGs, route tasks, verify quality, enforce guardrails |
+| **💼 Executive Suite** | 8 | CEO/CTO/CFO/CMO-level strategic decisions and specialized expertise |
+| **⚡ Vibe Coding** | 5 | Full-stack app generation — architecture, code, debug, deploy, vision |
+| **🏢 Operations** | 8 | Content, SEO, PR, Legal, Analytics, Product, Project management |
+| **⚙️ Core Workers** | 11 | Email, Calendar, CRM, Browser, Research, Voice, and infrastructure tools |
 
 </div>
-
----
-
-### 💼 Executive Suite (8)
-
-> 🎯 **Strategist** (CEO) • 🏗️ **Technical** (CTO) • 💰 **Finance** (CFO) • 📣 **Marketing** (CMO) • 👔 **HR** • 💻 **Coder** • 🎨 **Designer** • 🚀 **Growth**
-
-### 🏢 Company Operations (8)
-
-> ✏️ **Content** • 📈 **SEO** • 📰 **PR** • ⚖️ **Legal** • 🤝 **Success** • 📉 **Analytics** • 🗺️ **Product** • 📌 **Project**
-
-### ⚡ Vibe Coding Agents (5) — NEW
-
-> 🏛️ **App Architect** • ⚡ **Code Generator** • 🔧 **Auto-Debugger** • 🚀 **Deployer** • 📸 **Screenshot-to-Code**
->
-> *The AI app builder. Describe what you want, these agents design the architecture, generate production code, auto-fix build errors, and deploy to Vercel.*
-
-### ⚙️ Core Workers (11)
-
-> 📧 **Email** • 📅 **Calendar** • 👤 **CRM** • 📄 **Document** • 📊 **Spreadsheet** • 🌐 **Browser** • 🔍 **Research** • 🧠 **Knowledge** • 🎧 **Support** • ⚙️ **Ops** • 🎤 **Voice**
 
 ---
 
@@ -243,66 +333,152 @@ It connects to real infrastructure -- Gmail via IMAP/SMTP, Google Calendar via C
 
 ## ⚡ Vibe Coding — AI App Builder
 
-JAK Swarm includes a full **Vibe Coding** module that lets you build complete web applications by describing them in plain English. Think Emergent.sh / Lovable / Bolt.new, but integrated into a multi-agent platform with 3-tier cost optimization.
+<div align="center">
 
-### How It Works
+**Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
+
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 112 tools.*
+
+</div>
+
+### Pipeline Architecture
+
+```mermaid
+flowchart TD
+    subgraph INPUT["💬 User Input"]
+        A["📝 Text Description"]
+        B["📸 Screenshot Upload"]
+    end
+
+    subgraph VISION["👁️ Vision Layer — Optional"]
+        C["📸 Screenshot-to-Code Agent\n• Analyze layout, colors, typography\n• Extract component boundaries\n• Generate design tokens"]
+    end
+
+    subgraph ARCHITECT["🏛️ Architecture Layer — Tier 3"]
+        D["🏛️ App Architect Agent\n• File tree & component hierarchy\n• Prisma data models & relations\n• API endpoint contracts\n• Auth strategy & env vars\n• Dependency resolution"]
+    end
+
+    subgraph GENERATE["⚡ Generation Layer — Tier 2"]
+        direction LR
+        E["📄 Pages\nNext.js App Router\nServer Components"]
+        F["🧩 Components\nReact + Tailwind\nshadcn/ui patterns"]
+        G["🔌 API Routes\nRoute Handlers\nZod validation"]
+        H["🗃️ Database\nPrisma schema\nMigrations"]
+    end
+
+    subgraph SANDBOX["🏗️ Build Layer"]
+        I["📦 npm install\nDependency resolution"]
+        J["🔨 next build\nTypeScript compilation"]
+        K{"✅ Build\nPassed?"}
+    end
+
+    subgraph DEBUG["🔧 Debug Loop — Tier 1"]
+        L["🔧 Auto-Debugger Agent\n• Parse error logs\n• Identify root cause\n• Apply surgical fix\n• Max 3 retries"]
+    end
+
+    subgraph DELIVER["🚀 Delivery Layer"]
+        M["👁️ Live Preview\nIframe + Hot Reload"]
+        N["💬 Iterate via Chat\nModify only affected files"]
+        O["🚀 Deploy to Vercel\nOne-click • Custom domain"]
+        P["🔀 GitHub Sync\nPush/pull • CI/CD"]
+    end
+
+    A --> D
+    B --> C --> D
+    D --> E & F & G & H
+    E & F & G & H --> I --> J --> K
+    K -->|"✅ Yes"| M
+    K -->|"❌ No"| L --> J
+    M --> N --> D
+    M --> O
+    M --> P
+
+    style INPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
+    style VISION fill:#0d1117,stroke:#f472b6,color:#e6edf3
+    style ARCHITECT fill:#0d1117,stroke:#fbbf24,color:#e6edf3
+    style GENERATE fill:#0d1117,stroke:#38bdf8,color:#e6edf3
+    style SANDBOX fill:#0d1117,stroke:#c084fc,color:#e6edf3
+    style DEBUG fill:#0d1117,stroke:#fb923c,color:#e6edf3
+    style DELIVER fill:#0d1117,stroke:#34d399,color:#e6edf3
+```
+
+### Builder IDE
+
+<div align="center">
 
 ```
-"Build a task manager with user auth, drag-and-drop boards, and dark mode"
-    │
-    ▼
-┌─────────────────────────────────────────────────────┐
-│  🏛️ App Architect Agent (Tier 3)                    │
-│  Creates: file tree, data models, API endpoints,    │
-│  component hierarchy, dependency list               │
-└─────────────────┬───────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────┐
-│  ⚡ Code Generator Agent (Tier 2)                    │
-│  Generates: React pages, API routes, Prisma schema, │
-│  Tailwind styles — complete, working files           │
-└─────────────────┬───────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────┐
-│  🔧 Auto-Debugger Agent (Tier 1)                     │
-│  Runs: npm install → next build → fix errors →       │
-│  rebuild (max 3 retries before escalating to user)   │
-└─────────────────┬───────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────┐
-│  👁️ Live Preview                                     │
-│  Preview in iframe, iterate via chat, deploy to      │
-│  Vercel when ready                                   │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  ← Back   My Task Manager    v3          [GitHub]  [Deploy]     Ready   │
+├────────────┬─────────────────────────────────────┬───────────────────────┤
+│            │                                     │                       │
+│  📁 Files  │  [Code]  [Preview]                  │  💬 Chat              │
+│            │                                     │                       │
+│  ▸ src/    │  ┌─────────────────────────────┐    │  You: "Add dark mode  │
+│    ▸ app/  │  │  // Monaco Editor           │    │   and a sidebar"      │
+│      page  │  │  export default function    │    │                       │
+│      layou │  │    Home() {                 │    │  JAK: Modified 3 files│
+│    ▸ compo │  │    return (                 │    │   ✓ layout.tsx        │
+│    ▸ lib/  │  │      <main>                 │    │   ✓ Sidebar.tsx       │
+│  package.j │  │        <h1>Task Manager</h1>│    │   ✓ globals.css       │
+│  tsconfig  │  │      </main>                │    │                       │
+│  tailwind  │  │    );                       │    │  [📸 Screenshot]      │
+│            │  │  }                          │    │  [Type a message...]  │
+│  📋 v3     │  └─────────────────────────────┘    │  [Send ▶]             │
+│  📋 v2     │                                     │                       │
+│  📋 v1     │                                     │                       │
+├────────────┴─────────────────────────────────────┴───────────────────────┤
+│  ⏳ Analyzing ✅ → Generating ✅ → Building ⏳ → Preview ○     [72%]    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Builder IDE Features
+</div>
 
-| Feature | Description |
-|---------|-------------|
-| **3-Panel IDE** | File explorer + Monaco editor + chat panel |
-| **Live Preview** | Iframe preview via sandbox dev server |
-| **Screenshot-to-Code** | Upload a UI screenshot, AI replicates it |
-| **Version History** | Every change creates a snapshot, one-click rollback |
-| **Deploy to Vercel** | One-click deployment with env vars and custom domains |
-| **GitHub Sync** | Push/pull to any GitHub repository |
-| **Self-Debugging** | Build errors auto-detected and auto-fixed (3 retries) |
-| **Cost Optimization** | Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug loops |
-| **Iterative Chat** | Describe changes in natural language, only affected files regenerated |
-| **Template Library** | Next.js App, SaaS Starter, React SPA scaffolds |
+### Feature Comparison
 
-### Estimated Cost Per App
+<div align="center">
 
-| Operation | LLM Tier | Cost |
-|-----------|----------|------|
-| Initial architecture | Tier 3 (Claude/GPT-4o) | $0.20-0.50 |
-| Code generation | Tier 2 (Sonnet/Flash) | $0.15-0.40 |
-| Debug iterations | Tier 1 (DeepSeek/GPT-4o-mini) | $0.02-0.05/iter |
-| **Total (new app)** | | **$0.50-2.00** |
-| **Per iteration** | | **$0.05-0.30** |
+| Feature | JAK Swarm | Emergent.sh | Lovable | Bolt.new |
+|:--------|:---------:|:-----------:|:-------:|:--------:|
+| **Full-stack generation** | ✅ | ✅ | ✅ | ✅ |
+| **Multi-agent pipeline** | ✅ 5 agents | ✅ | ❌ | ❌ |
+| **Screenshot-to-code** | ✅ | ✅ | ❌ | ❌ |
+| **Self-debugging loop** | ✅ 3 retries | ✅ | ❌ | ❌ |
+| **3-tier cost routing** | ✅ $0.50/app | ❌ | ❌ | ❌ |
+| **Version rollback** | ✅ | ✅ | ✅ | ❌ |
+| **Monaco editor** | ✅ | ❌ | ✅ | ✅ |
+| **Vercel deploy** | ✅ | ❌ Custom | ✅ | ✅ |
+| **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
+| **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
+| **112 business tools** | ✅ | ❌ | ❌ | ❌ |
+| **Voice input** | ✅ | ❌ | ❌ | ❌ |
+| **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
+| **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
+
+</div>
+
+### Cost Per App
+
+<div align="center">
+
+| Stage | LLM Tier | Model | Est. Cost |
+|:------|:--------:|:------|:---------:|
+| 📸 Screenshot analysis | Tier 3 | GPT-4o Vision | $0.10-0.20 |
+| 🏛️ Architecture | Tier 3 | Claude Sonnet / GPT-4o | $0.20-0.50 |
+| ⚡ Code generation | Tier 2 | Gemini Flash / GPT-4o-mini | $0.15-0.40 |
+| 🔧 Debug iterations | Tier 1 | DeepSeek / Ollama | $0.02-0.05/iter |
+| 🚀 Deploy | Tier 1 | Tool calls only | $0.01-0.02 |
+| | | **Total (new app)** | **$0.50-2.00** |
+| | | **Per iteration** | **$0.05-0.30** |
+
+</div>
+
+### Templates
+
+| Template | Stack | Includes |
+|:---------|:------|:---------|
+| `nextjs-app` | Next.js 14 + Tailwind | App Router, TypeScript strict, responsive layout |
+| `nextjs-saas` | Next.js 14 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
+| `react-spa` | React + Vite + Router | Single-page app, client-side routing, Tailwind |
 
 ---
 
