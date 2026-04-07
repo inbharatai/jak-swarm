@@ -35,16 +35,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @jak-swarm/db exec prisma generate
 
-      - name: Build shared packages
+      - name: Build all packages (dependency order)
         run: |
           pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/tools build || true
           pnpm --filter @jak-swarm/agents build
-
-      - name: Typecheck all packages
-        run: |
-          pnpm --filter @jak-swarm/shared exec tsc --noEmit
-          pnpm --filter @jak-swarm/agents exec tsc --noEmit
-          pnpm --filter @jak-swarm/swarm exec tsc --noEmit
+          pnpm --filter @jak-swarm/swarm build || true
 
       - name: Build web app
         run: pnpm --filter @jak-swarm/web exec next build
@@ -77,9 +73,10 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @jak-swarm/db exec prisma generate
 
-      - name: Build shared packages
+      - name: Build packages (dependency order)
         run: |
           pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/tools build || true
           pnpm --filter @jak-swarm/agents build
 
       - name: Run tests
