@@ -15,14 +15,14 @@ const createProjectSchema = z.object({
 
 const iterateProjectSchema = z.object({
   message: z.string().min(1).max(5000),
-  imageBase64: z.string().optional(),
+  imageBase64: z.string().max(10_000_000).optional(), // FIX #10: max 10MB base64
 });
 
 const generateProjectSchema = z.object({
   description: z.string().min(1).max(5000),
   framework: z.string().max(50).optional(),
   templateId: z.string().max(100).optional(),
-  imageBase64: z.string().optional(),
+  imageBase64: z.string().max(10_000_000).optional(), // FIX: max 10MB base64
 });
 
 const rollbackSchema = z.object({
@@ -30,8 +30,11 @@ const rollbackSchema = z.object({
 });
 
 const updateFileSchema = z.object({
-  content: z.string(),
+  content: z.string().max(5_000_000), // FIX: 5MB max file content
 });
+
+// FIX #6: Statuses that block concurrent generation
+const BUSY_STATUSES = ['GENERATING', 'BUILDING'];
 
 const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   const projectService = new ProjectService(fastify.db, fastify.log);
@@ -68,11 +71,9 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const query = request.query as { page?: string; limit?: string; status?: string };
       const { tenantId } = request.user;
-      const projects = await projectService.listProjects(tenantId, {
-        page: query.page ? parseInt(query.page, 10) : 1,
-        limit: query.limit ? parseInt(query.limit, 10) : 20,
-        status: query.status,
-      });
+      const page = Math.max(1, parseInt(query.page ?? '1', 10) || 1);
+      const limit = Math.max(1, Math.min(parseInt(query.limit ?? '20', 10) || 20, 100));
+      const projects = await projectService.listProjects(tenantId, { page, limit, status: query.status });
       return reply.send(ok(projects));
     },
   );
@@ -87,6 +88,28 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
       return reply.send(ok(project));
+    },
+  );
+
+  // ─── DELETE /projects/:id ───────────────────────────────────────────
+  // FIX #11: Missing delete endpoint
+  fastify.delete(
+    '/:id',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
+      const project = await projectService.getProject(tenantId, id);
+      if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
+
+      try {
+        await projectService.deleteProject(tenantId, id);
+        await fastify.auditLog(request, 'DELETE_PROJECT', 'Project', id);
+        return reply.send(ok({ deleted: true }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
     },
   );
 
@@ -105,6 +128,11 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
 
+      // FIX #6: Concurrency guard — reject if already generating
+      if (BUSY_STATUSES.includes(project.status)) {
+        return reply.status(409).send(err('CONFLICT', 'Project is already being generated. Please wait for the current operation to complete.'));
+      }
+
       const { description, framework, templateId, imageBase64 } = parseResult.data;
 
       try {
@@ -112,6 +140,7 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
         await projectService.addConversation(id, 'user', description);
 
         // Fire-and-forget: run the vibe coding pipeline
+        // FIX #4: Use once() instead of on() to prevent listener leak
         setImmediate(() => {
           void vibeCoding.generateProject({
             projectId: id,
@@ -124,10 +153,19 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
           });
         });
 
-        // Forward SSE events from vibeCoding to fastify.swarm for the stream endpoint
-        vibeCoding.on(`project:${id}`, (event: unknown) => {
+        // FIX #4: Forward events with once-per-event pattern, cleaned up by SSE endpoint
+        const forwardHandler = (event: unknown) => {
           fastify.swarm.emit(`project:${id}`, event);
-        });
+        };
+        vibeCoding.on(`project:${id}`, forwardHandler);
+        // Clean up after terminal event
+        const cleanup = (event: Record<string, unknown>) => {
+          if (event.type === 'generation_completed' || event.type === 'generation_failed') {
+            vibeCoding.off(`project:${id}`, forwardHandler);
+            vibeCoding.off(`project:${id}`, cleanup);
+          }
+        };
+        vibeCoding.on(`project:${id}`, cleanup);
 
         await fastify.auditLog(request, 'GENERATE_PROJECT', 'Project', id, { description });
         return reply.status(202).send(ok({ projectId: id, status: 'GENERATING', message: 'Generation started' }));
@@ -153,7 +191,13 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
 
-      const { message } = parseResult.data;
+      // FIX #6: Concurrency guard
+      if (BUSY_STATUSES.includes(project.status)) {
+        return reply.status(409).send(err('CONFLICT', 'Project is currently busy. Please wait.'));
+      }
+
+      // FIX #10: Extract BOTH message AND imageBase64
+      const { message, imageBase64 } = parseResult.data;
 
       await projectService.addConversation(id, 'user', message);
 
@@ -163,12 +207,22 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
           tenantId,
           userId,
           message,
+          imageBase64,
         });
       });
 
-      vibeCoding.on(`project:${id}`, (event: unknown) => {
+      // FIX #4: Same cleanup pattern as generate
+      const forwardHandler = (event: unknown) => {
         fastify.swarm.emit(`project:${id}`, event);
-      });
+      };
+      vibeCoding.on(`project:${id}`, forwardHandler);
+      const cleanup = (event: Record<string, unknown>) => {
+        if (event.type === 'iteration_completed' || event.type === 'iteration_failed') {
+          vibeCoding.off(`project:${id}`, forwardHandler);
+          vibeCoding.off(`project:${id}`, cleanup);
+        }
+      };
+      vibeCoding.on(`project:${id}`, cleanup);
 
       return reply.status(202).send(ok({ projectId: id, status: 'GENERATING', message: 'Iteration started' }));
     },
@@ -183,6 +237,10 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId, userId } = request.user;
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
+
+      if (BUSY_STATUSES.includes(project.status)) {
+        return reply.status(409).send(err('CONFLICT', 'Project is currently busy.'));
+      }
 
       setImmediate(() => {
         void fastify.swarm.executeAsync({
@@ -219,7 +277,8 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
         await fastify.auditLog(request, 'ROLLBACK_PROJECT', 'Project', id, { version: parseResult.data.version });
         return reply.send(ok(version));
       } catch (e) {
-        return reply.status(400).send(err('ROLLBACK_FAILED', (e as Error).message));
+        const msg = e instanceof Error ? e.message : 'Rollback failed';
+        return reply.status(400).send(err('ROLLBACK_FAILED', msg));
       }
     },
   );
@@ -247,6 +306,11 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params as { id: string };
       const filePath = (request.params as Record<string, string>)['*'];
       if (!filePath) return reply.status(400).send(err('VALIDATION_ERROR', 'File path required'));
+
+      // FIX: Prevent path traversal
+      if (filePath.includes('..') || filePath.startsWith('/')) {
+        return reply.status(400).send(err('VALIDATION_ERROR', 'Invalid file path'));
+      }
 
       const parseResult = updateFileSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -297,11 +361,27 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // ─── GET /projects/:id/stream ───────────────────────────────────────
+  // FIX #1: Support both Authorization header AND query param token for EventSource
   fastify.get(
     '/:id/stream',
-    { preHandler },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.params as { id: string };
+
+      // FIX #1: EventSource can't set headers, so accept token from query param
+      const query = request.query as { token?: string };
+      if (query.token) {
+        // Manually set the Authorization header so fastify.authenticate works
+        request.headers.authorization = `Bearer ${query.token}`;
+      }
+
+      // Now authenticate
+      try {
+        await fastify.authenticate(request, reply);
+        enforceTenantIsolation(request, reply, () => {});
+      } catch {
+        return reply.status(401).send(err('UNAUTHORIZED', 'Invalid or missing token'));
+      }
+
       const { tenantId } = request.user;
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
@@ -314,12 +394,15 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       const send = (data: unknown) => {
-        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+        try {
+          reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+        } catch {
+          // Client disconnected
+        }
       };
 
       send({ type: 'connected', projectId: id, status: project.status });
 
-      // Listen for project events
       const handler = (event: unknown) => {
         send(event);
       };
@@ -328,7 +411,11 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Heartbeat every 15s
       const heartbeat = setInterval(() => {
-        reply.raw.write(': heartbeat\n\n');
+        try {
+          reply.raw.write(': heartbeat\n\n');
+        } catch {
+          // Client disconnected
+        }
       }, 15000);
 
       request.raw.on('close', () => {

@@ -140,6 +140,8 @@ export default function BuilderIDEPage() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployDialog, setShowDeployDialog] = useState(false);
   const [showGitHubSync, setShowGitHubSync] = useState(false);
+  // FIX #9: Error state for user-visible error messages
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
   const buildSteps = eventsToBuildSteps(streamEvents);
@@ -188,7 +190,10 @@ export default function BuilderIDEPage() {
       setChatMessage('');
       refresh();
     } catch (e) {
-      console.error('Failed to send message:', e);
+      // FIX #9: Show error to user, not just console
+      const msg = e instanceof Error ? e.message : 'Failed to send message. Please try again.';
+      setErrorMessage(msg);
+      setTimeout(() => setErrorMessage(null), 8000);
     } finally {
       setIsSending(false);
     }
@@ -207,11 +212,14 @@ export default function BuilderIDEPage() {
   };
 
   const handleRollback = async (version: number) => {
+    if (!confirm(`Rollback to version ${version}? Current changes will be preserved in the version history.`)) return;
     try {
       await projectApi.rollback(projectId, version);
       refresh();
     } catch (e) {
-      console.error('Rollback failed:', e);
+      const msg = e instanceof Error ? e.message : 'Rollback failed';
+      setErrorMessage(msg);
+      setTimeout(() => setErrorMessage(null), 8000);
     }
   };
 
@@ -252,10 +260,19 @@ export default function BuilderIDEPage() {
         </div>
       </div>
 
+      {/* FIX #9: Error banner */}
+      {errorMessage && (
+        <div className="mx-4 mt-2 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-destructive hover:text-destructive/80 ml-2 font-bold">&times;</button>
+        </div>
+      )}
+
       {/* ── Main 3-Panel Layout ─────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left: File Explorer */}
-        <div className="w-56 border-r overflow-y-auto shrink-0 py-2">
+      {/* FIX #21: Responsive — stack vertically on mobile, 3-panel on lg+ */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+        {/* Left: File Explorer — hidden on mobile, collapsible sidebar on tablet */}
+        <div className="hidden md:block w-56 border-r overflow-y-auto shrink-0 py-2">
           <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Files</p>
           {fileTree.length === 0 ? (
             <p className="px-3 text-xs text-muted-foreground">No files yet. Describe your app to get started.</p>
@@ -283,9 +300,12 @@ export default function BuilderIDEPage() {
 
         {/* Center: Code / Preview */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Tab Bar */}
-          <div className="flex items-center gap-1 border-b px-2 py-1 shrink-0">
+          {/* FIX #22: Tab Bar with ARIA roles */}
+          <div className="flex items-center gap-1 border-b px-2 py-1 shrink-0" role="tablist" aria-label="Editor view">
             <button
+              role="tab"
+              aria-selected={activeTab === 'code'}
+              aria-controls="editor-panel"
               onClick={() => setActiveTab('code')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'code' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
@@ -293,6 +313,9 @@ export default function BuilderIDEPage() {
               Code
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'preview'}
+              aria-controls="preview-panel"
               onClick={() => setActiveTab('preview')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'preview' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
@@ -357,8 +380,8 @@ export default function BuilderIDEPage() {
           </div>
         </div>
 
-        {/* Right: Chat */}
-        <div className="w-80 border-l flex flex-col shrink-0">
+        {/* Right: Chat — full width on mobile, fixed width on desktop */}
+        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l flex flex-col shrink-0">
           <div className="px-3 py-2 border-b">
             <p className="text-xs font-semibold">Chat</p>
           </div>

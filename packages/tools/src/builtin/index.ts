@@ -4813,7 +4813,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const opts = input as { template?: string; timeoutMs?: number } | undefined;
       return adapter.create({ template: opts?.template, timeoutMs: opts?.timeoutMs });
     },
@@ -4840,7 +4840,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId, path, content } = input as { sandboxId: string; path: string; content: string };
       await adapter.writeFile(sandboxId, path, content);
       return { success: true };
@@ -4853,7 +4853,8 @@ Date: _______________`;
       description: 'Execute a shell command in the sandbox. Returns stdout, stderr, and exit code.',
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
-      requiresApproval: false,
+      // FIX #8: Require approval for arbitrary command execution
+      requiresApproval: true,
       inputSchema: {
         type: 'object',
         properties: {
@@ -4877,7 +4878,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId, command, cwd, timeoutMs } = input as { sandboxId: string; command: string; cwd?: string; timeoutMs?: number };
       return adapter.exec(sandboxId, command, { cwd, timeoutMs });
     },
@@ -4906,7 +4907,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId, cwd } = input as { sandboxId: string; cwd?: string };
       return adapter.installDeps(sandboxId, cwd);
     },
@@ -4933,7 +4934,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId, command, port } = input as { sandboxId: string; command?: string; port?: number };
       const previewUrl = await adapter.startDevServer(sandboxId, { command, port });
       return { previewUrl };
@@ -4960,7 +4961,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId, port } = input as { sandboxId: string; port?: number };
       const previewUrl = await adapter.getPreviewUrl(sandboxId, port);
       return { previewUrl };
@@ -4984,7 +4985,7 @@ Date: _______________`;
     },
     async (input: unknown) => {
       const { getSandboxAdapter } = await import('../adapters/sandbox/index.js');
-      const adapter = getSandboxAdapter();
+      const adapter = await getSandboxAdapter();
       const { sandboxId } = input as { sandboxId: string };
       await adapter.destroy(sandboxId);
       return { success: true };

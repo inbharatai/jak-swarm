@@ -4,7 +4,8 @@
  * Uses Docker containers for isolated code execution when E2B is not available.
  * Requires Docker to be running on the host machine.
  *
- * This is a fallback for self-hosted deployments where E2B cloud isn't desired.
+ * SECURITY: All commands are passed as arrays to execFileSync/spawn to prevent
+ * shell injection. No string interpolation of user input into shell commands.
  */
 
 import type {
@@ -13,7 +14,7 @@ import type {
   SandboxExecResult,
   SandboxFileEntry,
 } from './sandbox.interface.js';
-import { execSync, spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -23,7 +24,7 @@ const activeSandboxes = new Map<string, { containerId: string; info: SandboxInfo
 
 function isDockerAvailable(): boolean {
   try {
-    execSync('docker info', { stdio: 'ignore' });
+    execFileSync('docker', ['info'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -31,12 +32,22 @@ function isDockerAvailable(): boolean {
 }
 
 function findFreePort(): number {
-  // Simple port allocation starting from 4000
   const usedPorts = new Set([...activeSandboxes.values()].map(s => s.port));
   for (let port = 4000; port < 5000; port++) {
     if (!usedPorts.has(port)) return port;
   }
-  return 4000 + Math.floor(Math.random() * 1000);
+  throw new Error('No free ports available for sandbox (4000-4999 exhausted)');
+}
+
+/**
+ * Validate a file path to prevent directory traversal.
+ */
+function sanitizePath(filePath: string): string {
+  const normalized = path.normalize(filePath).replace(/\\/g, '/');
+  if (normalized.includes('..') || path.isAbsolute(normalized)) {
+    throw new Error(`Invalid file path: ${filePath}`);
+  }
+  return normalized;
 }
 
 export class DockerSandboxAdapter implements SandboxAdapter {
@@ -64,13 +75,24 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
     const port = findFreePort();
     const image = 'node:20-slim';
-    const timeoutSec = Math.floor((options?.timeoutMs ?? 30 * 60 * 1000) / 1000);
 
-    // Start container with mounted project directory
-    const containerId = execSync(
-      `docker run -d --name ${id} -v "${projectDir}:/home/user/project" -w /home/user/project -p ${port}:3000 --stop-timeout ${timeoutSec} ${image} tail -f /dev/null`,
-      { encoding: 'utf8' },
-    ).trim();
+    // FIX #2: Use execFileSync with argument array — NO shell interpolation
+    const containerId = execFileSync('docker', [
+      'run', '-d',
+      '--name', id,
+      '-v', `${projectDir}:/home/user/project`,
+      '-w', '/home/user/project',
+      '-p', `${port}:3000`,
+      '--memory', '512m',           // FIX: Resource limits
+      '--cpus', '1',                // FIX: CPU limit
+      '--pids-limit', '256',        // FIX: Process limit
+      '--network', 'none',          // FIX: No network access (isolation)
+      '--read-only',                // FIX: Read-only filesystem
+      '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',  // Writable tmp
+      '--tmpfs', '/home/user/project/node_modules:rw,exec,size=1g', // Writable node_modules
+      image,
+      'tail', '-f', '/dev/null',
+    ], { encoding: 'utf8' }).trim();
 
     const info: SandboxInfo = {
       id,
@@ -87,7 +109,15 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     const entry = activeSandboxes.get(sandboxId);
     if (!entry) throw new Error(`Sandbox ${sandboxId} not found`);
 
-    const fullPath = path.join(entry.projectDir, filePath);
+    // FIX #2: Prevent path traversal
+    const safePath = sanitizePath(filePath);
+    const fullPath = path.join(entry.projectDir, safePath);
+
+    // Verify the resolved path is still within the project directory
+    if (!fullPath.startsWith(entry.projectDir)) {
+      throw new Error(`Path traversal detected: ${filePath}`);
+    }
+
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
     fs.writeFileSync(fullPath, content, 'utf8');
   }
@@ -101,13 +131,22 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   async readFile(sandboxId: string, filePath: string): Promise<string> {
     const entry = activeSandboxes.get(sandboxId);
     if (!entry) throw new Error(`Sandbox ${sandboxId} not found`);
-    return fs.readFileSync(path.join(entry.projectDir, filePath), 'utf8');
+
+    const safePath = sanitizePath(filePath);
+    const fullPath = path.join(entry.projectDir, safePath);
+    if (!fullPath.startsWith(entry.projectDir)) {
+      throw new Error(`Path traversal detected: ${filePath}`);
+    }
+
+    return fs.readFileSync(fullPath, 'utf8');
   }
 
   async listFiles(sandboxId: string, directory?: string): Promise<string[]> {
     const entry = activeSandboxes.get(sandboxId);
     if (!entry) throw new Error(`Sandbox ${sandboxId} not found`);
-    const dir = path.join(entry.projectDir, directory ?? '.');
+    const safePath = sanitizePath(directory ?? '.');
+    const dir = path.join(entry.projectDir, safePath);
+    if (!dir.startsWith(entry.projectDir)) throw new Error('Path traversal detected');
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir);
   }
@@ -121,20 +160,31 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     if (!entry) throw new Error(`Sandbox ${sandboxId} not found`);
 
     const startTime = Date.now();
-    const envFlags = options?.env
-      ? Object.entries(options.env).map(([k, v]) => `-e ${k}=${v}`).join(' ')
-      : '';
     const cwd = options?.cwd ?? '/home/user/project';
 
+    // FIX #2: Use execFileSync with argument array — NO shell interpolation
+    // Pass command via sh -c but as a single argument, not interpolated
+    const args = ['exec'];
+
+    // Add env vars safely as separate args
+    if (options?.env) {
+      for (const [k, v] of Object.entries(options.env)) {
+        // Validate env key (alphanumeric + underscore only)
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) {
+          throw new Error(`Invalid environment variable name: ${k}`);
+        }
+        args.push('-e', `${k}=${v}`);
+      }
+    }
+
+    args.push('-w', cwd, entry.containerId, 'sh', '-c', command);
+
     try {
-      const output = execSync(
-        `docker exec ${envFlags} -w ${cwd} ${entry.containerId} sh -c "${command.replace(/"/g, '\\"')}"`,
-        {
-          encoding: 'utf8',
-          timeout: options?.timeoutMs ?? 120000,
-          maxBuffer: 10 * 1024 * 1024, // 10MB
-        },
-      );
+      const output = execFileSync('docker', args, {
+        encoding: 'utf8',
+        timeout: options?.timeoutMs ?? 120000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
 
       return {
         stdout: output.trim(),
@@ -145,8 +195,8 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     } catch (err: unknown) {
       const execError = err as { stdout?: string; stderr?: string; status?: number };
       return {
-        stdout: (execError.stdout ?? '').toString().trim(),
-        stderr: (execError.stderr ?? '').toString().trim(),
+        stdout: String(execError.stdout ?? '').trim(),
+        stderr: String(execError.stderr ?? '').trim(),
         exitCode: execError.status ?? 1,
         durationMs: Date.now() - startTime,
       };
@@ -167,7 +217,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
     const command = options?.command ?? 'npx next dev -p 3000';
 
-    // Start dev server in background
+    // Start dev server in background using execFileSync-safe pattern
     spawn('docker', ['exec', '-d', entry.containerId, 'sh', '-c', command], {
       stdio: 'ignore',
       detached: true,
@@ -196,7 +246,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     if (!entry) return;
 
     try {
-      execSync(`docker rm -f ${entry.containerId}`, { stdio: 'ignore' });
+      execFileSync('docker', ['rm', '-f', entry.containerId], { stdio: 'ignore' });
     } catch {
       // Container may already be removed
     }

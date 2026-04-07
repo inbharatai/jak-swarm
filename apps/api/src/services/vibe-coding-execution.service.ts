@@ -212,20 +212,27 @@ export class VibeCodingExecutionService extends EventEmitter {
         });
       }
 
-      // Track cost
-      const traces = context.getTraces();
-      const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
-      await this.db.project.update({
-        where: { id: projectId },
-        data: { totalCostUsd: { increment: totalCost } },
-      });
-
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log.error({ projectId, error: errorMsg }, 'Vibe coding generation failed');
-      await this.projectService.updateProjectStatus(projectId, 'FAILED');
+      // FIX #17: Store build error on project
+      await this.projectService.updateProjectStatus(projectId, 'FAILED', { lastBuildError: errorMsg });
       await this.projectService.addConversation(projectId, 'system', `Generation failed: ${errorMsg}`);
       this.emitProjectEvent(projectId, 'generation_failed', { error: errorMsg });
+    } finally {
+      // FIX #20: Always track cost, even on failure
+      try {
+        const traces = context.getTraces();
+        const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
+        if (totalCost > 0) {
+          await this.db.project.update({
+            where: { id: projectId },
+            data: { totalCostUsd: { increment: totalCost } },
+          });
+        }
+      } catch (costErr) {
+        this.log.warn({ projectId, err: costErr }, 'Failed to track cost');
+      }
     }
   }
 
@@ -289,7 +296,8 @@ export class VibeCodingExecutionService extends EventEmitter {
           modifyInstructions: message,
           existingFiles: affectedFiles.map(f => ({ path: f.path, content: f.content })),
           architecture: changePlan.architecture,
-          framework: 'nextjs',
+          // FIX #23: Use project's actual framework, not hardcoded
+          framework: (await this.db.project.findUnique({ where: { id: projectId }, select: { framework: true } }))?.framework ?? 'nextjs',
         },
         context,
       );
@@ -321,20 +329,26 @@ export class VibeCodingExecutionService extends EventEmitter {
         });
       }
 
-      // Track cost
-      const traces = context.getTraces();
-      const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
-      await this.db.project.update({
-        where: { id: projectId },
-        data: { totalCostUsd: { increment: totalCost } },
-      });
-
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log.error({ projectId, error: errorMsg }, 'Vibe coding iteration failed');
-      await this.projectService.updateProjectStatus(projectId, 'FAILED');
+      await this.projectService.updateProjectStatus(projectId, 'FAILED', { lastBuildError: errorMsg });
       await this.projectService.addConversation(projectId, 'system', `Iteration failed: ${errorMsg}`);
       this.emitProjectEvent(projectId, 'iteration_failed', { error: errorMsg });
+    } finally {
+      // FIX #20: Always track cost
+      try {
+        const traces = context.getTraces();
+        const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
+        if (totalCost > 0) {
+          await this.db.project.update({
+            where: { id: projectId },
+            data: { totalCostUsd: { increment: totalCost } },
+          });
+        }
+      } catch (costErr) {
+        this.log.warn({ projectId, err: costErr }, 'Failed to track iteration cost');
+      }
     }
   }
 

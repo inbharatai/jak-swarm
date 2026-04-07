@@ -18,13 +18,15 @@ export type { ProjectTemplate } from './template-registry.js';
 /**
  * Get the best available sandbox adapter.
  * Prefers E2B (cloud) over Docker (self-hosted).
+ *
+ * FIX #15: Use dynamic import instead of require() for ESM compatibility.
  */
-export function getSandboxAdapter(): import('./sandbox.interface.js').SandboxAdapter {
-  const { e2bSandbox: e2b } = require('./e2b.adapter.js') as { e2bSandbox: import('./sandbox.interface.js').SandboxAdapter };
-  if (e2b.isAvailable()) return e2b;
+export async function getSandboxAdapter(): Promise<import('./sandbox.interface.js').SandboxAdapter> {
+  const { e2bSandbox } = await import('./e2b.adapter.js');
+  if (e2bSandbox.isAvailable()) return e2bSandbox;
 
-  const { dockerSandbox: docker } = require('./docker.adapter.js') as { dockerSandbox: import('./sandbox.interface.js').SandboxAdapter };
-  if (docker.isAvailable()) return docker;
+  const { dockerSandbox } = await import('./docker.adapter.js');
+  if (dockerSandbox.isAvailable()) return dockerSandbox;
 
   throw new Error(
     'No sandbox provider available. Set E2B_API_KEY for cloud sandboxes or install Docker for local sandboxes.',

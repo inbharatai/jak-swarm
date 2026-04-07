@@ -57,6 +57,7 @@ model User {
   sessions  Session[]
   workflows Workflow[]
   approvals ApprovalRequest[] @relation("reviewer")
+  projects  Project[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -311,6 +312,7 @@ model Project {
   description     String?   @db.Text
   framework       String    @default("nextjs") // nextjs | react-spa | react-native | fastify-api
   status          String    @default("DRAFT")  // DRAFT | GENERATING | BUILDING | READY | DEPLOYED | FAILED
+  lastBuildError  String?   @db.Text           // FIX #17: Store last build error for debugging
   sandboxId       String?
   previewUrl      String?
   deploymentUrl   String?
@@ -324,7 +326,9 @@ model Project {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // FIX #16: Add proper User relation
   tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User                @relation(fields: [userId], references: [id])
   files           ProjectFile[]
   versions        ProjectVersion[]
   conversations   ProjectConversation[]
@@ -343,12 +347,13 @@ model ProjectFile {
   size       Int      @default(0)
   hash       String?  // SHA-256 for diffing
   versionId  String?  // which version created/modified this
-  isDeleted  Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // FIX #3: Removed isDeleted + soft-delete pattern.
+  // Files are hard-deleted; use ProjectVersion.snapshotJson for history/rollback.
   @@unique([projectId, path])
   @@index([projectId])
   @@map("project_files")

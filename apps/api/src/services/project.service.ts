@@ -35,7 +35,8 @@ export class ProjectService {
     return this.db.project.findFirst({
       where: { id: projectId, tenantId },
       include: {
-        files: { where: { isDeleted: false }, orderBy: { path: 'asc' } },
+        // FIX #3: No more isDeleted filter — files are hard-deleted
+        files: { orderBy: { path: 'asc' } },
         versions: { orderBy: { version: 'desc' }, take: 10 },
         conversations: { orderBy: { createdAt: 'asc' }, take: 50 },
       },
@@ -80,6 +81,7 @@ export class ProjectService {
     deploymentUrl?: string;
     deploymentId?: string;
     githubRepo?: string;
+    lastBuildError?: string | null;
     metadata?: Record<string, unknown>;
   }) {
     return this.db.project.update({
@@ -89,6 +91,9 @@ export class ProjectService {
   }
 
   async deleteProject(tenantId: string, projectId: string) {
+    // Verify tenant ownership before delete
+    const project = await this.db.project.findFirst({ where: { id: projectId, tenantId } });
+    if (!project) throw new Error('Project not found');
     return this.db.project.delete({ where: { id: projectId } });
   }
 
@@ -114,7 +119,6 @@ export class ProjectService {
           size: Buffer.byteLength(file.content, 'utf8'),
           hash,
           versionId,
-          isDeleted: false,
         },
       });
     });
@@ -124,14 +128,14 @@ export class ProjectService {
 
   async getFiles(projectId: string) {
     return this.db.projectFile.findMany({
-      where: { projectId, isDeleted: false },
+      where: { projectId },
       orderBy: { path: 'asc' },
     });
   }
 
   async getFile(projectId: string, path: string) {
     return this.db.projectFile.findFirst({
-      where: { projectId, path, isDeleted: false },
+      where: { projectId, path },
     });
   }
 
@@ -149,36 +153,38 @@ export class ProjectService {
 
   // ─── Version Operations ───────────────────────────────────────────
 
+  // FIX #25: Use $transaction for atomic version creation
   async createVersion(projectId: string, description: string, createdBy: string = 'agent', workflowId?: string) {
-    // Get current files for snapshot
-    const files = await this.getFiles(projectId);
-    const snapshot = files.map(f => ({ path: f.path, content: f.content, language: f.language }));
+    return this.db.$transaction(async (tx) => {
+      // Get current files for snapshot
+      const files = await tx.projectFile.findMany({ where: { projectId }, orderBy: { path: 'asc' } });
+      const snapshot = files.map(f => ({ path: f.path, content: f.content, language: f.language }));
 
-    // Get next version number
-    const lastVersion = await this.db.projectVersion.findFirst({
-      where: { projectId },
-      orderBy: { version: 'desc' },
+      // Atomic version number increment
+      const lastVersion = await tx.projectVersion.findFirst({
+        where: { projectId },
+        orderBy: { version: 'desc' },
+      });
+      const nextVersion = (lastVersion?.version ?? 0) + 1;
+
+      const version = await tx.projectVersion.create({
+        data: {
+          projectId,
+          version: nextVersion,
+          description,
+          snapshotJson: snapshot as unknown as Record<string, unknown>,
+          createdBy,
+          workflowId,
+        },
+      });
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentVersion: nextVersion },
+      });
+
+      return version;
     });
-    const nextVersion = (lastVersion?.version ?? 0) + 1;
-
-    const version = await this.db.projectVersion.create({
-      data: {
-        projectId,
-        version: nextVersion,
-        description,
-        snapshotJson: snapshot as unknown as Record<string, unknown>,
-        createdBy,
-        workflowId,
-      },
-    });
-
-    // Update project's current version
-    await this.db.project.update({
-      where: { id: projectId },
-      data: { currentVersion: nextVersion },
-    });
-
-    return version;
   }
 
   async getVersions(projectId: string) {
@@ -188,6 +194,7 @@ export class ProjectService {
     });
   }
 
+  // FIX #19: Wrap rollback in $transaction for atomicity
   async rollbackToVersion(projectId: string, targetVersion: number) {
     const version = await this.db.projectVersion.findFirst({
       where: { projectId, version: targetVersion },
@@ -197,17 +204,49 @@ export class ProjectService {
     const snapshot = version.snapshotJson as unknown as Array<{ path: string; content: string; language: string }>;
     if (!snapshot || !Array.isArray(snapshot)) throw new Error('Version snapshot is corrupted');
 
-    // Soft-delete all current files
-    await this.db.projectFile.updateMany({
-      where: { projectId },
-      data: { isDeleted: true },
+    return this.db.$transaction(async (tx) => {
+      // FIX #3: Hard-delete all current files (no soft-delete)
+      await tx.projectFile.deleteMany({ where: { projectId } });
+
+      // Restore from snapshot
+      for (const file of snapshot) {
+        const hash = crypto.createHash('sha256').update(file.content).digest('hex');
+        await tx.projectFile.create({
+          data: {
+            projectId,
+            path: file.path,
+            content: file.content,
+            language: file.language ?? this.inferLanguage(file.path),
+            size: Buffer.byteLength(file.content, 'utf8'),
+            hash,
+          },
+        });
+      }
+
+      // Create new version marking the rollback
+      const lastVersion = await tx.projectVersion.findFirst({
+        where: { projectId },
+        orderBy: { version: 'desc' },
+      });
+      const nextVersion = (lastVersion?.version ?? 0) + 1;
+
+      const newVersion = await tx.projectVersion.create({
+        data: {
+          projectId,
+          version: nextVersion,
+          description: `Rollback to v${targetVersion}`,
+          snapshotJson: snapshot as unknown as Record<string, unknown>,
+          createdBy: 'system',
+        },
+      });
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentVersion: nextVersion },
+      });
+
+      return newVersion;
     });
-
-    // Restore from snapshot
-    await this.saveFiles(projectId, snapshot);
-
-    // Create a new version marking the rollback
-    return this.createVersion(projectId, `Rollback to v${targetVersion}`, 'system');
   }
 
   // ─── Conversation Operations ──────────────────────────────────────
