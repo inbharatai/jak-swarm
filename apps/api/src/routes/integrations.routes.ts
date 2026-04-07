@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { mcpClientManager, MCP_PROVIDERS } from '@jak-swarm/tools';
+import { encrypt as encryptCredentials } from '../utils/crypto.js';
 
 export async function integrationRoutes(app: FastifyInstance) {
   // List connected integrations for tenant
@@ -87,8 +88,8 @@ export async function integrationRoutes(app: FastifyInstance) {
       // Store encrypted credentials
       await app.db.integrationCredential.upsert({
         where: { integrationId: integration.id },
-        update: { accessTokenEnc: JSON.stringify(credentials) },
-        create: { integrationId: integration.id, accessTokenEnc: JSON.stringify(credentials) },
+        update: { accessTokenEnc: encryptCredentials(JSON.stringify(credentials)) },
+        create: { integrationId: integration.id, accessTokenEnc: encryptCredentials(JSON.stringify(credentials)) },
       });
 
       return reply.send({

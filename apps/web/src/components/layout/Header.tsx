@@ -13,6 +13,7 @@ import {
   User,
   LogOut,
   Settings,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
@@ -66,6 +67,17 @@ export function Header() {
           {pageTitle}
         </h1>
       </div>
+
+      {/* Cmd+K Search Trigger */}
+      <button
+        onClick={() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true })); }}
+        className="hidden sm:flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent transition-colors"
+        aria-label="Search (Cmd+K)"
+      >
+        <Search className="h-3.5 w-3.5" />
+        <span>Search</span>
+        <kbd className="ml-2 rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] font-mono">⌘K</kbd>
+      </button>
 
       <div className="flex items-center gap-2">
         {/* Emergency Kill All */}

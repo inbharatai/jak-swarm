@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Space_Grotesk, Syne, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AppShell } from '@/components/layout/AppShell';
+import { ToastProvider } from '@/components/ui/toast';
+import { CommandPalette } from '@/components/CommandPalette';
 import './globals.css';
 
 const syne = Syne({
@@ -57,7 +59,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>{children}</AppShell>
+          <ToastProvider>
+            <AppShell>{children}</AppShell>
+            <CommandPalette />
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
