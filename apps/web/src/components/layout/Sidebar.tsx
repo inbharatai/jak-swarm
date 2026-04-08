@@ -52,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Integrations', href: '/integrations', icon: Plug,          group: 'CONFIGURE' },
   { label: 'Knowledge',    href: '/knowledge',    icon: BookOpen,      group: 'CONFIGURE' },
   { label: 'Skills',       href: '/skills',       icon: Zap,           group: 'CONFIGURE' },
+  { label: 'LLM Settings', href: '/settings',     icon: Settings,      group: 'CONFIGURE' },
   // ADMIN
   { label: 'Admin',        href: '/admin',        icon: ShieldCheck,   group: 'ADMIN', adminOnly: true },
 ];
