@@ -4,13 +4,13 @@
 
 ## Tagline (60 chars)
 
-Open-source multi-agent AI with 33 agents and 79 tools
+Open-source multi-agent AI with 38 agents and 112 tools
 
 ---
 
 ## Description (260 chars)
 
-JAK Swarm is an open-source multi-agent AI platform with 33 specialized agents, 79 tools, and support for 6 LLM providers. Build complex AI workflows by orchestrating agents that collaborate, delegate, and execute tasks together. No vendor lock-in. Free forever.
+JAK Swarm is an open-source multi-agent AI platform with 38 specialized agents, 112 tools, and support for 6 LLM providers. Build complex AI workflows by orchestrating agents that collaborate, delegate, and execute tasks together. No vendor lock-in. Free forever.
 
 ---
 
@@ -22,7 +22,7 @@ I started building JAK Swarm out of frustration. I was working on an AI project 
 
 So I asked: what if AI agents could work together the way a real team does? A researcher hands off findings to an analyst, who passes insights to a writer, who sends the draft to an editor. Each one specialized. Each one focused.
 
-That question turned into 14 months of building. JAK Swarm now has 33 agents, 79 tools, and works with 6 different LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, and more). You can run the whole thing locally with Ollama if you want zero cloud dependency.
+That question turned into 14 months of building. JAK Swarm now has 38 agents, 112 tools, and works with 6 different LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, and more). You can run the whole thing locally with Ollama if you want zero cloud dependency.
 
 What makes this different from LangChain or CrewAI:
 
@@ -44,7 +44,7 @@ GitHub: https://github.com/inbharatai/jak-swarm
 
 ### Screenshot 1: Dashboard Overview
 Title: "33 Agents, One Dashboard"
-Description: The JAK Swarm control panel showing all 33 agents organized by category -- Research, Code, Data, Content, and Utility. Each agent card displays its name, description, available tools, and current status. The sidebar shows active swarm sessions and recent task history.
+Description: The JAK Swarm control panel showing all 38 agents organized by category -- Research, Code, Data, Content, and Utility. Each agent card displays its name, description, available tools, and current status. The sidebar shows active swarm sessions and recent task history.
 
 ### Screenshot 2: Agent Orchestration Flow
 Title: "Watch Agents Collaborate in Real-Time"

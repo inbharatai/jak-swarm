@@ -75,7 +75,7 @@ The core execution engine. Contains:
 
 ### `packages/agents` -- Agent Implementations
 
-33 agents organized by role:
+38 agents organized by role:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
@@ -90,7 +90,7 @@ The core execution engine. Contains:
 
 ### `packages/tools` -- Tool System
 
-65 built-in tools managed by a singleton ToolRegistry:
+112 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
 
 - **ToolRegistry** (`registry/tool-registry.ts`): Singleton. Tools register with metadata (name, description, category, risk class, input/output schemas) and an executor function. Supports input validation and execution timing.
 

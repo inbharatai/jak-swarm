@@ -9,7 +9,7 @@
 
 **DM (Twitter):**
 
-Hey Jeff, I'm a solo developer from India who just open-sourced JAK Swarm -- a multi-agent AI platform with 33 agents, 79 tools, and support for 6 LLM providers including fully local execution via Ollama.
+Hey Jeff, I'm a solo developer from India who just open-sourced JAK Swarm -- a multi-agent AI platform with 38 agents, 112 tools, and support for 6 LLM providers including fully local execution via Ollama.
 
 The pitch for your audience: the entire codebase is under 15K lines of Python. No bloated abstractions. Agents are just a system prompt + tool set + LLM provider. You can understand it in a day and build a new agent in 20 lines.
 
@@ -26,9 +26,9 @@ GitHub: github.com/inbharatai/jak-swarm
 
 **DM (Twitter):**
 
-Hi Andrej, I built JAK Swarm, an open-source multi-agent AI platform. 33 specialized agents, 79 tools, 6 LLM providers, under 15K lines of Python.
+Hi Andrej, I built JAK Swarm, an open-source multi-agent AI platform. 38 specialized agents, 112 tools, 6 LLM providers, under 15K lines of Python.
 
-The design philosophy you might appreciate: agents communicate through a shared context (literally a dictionary), not complex message buses. Specialization beats generalization -- 33 focused agents significantly outperform fewer general-purpose ones. And the whole thing runs locally with Ollama.
+The design philosophy you might appreciate: agents communicate through a shared context (literally a dictionary), not complex message buses. Specialization beats generalization -- 38 focused agents significantly outperform fewer general-purpose ones. And the whole thing runs locally with Ollama.
 
 I know you value simple, readable code. The entire architecture is designed to be understood in a few hours.
 
@@ -47,7 +47,7 @@ Hey Matt, I've been following your work on AI agents and wanted to share somethi
 
 What might interest you from an agent architecture perspective: agents delegate to each other dynamically (not just sequential chains), tool selection is resolved at runtime through a registry pattern, and the LLM provider layer is fully abstracted so you can mix Claude for writing, GPT-4 for reasoning, and Ollama for privacy in the same pipeline.
 
-33 agents, 79 tools, MIT licensed: github.com/inbharatai/jak-swarm
+38 agents, 112 tools, MIT licensed: github.com/inbharatai/jak-swarm
 
 Would love your take on the delegation patterns.
 
@@ -60,7 +60,7 @@ Would love your take on the delegation patterns.
 
 **DM (Twitter):**
 
-Hi Lenny, I'm a solo developer from India who just open-sourced a multi-agent AI platform called JAK Swarm (33 agents, 79 tools, 6 LLM providers).
+Hi Lenny, I'm a solo developer from India who just open-sourced a multi-agent AI platform called JAK Swarm (38 agents, 112 tools, 6 LLM providers).
 
 The story that might interest your audience: I built this over 14 months of evenings and weekends while running InBharat AI. The business decision to open-source (MIT license, free forever) instead of charging was deliberate -- open source as distribution strategy, not business model. I've already gotten consulting inquiries just from people discovering the project.
 
@@ -79,7 +79,7 @@ github.com/inbharatai/jak-swarm
 
 Hi Yannic, I built JAK Swarm -- an open-source multi-agent AI platform that takes a deliberately simple approach to agent orchestration.
 
-The technical bit: 33 agents communicate through shared state (no message queues), tools are resolved dynamically through a registry with semantic matching, and the entire thing is under 15K lines of Python with no dependencies beyond LLM SDKs. It supports 6 providers including Ollama for fully local execution.
+The technical bit: 38 agents communicate through shared state (no message queues), tools are resolved dynamically through a registry with semantic matching, and the entire thing is under 15K lines of Python with no dependencies beyond LLM SDKs. It supports 6 providers including Ollama for fully local execution.
 
 One finding that might be worth discussing: specializing agents (narrow prompt + few tools) significantly outperforms generalist agents on complex tasks, even when the underlying LLM is the same. The prompt constraints seem to matter more than the model capability.
 
@@ -94,7 +94,7 @@ github.com/inbharatai/jak-swarm
 
 **DM (Twitter):**
 
-Hey Mckay, I just open-sourced JAK Swarm -- a multi-agent AI platform with 33 agents, 79 tools, and 6 LLM providers.
+Hey Mckay, I just open-sourced JAK Swarm -- a multi-agent AI platform with 38 agents, 112 tools, and 6 LLM providers.
 
 Given your work building AI tools, I think you'd find the architecture interesting. Each agent is dead simple (system prompt + tools + LLM), agents delegate to each other dynamically, and you can mix providers per agent. The whole thing works with Ollama for full local execution.
 
@@ -115,7 +115,7 @@ Hey Riley, I've been watching your AI dev tutorials and wanted to share a projec
 
 It would make for a great tutorial topic -- you can set up a multi-agent pipeline (research agent to analysis agent to writing agent) in about 10 lines of Python, and the whole thing works with Ollama so your viewers can follow along without API keys.
 
-33 agents, 79 tools, 6 providers, MIT licensed: github.com/inbharatai/jak-swarm
+38 agents, 112 tools, 6 providers, MIT licensed: github.com/inbharatai/jak-swarm
 
 Happy to jump on a call to walk through the architecture if you want to cover it.
 
@@ -130,7 +130,7 @@ Happy to jump on a call to walk through the architecture if you want to cover it
 
 Hi Harrison, I built JAK Swarm, an open-source multi-agent AI platform that focuses specifically on agent orchestration. It's not a LangChain replacement -- it's a complement for the multi-agent coordination layer.
 
-The approach: 33 specialized agents communicate through shared context, delegate dynamically, and use different LLM providers per agent. The architecture is intentionally narrow (just orchestration, not a full LLM framework) and simple (under 15K lines, no complex abstractions).
+The approach: 38 specialized agents communicate through shared context, delegate dynamically, and use different LLM providers per agent. The architecture is intentionally narrow (just orchestration, not a full LLM framework) and simple (under 15K lines, no complex abstractions).
 
 I've been open about positioning: LangChain for comprehensive LLM tooling, JAK Swarm for focused multi-agent workflows. Would appreciate any feedback on the agent patterns.
 
@@ -147,9 +147,9 @@ github.com/inbharatai/jak-swarm
 
 Hey Swyx, I wanted to share JAK Swarm -- an open-source multi-agent platform I built over 14 months as a solo developer in India.
 
-The angle I think would resonate with the Latent Space audience: my core finding after building 33 agents is that specialization + simple coordination crushes generalization + complex coordination. A focused agent with 3 tools and a tight prompt beats a general agent with 30 tools almost every time. The shared context architecture (a dictionary, not a message queue) is boring but outperformed every "sophisticated" pattern I tried.
+The angle I think would resonate with the Latent Space audience: my core finding after building 38 agents is that specialization + simple coordination crushes generalization + complex coordination. A focused agent with 3 tools and a tight prompt beats a general agent with 30 tools almost every time. The shared context architecture (a dictionary, not a message queue) is boring but outperformed every "sophisticated" pattern I tried.
 
-6 LLM providers, 79 tools, under 15K lines of Python, MIT licensed: github.com/inbharatai/jak-swarm
+6 LLM providers, 112 tools, under 15K lines of Python, MIT licensed: github.com/inbharatai/jak-swarm
 
 Would be a fun Latent Space topic -- the case for boring agent architectures.
 
@@ -162,7 +162,7 @@ Would be a fun Latent Space topic -- the case for boring agent architectures.
 
 **DM (Twitter):**
 
-Hi Simon, I built JAK Swarm, an open-source (MIT) multi-agent AI platform in Python. 33 agents, 79 tools, 6 LLM providers, under 15K lines.
+Hi Simon, I built JAK Swarm, an open-source (MIT) multi-agent AI platform in Python. 38 agents, 112 tools, 6 LLM providers, under 15K lines.
 
 What I think you'd appreciate: no framework dependencies beyond LLM SDKs, agents are just a system prompt + tool set + provider (no magic base classes), tools register through a standard interface and are resolved dynamically, and the whole thing runs locally with Ollama. I prioritized readability and simplicity over abstraction.
 

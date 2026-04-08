@@ -377,7 +377,7 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       // Now authenticate
       try {
         await fastify.authenticate(request, reply);
-        enforceTenantIsolation(request, reply, () => {});
+        await enforceTenantIsolation(request, reply);
       } catch {
         return reply.status(401).send(err('UNAUTHORIZED', 'Invalid or missing token'));
       }

@@ -6,7 +6,7 @@
 
 I just open-sourced JAK Swarm after 14 months of building.
 
-It's a multi-agent AI platform with 33 specialized agents, 79 tools, and support for 6 LLM providers.
+It's a multi-agent AI platform with 38 specialized agents, 112 tools, and support for 6 LLM providers.
 
 Here's what that means in plain English:
 
@@ -22,8 +22,8 @@ I was building AI automations for InBharat AI and kept writing the same boilerpl
 
 14 months and roughly 1,400 hours later, JAK Swarm has:
 
-- 33 agents covering research, coding, data, content, and utilities
-- 79 tools for web scraping, APIs, file operations, databases, and more
+- 38 agents covering research, coding, data, content, and utilities
+- 112 tools for web scraping, APIs, file operations, databases, and more
 - Works with OpenAI, Anthropic, Google, Mistral, Ollama, and Groq
 - Runs fully locally with Ollama if you need data privacy
 - MIT licensed. Free forever. No strings
@@ -101,7 +101,7 @@ AutoGen (Microsoft) is excellent for conversational agent patterns. If your use 
 Where JAK Swarm wins:
 
 - Provider flexibility (6 providers, mix and match per agent)
-- Pre-built agents out of the box (33 agents, ready to go)
+- Pre-built agents out of the box (38 agents, ready to go)
 - Simplicity (under 15K lines, readable in a day)
 - Local-first (full Ollama support, zero cloud required)
 - Cost tracking (built-in token management and budgets)

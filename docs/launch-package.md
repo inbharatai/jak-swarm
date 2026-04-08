@@ -13,7 +13,7 @@
 
 ### Description (258 chars)
 ```
-JAK Swarm is an open-source multi-agent AI platform with 33 specialized agents, 74 tools, and 6 LLM providers. Give it a goal — it plans, executes, and verifies complex business workflows autonomously, with human-in-the-loop approval gates for high-risk actions.
+JAK Swarm is an open-source multi-agent AI platform with 38 specialized agents, 112 tools, and 6 LLM providers. Give it a goal — it plans, executes, and verifies complex business workflows autonomously, with human-in-the-loop approval gates for high-risk actions.
 ```
 
 ### First Comment (Maker's Comment)
@@ -30,7 +30,7 @@ The core idea is a two-tier swarm: **Orchestrators** that think and plan, and **
 
 **What makes it different from CrewAI / LangGraph / Devin:**
 
-- **CrewAI/LangGraph** are frameworks for building agents — you still have to wire everything together, write the prompts, define the tools. JAK Swarm is a *platform*: 33 agents and 74 tools are already built, configured, and policy-governed. You bring the goal.
+- **CrewAI/LangGraph** are frameworks for building agents — you still have to wire everything together, write the prompts, define the tools. JAK Swarm is a *platform*: 38 agents and 112 tools are already built, configured, and policy-governed. You bring the goal.
 - **Devin** is a brilliant software engineer. JAK Swarm is a company operations platform. Different jobs — email routing, CRM updates, document workflows, customer support triage, scheduling, research synthesis.
 - **The approval gate** is the thing I haven't seen done properly anywhere else. High-risk tasks pause and notify a human reviewer before executing. You can configure the threshold per tenant and per industry. Healthcare? Approval required at MEDIUM risk. Internal ops? Only CRITICAL. This is what makes it safe enough to actually run unsupervised.
 
@@ -52,7 +52,7 @@ Would love questions, feedback, and brutal honesty in the comments. This is v1 �
 The trace viewer showing a live workflow execution graph built with React Flow. Nodes are the agents (Commander → Planner → Router → Worker Email / Worker CRM in parallel → Verifier → Commander). Each node shows status (running/completed/pending approval) with latency. This is the "wow moment" — you can watch your company run itself in real time.
 
 **Screenshot 2 — Integrations Page**
-A grid of all connected tools and providers: Gmail, Google Calendar, Google Docs, Google Sheets, Salesforce, HubSpot, Pipedrive, Slack, Playwright Browser, Tavily Research, Pinecone, pgvector — with enabled/disabled toggles per tenant. Showcases the breadth of the 74 tools.
+A grid of all connected tools and providers: Gmail, Google Calendar, Google Docs, Google Sheets, Salesforce, HubSpot, Pipedrive, Slack, Playwright Browser, Tavily Research, Pinecone, pgvector — with enabled/disabled toggles per tenant. Showcases the breadth of the 112 tools.
 
 **Screenshot 3 — Agent Activity Tracker**
 The live agent run log: a scrolling timeline of agent steps, tool calls, handoffs, and results. Each row shows the agent role, action taken, duration, and a snippet of the result. Guardrail verdicts (ALLOW/WARN/BLOCK) appear inline. Makes the "black box" completely transparent.
@@ -74,7 +74,7 @@ The human-in-the-loop approval UI. A pending approval card shows: the workflow t
 I built an open-source platform with 33 AI agents that runs your company autonomously.
 
 Not a demo. Not a framework. A production-grade system with:
-• 74 tools
+• 112 tools
 • 6 LLM providers
 • Human approval gates for high-risk actions
 • Full execution trace
@@ -177,7 +177,7 @@ How JAK Swarm compares to alternatives:
 
 vs CrewAI / LangGraph:
 → They're frameworks. You build the agents.
-→ JAK Swarm is a platform. 33 agents are already built.
+→ JAK Swarm is a platform. 38 agents are already built.
 
 vs Devin:
 → Devin writes code. JAK Swarm runs operations.
@@ -194,7 +194,7 @@ JAK Swarm is fully open-source.
 
 ⭐ Star it: github.com/inbharatai/jak-swarm
 📖 Read the architecture: github.com/inbharatai/jak-swarm/blob/main/docs/architecture.md
-🗺 See all 33 agents: github.com/inbharatai/jak-swarm/blob/main/AGENTS.md
+🗺 See all 38 agents: github.com/inbharatai/jak-swarm/blob/main/AGENTS.md
 
 Would love your feedback, PRs, and hard questions.
 
@@ -207,7 +207,7 @@ What workflow would you automate first?
 
 ### Title (79 chars)
 ```
-Show HN: JAK Swarm – open-source autonomous multi-agent platform (33 agents)
+Show HN: JAK Swarm – open-source autonomous multi-agent platform (38 agents)
 ```
 
 ### Body
@@ -234,7 +234,7 @@ Every plan is validated by a Guardrail agent before execution. Every tool call r
 
 **Industry packs** are declarative config objects (not code) that customise agent behaviour for specific verticals — healthcare, legal, finance, recruiting, etc. They inject compliance rules into the Guardrail, constrain which tool categories are available, supplement agent prompts with domain context, and set default approval thresholds. Adding a new industry is purely a config change.
 
-**What's working:** Full agent swarm, 74 tools across 10 categories, multi-tenant isolation (row-level in Postgres, namespace-level in Redis), voice interface via OpenAI Realtime API, 3-tier skill extension system with sandbox execution and human review, 13 industry packs.
+**What's working:** Full agent swarm, 112 tools across 10 categories, multi-tenant isolation (row-level in Postgres, namespace-level in Redis), voice interface via OpenAI Realtime API, 3-tier skill extension system with sandbox execution and human review, 13 industry packs.
 
 **What's honestly not done yet:** Kubernetes manifests (Phase 2 target), Prometheus metrics integration, a few CRM adapters, and the public hosted version. This is v1 — I'm shipping the core, not vaporware.
 
@@ -269,7 +269,7 @@ A two-tier swarm. Orchestrators (Commander, Planner, Router, Verifier, Guardrail
 
 **Multi-agent coordination** uses structured handoffs rather than direct function calls. Each handoff is logged. Circular handoff detection prevents infinite loops. Workers can't call other workers — all coordination routes through the Router.
 
-Currently supports 6 LLM providers, 74 tools, 33 agents, 13 industry packs.
+Currently supports 6 LLM providers, 112 tools, 38 agents, 13 industry packs.
 
 **GitHub:** https://github.com/inbharatai/jak-swarm
 
@@ -308,7 +308,7 @@ If you're working on something similar or have feedback, I'm all ears. The solo 
 
 Just shipped an open-source project and wanted to share the tech stack decisions with r/webdev since I made some unconventional choices that might be interesting.
 
-**Project:** JAK Swarm — an autonomous multi-agent AI platform. 33 agents, 74 tools. The frontend visualises the live workflow execution graph as it runs.
+**Project:** JAK Swarm — an autonomous multi-agent AI platform. 38 agents, 112 tools. The frontend visualises the live workflow execution graph as it runs.
 
 **The stack:**
 
@@ -339,7 +339,7 @@ Happy to go deep on any of these. Code is at https://github.com/inbharatai/jak-s
 
 Excited to share something I've been building for a while: **JAK Swarm** — an open-source autonomous multi-agent AI platform that runs your company's operations.
 
-**The elevator pitch:** 33 specialised AI agents, 74 tools, 6 LLM providers. Give it a goal in plain English. It plans the work, executes it across your real systems, verifies the results, and reports back.
+**The elevator pitch:** 33 specialised AI agents, 112 tools, 6 LLM providers. Give it a goal in plain English. It plans the work, executes it across your real systems, verifies the results, and reports back.
 
 **What "running your company" actually means:**
 
@@ -369,7 +369,7 @@ I'd love to hear from operators, founders, and enterprise teams thinking about A
 
 ### Subject Line
 ```
-Open-source AI platform that actually runs company operations (33 agents, not a framework)
+Open-source AI platform that actually runs company operations (38 agents, not a framework)
 ```
 
 ### Email Body
@@ -378,7 +378,7 @@ Hi [Newsletter Name] team,
 
 I wanted to pitch a story that I think fits your audience well.
 
-**What I built:** JAK Swarm — an open-source autonomous multi-agent AI platform with 33 specialised agents, 74 tools, and 6 LLM providers. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
+**What I built:** JAK Swarm — an open-source autonomous multi-agent AI platform with 38 specialised agents, 112 tools, and 6 LLM providers. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
 
 **Why it's different from what's already been covered:**
 
@@ -387,8 +387,8 @@ Most multi-agent coverage has focused on *frameworks* — CrewAI, LangGraph, Aut
 The key innovation is the trust model. Before any consequential action — sending an email, updating a CRM record, submitting a form — the platform creates a human-readable approval request and pauses until a person signs off. This is configurable per business type and per industry. It's what makes "autonomous AI" safe enough to actually run unsupervised on production data.
 
 **The numbers that might interest your readers:**
-- 33 agents across two tiers (orchestrators + workers)
-- 74 tools spanning email, calendar, CRM, documents, spreadsheets, browser automation, research, and voice
+- 38 agents across two tiers (orchestrators + workers)
+- 112 tools spanning email, calendar, CRM, documents, spreadsheets, browser automation, research, and voice
 - 13 industry packs (healthcare, legal, finance, recruiting, and more) with pre-configured compliance rules
 - Built on Temporal for durable, crash-safe workflow execution
 
@@ -434,7 +434,7 @@ GitHub: github.com/inbharatai/jak-swarm. No ask — just thought it might be gen
 
 Hi Yohei — BabyAGI was the thing that convinced me multi-agent systems could actually work. I've been building on that intuition.
 
-JAK Swarm is an open-source platform that takes the "task-driven autonomous agent" concept and operationalises it for business workflows — email, CRM, documents, scheduling, voice. 33 agents, 74 tools, built on Temporal for durability.
+JAK Swarm is an open-source platform that takes the "task-driven autonomous agent" concept and operationalises it for business workflows — email, CRM, documents, scheduling, voice. 38 agents, 112 tools, built on Temporal for durability.
 
 The piece I think you'd find interesting: the Verifier agent. After all tasks complete, it re-evaluates the combined output against the original goal, checks cross-task consistency (did the CRM update match the email that was sent?), and can trigger a remediation cycle if there are gaps. It's an attempt to solve the "agent hallucination compounds across steps" problem.
 
@@ -480,7 +480,7 @@ Hi Greg — your LangChain tutorials and chunking research have been genuinely u
 
 I just launched JAK Swarm on Product Hunt — an open-source multi-agent platform with a built-in Knowledge Worker agent that does RAG over tenant documents. The approach: pgvector in Postgres (no separate vector DB), semantic + full-text hybrid search, source citations on every answer, access-level tags (CONFIDENTIAL docs don't surface to END_USER roles).
 
-The broader platform is 33 agents, 74 tools, Temporal for orchestration. Would love your take on the RAG implementation specifically — I suspect there are better chunking approaches for the mixed document types (contracts, support tickets, policies) that the knowledge base ingests.
+The broader platform is 38 agents, 112 tools, Temporal for orchestration. Would love your take on the RAG implementation specifically — I suspect there are better chunking approaches for the mixed document types (contracts, support tickets, policies) that the knowledge base ingests.
 
 GitHub: github.com/inbharatai/jak-swarm
 

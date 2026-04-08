@@ -5,7 +5,7 @@
 ## Thread 1: Launch Announcement
 
 **Tweet 1:**
-I just open-sourced JAK Swarm -- a multi-agent AI platform with 33 agents, 79 tools, and support for 6 LLM providers.
+I just open-sourced JAK Swarm -- a multi-agent AI platform with 38 agents, 112 tools, and support for 6 LLM providers.
 
 It took 14 months to build.
 
@@ -30,7 +30,7 @@ Instead of one mega-model doing everything, you get specialized agents that coll
 - An Analysis Agent that processes data
 - A Content Agent that writes and edits
 
-33 agents total.
+38 agents total.
 
 **Tweet 4:**
 Each agent has access to specific tools from a library of 79.
@@ -104,7 +104,7 @@ Let me know what you think. What agents would you want?
 **Tweet 1:**
 Let me show you how JAK Swarm actually works under the hood.
 
-33 agents. 79 tools. 6 LLM providers.
+38 agents. 112 tools. 6 LLM providers.
 
 But the architecture is surprisingly simple.
 
@@ -136,7 +136,7 @@ If an agent fails, the orchestrator can retry, reassign, or ask a different agen
 **Tweet 5:**
 Tool selection is dynamic.
 
-Each agent has access to a subset of the 79 tools. When an agent decides it needs to scrape a webpage, it doesn't call a hardcoded function.
+Each agent has access to a subset of the 112 tools. When an agent decides it needs to scrape a webpage, it doesn't call a hardcoded function.
 
 It describes what it needs, the tool resolver finds the best match, and the tool executes.
 
@@ -245,7 +245,7 @@ A 5-agent swarm calling GPT-4 can burn through dollars in minutes if you're not 
 JAK Swarm tracks token usage per agent, per task, per provider. You set budgets. Agents respect them. No surprise bills.
 
 **Tweet 9:**
-Lesson 8: Users don't want to configure 33 agents.
+Lesson 8: Users don't want to configure 38 agents.
 
 My first UI required setting up each agent individually. Nobody used it.
 
@@ -260,4 +260,4 @@ The value isn't in the code. It's in the community that forms around it.
 
 github.com/inbharatai/jak-swarm
 
-What would you build with 33 agents?
+What would you build with 38 agents?

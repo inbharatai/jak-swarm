@@ -166,13 +166,14 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     const port = options?.port ?? 3000;
     const command = options?.command ?? `npx next dev -p ${port}`;
 
-    // Start dev server in background (don't await)
-    const proc = entry.sandbox.process.start({
+    // Start dev server as background process (intentionally not awaited —
+    // next dev runs indefinitely, awaiting would block forever)
+    const procPromise = entry.sandbox.process.start({
       cmd: command,
       cwd: options?.cwd ?? '/home/user/project',
       envs: { PORT: String(port), NODE_ENV: 'development' },
     });
-    entry.devProcess = proc;
+    entry.devProcess = procPromise;
 
     // Wait a few seconds for the server to start
     await new Promise(resolve => setTimeout(resolve, 5000));
