@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProject';
 import { projectApi } from '@/lib/api-client';
 import { Button, Card, CardContent, Badge, Spinner, EmptyState, Input, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
 import { Code2, Plus, Globe, GitBranch, Clock, Trash2 } from 'lucide-react';
 
 const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
@@ -23,6 +24,7 @@ const FRAMEWORKS = [
 ];
 
 export default function BuilderPage() {
+  const toast = useToast();
   const router = useRouter();
   const { projects, isLoading, refresh } = useProjects();
   const [showCreate, setShowCreate] = useState(false);
@@ -43,7 +45,7 @@ export default function BuilderPage() {
       refresh();
       router.push(`/builder/${result.data.id}`);
     } catch (e) {
-      console.error('Failed to create project:', e);
+      toast.error('Failed to create project', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setCreating(false);
     }

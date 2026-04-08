@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/components/ui/toast';
 import { useApprovals } from '@/hooks/useWorkflow';
 import { workflowApi } from '@/lib/api-client';
 import { Avatar, Badge, Button } from '@/components/ui';
@@ -35,6 +36,7 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
   const { pendingCount } = useApprovals();
+  const toast = useToast();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isKilling, setIsKilling] = useState(false);
 
@@ -46,8 +48,8 @@ export function Header() {
     setIsKilling(true);
     try {
       await workflowApi.stopAll();
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to stop workflows', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setIsKilling(false);
     }

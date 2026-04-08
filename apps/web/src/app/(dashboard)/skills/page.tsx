@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api-client';
 import { Button, Card, CardContent, Badge, Input, Spinner, EmptyState, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { Plus, Search, Package, Zap, Shield, Code2, CheckCircle, XCircle, Clock, ExternalLink, Download } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 
 const SKILL_STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
   ACTIVE: { label: 'Active', variant: 'success' },
@@ -62,6 +63,7 @@ interface Skill {
 }
 
 export default function SkillsPage() {
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace' | 'create'>('installed');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -109,7 +111,7 @@ export default function SkillsPage() {
       setNewSkill({ name: '', description: '', riskLevel: 'MEDIUM', implementation: '' });
       mutate();
     } catch (e) {
-      console.error('Failed to create skill:', e);
+      toast.error('Failed to create skill', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setCreating(false);
     }

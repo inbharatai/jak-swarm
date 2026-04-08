@@ -207,7 +207,7 @@ export default function BuilderIDEPage() {
       await projectApi.deploy(projectId);
       refresh();
     } catch (e) {
-      console.error('Deploy failed:', e);
+      setErrorMessage(e instanceof Error ? e.message : 'Deploy failed');
     } finally {
       setIsDeploying(false);
     }

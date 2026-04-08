@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { Clock, Plus, Play, Trash2, Edit2 } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import {
   Button,
   Card,
@@ -89,6 +90,7 @@ function cronToHuman(cron: string): string {
 }
 
 export default function SchedulesPage() {
+  const toast = useToast();
   const { data, isLoading, mutate } = useSWR<{ data: WorkflowSchedule[] }>('/schedules', fetcher);
   const schedules = (data as any)?.data ?? [];
 
@@ -156,21 +158,21 @@ export default function SchedulesPage() {
     try {
       await scheduleApi.delete(id);
       mutate();
-    } catch { /* ignore */ }
+    } catch (err) { toast.error('Operation failed', err instanceof Error ? err.message : 'Please try again.'); }
   }, [mutate]);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     try {
       await scheduleApi.update(id, { enabled: !enabled });
       mutate();
-    } catch { /* ignore */ }
+    } catch (err) { toast.error('Operation failed', err instanceof Error ? err.message : 'Please try again.'); }
   }, [mutate]);
 
   const handleRunNow = useCallback(async (id: string) => {
     try {
       await scheduleApi.runNow(id);
       mutate();
-    } catch { /* ignore */ }
+    } catch (err) { toast.error('Operation failed', err instanceof Error ? err.message : 'Please try again.'); }
   }, [mutate]);
 
   const updateField = (field: keyof ScheduleFormData, value: string) => {

@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { PlusCircle, StopCircle, CheckCircle2, Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, EmptyState } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
 import { CommandInput } from '@/components/workspace/CommandInput';
 import { PlanView } from '@/components/workspace/PlanView';
 import { WorkflowDAG } from '@/components/graph/WorkflowDAG';
@@ -22,6 +23,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export default function WorkspacePage() {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [planViewMode, setPlanViewMode] = useState<'graph' | 'list'>('graph');
@@ -41,7 +43,7 @@ export default function WorkspacePage() {
       setActiveWorkflowId(result.id);
       refreshWorkflow();
     } catch (err) {
-      console.error('Failed to create workflow:', err);
+      toast.error('Failed to create workflow', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -57,8 +59,8 @@ export default function WorkspacePage() {
     try {
       await workflowApi.stopAll();
       refreshWorkflow();
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to stop workflows', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -306,7 +308,7 @@ export default function WorkspacePage() {
                   plan={workflow?.plan}
                   workflowStatus={workflow?.status}
                   onNodeClick={(stepId) => {
-                    console.log('Node clicked:', stepId);
+                    // Node click handler — could open trace detail
                   }}
                 />
               ) : (

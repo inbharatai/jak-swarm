@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Plug } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { fetcher, integrationApi } from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
@@ -20,6 +21,7 @@ const ALL_PROVIDERS: IntegrationProvider[] = [
 ];
 
 export default function IntegrationsPage() {
+  const toast = useToast();
   const { data, mutate } = useSWR<{ data: Integration[] }>(
     '/integrations',
     fetcher,
@@ -50,8 +52,8 @@ export default function IntegrationsPage() {
     try {
       await integrationApi.disconnect(id);
       await mutate();
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to disconnect', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoadingId(null);
     }

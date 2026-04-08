@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useToast } from '@/components/ui/toast';
 import {
   Shield,
   Users,
@@ -490,6 +491,7 @@ function ApiKeysTab() {
 
 export default function AdminPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const router = useRouter();
 
   if (user && user.role !== 'TENANT_ADMIN') {
@@ -514,8 +516,9 @@ export default function AdminPage() {
     try {
       await adminApi.updateSettings(data);
       refreshSettings();
-    } catch {
-      // ignore
+      toast.success('Settings saved');
+    } catch (err) {
+      toast.error('Failed to save settings', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
