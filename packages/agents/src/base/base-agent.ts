@@ -156,7 +156,7 @@ export abstract class BaseAgent {
         });
 
         // Convert LLMResponse to OpenAI ChatCompletion shape
-        const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = response.toolCalls.map((tc) => ({
+        const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = (response.toolCalls ?? []).map((tc) => ({
           id: tc.id,
           type: 'function' as const,
           function: { name: tc.name, arguments: tc.arguments },

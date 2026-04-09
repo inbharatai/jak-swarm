@@ -5,6 +5,9 @@ import { generateId } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
 import { createInitialSwarmState } from '../state/swarm-state.js';
 import { buildSwarmGraph } from '../graph/swarm-graph.js';
+import type { WorkflowStateStore } from '../state/workflow-state-store.js';
+import { InMemoryStateStore } from '../state/workflow-state-store.js';
+import { supervisorBus } from '../supervisor/supervisor-bus.js';
 
 export interface RunParams {
   goal: string;
@@ -42,17 +45,10 @@ export interface ApprovalDecision {
 
 const logger = createLogger('swarm-runner');
 
-// In-memory workflow state store (replace with Redis/DB in production)
-const workflowStateStore = new Map<string, SwarmState>();
-
-// Module-level signal sets (shared across runner instances for the same process)
-const cancelledWorkflows = new Set<string>();
-const pausedWorkflows = new Set<string>();
-
 /** Clean up signals after workflow completes */
-function cleanupSignals(workflowId: string): void {
-  cancelledWorkflows.delete(workflowId);
-  pausedWorkflows.delete(workflowId);
+function cleanupSignals(signals: { cancelled: Set<string>; paused: Set<string> }, workflowId: string): void {
+  signals.cancelled.delete(workflowId);
+  signals.paused.delete(workflowId);
 }
 
 export class SwarmRunner {
@@ -60,34 +56,40 @@ export class SwarmRunner {
   private readonly defaultTimeoutMs: number;
   private readonly maxConcurrent: number;
   private activeWorkflows = new Set<string>();
+  private readonly stateStore: WorkflowStateStore;
 
-  constructor(options?: { defaultTimeoutMs?: number; maxConcurrentWorkflows?: number }) {
+  // Instance-level signal sets — prevents race conditions across SwarmRunner instances
+  private readonly cancelledWorkflows = new Set<string>();
+  private readonly pausedWorkflows = new Set<string>();
+
+  constructor(options?: { defaultTimeoutMs?: number; maxConcurrentWorkflows?: number; stateStore?: WorkflowStateStore }) {
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 5 * 60 * 1000; // 5 minutes
     this.maxConcurrent = options?.maxConcurrentWorkflows ?? 20;
+    this.stateStore = options?.stateStore ?? new InMemoryStateStore();
 
     // Wire signal callbacks to graph
-    this.graph.shouldStop = (wfId) => cancelledWorkflows.has(wfId);
-    this.graph.shouldPause = (wfId) => pausedWorkflows.has(wfId);
+    this.graph.shouldStop = (wfId) => this.cancelledWorkflows.has(wfId);
+    this.graph.shouldPause = (wfId) => this.pausedWorkflows.has(wfId);
   }
 
   pause(workflowId: string): void {
-    pausedWorkflows.add(workflowId);
+    this.pausedWorkflows.add(workflowId);
   }
 
   unpause(workflowId: string): void {
-    pausedWorkflows.delete(workflowId);
+    this.pausedWorkflows.delete(workflowId);
   }
 
   stop(workflowId: string): void {
-    cancelledWorkflows.add(workflowId);
+    this.cancelledWorkflows.add(workflowId);
   }
 
-  static isCancelled(workflowId: string): boolean {
-    return cancelledWorkflows.has(workflowId);
+  isCancelled(workflowId: string): boolean {
+    return this.cancelledWorkflows.has(workflowId);
   }
 
-  static isPaused(workflowId: string): boolean {
-    return pausedWorkflows.has(workflowId);
+  isPaused(workflowId: string): boolean {
+    return this.pausedWorkflows.has(workflowId);
   }
 
   async run(params: RunParams): Promise<SwarmResult> {
@@ -116,6 +118,13 @@ export class SwarmRunner {
       'Starting swarm workflow',
     );
 
+    // Publish workflow lifecycle event to SupervisorBus
+    supervisorBus.publish('workflow:started', {
+      type: 'workflow:started',
+      tenantId: params.tenantId,
+      workflowId,
+    });
+
     const initialState = createInitialSwarmState({
       goal: params.goal,
       tenantId: params.tenantId,
@@ -134,7 +143,9 @@ export class SwarmRunner {
     // Register state-change listener so callers can persist intermediate state
     if (params.onStateChange) {
       const fn = (data: { workflowId: string; state: unknown }) => {
-        params.onStateChange!(data.workflowId, data.state).catch(() => {});
+        params.onStateChange!(data.workflowId, data.state).catch((err) => {
+          logger.error({ workflowId: data.workflowId, err: err instanceof Error ? err.message : String(err) }, 'State change callback failed');
+        });
       };
       this.graph.on('state:updated', fn);
       listeners.push({ event: 'state:updated', fn });
@@ -205,9 +216,11 @@ export class SwarmRunner {
     this.activeWorkflows.delete(workflowId);
 
     // Persist state for resume/cancel
-    workflowStateStore.set(workflowId, finalState);
-    // Clean up after 5 minutes (keep briefly for status queries)
-    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
+    try {
+      await this.stateStore.set(workflowId, finalState);
+    } catch (err) {
+      logger.error({ workflowId, err: err instanceof Error ? err.message : String(err) }, 'Failed to persist final workflow state');
+    }
 
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAt.getTime();
@@ -223,7 +236,18 @@ export class SwarmRunner {
       'Swarm workflow completed',
     );
 
-    cleanupSignals(workflowId);
+    // Publish completion event to SupervisorBus
+    supervisorBus.publish('workflow:completed', {
+      type: 'workflow:completed',
+      tenantId: finalState.tenantId,
+      workflowId,
+      status: finalState.status,
+      durationMs,
+      taskCount: finalState.plan?.tasks.length ?? 0,
+      failedCount: finalState.plan?.tasks.filter(t => t.status === 'FAILED').length ?? 0,
+    });
+
+    cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     return this.stateToResult(finalState, workflowId, startedAt, completedAt);
   }
 
@@ -239,14 +263,14 @@ export class SwarmRunner {
       'Resuming workflow after approval decision',
     );
 
-    let savedState = workflowStateStore.get(workflowId);
+    let savedState = await this.stateStore.get(workflowId);
 
-    // If not in memory, try loading from external store (e.g. DB)
+    // If not in store, try loading from external callback (e.g. DB)
     if (!savedState && options?.loadState) {
       const loaded = await options.loadState(workflowId);
       if (loaded) {
         savedState = loaded as SwarmState;
-        workflowStateStore.set(workflowId, savedState);
+        void this.stateStore.set(workflowId, savedState);
       }
     }
 
@@ -305,17 +329,15 @@ export class SwarmRunner {
       };
     }
 
-    workflowStateStore.set(workflowId, finalState);
-    // Clean up after 5 minutes (keep briefly for status queries)
-    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
+    void this.stateStore.set(workflowId, finalState);
 
-    cleanupSignals(workflowId);
+    cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     const completedAt = new Date();
     return this.stateToResult(finalState, workflowId, startedAt, completedAt);
   }
 
   async cancel(workflowId: string): Promise<void> {
-    const state = workflowStateStore.get(workflowId);
+    const state = await this.stateStore.get(workflowId);
     if (!state) {
       logger.warn({ workflowId }, 'Cancel requested for unknown workflow');
       return;
@@ -327,15 +349,13 @@ export class SwarmRunner {
       error: 'Cancelled by user',
     };
 
-    workflowStateStore.set(workflowId, cancelledState);
-    // Clean up after 5 minutes (keep briefly for status queries)
-    setTimeout(() => { workflowStateStore.delete(workflowId); }, 5 * 60 * 1000);
+    void this.stateStore.set(workflowId, cancelledState);
 
     logger.info({ workflowId }, 'Workflow cancelled');
   }
 
-  getState(workflowId: string): SwarmState | undefined {
-    return workflowStateStore.get(workflowId);
+  async getState(workflowId: string): Promise<SwarmState | undefined> {
+    return this.stateStore.get(workflowId);
   }
 
   private stateToResult(

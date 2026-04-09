@@ -27,7 +27,7 @@ export async function enforceTenantIsolation(
   const params = request.params as Record<string, string | undefined>;
   const routeTenantId = params['tenantId'];
 
-  if (routeTenantId !== undefined && routeTenantId !== user.tenantId) {
+  if (routeTenantId !== undefined && (!routeTenantId || routeTenantId !== user.tenantId)) {
     throw new TenantIsolationError();
   }
 }

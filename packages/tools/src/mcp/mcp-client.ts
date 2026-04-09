@@ -5,6 +5,9 @@ import { toolRegistry } from '../registry/tool-registry.js';
 import type { McpServerConfig } from './mcp-providers.js';
 import type { McpToolSpec } from './mcp-tool-bridge.js';
 import type { ToolExecutionContext } from '@jak-swarm/shared';
+import { createLogger } from '@jak-swarm/shared';
+
+const logger = createLogger('mcp-client');
 
 export class McpClientManager {
   private clients = new Map<string, { client: Client; toolNames: string[] }>();
@@ -28,7 +31,11 @@ export class McpClientManager {
       { capabilities: {} },
     );
 
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (err) {
+      throw new Error(`Failed to connect to MCP server '${provider}': ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     // Discover available tools
     const { tools } = await client.listTools();
@@ -79,7 +86,7 @@ export class McpClientManager {
     }
 
     this.clients.set(provider, { client, toolNames: registeredNames });
-    console.log(`[mcp] Connected to ${provider}: ${registeredNames.length} tools registered`);
+    logger.info({ provider, toolCount: registeredNames.length }, 'Connected to MCP server');
     return registeredNames;
   }
 
@@ -97,7 +104,7 @@ export class McpClientManager {
     }
 
     this.clients.delete(provider);
-    console.log(`[mcp] Disconnected from ${provider}`);
+    logger.info({ provider }, 'Disconnected from MCP server');
   }
 
   isConnected(provider: string): boolean {

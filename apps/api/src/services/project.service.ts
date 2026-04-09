@@ -1,13 +1,15 @@
-import type { PrismaClient } from '@prisma/client';
-import type { Logger } from 'pino';
+import { Prisma, type PrismaClient } from '@jak-swarm/db';
+import type { FastifyBaseLogger } from 'fastify';
 import * as crypto from 'node:crypto';
+
+type TransactionClient = Prisma.TransactionClient;
 
 export type ProjectStatus = 'DRAFT' | 'GENERATING' | 'BUILDING' | 'READY' | 'DEPLOYED' | 'FAILED';
 
 export class ProjectService {
   constructor(
     private readonly db: PrismaClient,
-    private readonly logger: Logger,
+    _log: FastifyBaseLogger,
   ) {}
 
   async createProject(
@@ -70,10 +72,10 @@ export class ProjectService {
   async updateProjectStatus(projectId: string, status: ProjectStatus, extra?: Record<string, unknown>) {
     const data: Record<string, unknown> = { status };
     if (extra) Object.assign(data, extra);
-    return this.db.project.update({ where: { id: projectId }, data });
+    return this.db.project.update({ where: { id: projectId }, data: data as Prisma.ProjectUpdateInput });
   }
 
-  async updateProject(tenantId: string, projectId: string, data: {
+  async updateProject(_tenantId: string, projectId: string, data: {
     name?: string;
     description?: string;
     sandboxId?: string;
@@ -86,7 +88,7 @@ export class ProjectService {
   }) {
     return this.db.project.update({
       where: { id: projectId },
-      data,
+      data: data as Prisma.ProjectUpdateInput,
     });
   }
 
@@ -155,10 +157,10 @@ export class ProjectService {
 
   // FIX #25: Use $transaction for atomic version creation
   async createVersion(projectId: string, description: string, createdBy: string = 'agent', workflowId?: string) {
-    return this.db.$transaction(async (tx) => {
+    return this.db.$transaction(async (tx: TransactionClient) => {
       // Get current files for snapshot
       const files = await tx.projectFile.findMany({ where: { projectId }, orderBy: { path: 'asc' } });
-      const snapshot = files.map(f => ({ path: f.path, content: f.content, language: f.language }));
+      const snapshot = files.map((f: { path: string; content: string; language: string | null }) => ({ path: f.path, content: f.content, language: f.language }));
 
       // Atomic version number increment
       const lastVersion = await tx.projectVersion.findFirst({
@@ -172,7 +174,7 @@ export class ProjectService {
           projectId,
           version: nextVersion,
           description,
-          snapshotJson: snapshot as unknown as Record<string, unknown>,
+          snapshotJson: snapshot as unknown as Prisma.InputJsonValue,
           createdBy,
           workflowId,
         },
@@ -204,7 +206,7 @@ export class ProjectService {
     const snapshot = version.snapshotJson as unknown as Array<{ path: string; content: string; language: string }>;
     if (!snapshot || !Array.isArray(snapshot)) throw new Error('Version snapshot is corrupted');
 
-    return this.db.$transaction(async (tx) => {
+    return this.db.$transaction(async (tx: TransactionClient) => {
       // FIX #3: Hard-delete all current files (no soft-delete)
       await tx.projectFile.deleteMany({ where: { projectId } });
 
@@ -235,7 +237,7 @@ export class ProjectService {
           projectId,
           version: nextVersion,
           description: `Rollback to v${targetVersion}`,
-          snapshotJson: snapshot as unknown as Record<string, unknown>,
+          snapshotJson: snapshot as unknown as Prisma.InputJsonValue,
           createdBy: 'system',
         },
       });
@@ -253,7 +255,7 @@ export class ProjectService {
 
   async addConversation(projectId: string, role: string, content: string, metadata?: Record<string, unknown>, workflowId?: string) {
     return this.db.projectConversation.create({
-      data: { projectId, role, content, metadata: metadata as Record<string, unknown> | undefined, workflowId },
+      data: { projectId, role, content, metadata: metadata as Prisma.InputJsonValue | undefined, workflowId },
     });
   }
 

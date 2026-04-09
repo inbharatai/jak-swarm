@@ -5,7 +5,7 @@
 ### The Autonomous AI Company — 38 Agents That Run Your Business
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-112-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tools](https://img.shields.io/badge/Tools-108-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
@@ -126,18 +126,18 @@ flowchart LR
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **38 AI Agents** | 6 orchestrators + 27 workers + 5 vibe coding specialists |
-| 🔧 | **112 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision |
+| 🤖 | **38 AI Agents** | 6 orchestrators + 32 workers |
+| 🔧 | **108 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision |
 | ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
 | 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, get pixel-accurate React + Tailwind components |
 | 📧 | **Real Gmail/Calendar** | IMAP/SMTP + CalDAV — no OAuth needed, just app password |
-| 🔌 | **20 MCP Integrations** | HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics |
+| 🔌 | **MCP Integrations** | HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics |
 | 🧩 | **Skills Marketplace** | Browse, install, and create custom skills with sandbox testing and approval workflow |
 | ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
 | 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
 | 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
-| 🌐 | **22 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
+| 🌐 | **20 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
 | 📊 | **React Flow DAG Graph** | Real-time visualization of agent execution |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, onboarding wizard |
 | 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel with env vars and custom domains |
@@ -247,7 +247,7 @@ graph LR
 | `WORKER_CRM` | CRMAgent | lookup_crm_contact, update_crm_record, search_deals, enrich_contact |
 | `WORKER_DOCUMENT` | DocumentAgent | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze |
 | `WORKER_SPREADSHEET` | SpreadsheetAgent | parse_spreadsheet, compute_statistics, generate_report |
-| `WORKER_BROWSER` | BrowserAgent | browser_navigate, browser_extract, browser_fill_form, browser_screenshot + 7 more |
+| `WORKER_BROWSER` | BrowserAgent | browser_navigate, browser_extract, browser_fill_form, browser_screenshot + 23 more |
 | `WORKER_RESEARCH` | ResearchAgent | web_search, web_fetch, search_knowledge |
 | `WORKER_KNOWLEDGE` | KnowledgeAgent | search_knowledge, memory_store, memory_retrieve |
 | `WORKER_SUPPORT` | SupportAgent | classify_ticket, lookup_customer, search_knowledge_base |
@@ -338,7 +338,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 112 tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 108 tools.*
 
 </div>
 
@@ -450,10 +450,10 @@ flowchart TD
 | **Vercel deploy** | ✅ | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **112 business tools** | ✅ | ❌ | ❌ | ❌ |
+| **108 business tools** | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
-| **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
+| **Industry compliance** | ✅ 11 packs | ❌ | ❌ | ❌ |
 
 </div>
 
@@ -477,8 +477,8 @@ flowchart TD
 
 | Template | Stack | Includes |
 |:---------|:------|:---------|
-| `nextjs-app` | Next.js 14 + Tailwind | App Router, TypeScript strict, responsive layout |
-| `nextjs-saas` | Next.js 14 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
+| `nextjs-app` | Next.js 15 + Tailwind | App Router, TypeScript strict, responsive layout |
+| `nextjs-saas` | Next.js 15 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
 | `react-spa` | React + Vite + Router | Single-page app, client-side routing, Tailwind |
 
 ---
@@ -560,7 +560,7 @@ http://localhost:3000
 | 🔎 **Traces** | Full agent trace explorer with token/cost breakdown |
 | 📊 **Analytics** | Usage metrics, cost tracking, agent performance charts |
 | ⏰ **Schedules** | Cron-based recurring workflow management |
-| 🔌 **Integrations** | 20 MCP providers — HubSpot, Salesforce, Slack, GitHub + more |
+| 🔌 **Integrations** | MCP providers — HubSpot, Salesforce, Slack, GitHub + more |
 | 🧩 **Skills** | Skill marketplace — browse, install, create custom skills |
 | 🧠 **Knowledge** | Memory store — facts, preferences, policies, learnings |
 | ⚙️ **Settings** | LLM provider config, approval thresholds |
@@ -568,14 +568,14 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (112 Tools)
+## 🔧 Tool Inventory (108 Tools)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
 | **Email** | 5 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
 | **CRM** | 3 | lookup_crm_contact, update_crm_record, search_deals | 🔌 Mock (pluggable adapter) |
-| **Browser** | 11 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page | ✅ Real (Playwright) |
+| **Browser** | 20 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs + more | ✅ Real (Playwright) |
 | **Document** | 4 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze | ✅ Real (pdf-parse) |
 | **Research** | 3 | web_search, web_fetch, search_knowledge | ✅ Real (web) |
 | **Spreadsheet** | 3 | parse_spreadsheet, compute_statistics, generate_report | ✅ Built-in |
@@ -589,7 +589,7 @@ http://localhost:3000
 | **Phoring.ai** | 4 | phoring_forecast, phoring_graph_query, phoring_validate, phoring_simulate | ✅ Real (needs API key) |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion tools loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 112 tools (built-in + sandbox + MCP integrations)**
+**Total: 108 tools (built-in + sandbox + MCP integrations)**
 
 ---
 
@@ -666,15 +666,15 @@ Create recurring workflows from the dashboard at `/schedules`:
 
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
-| Pre-built agents | **33** | 0 | 0 | 1 |
-| Tools | **74** | 50+ | Custom | ~10 |
-| Built-in UI | **15 pages** | --- | LangSmith | IDE |
-| Multi-tenant | ✅ | Enterprise | --- | --- |
-| Scheduling | ✅ | ✅ | ✅ | --- |
-| Browser control | **22 tools** | Via plugin | Via plugin | --- |
+| Pre-built agents | **38** | 0 | 0 | 1 |
+| Tools | **108** | 50+ | Custom | ~10 |
+| Built-in UI | **12 pages** | — | LangSmith | IDE |
+| Multi-tenant | ✅ | Enterprise | — | — |
+| Scheduling | ✅ | ✅ | ✅ | — |
+| Browser control | **20 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
 | Self-correction | **4 layers** | Limited | Manual | Limited |
-| Open source | ✅ MIT | ✅ MIT | ✅ MIT | --- $20/mo |
+| Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
 | Price | **Free** | Free | Free+$39 | $20/mo |
 
 </div>
@@ -781,7 +781,7 @@ jak-swarm/
 │   │       ├── services/       # Business logic
 │   │       ├── middleware/      # Auth, RBAC, rate limiting
 │   │       └── plugins/        # Fastify plugins
-│   └── web/                    # Next.js dashboard (port 3000)
+│   └── web/                    # Next.js 15 dashboard (port 3000)
 │       └── src/app/(dashboard)/
 │           ├── home/           # Mission control
 │           ├── swarm/          # Real-time DAG execution view
@@ -798,11 +798,11 @@ jak-swarm/
 │   │   └── src/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
-│   │       └── workers/        # 27 worker agents
-│   ├── tools/                  # 65 tool implementations
+│   │       └── workers/        # 32 worker agents
+│   ├── tools/                  # 108 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
-│   │       ├── builtin/        # 112 tools (built-in + sandbox + MCP)
+│   │       ├── builtin/        # Built-in + sandbox tools
 │   │       ├── adapters/       # Email, Calendar, CRM, Browser, Memory
 │   │       └── mcp/            # MCP client, bridge, provider configs
 │   ├── swarm/                  # Orchestration engine
@@ -815,7 +815,7 @@ jak-swarm/
 │   ├── workflows/              # Temporal workflow definitions
 │   ├── security/               # Audit logging, RBAC, guardrails, tool risk
 │   ├── voice/                  # Voice pipeline (WebRTC, STT, TTS)
-│   └── industry-packs/         # Industry-specific agent configurations
+│   └── industry-packs/         # 11 industry-specific agent configurations
 ├── tests/
 │   ├── unit/                   # Unit tests
 │   ├── integration/            # Integration tests

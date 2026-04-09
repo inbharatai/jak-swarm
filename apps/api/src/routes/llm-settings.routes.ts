@@ -11,9 +11,13 @@ import { config } from '../config.js';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 
+let cachedKey: Buffer | null = null;
 
 function deriveKey(): Buffer {
-  return scryptSync(config.jwtSecret, 'jak-swarm-llm-keys', 32);
+  if (!cachedKey) {
+    cachedKey = scryptSync(config.jwtSecret, 'jak-swarm-llm-keys', 32);
+  }
+  return cachedKey;
 }
 
 function encrypt(plaintext: string): string {

@@ -7,7 +7,26 @@
 
 import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
-import type { SandboxAdapter, SandboxInfo } from '@jak-swarm/tools/adapters/sandbox/sandbox.interface.js';
+
+// Sandbox types — defined locally to avoid deep path imports
+interface SandboxInfo {
+  id: string;
+  status: string;
+  host?: string;
+}
+
+interface SandboxAdapter {
+  isAvailable(): boolean;
+  create(opts: { template?: string; timeoutMs?: number; metadata?: Record<string, string> }): Promise<SandboxInfo>;
+  getInfo(sandboxId: string): Promise<SandboxInfo | null>;
+  writeFiles(sandboxId: string, files: Array<{ path: string; content: string }>): Promise<void>;
+  writeFile(sandboxId: string, path: string, content: string): Promise<void>;
+  installDeps(sandboxId: string): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  exec(sandboxId: string, command: string, opts?: { timeoutMs?: number }): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  startDevServer(sandboxId: string, options?: { command?: string; port?: number; cwd?: string }): Promise<string>;
+  getPreviewUrl(sandboxId: string, port?: number): Promise<string | null>;
+  destroy(sandboxId: string): Promise<void>;
+}
 
 // Auto-destroy sandbox after 30 minutes of inactivity
 const DEFAULT_TTL_MS = 30 * 60 * 1000;
@@ -70,7 +89,7 @@ export class SandboxService {
     if (!project?.sandboxId) throw new Error('No sandbox for project');
 
     const files = await this.db.projectFile.findMany({
-      where: { projectId, isDeleted: false },
+      where: { projectId },
     });
 
     await this.adapter.writeFiles(

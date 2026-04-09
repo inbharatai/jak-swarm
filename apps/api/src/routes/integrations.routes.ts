@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { mcpClientManager, MCP_PROVIDERS } from '@jak-swarm/tools';
 import { encrypt as encryptCredentials } from '../utils/crypto.js';
 
@@ -40,7 +41,15 @@ export async function integrationRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
     const { tenantId, userId } = request.user;
-    const { provider, credentials } = request.body as { provider: string; credentials: Record<string, string> };
+    const connectSchema = z.object({
+      provider: z.string().min(1).max(100),
+      credentials: z.record(z.string(), z.string()),
+    });
+    const parsed = connectSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.message });
+    }
+    const { provider, credentials } = parsed.data;
 
     const providerUpper = provider.toUpperCase();
     const providerDef = MCP_PROVIDERS[providerUpper];

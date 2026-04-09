@@ -233,6 +233,9 @@ export interface AgentTraceRecord {
   agentRole: AgentRole;
   status: string;
   steps: unknown[];
+  output?: string;
+  error?: string;
+  durationMs?: number;
   startedAt: string;
   completedAt: string | null;
   createdAt: string;

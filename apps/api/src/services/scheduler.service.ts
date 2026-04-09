@@ -7,6 +7,9 @@
  */
 import type { PrismaClient } from '@jak-swarm/db';
 import { CronExpressionParser } from 'cron-parser';
+import { createLogger } from '@jak-swarm/shared';
+
+const logger = createLogger('scheduler');
 
 export interface SchedulerExecuteParams {
   goal: string;
@@ -30,7 +33,7 @@ export class SchedulerService {
   }
 
   start(): void {
-    console.log('[scheduler] Starting workflow scheduler (60s interval)');
+    logger.info('Starting workflow scheduler (60s interval)');
     this.interval = setInterval(() => {
       void this.tick();
     }, 60_000);
@@ -47,7 +50,7 @@ export class SchedulerService {
       clearInterval(this.interval);
       this.interval = null;
     }
-    console.log('[scheduler] Stopped');
+    logger.info('Stopped');
   }
 
   private async initializeNextRuns(): Promise<void> {
@@ -68,12 +71,13 @@ export class SchedulerService {
         }
       }
       if (schedules.length > 0) {
-        console.log(
-          `[scheduler] Initialized nextRunAt for ${schedules.length} schedules`,
+        logger.info(
+          { count: schedules.length },
+          'Initialized nextRunAt for schedules',
         );
       }
     } catch (err) {
-      console.error('[scheduler] Failed to initialize schedules:', err);
+        logger.error({ err }, 'Failed to initialize schedules');
     }
   }
 
@@ -86,7 +90,7 @@ export class SchedulerService {
 
       if (due.length === 0) return;
 
-      console.log(`[scheduler] ${due.length} schedule(s) due for execution`);
+      logger.info({ count: due.length }, 'Schedules due for execution');
 
       for (const schedule of due) {
         try {
@@ -113,13 +117,14 @@ export class SchedulerService {
             },
           });
 
-          console.log(
-            `[scheduler] Fired schedule "${schedule.name}" -> workflow ${workflowId}`,
+          logger.info(
+            { schedule: schedule.name, workflowId },
+            'Fired schedule',
           );
         } catch (err) {
-          console.error(
-            `[scheduler] Failed to fire schedule "${schedule.name}":`,
-            err,
+          logger.error(
+            { schedule: schedule.name, err },
+            'Failed to fire schedule',
           );
           await this.db.workflowSchedule
             .update({
@@ -130,7 +135,7 @@ export class SchedulerService {
         }
       }
     } catch (err) {
-      console.error('[scheduler] Tick error:', err);
+      logger.error({ err }, 'Tick error');
     }
   }
 }

@@ -100,10 +100,9 @@ export function fetcher<T>(url: string): Promise<T> {
 }
 
 /** Generic fetch helper for use in components */
-export function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export function apiFetch<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
   const method = options?.method ?? 'GET';
-  const body = options?.body ? JSON.parse(options.body as string) : undefined;
-  return request<T>(method, path, body);
+  return request<T>(method, path, options?.body);
 }
 
 // ─── Typed API endpoints ──────────────────────────────────────────────────────
@@ -163,9 +162,13 @@ export const workflowApi = {
   /** Resume a paused workflow */
   unpause: (id: string) => apiClient.post<unknown>(`/workflows/${id}/unpause`),
 
-  /** Alias: stop = cancel, stopAll is a no-op (cancel each separately) */
+  /** Alias: stop = cancel */
   stop: (id: string) => apiClient.post<unknown>(`/workflows/${id}/stop`),
-  stopAll: () => Promise.resolve(null),
+  stopAll: async () => {
+    const res = await workflowApi.list({ status: 'RUNNING' }) as { data?: { id: string }[] };
+    const running = res?.data ?? [];
+    await Promise.allSettled(running.map(w => workflowApi.cancel(w.id)));
+  },
 
   /** GET /workflows/:id/traces */
   traces: (id: string) => apiClient.get<unknown>(`/workflows/${id}/traces`),
@@ -321,7 +324,7 @@ export const integrationApi = {
   connect: (provider: string, credentials: Record<string, string>) =>
     apiFetch<{ id: string; provider: string; status: string; toolsRegistered: string[] }>(
       '/integrations/connect',
-      { method: 'POST', body: JSON.stringify({ provider, credentials }) },
+      { method: 'POST', body: { provider, credentials } },
     ),
   getProviderInfo: (provider: string) =>
     apiFetch<{ name: string; description: string; credentialFields: Array<{ key: string; label: string; placeholder: string; type: string; helpUrl?: string }>; setupInstructions: string }>(

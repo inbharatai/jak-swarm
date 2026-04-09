@@ -14,6 +14,8 @@ import { guardrailNode } from './nodes/guardrail-node.js';
 import { workerNode } from './nodes/worker-node.js';
 import { verifierNode } from './nodes/verifier-node.js';
 import { approvalNode } from './nodes/approval-node.js';
+import { validatorNode } from './nodes/validator-node.js';
+import { replannerNode } from './nodes/replanner-node.js';
 import { getReadyTasks, getSkippedTasks } from './task-scheduler.js';
 
 export type NodeName =
@@ -24,6 +26,8 @@ export type NodeName =
   | 'worker'
   | 'verifier'
   | 'approval'
+  | 'validator'
+  | 'replanner'
   | '__end__'
   | '__clarification__';
 
@@ -58,7 +62,14 @@ export function afterVerifier(state: SwarmState): NodeName {
   const currentResult = getCurrentVerificationResult(state);
 
   if (currentResult && !currentResult.passed && currentResult.needsRetry) {
-    return 'worker';
+    // Enforce per-task retry limit to prevent infinite loops
+    const task = getCurrentTask(state);
+    const MAX_TASK_RETRIES = 3;
+    const retries = task ? (state.taskRetryCount[task.id] ?? 0) : MAX_TASK_RETRIES;
+    if (retries < MAX_TASK_RETRIES) {
+      return 'worker';
+    }
+    // Exhausted retries — treat as passed (move on)
   }
 
   if (hasMoreTasks(state)) {
@@ -86,7 +97,8 @@ export interface SwarmGraphEvents {
 
 export class SwarmGraph extends EventEmitter {
   private nodes: Map<NodeName, NodeHandler> = new Map();
-  private readonly MAX_STEPS = 100;
+  private readonly BASE_MAX_STEPS = 100;
+  private readonly STEPS_PER_TASK = 10; // Each task: commander→planner→...→verifier
 
   /** Optional callback: returns true if the given workflow should be cancelled. */
   shouldStop?: (workflowId: string) => boolean;
@@ -103,14 +115,18 @@ export class SwarmGraph extends EventEmitter {
     this.nodes.set('worker', workerNode);
     this.nodes.set('verifier', verifierNode);
     this.nodes.set('approval', approvalNode);
+    this.nodes.set('validator', validatorNode);
+    this.nodes.set('replanner', replannerNode);
   }
 
   async run(initialState: SwarmState): Promise<SwarmState> {
     let state: SwarmState = { ...initialState };
     let currentNode: NodeName = 'commander';
     let steps = 0;
+    const taskCount = initialState.plan?.tasks.length ?? 5;
+    const maxSteps = Math.min(500, Math.max(this.BASE_MAX_STEPS, taskCount * this.STEPS_PER_TASK));
 
-    while (currentNode !== '__end__' && currentNode !== '__clarification__' && steps < this.MAX_STEPS) {
+    while (currentNode !== '__end__' && currentNode !== '__clarification__' && steps < maxSteps) {
       steps++;
 
       // Check for user-initiated stop/pause
@@ -141,7 +157,10 @@ export class SwarmGraph extends EventEmitter {
         this.emit('state:updated', { workflowId: state.workflowId, state });
 
         // Accumulate cost from new traces
-        const nodeCost = (updates.traces ?? []).reduce((sum: number, t: { costUsd?: number }) => sum + (t.costUsd ?? 0), 0);
+        const nodeCost = (updates.traces ?? []).reduce((sum: number, t: { costUsd?: unknown }) => {
+          const cost = typeof t.costUsd === 'number' && Number.isFinite(t.costUsd) ? t.costUsd : 0;
+          return sum + cost;
+        }, 0);
         if (nodeCost > 0) {
           state = { ...state, accumulatedCostUsd: (state.accumulatedCostUsd ?? 0) + nodeCost };
         }
@@ -227,6 +246,20 @@ export class SwarmGraph extends EventEmitter {
       // Determine next node
       currentNode = this.getNextNode(currentNode, state);
 
+      // Increment retry counter when verifier sends task back to worker
+      if (currentNode === 'worker') {
+        const retryTask = getCurrentTask(state);
+        if (retryTask) {
+          state = {
+            ...state,
+            taskRetryCount: {
+              ...state.taskRetryCount,
+              [retryTask.id]: (state.taskRetryCount[retryTask.id] ?? 0) + 1,
+            },
+          };
+        }
+      }
+
       // Advance task index when moving from verifier to guardrail (next task)
       if (currentNode === 'guardrail' && state.plan) {
         const vResult = getCurrentVerificationResult(state);
@@ -240,10 +273,10 @@ export class SwarmGraph extends EventEmitter {
       }
     }
 
-    if (steps >= this.MAX_STEPS) {
+    if (steps >= maxSteps) {
       state = {
         ...state,
-        error: 'Workflow exceeded maximum step limit',
+        error: `Workflow exceeded maximum step limit (${maxSteps} steps)`,
         status: WorkflowStatus.FAILED,
       };
     }
@@ -347,8 +380,10 @@ export class SwarmGraph extends EventEmitter {
     let currentNode: NodeName = 'worker';
     let resumedState = updatedState;
     let steps = 0;
+    const taskCount = updatedState.plan?.tasks.length ?? 5;
+    const maxSteps = Math.min(500, Math.max(this.BASE_MAX_STEPS, taskCount * this.STEPS_PER_TASK));
 
-    while (currentNode !== '__end__' && currentNode !== '__clarification__' && steps < this.MAX_STEPS) {
+    while (currentNode !== '__end__' && currentNode !== '__clarification__' && steps < maxSteps) {
       steps++;
       const handler = this.nodes.get(currentNode);
       if (!handler) break;
@@ -504,8 +539,10 @@ export class SwarmGraph extends EventEmitter {
     const completedIds = new Set<string>(state.completedTaskIds ?? []);
     const failedIds = new Set<string>(state.failedTaskIds ?? []);
     let iterations = 0;
+    const taskCount = plan.tasks.length;
+    const maxIterations = Math.min(500, Math.max(this.BASE_MAX_STEPS, taskCount * this.STEPS_PER_TASK));
 
-    while (iterations < this.MAX_STEPS) {
+    while (iterations < maxIterations) {
       iterations++;
 
       // Check for user-initiated stop/pause
@@ -600,27 +637,18 @@ export class SwarmGraph extends EventEmitter {
       this.emit('node:enter', { node: 'auto-repair', timestamp: new Date() });
 
       try {
-        // Invoke the planner in replan mode
-        const plannerHandler = this.nodes.get('planner');
-        if (!plannerHandler) break;
+        // Use the dedicated replanner node for failure recovery
+        const replannerHandler = this.nodes.get('replanner');
+        if (!replannerHandler) break;
 
         const replanState: SwarmState = {
           ...state,
-          // Signal to planner that this is a replan
-          missionBrief: state.missionBrief
-            ? {
-                ...state.missionBrief,
-                // Add replan context — planner reads this
-                riskIndicators: [
-                  ...(state.missionBrief.riskIndicators ?? []),
-                  `AUTO-REPAIR: ${failedIds.size} tasks failed. Create alternative approaches.`,
-                ],
-              }
-            : state.missionBrief,
+          failedTaskIds: [...failedIds],
+          completedTaskIds: [...completedIds],
         };
 
-        // The planner will see the failed tasks and create alternatives
-        const replanUpdates = await this.executeNode('planner', plannerHandler, replanState);
+        // The replanner will see the failed tasks and create alternatives
+        const replanUpdates = await this.executeNode('replanner', replannerHandler, replanState);
         const replanResult = this.mergeState(state, replanUpdates);
 
         if (!replanResult.plan || replanResult.plan.tasks.length === 0) break;
@@ -793,6 +821,19 @@ export class SwarmGraph extends EventEmitter {
           [task.id]: { ...verificationResult, needsRetry: false },
         },
       };
+    }
+
+    // 4. Validator — double-validation after verifier passes (non-blocking)
+    if (passed) {
+      const validatorHandler = this.nodes.get('validator');
+      if (validatorHandler) {
+        try {
+          const validatorUpdates = await this.executeNode('validator', validatorHandler, finalState, task.id);
+          finalState = this.mergeState(finalState, validatorUpdates);
+        } catch {
+          // Validator is advisory — never fails the task
+        }
+      }
     }
 
     // Merge all updates

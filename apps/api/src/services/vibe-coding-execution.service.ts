@@ -24,8 +24,8 @@ import {
   ScreenshotToCodeAgent,
 } from '@jak-swarm/agents';
 import { ProjectService } from './project.service.js';
-import { getTemplate, generatePackageJson } from '@jak-swarm/tools/adapters/sandbox/template-registry.js';
-import type { SandboxAdapter } from '@jak-swarm/tools/adapters/sandbox/sandbox.interface.js';
+import { getTemplate, generatePackageJson } from '@jak-swarm/tools';
+import type { SandboxAdapter } from '@jak-swarm/tools';
 
 const MAX_DEBUG_RETRIES = 3;
 
@@ -75,11 +75,13 @@ export class VibeCodingExecutionService extends EventEmitter {
 
     this.log.info({ projectId, tenantId, runId }, 'Starting vibe coding generation');
 
+    let context: AgentContext | undefined;
+
     try {
       await this.projectService.updateProjectStatus(projectId, 'GENERATING');
       this.emitProjectEvent(projectId, 'generation_started', { description });
 
-      const context = new AgentContext({
+      context = new AgentContext({
         traceId: runId,
         runId,
         tenantId,
@@ -221,17 +223,19 @@ export class VibeCodingExecutionService extends EventEmitter {
       this.emitProjectEvent(projectId, 'generation_failed', { error: errorMsg });
     } finally {
       // FIX #20: Always track cost, even on failure
-      try {
-        const traces = context.getTraces();
-        const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
-        if (totalCost > 0) {
-          await this.db.project.update({
-            where: { id: projectId },
-            data: { totalCostUsd: { increment: totalCost } },
-          });
+      if (context) {
+        try {
+          const traces = context.getTraces();
+          const totalCost = traces.reduce((sum: number, t: { costUsd?: number }) => sum + (t.costUsd ?? 0), 0);
+          if (totalCost > 0) {
+            await this.db.project.update({
+              where: { id: projectId },
+              data: { totalCostUsd: { increment: totalCost } },
+            });
+          }
+        } catch (costErr) {
+          this.log.warn({ projectId, err: costErr }, 'Failed to track cost');
         }
-      } catch (costErr) {
-        this.log.warn({ projectId, err: costErr }, 'Failed to track cost');
       }
     }
   }
@@ -245,11 +249,13 @@ export class VibeCodingExecutionService extends EventEmitter {
 
     this.log.info({ projectId, tenantId, runId }, 'Starting vibe coding iteration');
 
+    let context: AgentContext | undefined;
+
     try {
       await this.projectService.updateProjectStatus(projectId, 'GENERATING');
       this.emitProjectEvent(projectId, 'iteration_started', { message });
 
-      const context = new AgentContext({
+      context = new AgentContext({
         traceId: runId,
         runId,
         tenantId,
@@ -337,17 +343,19 @@ export class VibeCodingExecutionService extends EventEmitter {
       this.emitProjectEvent(projectId, 'iteration_failed', { error: errorMsg });
     } finally {
       // FIX #20: Always track cost
-      try {
-        const traces = context.getTraces();
-        const totalCost = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
-        if (totalCost > 0) {
-          await this.db.project.update({
-            where: { id: projectId },
-            data: { totalCostUsd: { increment: totalCost } },
-          });
+      if (context) {
+        try {
+          const traces = context.getTraces();
+          const totalCost = traces.reduce((sum: number, t: { costUsd?: number }) => sum + (t.costUsd ?? 0), 0);
+          if (totalCost > 0) {
+            await this.db.project.update({
+              where: { id: projectId },
+              data: { totalCostUsd: { increment: totalCost } },
+            });
+          }
+        } catch (costErr) {
+          this.log.warn({ projectId, err: costErr }, 'Failed to track iteration cost');
         }
-      } catch (costErr) {
-        this.log.warn({ projectId, err: costErr }, 'Failed to track iteration cost');
       }
     }
   }

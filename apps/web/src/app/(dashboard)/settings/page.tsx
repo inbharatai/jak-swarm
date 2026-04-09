@@ -86,11 +86,10 @@ export default function SettingsPage() {
     try {
       await apiFetch(`/settings/llm/${providerName}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           apiKey: apiKey || undefined,
           model: selectedModel || undefined,
-        }),
+        },
       });
       toast.success(`${PROVIDER_META[providerName]?.label ?? providerName} saved`);
       setEditingProvider(null);

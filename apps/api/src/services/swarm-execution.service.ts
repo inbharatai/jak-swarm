@@ -9,10 +9,11 @@
 import { EventEmitter } from 'node:events';
 import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
-import { SwarmRunner } from '@jak-swarm/swarm';
+import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
 import type { SwarmResult } from '@jak-swarm/swarm';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
 import { WorkflowService } from './workflow.service.js';
+import { DbWorkflowStateStore } from './db-state-store.js';
 
 /**
  * Map the rich internal WorkflowStatus enum to the DB-persisted string literal.
@@ -70,7 +71,8 @@ export class SwarmExecutionService extends EventEmitter {
     private readonly log: FastifyBaseLogger,
   ) {
     super();
-    this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000 });
+    const stateStore = new DbWorkflowStateStore(db);
+    this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
     this.workflowService = new WorkflowService(db, log);
   }
 
@@ -94,6 +96,13 @@ export class SwarmExecutionService extends EventEmitter {
     try {
       await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
       this.emit(`workflow:${workflowId}`, { type: 'started', workflowId, timestamp: new Date().toISOString() });
+
+      // Publish to supervisor bus for cross-cutting coordination
+      supervisorBus.publish('workflow:started', {
+        type: 'workflow:started',
+        tenantId,
+        workflowId,
+      });
 
       const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
 
@@ -147,6 +156,17 @@ export class SwarmExecutionService extends EventEmitter {
       } else if (dbStatus === 'FAILED') {
         this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: result.error, timestamp: new Date().toISOString() });
       }
+
+      // Publish completion to supervisor bus
+      supervisorBus.publish('workflow:completed', {
+        type: 'workflow:completed',
+        tenantId,
+        workflowId,
+        status: dbStatus,
+        durationMs: result.durationMs,
+        taskCount: result.traces.length,
+        failedCount: result.traces.filter(t => t.error).length,
+      });
 
       this.log.info(
         { workflowId, dbStatus, durationMs: result.durationMs, traces: result.traces.length },

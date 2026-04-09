@@ -2,6 +2,9 @@
 export { ToolRegistry, toolRegistry } from './registry/tool-registry.js';
 export type { RegisteredTool, ToolExecutor } from './registry/tool-registry.js';
 
+// Tenant-scoped registry
+export { TenantToolRegistry, getTenantToolRegistry, clearTenantToolRegistries } from './registry/tenant-tool-registry.js';
+
 // Email adapter
 export type {
   EmailAdapter,
@@ -78,10 +81,18 @@ export type { McpToolSpec, McpToolAnnotations, McpInputSchema } from './mcp/mcp-
 // MCP Client Manager
 export { McpClientManager, mcpClientManager } from './mcp/mcp-client.js';
 export { MCP_PROVIDERS } from './mcp/mcp-providers.js';
+
+// Tenant-scoped MCP Manager
+export { TenantMcpManager, getTenantMcpManager, clearTenantMcpManagers } from './mcp/tenant-mcp-manager.js';
 export type { McpProviderDef, McpServerConfig, ProviderCredentialField } from './mcp/mcp-providers.js';
 
 // Built-in tool registration
 export { registerBuiltinTools } from './builtin/index.js';
+
+// Sandbox adapters & templates
+export type { SandboxAdapter, SandboxInfo, SandboxExecResult, SandboxFileEntry } from './adapters/sandbox/index.js';
+export { getTemplate, listTemplates, generatePackageJson, getSandboxAdapter } from './adapters/sandbox/index.js';
+export type { ProjectTemplate } from './adapters/sandbox/index.js';
 
 // Auto-register built-in tools on first import
 import { registerBuiltinTools as _autoRegister } from './builtin/index.js';

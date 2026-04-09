@@ -60,8 +60,8 @@ export class DeepgramProvider implements IVoiceProvider {
       const tempKey = await this.createTemporaryKey(60);
       wsUrl = `${this.wsBaseUrl}/listen?${params.toString()}&token=${tempKey}`;
     } catch {
-      // Fallback: use API key directly (not recommended for browser clients)
-      wsUrl = `${this.wsBaseUrl}/listen?${params.toString()}`;
+      // Refuse to expose the raw API key in a WebSocket URL — require temporary key
+      throw new Error('Failed to create temporary Deepgram key. Cannot start session without a temporary key (raw API key in URLs is a security risk).');
     }
 
     return {

@@ -23,7 +23,11 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.log.info('[Swarm] SwarmExecutionService registered');
 
   // Recover any workflows that were mid-execution when the server last stopped
-  setImmediate(() => { void swarmService.recoverStaleWorkflows(); });
+  setImmediate(() => {
+    swarmService.recoverStaleWorkflows().catch((err) => {
+      fastify.log.error({ err }, '[Swarm] Failed to recover stale workflows on startup');
+    });
+  });
 
   // Start the workflow scheduler
   const workflowService = new WorkflowService(fastify.db, fastify.log);
@@ -48,11 +52,11 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   });
   scheduler.start();
 
-  // Auto-reconnect previously connected MCP integrations
+  // Auto-reconnect previously connected MCP integrations (tenant-scoped)
   const db = fastify.db;
   setImmediate(async () => {
     try {
-      const { mcpClientManager, MCP_PROVIDERS } = await import('@jak-swarm/tools');
+      const { getTenantMcpManager, MCP_PROVIDERS } = await import('@jak-swarm/tools');
       const integrations = await db.integration.findMany({
         where: { status: 'CONNECTED' },
         include: { credentials: true },
@@ -65,9 +69,11 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
         try {
           const creds = JSON.parse(integration.credentials.accessTokenEnc) as Record<string, string>;
           const config = providerDef.buildConfig(creds);
-          await mcpClientManager.connect(integration.provider, config);
+          // Use tenant-scoped MCP manager instead of global singleton
+          const tenantMcp = getTenantMcpManager(integration.tenantId);
+          await tenantMcp.connect(integration.provider, config);
         } catch (err) {
-          console.error(`[mcp] Failed to reconnect ${integration.provider}:`, err);
+          fastify.log.error({ err, provider: integration.provider, tenantId: integration.tenantId }, '[mcp] Failed to reconnect provider');
           // Mark as needing reauth
           await db.integration.update({
             where: { id: integration.id },
@@ -76,7 +82,7 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
         }
       }
     } catch (err) {
-      console.error('[mcp] Auto-reconnect failed:', err);
+      fastify.log.error({ err }, '[mcp] Auto-reconnect failed');
     }
   });
 

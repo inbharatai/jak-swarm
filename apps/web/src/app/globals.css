@@ -345,3 +345,78 @@
     transform: none;
   }
 }
+
+/* ─── JAK Platform Shell: Mosaic Theme ─────────────────────────────────────── */
+
+.mosaic-jak-theme.mosaic {
+  height: 100%;
+}
+
+.mosaic-jak-theme .mosaic-tile {
+  margin: 2px;
+}
+
+.mosaic-jak-theme .mosaic-split {
+  z-index: 10;
+}
+
+.mosaic-jak-theme .mosaic-split.-row {
+  margin: 0 -2px;
+}
+
+.mosaic-jak-theme .mosaic-split.-column {
+  margin: -2px 0;
+}
+
+.mosaic-jak-theme .mosaic-split .mosaic-split-line {
+  background: hsl(var(--border));
+}
+
+.mosaic-jak-theme .mosaic-split:hover .mosaic-split-line {
+  background: hsl(var(--primary) / 0.5);
+}
+
+.mosaic-jak-theme .mosaic-window,
+.mosaic-jak-theme .mosaic-preview {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+}
+
+.mosaic-jak-theme .mosaic-window-toolbar {
+  display: none; /* We use our own ModuleFrame title bar */
+}
+
+.mosaic-jak-theme .mosaic-window-body {
+  height: 100% !important;
+  top: 0 !important;
+}
+
+.mosaic-jak-theme .mosaic-zero-state {
+  background: transparent;
+}
+
+/* Drop preview during drag */
+.mosaic-jak-theme .mosaic-drop-target-container .drop-target-container {
+  border-radius: 8px;
+}
+
+.mosaic-jak-theme .drop-target.drop-target-hover {
+  background: hsl(var(--primary) / 0.1);
+  border: 2px dashed hsl(var(--primary) / 0.4);
+  border-radius: 8px;
+}
+
+/* react-rnd floating window shadows */
+.jak-floating-window {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  overflow: hidden;
+}
+
+.jak-floating-window:focus-within {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px hsl(var(--primary) / 0.3);
+}

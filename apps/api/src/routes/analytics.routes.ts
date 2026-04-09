@@ -41,6 +41,11 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       const fromDate = query.from ? new Date(query.from) : new Date(now.getTime() - 30 * 86_400_000);
       const toDate = query.to ? new Date(query.to) : now;
 
+      // Validate parsed dates
+      if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+        return reply.code(400).send(err('VALIDATION_ERROR', 'Invalid date format. Use ISO 8601 (e.g. 2025-01-01)'));
+      }
+
       try {
         // Fetch all traces in the period
         const traces = await fastify.db.agentTrace.findMany({

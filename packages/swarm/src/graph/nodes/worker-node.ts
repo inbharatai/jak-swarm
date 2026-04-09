@@ -36,6 +36,7 @@ import {
 } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
+import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
 
 export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>> {
   const task = getCurrentTask(state);
@@ -69,7 +70,28 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     } else {
       // Build task input from task description and any upstream results
       const taskInput = buildTaskInput(task, state);
-      output = await agent.execute(taskInput, context);
+
+      // Execute through circuit breaker — prevents cascading failures
+      // when a particular agent role fails repeatedly
+      const breaker = getCircuitBreaker(`worker:${task.agentRole}`, {
+        failureThreshold: 5,
+        resetTimeoutMs: 30_000,
+        tenantId: state.tenantId,
+      });
+
+      try {
+        output = await breaker.call<unknown>(() => agent.execute(taskInput, context));
+      } catch (err) {
+        if (err instanceof CircuitOpenError) {
+          taskFailed = true;
+          output = {
+            error: `Circuit breaker open for ${task.agentRole}: ${err.message}`,
+            taskId: task.id,
+          };
+        } else {
+          throw err; // Re-throw non-circuit-breaker errors for outer catch
+        }
+      }
 
       // Self-correction: agent reviews its own output before passing to verifier.
       // This catches obvious errors early, reducing verifier retry loops.

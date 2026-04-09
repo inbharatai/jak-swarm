@@ -45,6 +45,9 @@ export interface SwarmState {
   completedTaskIds?: string[];
   failedTaskIds?: string[];
 
+  // Per-task retry counter: taskId → number of retries attempted
+  taskRetryCount: Record<string, number>;
+
   // Cost tracking
   accumulatedCostUsd: number;
   maxCostUsd?: number;
@@ -87,6 +90,7 @@ export function createInitialSwarmState(params: {
     verificationResults: {},
     completedTaskIds: [],
     failedTaskIds: [],
+    taskRetryCount: {},
     accumulatedCostUsd: 0,
     maxCostUsd: params.maxCostUsd,
     approvalThreshold: params.approvalThreshold,

@@ -391,3 +391,13 @@ model ProjectConversation {
   @@index([projectId, createdAt])
   @@map("project_conversations")
 }
+
+model UserLayout {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  layout    Json     // SerializedLayout from shell-store
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_layouts")
+}

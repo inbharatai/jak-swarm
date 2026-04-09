@@ -4,10 +4,14 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { PlatformShell } from '@/components/shell/PlatformShell';
 import { useAuth } from '@/lib/auth';
 import { Spinner } from '@/components/ui/spinner';
 
 const AUTH_PATHS = ['/login', '/register', '/'];
+
+// Dashboard routes that should render inside the PlatformShell
+const DASHBOARD_PREFIX = ['/home', '/workspace', '/builder', '/swarm', '/traces', '/analytics', '/skills', '/knowledge', '/integrations', '/schedules', '/settings', '/admin'];
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -33,6 +37,13 @@ export function AppShell({ children }: AppShellProps) {
     return <>{children}</>;
   }
 
+  // Dashboard routes → PlatformShell (module-based desktop OS)
+  const isDashboard = DASHBOARD_PREFIX.some(p => pathname.startsWith(p));
+  if (isDashboard) {
+    return <PlatformShell />;
+  }
+
+  // Fallback: legacy layout for any remaining routes
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />

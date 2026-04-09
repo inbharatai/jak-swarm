@@ -110,6 +110,23 @@ export class ToolRegistry {
       const output = await registered.executor(input, context);
       const durationMs = Date.now() - startedAt;
 
+      // Validate output against declared schema (advisory — logs warning, does not fail)
+      if (registered.metadata.outputSchema && Object.keys(registered.metadata.outputSchema).length > 0) {
+        const outputValidationError = this.validateOutput(output, registered.metadata.outputSchema);
+        if (outputValidationError) {
+          // Log but don't fail — output schema violations are advisory
+          const result: ToolResult<TOutput> = {
+            success: true,
+            data: output as TOutput,
+            durationMs,
+          };
+          // Attach warning to result for downstream consumers
+          (result as ToolResult<TOutput> & { outputSchemaWarning?: string }).outputSchemaWarning =
+            `Output schema mismatch for tool '${name}': ${outputValidationError}`;
+          return result;
+        }
+      }
+
       return {
         success: true,
         data: output as TOutput,
@@ -145,34 +162,49 @@ export class ToolRegistry {
     input: unknown,
     schema: Record<string, unknown>,
   ): string | null {
+    return this.validateAgainstSchema(input, schema, 'input');
+  }
+
+  private validateOutput(
+    output: unknown,
+    schema: Record<string, unknown>,
+  ): string | null {
+    return this.validateAgainstSchema(output, schema, 'output');
+  }
+
+  private validateAgainstSchema(
+    data: unknown,
+    schema: Record<string, unknown>,
+    label: string,
+  ): string | null {
     const properties = schema['properties'] as Record<string, { type: string }> | undefined;
     const required = schema['required'] as string[] | undefined;
 
     if (!properties) return null;
 
-    if (typeof input !== 'object' || input === null) {
-      return 'Input must be an object';
+    if (typeof data !== 'object' || data === null) {
+      return `${label} must be an object`;
     }
 
-    const inputObj = input as Record<string, unknown>;
+    const dataObj = data as Record<string, unknown>;
 
     // Check required fields
     if (required) {
       for (const field of required) {
-        if (!(field in inputObj) || inputObj[field] === undefined || inputObj[field] === null) {
-          return `Required field '${field}' is missing`;
+        if (!(field in dataObj) || dataObj[field] === undefined || dataObj[field] === null) {
+          return `Required ${label} field '${field}' is missing`;
         }
       }
     }
 
     // Check types for provided fields
     for (const [field, spec] of Object.entries(properties)) {
-      if (field in inputObj) {
-        const value = inputObj[field];
+      if (field in dataObj) {
+        const value = dataObj[field];
         const expectedType = spec.type;
 
         if (!this.checkType(value, expectedType)) {
-          return `Field '${field}' should be of type '${expectedType}'`;
+          return `${label} field '${field}' should be of type '${expectedType}'`;
         }
       }
     }

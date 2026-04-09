@@ -150,9 +150,9 @@ const AGENTS = [
 
 const STATS = [
   { value: 38, label: 'Agents', suffix: '' },
-  { value: 112, label: 'Tools', suffix: '' },
+  { value: 108, label: 'Tools', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
-  { value: 22, label: 'Browser Tools', suffix: '' },
+  { value: 20, label: 'Browser Tools', suffix: '' },
 ];
 
 const WORKFLOW_STEPS = [
@@ -427,7 +427,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                38 AI agents. 112 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
+                38 AI agents. 108 tools. 6 LLM providers. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -681,7 +681,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">112 Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">108 Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
@@ -689,24 +689,23 @@ export default function HomePage() {
             {/* Tool Categories Grid */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
               {[
-                { icon: '📧', category: 'Email', count: 8, tools: 'Read, draft, send, search, archive, thread', color: '#EA4335' },
-                { icon: '📅', category: 'Calendar', count: 5, tools: 'List events, create, update, delete, find availability', color: '#4285F4' },
-                { icon: '🌐', category: 'Browser', count: 22, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
-                { icon: '🏗️', category: 'Sandbox', count: 7, tools: 'Create VM, write files, exec commands, dev server, deploy', color: '#fbbf24' },
-                { icon: '📄', category: 'Document', count: 8, tools: 'Read, write, summarize, extract data, export, PDF analysis', color: '#8B5CF6' },
-                { icon: '📊', category: 'Spreadsheet', count: 6, tools: 'Parse CSV, compute stats, formulas, charts, export', color: '#10B981' },
-                { icon: '👤', category: 'CRM', count: 10, tools: 'Contacts, deals, activities, enrichment, lead scoring', color: '#F59E0B' },
-                { icon: '🔍', category: 'Research', count: 6, tools: 'Web search, news, academic, citations, deep research', color: '#06B6D4' },
-                { icon: '🧠', category: 'Knowledge', count: 10, tools: 'Memory store, retrieve, search, Q&A, index, summarize', color: '#c084fc' },
-                { icon: '⚙️', category: 'Ops', count: 8, tools: 'Webhooks, API calls, file I/O, code execute, health checks', color: '#fb923c' },
-                { icon: '🎤', category: 'Voice', count: 4, tools: 'Transcribe, synthesize, detect intent, real-time sessions', color: '#f472b6' },
-                { icon: '🔌', category: 'MCP', count: 20, tools: 'Slack, GitHub, Notion, HubSpot, Salesforce, Jira, Linear, Stripe + 12 more', color: '#38bdf8' },
+                { icon: '📧', category: 'Email', count: 10, tools: 'Read, draft, send, search, sequences, personalize, track', color: '#EA4335' },
+                { icon: '📅', category: 'Calendar', count: 3, tools: 'List events, create events, find availability', color: '#4285F4' },
+                { icon: '🌐', category: 'Browser', count: 20, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
+                { icon: '📄', category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, export', color: '#8B5CF6' },
+                { icon: '📊', category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
+                { icon: '👤', category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
+                { icon: '🔍', category: 'Research', count: 11, tools: 'Web search, fetch, SEO audit, keywords, SERP, Phoring.ai', color: '#06B6D4' },
+                { icon: '🧠', category: 'Knowledge', count: 7, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
+                { icon: '⚙️', category: 'Ops', count: 3, tools: 'Webhooks, file I/O, code execution', color: '#fb923c' },
+                { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC sessions via OpenAI Realtime API', color: '#f472b6' },
+                { icon: '🔌', category: 'MCP', count: 0, tools: 'Slack, GitHub, Notion, HubSpot, Jira, Linear, Stripe — loaded at runtime', color: '#38bdf8' },
               ].map((cat) => (
                 <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">{cat.icon}</span>
                     <h3 className="font-display font-semibold text-sm text-white">{cat.category}</h3>
-                    <span className="ml-auto text-xs font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{cat.count}</span>
+                    <span className="ml-auto text-xs font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{cat.count === 0 ? '∞' : cat.count}</span>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed font-sans">{cat.tools}</p>
                 </div>
@@ -747,7 +746,7 @@ export default function HomePage() {
                   </div>
                 ))}
                 <div className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-white/10 font-sans">
-                  + 20 MCP providers &amp; growing
+                  + MCP providers &amp; growing
                 </div>
               </div>
             </div>
@@ -988,7 +987,7 @@ export default function HomePage() {
 
             {/* Tech stack badges */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {['TypeScript', 'Next.js 14', 'Fastify', 'Prisma', 'PostgreSQL', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor'].map(tech => (
+              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor'].map(tech => (
                 <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 font-sans">{tech}</span>
               ))}
             </div>
@@ -1035,7 +1034,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 38 agents, 112 tools, vibe coding built in.
+                  The autonomous AI workforce platform. 38 agents, 108 tools, vibe coding built in.
                 </p>
               </div>
 

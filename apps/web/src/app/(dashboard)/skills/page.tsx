@@ -98,14 +98,13 @@ export default function SkillsPage() {
     try {
       await apiFetch('/skills/propose', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name: newSkill.name,
           description: newSkill.description,
           riskLevel: newSkill.riskLevel,
           implementation: newSkill.implementation || undefined,
           tier: newSkill.implementation ? 3 : 2,
-        }),
+        },
       });
       setShowCreateDialog(false);
       setNewSkill({ name: '', description: '', riskLevel: 'MEDIUM', implementation: '' });

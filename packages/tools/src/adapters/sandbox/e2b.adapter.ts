@@ -40,6 +40,7 @@ const activeSandboxes = new Map<string, { sandbox: E2BSandbox; info: SandboxInfo
 async function getE2BModule(): Promise<{ Sandbox: { create: (opts: { template?: string; apiKey?: string; timeout?: number; metadata?: Record<string, string> }) => Promise<E2BSandbox> } }> {
   try {
     // Dynamic import to avoid bundling issues when E2B is not installed
+    // @ts-ignore -- e2b/code-interpreter is an optional peer dependency
     const mod = await import('@e2b/code-interpreter');
     return mod as unknown as { Sandbox: { create: (opts: { template?: string; apiKey?: string; timeout?: number; metadata?: Record<string, string> }) => Promise<E2BSandbox> } };
   } catch {

@@ -1,4 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+
+const updateOnboardingSchema = z.object({
+  completedSteps: z.array(z.string()).optional(),
+  dismissed: z.boolean().optional(),
+});
 
 export async function onboardingRoutes(app: FastifyInstance) {
   // GET current onboarding state
@@ -17,7 +23,11 @@ export async function onboardingRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { completedSteps, dismissed } = request.body as { completedSteps?: string[]; dismissed?: boolean };
+    const parsed = updateOnboardingSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.message });
+    }
+    const { completedSteps, dismissed } = parsed.data;
     const state = await app.db.onboardingState.upsert({
       where: { tenantId },
       update: {

@@ -1,7 +1,27 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import { CronExpressionParser } from 'cron-parser';
 import { ok, err } from '../types.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
+
+const createScheduleSchema = z.object({
+  name: z.string().min(1).max(200),
+  goal: z.string().min(1).max(5000),
+  cronExpression: z.string().min(5).max(100),
+  description: z.string().max(2000).optional(),
+  industry: z.string().max(100).optional(),
+  maxCostUsd: z.number().positive().optional(),
+});
+
+const updateScheduleSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  goal: z.string().min(1).max(5000).optional(),
+  cronExpression: z.string().min(5).max(100).optional(),
+  description: z.string().max(2000).optional(),
+  industry: z.string().max(100).optional(),
+  maxCostUsd: z.number().positive().nullable().optional(),
+  enabled: z.boolean().optional(),
+});
 
 const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
   const preHandlerBase = [fastify.authenticate, enforceTenantIsolation];
@@ -48,14 +68,11 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { tenantId, userId } = request.user;
-      const body = request.body as {
-        name?: string;
-        goal?: string;
-        cronExpression?: string;
-        description?: string;
-        industry?: string;
-        maxCostUsd?: number;
-      };
+      const parsed = createScheduleSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
+      }
+      const body = parsed.data;
 
       if (!body.name || !body.goal || !body.cronExpression) {
         return reply.code(400).send(err('VALIDATION_ERROR', 'name, goal, and cronExpression are required'));
@@ -102,7 +119,11 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user;
-      const updates = request.body as Record<string, unknown>;
+      const parsed = updateScheduleSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
+      }
+      const updates: Record<string, unknown> = { ...parsed.data };
 
       const existing = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
       if (!existing) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
