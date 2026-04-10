@@ -121,7 +121,7 @@ function SettingsTab({ settings, onSave }: { settings?: TenantSettings; onSave: 
 // ─── Users Tab ────────────────────────────────────────────────────────────────
 
 function UsersTab() {
-  const { data: users, isLoading, mutate } = useSWR<User[]>('/api/admin/users', fetcher);
+  const { data: users, isLoading, mutate } = useSWR<User[]>('/admin/users', fetcher);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const ROLES = ['VIEWER', 'OPERATOR', 'MANAGER', 'TENANT_ADMIN'] as const;
@@ -186,7 +186,7 @@ function UsersTab() {
 // ─── Skills Tab ───────────────────────────────────────────────────────────────
 
 function SkillsTab() {
-  const { data: skills, isLoading, mutate } = useSWR<Skill[]>('/api/admin/skills?status=pending', fetcher);
+  const { data: skills, isLoading, mutate } = useSWR<Skill[]>('/admin/skills?status=pending', fetcher);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
 
@@ -305,7 +305,7 @@ function SkillsTab() {
 
 function ToolsTab() {
   const { data: tools, isLoading, mutate } = useSWR<{ id: string; name: string; description: string; enabled: boolean }[]>(
-    '/api/admin/tools',
+    '/admin/tools',
     fetcher,
   );
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -363,7 +363,7 @@ function ToolsTab() {
 // ─── API Keys Tab ─────────────────────────────────────────────────────────────
 
 function ApiKeysTab() {
-  const { data: apiKeys, isLoading, mutate } = useSWR<ApiKey[]>('/api/admin/api-keys', fetcher);
+  const { data: apiKeys, isLoading, mutate } = useSWR<ApiKey[]>('/admin/api-keys', fetcher);
   const [creating, setCreating] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -508,7 +508,7 @@ export default function AdminPage() {
   }
 
   const { data: settings, mutate: refreshSettings } = useSWR<TenantSettings>(
-    '/api/admin/settings',
+    '/admin/settings',
     fetcher,
   );
 

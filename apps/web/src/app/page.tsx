@@ -427,7 +427,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                38 AI agents. 108 tools. 6 LLM providers. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
+                38 AI agents. 112 tools. 6 LLM providers. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -656,7 +656,7 @@ export default function HomePage() {
                 { icon: '🏛️', title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
                 { icon: '⚡', title: 'Code Generator', desc: 'Generates production-grade Next.js, React, Tailwind CSS, and Prisma code — complete files, not stubs', color: '#fbbf24' },
                 { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors, diagnoses root cause, applies surgical fixes, rebuilds — up to 3 retries automatically', color: '#f472b6' },
-                { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI replicates it with pixel-accurate Tailwind components', color: '#38bdf8' },
+                { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
                 { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with environment variables, custom domains, and zero-downtime updates', color: '#c084fc' },
                 { icon: '🔀', title: 'Version Control', desc: 'Every change creates a snapshot. Roll back to any version instantly. GitHub sync built-in.', color: '#fb923c' },
               ].map((feature) => (
@@ -681,7 +681,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">108 Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">112 Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
@@ -1034,7 +1034,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 38 agents, 108 tools, vibe coding built in.
+                  The autonomous AI workforce platform. 38 agents, 112 tools, vibe coding built in.
                 </p>
               </div>
 

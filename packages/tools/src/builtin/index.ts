@@ -1,19 +1,19 @@
 import { ToolCategory, ToolRiskClass } from '@jak-swarm/shared';
 import type { ToolExecutionContext } from '@jak-swarm/shared';
 import { toolRegistry } from '../registry/tool-registry.js';
-import { MockCRMAdapter } from '../adapters/crm/mock-crm.adapter.js';
+import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
 import { registerPhoringTools } from './phoring.tools.js';
 import { getEmailAdapter, getCalendarAdapter, hasRealAdapters } from '../adapters/adapter-factory.js';
 
 const emailAdapter = getEmailAdapter();
 const calendarAdapter = getCalendarAdapter();
-const crmAdapter = new MockCRMAdapter();
+const crmAdapter = new UnconfiguredCRMAdapter();
 
 if (hasRealAdapters()) {
   console.log('[tools] Using REAL Gmail + Calendar adapters');
 } else {
-  console.log('[tools] Using MOCK email + calendar adapters (set GMAIL_EMAIL + GMAIL_APP_PASSWORD for real)');
+  console.warn('[tools] Email + Calendar adapters NOT configured (set GMAIL_EMAIL + GMAIL_APP_PASSWORD). Tools will fail on use.');
 }
 
 /**
@@ -238,16 +238,54 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { results: { type: 'array' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
-      const { query } = input as { query: string; maxResults?: number };
-      // Honest stub: no knowledge base connected yet.
-      // Returns a clear signal so the LLM knows to use its own knowledge.
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { query, maxResults = 5 } = input as { query: string; maxResults?: number };
+      try {
+        // Try loading Prisma to search the TenantMemory table directly
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const dbModule = require('@jak-swarm/db');
+        const prisma = dbModule.prisma;
+        if (prisma?.tenantMemory) {
+          const entries = await prisma.tenantMemory.findMany({
+            where: {
+              tenantId: context.tenantId,
+              OR: [
+                { key: { contains: query, mode: 'insensitive' } },
+                { memoryType: 'KNOWLEDGE' },
+                { memoryType: 'POLICY' },
+              ],
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: maxResults,
+          });
+          return {
+            results: entries.map((e: { key: string; value: unknown; memoryType: string; source: string; updatedAt: Date | string }) => ({
+              key: e.key,
+              value: e.value,
+              type: e.memoryType,
+              source: e.source,
+              updatedAt: e.updatedAt instanceof Date ? e.updatedAt.toISOString() : String(e.updatedAt),
+            })),
+            query,
+            totalFound: entries.length,
+            connected: true,
+          };
+        }
+      } catch {
+        // DB not available — fall back to memory adapter
+      }
+      // Fallback: search via memory adapter (in-memory or DB-backed)
+      const adapter = getMemoryAdapter();
+      const result = await adapter.get(query, context.tenantId);
+      if (result) {
+        return { results: [result], query, totalFound: 1, connected: true };
+      }
       return {
         results: [],
         query,
         totalFound: 0,
         connected: false,
-        message: `Knowledge base not connected. No stored documents found for "${query}". The agent should use its built-in knowledge and web_search tool instead.`,
+        message: `No stored knowledge found for "${query}". Try memory_store to add entries, or use web_search for external information.`,
       };
     },
   );
@@ -2313,9 +2351,15 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { query } = input as { query: string };
-      return { query, results: [], message: 'Knowledge base not connected. Use your built-in knowledge to help the customer.', connected: false };
+      // Search tenant memory for knowledge entries
+      const adapter = getMemoryAdapter();
+      const result = await adapter.get(query, context.tenantId);
+      if (result) {
+        return { query, results: [result], connected: true, totalFound: 1 };
+      }
+      return { query, results: [], message: 'No knowledge base entries found. Use memory_store to add entries, or use web_search for external information.', connected: true, totalFound: 0 };
     },
   );
 

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { cn } from '@/lib/cn';
+import { apiClient } from '@/lib/api-client';
 import { Button, Badge } from '@/components/ui';
 import { COMMAND_TEMPLATES } from '@/lib/templates';
 import type { Industry, Integration } from '@/types';
@@ -136,9 +137,14 @@ export function CommandInput({
 
   // Fetch connected integrations for context chips
   const { data: integrationsData } = useSWR<Integration[]>('workspace-integrations',
-    () => fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/integrations`, {
-      headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('jak_token') ?? '' : ''}` },
-    }).then(r => r.ok ? r.json().then((d: { data?: Integration[] }) => d.data ?? []) : []).catch(() => []),
+    async () => {
+      try {
+        const result = await apiClient.get<{ data?: Integration[] }>('/integrations');
+        return result.data ?? [];
+      } catch {
+        return [];
+      }
+    },
     { refreshInterval: 60000 },
   );
   const connectedIntegrations = integrationsData ?? [];

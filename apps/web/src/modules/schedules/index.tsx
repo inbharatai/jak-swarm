@@ -58,7 +58,7 @@ function cronToHuman(cron: string): string {
 export default function SchedulesModule({ moduleId, isActive }: ModuleProps) {
   const toast = useToast();
   const { data, isLoading, mutate } = useSWR<{ data: WorkflowSchedule[] }>('/schedules', fetcher);
-  const schedules = (data as any)?.data ?? [];
+  const schedules = data?.data ?? [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

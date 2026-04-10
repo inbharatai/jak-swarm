@@ -13,7 +13,7 @@ export type {
   EmailDraft,
   EmailAttachment,
 } from './adapters/email/email.interface.js';
-export { MockEmailAdapter } from './adapters/email/mock-email.adapter.js';
+export { UnconfiguredEmailAdapter } from './adapters/unconfigured.js';
 export { GmailImapAdapter } from './adapters/email/gmail-imap.adapter.js';
 
 // Calendar adapter
@@ -25,11 +25,11 @@ export type {
   UpdateEventParams,
   AvailabilitySlot,
 } from './adapters/calendar/calendar.interface.js';
-export { MockCalendarAdapter } from './adapters/calendar/mock-calendar.adapter.js';
+export { UnconfiguredCalendarAdapter } from './adapters/unconfigured.js';
 export { CalDAVCalendarAdapter } from './adapters/calendar/caldav-calendar.adapter.js';
 
 // Adapter factory
-export { getEmailAdapter, getCalendarAdapter, hasRealAdapters } from './adapters/adapter-factory.js';
+export { getEmailAdapter, getCalendarAdapter, getCRMAdapter, hasRealAdapters } from './adapters/adapter-factory.js';
 
 // CRM adapter
 export type {
@@ -39,7 +39,8 @@ export type {
   CRMDeal,
   ContactFilter,
 } from './adapters/crm/crm.interface.js';
-export { MockCRMAdapter } from './adapters/crm/mock-crm.adapter.js';
+export { UnconfiguredCRMAdapter } from './adapters/unconfigured.js';
+export { PrismaCRMAdapter } from './adapters/crm/prisma-crm.adapter.js';
 
 // Browser adapter
 export type {
@@ -51,7 +52,6 @@ export type {
   ClickResult,
   BrowserError,
 } from './adapters/browser/browser.interface.js';
-export { PlaywrightBrowserAdapter } from './adapters/browser/playwright.adapter.js';
 
 // Playwright engine (singleton)
 export { playwrightEngine } from './adapters/browser/playwright-engine.js';

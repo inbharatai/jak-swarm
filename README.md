@@ -5,12 +5,12 @@
 ### The Autonomous AI Company — 38 Agents That Run Your Business
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-108-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tools](https://img.shields.io/badge/Tools-112-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-80%2F80_Human_Sim-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-63_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
 **Open-source multi-agent AI platform that replaces entire departments.**
 **CEO • CTO • CMO • Engineer • Legal • Finance • HR • Marketing — all autonomous.**
@@ -127,20 +127,20 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators + 32 workers |
-| 🔧 | **108 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision |
+| 🔧 | **112 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision (98 production + 14 utility/mock) |
 | ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
-| 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, get pixel-accurate React + Tailwind components |
+| 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, AI generates React + Tailwind components |
 | 📧 | **Real Gmail/Calendar** | IMAP/SMTP + CalDAV — no OAuth needed, just app password |
-| 🔌 | **MCP Integrations** | HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics |
+| 🔌 | **MCP Provider Templates** | 20 supported providers: HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics (connect via API keys) |
 | 🧩 | **Skills Marketplace** | Browse, install, and create custom skills with sandbox testing and approval workflow |
 | ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
 | 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
-| 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
+| 🛡️ | **4-Layer Hallucination Detection** | Regex pattern detection → citation validation → confidence flagging → inconsistency detection |
 | 🌐 | **20 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
 | 📊 | **React Flow DAG Graph** | Real-time visualization of agent execution |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, onboarding wizard |
-| 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel with env vars and custom domains |
+| 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel (requires Vercel API token — experimental) |
 | 🔀 | **Version Control** | Every change creates a snapshot. Rollback to any version instantly |
 | 📸 | **Image-to-Code** | Drag-drop a Figma screenshot, AI replicates the design |
 
@@ -277,7 +277,7 @@ graph LR
 | `WORKER_APP_ARCHITECT` | AppArchitectAgent | Architecture blueprints, file tree planning, data model design |
 | `WORKER_APP_GENERATOR` | AppGeneratorAgent | Full file code generation (React, Next.js, Tailwind, Prisma) |
 | `WORKER_APP_DEBUGGER` | AppDebuggerAgent | Self-debugging loop: diagnose build errors, auto-fix, rebuild |
-| `WORKER_APP_DEPLOYER` | AppDeployerAgent | Vercel deployment, GitHub sync, custom domain config |
+| `WORKER_APP_DEPLOYER` | AppDeployerAgent | Vercel deployment via LLM tool calls (experimental — requires Vercel API token) |
 | `WORKER_SCREENSHOT_TO_CODE` | ScreenshotToCodeAgent | Vision analysis, UI replication from screenshots |
 
 </details>
@@ -338,7 +338,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 108 tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 112 tools.*
 
 </div>
 
@@ -380,7 +380,7 @@ flowchart TD
     subgraph DELIVER["🚀 Delivery Layer"]
         M["👁️ Live Preview\nIframe + Hot Reload"]
         N["💬 Iterate via Chat\nModify only affected files"]
-        O["🚀 Deploy to Vercel\nOne-click • Custom domain"]
+        O["🚀 Deploy to Vercel\n(Planned — experimental)"]
         P["🔀 GitHub Sync\nPush/pull • CI/CD"]
     end
 
@@ -444,16 +444,16 @@ flowchart TD
 | **Multi-agent pipeline** | ✅ 5 agents | ✅ | ❌ | ❌ |
 | **Screenshot-to-code** | ✅ | ✅ | ❌ | ❌ |
 | **Self-debugging loop** | ✅ 3 retries | ✅ | ❌ | ❌ |
-| **3-tier cost routing** | ✅ $0.50/app | ❌ | ❌ | ❌ |
+| **3-tier cost routing** | ✅ | ❌ | ❌ | ❌ |
 | **Version rollback** | ✅ | ✅ | ✅ | ❌ |
 | **Monaco editor** | ✅ | ❌ | ✅ | ✅ |
-| **Vercel deploy** | ✅ | ❌ Custom | ✅ | ✅ |
+| **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **108 business tools** | ✅ | ❌ | ❌ | ❌ |
+| **112 business tools** | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
-| **Industry compliance** | ✅ 11 packs | ❌ | ❌ | ❌ |
+| **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
 
 </div>
 
@@ -470,6 +470,8 @@ flowchart TD
 | 🚀 Deploy | Tier 1 | Tool calls only | $0.01-0.02 |
 | | | **Total (new app)** | **$0.50-2.00** |
 | | | **Per iteration** | **$0.05-0.30** |
+
+*Estimated costs based on model pricing. Actual costs vary by app complexity, model selection, and debug iterations.*
 
 </div>
 
@@ -568,13 +570,13 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (108 Tools)
+## 🔧 Tool Inventory (112 Tools)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
 | **Email** | 5 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
-| **CRM** | 3 | lookup_crm_contact, update_crm_record, search_deals | 🔌 Mock (pluggable adapter) |
+| **CRM** | 3 | lookup_crm_contact, update_crm_record, search_deals | 🔌 Mock (pluggable adapter — bring your own CRM API) |
 | **Browser** | 20 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs + more | ✅ Real (Playwright) |
 | **Document** | 4 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze | ✅ Real (pdf-parse) |
 | **Research** | 3 | web_search, web_fetch, search_knowledge | ✅ Real (web) |
@@ -589,7 +591,7 @@ http://localhost:3000
 | **Phoring.ai** | 4 | phoring_forecast, phoring_graph_query, phoring_validate, phoring_simulate | ✅ Real (needs API key) |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion tools loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 108 tools (built-in + sandbox + MCP integrations)**
+**Total: 112 tools (98 production + 2 mock + 4 LLM-passthrough + 8 thin wrappers)**
 
 ---
 
@@ -667,13 +669,13 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
-| Tools | **108** | 50+ | Custom | ~10 |
+| Tools | **112** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
 | Browser control | **20 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
-| Self-correction | **4 layers** | Limited | Manual | Limited |
+| Self-correction | **4 layers** (heuristic) | Limited | Manual | Limited |
 | Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
 | Price | **Free** | Free | Free+$39 | $20/mo |
 
@@ -710,16 +712,16 @@ Create recurring workflows from the dashboard at `/schedules`:
 
 ---
 
-## 🛡️ 4-Layer Anti-Hallucination
+## 🛡️ 4-Layer Hallucination Detection
 
 | Layer | Detection | Action |
 |:-----:|:----------|:-------|
 | 1 | **Invented statistics** | Regex patterns catch fabricated percentages, dollar amounts, specific counts |
-| 2 | **Fabricated sources** | Identifies fake citations and academic references |
-| 3 | **Overconfidence** | Flags absolute claims without evidence |
-| 4 | **Impossible claims** | Catches logically inconsistent statements |
+| 2 | **Fabricated sources** | Pattern matching identifies fake citations and academic references |
+| 3 | **Overconfidence** | Flags absolute claims ("always", "never", "guaranteed") without evidence |
+| 4 | **Impossible claims** | Rule-based detection of logically inconsistent statements |
 
-> Each layer returns a grounding score (0.0-1.0) and lists specific ungrounded claims.
+> Each layer returns a grounding score (0.0-1.0) and lists specific ungrounded claims. Detection is heuristic/regex-based, not AI-powered.
 
 ---
 
@@ -759,7 +761,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | **Frontend** | Next.js 15, React, Tailwind CSS |
 | **DAG Visualization** | React Flow |
 | **Database** | PostgreSQL + Prisma ORM |
-| **Durable Workflows** | Temporal |
+| **Durable Workflows** | PostgreSQL state persistence (Temporal package included, API wiring in progress) |
 | **Browser Automation** | Playwright |
 | **Email** | imapflow (IMAP) + nodemailer (SMTP) |
 | **Calendar** | tsdav (CalDAV) |
@@ -799,7 +801,7 @@ jak-swarm/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 32 worker agents
-│   ├── tools/                  # 108 tool implementations
+│   ├── tools/                  # 112 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools
@@ -815,7 +817,7 @@ jak-swarm/
 │   ├── workflows/              # Temporal workflow definitions
 │   ├── security/               # Audit logging, RBAC, guardrails, tool risk
 │   ├── voice/                  # Voice pipeline (WebRTC, STT, TTS)
-│   └── industry-packs/         # 11 industry-specific agent configurations
+│   └── industry-packs/         # 13 industry-specific agent configurations
 ├── tests/
 │   ├── unit/                   # Unit tests
 │   ├── integration/            # Integration tests
@@ -1048,7 +1050,7 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | `ELEVENLABS_VOICE_ID` | No | -- | ElevenLabs voice ID |
 | `PHORING_API_URL` | No | -- | Phoring.ai API endpoint |
 | `PHORING_API_KEY` | No | -- | Phoring.ai API key |
-| `TEMPORAL_ADDRESS` | No | `localhost:7233` | Temporal server for durable workflows |
+| `TEMPORAL_ADDRESS` | No | `localhost:7233` | Temporal server (infrastructure-ready, API execution path not yet wired) |
 | `TEMPORAL_NAMESPACE` | No | `jak-swarm` | Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | No | `jak-main` | Temporal task queue |
 | `NODE_ENV` | No | `development` | Environment |

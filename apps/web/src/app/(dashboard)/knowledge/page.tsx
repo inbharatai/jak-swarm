@@ -213,7 +213,7 @@ export default function KnowledgePage() {
   const qs = params.toString();
 
   const { data, isLoading, mutate } = useSWR<{ data: MemoryEntry[]; total: number }>(
-    `/api/memory${qs ? `?${qs}` : ''}`,
+    `/memory${qs ? `?${qs}` : ''}`,
     url => apiClient.get(url),
     { refreshInterval: 30_000 },
   );

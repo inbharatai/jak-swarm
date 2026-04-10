@@ -22,11 +22,11 @@ InBharat AI
 
 ## 2. Ben's Bites
 
-**Subject:** JAK Swarm: 33 AI agents working as a team (open-source, MIT)
+**Subject:** JAK Swarm: 38 AI agents working as a team (open-source, MIT)
 
 Hi Ben,
 
-Quick pitch for your readers: I built JAK Swarm, an open-source multi-agent AI platform where 33 specialized agents collaborate on tasks using 112 tools and any of 6 LLM providers. Think of it as building an AI team instead of making one AI do everything.
+Quick pitch for your readers: I built JAK Swarm, an open-source multi-agent AI platform where 38 specialized agents collaborate on tasks using 112 tools and any of 6 LLM providers. Think of it as building an AI team instead of making one AI do everything.
 
 What makes it interesting for your audience: developers can mix and match LLM providers per agent (Claude for writing, GPT-4 for code, Ollama for privacy-sensitive work), the entire thing runs locally with zero cloud dependency if needed, and the codebase is intentionally simple -- under 15K lines of Python, readable in a day. Agents dynamically delegate work to each other, select their own tools, and handle failures with built-in retry logic.
 
@@ -77,7 +77,7 @@ InBharat AI
 
 Hi Neuron team,
 
-I'm sharing JAK Swarm, an open-source multi-agent AI platform I've been building for the past 14 months. It ships with 33 specialized agents, 112 tools, and supports 6 LLM providers -- including full local execution via Ollama.
+I'm sharing JAK Swarm, an open-source multi-agent AI platform I've been building for the past 14 months. It ships with 38 specialized agents, 112 tools, and supports 6 LLM providers -- including full local execution via Ollama.
 
 What sets it apart from other agent frameworks: the focus on practical, task-based agent orchestration rather than conversational AI. Agents are specialists -- a Research Agent with web scraping tools, a Code Agent with execution capabilities, a Data Agent with analysis tools -- that hand work to each other through a simple shared context system. Developers can create new agents in about 20 lines of code and new tools with a standard registration interface.
 
@@ -106,7 +106,7 @@ InBharat AI
 
 ## 7. AI Weekly
 
-**Subject:** New open-source project: 33 AI agents working as a coordinated team
+**Subject:** New open-source project: 38 AI agents working as a coordinated team
 
 Hi AI Weekly team,
 
@@ -123,11 +123,11 @@ InBharat AI
 
 ## 8. Superhuman AI
 
-**Subject:** JAK Swarm: run 33 AI agents locally with zero cloud dependency
+**Subject:** JAK Swarm: run 38 AI agents locally with zero cloud dependency
 
 Hi Superhuman AI team,
 
-I just launched JAK Swarm, an open-source multi-agent AI platform that runs entirely locally. 33 specialized agents, 112 tools, 6 LLM providers -- including Ollama for complete on-device execution with no API keys required.
+I just launched JAK Swarm, an open-source multi-agent AI platform that runs entirely locally. 38 specialized agents, 112 tools, 6 LLM providers -- including Ollama for complete on-device execution with no API keys required.
 
 What your productivity-focused audience should know: JAK Swarm handles multi-step tasks by breaking them into subtasks and assigning each to a specialized agent. A research workflow that would take a human hours -- searching multiple sources, extracting key information, analyzing patterns, and writing a structured report -- runs in minutes. The agents handle the orchestration; users just define the task and the output format.
 
@@ -140,7 +140,7 @@ Reeturaj Goswami
 
 ## 9. The AI Valley
 
-**Subject:** 33 AI agents, one platform, fully open-source -- JAK Swarm launch
+**Subject:** 38 AI agents, one platform, fully open-source -- JAK Swarm launch
 
 Hi AI Valley team,
 

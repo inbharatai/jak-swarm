@@ -28,7 +28,7 @@
 
 | Day | Platform | Content Type | Description |
 |-----|----------|-------------|-------------|
-| Monday | Twitter | Thread (10 tweets) | "What I learned building 33 AI agents" lessons thread |
+| Monday | Twitter | Thread (10 tweets) | "What I learned building 38 AI agents" lessons thread |
 | Monday | Newsletter pitches | Email | Send pitches to The Rundown AI, Ben's Bites, TLDR AI |
 | Tuesday | LinkedIn | Long post | Technical architecture deep-dive -- how agents communicate |
 | Tuesday | Dev.to | Tutorial | "Getting Started with JAK Swarm: Your First Multi-Agent Pipeline" |

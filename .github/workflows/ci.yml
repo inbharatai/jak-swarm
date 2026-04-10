@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-typecheck-build:
-    name: Lint, Typecheck & Build
+  build:
+    name: Build & Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -38,9 +38,9 @@ jobs:
       - name: Build all packages (dependency order)
         run: |
           pnpm --filter @jak-swarm/shared build
-          pnpm --filter @jak-swarm/tools build || true
+          pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
-          pnpm --filter @jak-swarm/swarm build || true
+          pnpm --filter @jak-swarm/swarm build
 
       - name: Build web app
         run: pnpm --filter @jak-swarm/web exec next build
@@ -52,7 +52,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: lint-typecheck-build
+    needs: build
 
     steps:
       - name: Checkout
@@ -76,7 +76,7 @@ jobs:
       - name: Build packages (dependency order)
         run: |
           pnpm --filter @jak-swarm/shared build
-          pnpm --filter @jak-swarm/tools build || true
+          pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
 
       - name: Run tests

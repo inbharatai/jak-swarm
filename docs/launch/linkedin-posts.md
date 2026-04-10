@@ -40,7 +40,7 @@ GitHub: https://github.com/inbharatai/jak-swarm
 
 ## Week 2: Technical Architecture Deep-Dive
 
-One question I keep getting about JAK Swarm: "How do 33 AI agents actually work together?"
+One question I keep getting about JAK Swarm: "How do 38 AI agents actually work together?"
 
 Here's the architecture, explained simply.
 
@@ -126,7 +126,7 @@ GitHub: https://github.com/inbharatai/jak-swarm
 
 ## Week 4: Lessons Learned Building an AI Swarm
 
-I spent 14 months building 33 AI agents. Here are the lessons that apply far beyond AI:
+I spent 14 months building 38 AI agents. Here are the lessons that apply far beyond AI:
 
 1. Specialization beats generalization.
 

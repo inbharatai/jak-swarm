@@ -271,8 +271,8 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
           setProvider('realtime-api');
         }
       })
-      .catch(() => {
-        // Fall back to browser STT or text
+      .catch((err) => {
+        console.warn('[useVoice] Realtime API unavailable, falling back to browser STT:', err);
       });
   }, []);
 

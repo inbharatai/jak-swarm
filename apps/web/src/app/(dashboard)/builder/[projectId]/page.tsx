@@ -144,9 +144,17 @@ export default function BuilderIDEPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSavingFile, setIsSavingFile] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedFileRef = useRef<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
   const buildSteps = eventsToBuildSteps(streamEvents);
+
+  // Cleanup save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -160,6 +168,11 @@ export default function BuilderIDEPage() {
       if (mainFile) setSelectedFile(mainFile.path);
     }
   }, [project?.files, selectedFile]);
+
+  // Keep selectedFileRef in sync to avoid stale closures in debounced save
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
 
   if (isLoading || !project) {
     return (
@@ -218,9 +231,11 @@ export default function BuilderIDEPage() {
     if (!value || !selectedFile || !currentFile || value === currentFile.content) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
+      const fileToSave = selectedFileRef.current;
+      if (!fileToSave) return;
       setIsSavingFile(true);
       try {
-        await projectApi.updateFile(projectId, selectedFile, value);
+        await projectApi.updateFile(projectId, fileToSave, value);
         refresh();
       } catch (e) {
         setErrorMessage('Failed to save file');

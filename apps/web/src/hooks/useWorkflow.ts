@@ -26,14 +26,21 @@ function isTerminal(workflow?: Workflow): boolean {
 
 // ─── useWorkflow ──────────────────────────────────────────────────────────────
 
-export function useWorkflow(workflowId: string | null | undefined) {
+interface UseWorkflowOptions {
+  /** When true, disables polling (e.g. when SSE stream is connected). */
+  disablePolling?: boolean;
+}
+
+export function useWorkflow(workflowId: string | null | undefined, options?: UseWorkflowOptions) {
   const { data, error, isLoading, mutate } = useSWR<Workflow>(
-    workflowId ? `/api/workflows/${workflowId}` : null,
+    workflowId ? `/workflows/${workflowId}` : null,
     fetcher,
     {
       refreshInterval: (data) => {
         // Stop polling once terminal
         if (isTerminal(data)) return 0;
+        // Stop polling when SSE stream is providing live updates
+        if (options?.disablePolling) return 0;
         return 2000; // Poll every 2s while running
       },
       revalidateOnFocus: !isTerminal(undefined),
@@ -65,7 +72,7 @@ export function useWorkflows(filters?: WorkflowFilters, config?: SWRConfiguratio
   if (filters?.pageSize) params.set('pageSize', String(filters.pageSize));
 
   const qs = params.toString();
-  const key = `/api/workflows${qs ? `?${qs}` : ''}`;
+  const key = `/workflows${qs ? `?${qs}` : ''}`;
 
   const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Workflow>>(
     key,
@@ -90,7 +97,8 @@ export function useWorkflows(filters?: WorkflowFilters, config?: SWRConfiguratio
 
 export function useApprovals(status: 'pending' | 'all' = 'pending') {
   const { data, error, isLoading, mutate } = useSWR<ApprovalRequest[]>(
-    `/api/approvals${status !== 'all' ? `?status=${status}` : ''}`,
+    `/approvals${status !== 'all' ? `?status=${status}` : ''}`,
+
     fetcher,
     {
       refreshInterval: 5_000, // Poll every 5s for new approvals

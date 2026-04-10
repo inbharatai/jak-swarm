@@ -376,61 +376,73 @@ export class SwarmGraph extends EventEmitter {
       };
     }
 
-    // Continue from worker node
-    let currentNode: NodeName = 'worker';
-    let resumedState = updatedState;
-    let steps = 0;
-    const taskCount = updatedState.plan?.tasks.length ?? 5;
-    const maxSteps = Math.min(500, Math.max(this.BASE_MAX_STEPS, taskCount * this.STEPS_PER_TASK));
+    // Continue from worker node for the approved task only
+    const workerHandler = this.nodes.get('worker')!;
+    const verifierHandler = this.nodes.get('verifier')!;
 
-    while (currentNode !== '__end__' && currentNode !== '__clarification__' && steps < maxSteps) {
-      steps++;
-      const handler = this.nodes.get(currentNode);
-      if (!handler) break;
+    try {
+      // Execute the approved task: worker → verifier
+      const workerUpdates = await this.executeNode('worker', workerHandler, updatedState);
+      let resumedState = this.mergeState(updatedState, workerUpdates);
+      this.emit('state:updated', { workflowId: resumedState.workflowId, state: resumedState });
 
-      try {
-        const updates = await handler(resumedState);
-        resumedState = this.mergeState(resumedState, updates);
-        this.emit('state:updated', { workflowId: resumedState.workflowId, state: resumedState });
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        return {
-          ...resumedState,
-          error: `Error resuming at node '${currentNode}': ${errorMessage}`,
-          status: WorkflowStatus.FAILED,
-        };
-      }
+      const verifierUpdates = await this.executeNode('verifier', verifierHandler, resumedState);
+      resumedState = this.mergeState(resumedState, verifierUpdates);
+      this.emit('state:updated', { workflowId: resumedState.workflowId, state: resumedState });
 
       if (
         resumedState.status === WorkflowStatus.FAILED ||
         resumedState.status === WorkflowStatus.CANCELLED ||
         resumedState.status === WorkflowStatus.AWAITING_APPROVAL
       ) {
-        break;
+        return resumedState;
       }
 
-      currentNode = this.getNextNode(currentNode, resumedState);
-
-      if (currentNode === 'guardrail' && resumedState.plan) {
-        const vResult = getCurrentVerificationResult(resumedState);
-        const taskPassed = !vResult || vResult.passed || (!vResult.needsRetry);
-        if (taskPassed) {
-          resumedState = {
-            ...resumedState,
-            currentTaskIndex: resumedState.currentTaskIndex + 1,
-          };
+      // Mark current task as complete and advance
+      const currentTask = getCurrentTask(resumedState);
+      const completedIds = new Set(resumedState.completedTaskIds ?? []);
+      const failedIds = new Set(resumedState.failedTaskIds ?? []);
+      if (currentTask) {
+        const vResult = resumedState.verificationResults[currentTask.id];
+        if (!vResult || vResult.passed) {
+          completedIds.add(currentTask.id);
+        } else {
+          failedIds.add(currentTask.id);
         }
       }
-    }
 
-    if (
-      resumedState.status === WorkflowStatus.EXECUTING ||
-      resumedState.status === WorkflowStatus.VERIFYING
-    ) {
-      resumedState = { ...resumedState, status: WorkflowStatus.COMPLETED };
-    }
+      resumedState = {
+        ...resumedState,
+        completedTaskIds: [...completedIds],
+        failedTaskIds: [...failedIds],
+        currentTaskIndex: resumedState.currentTaskIndex + 1,
+      };
 
-    return resumedState;
+      // Check if there are more tasks — if so, run them through the parallel engine
+      if (resumedState.plan) {
+        const readyTasks = getReadyTasks(resumedState.plan, completedIds, failedIds);
+        if (readyTasks.length > 0) {
+          // Delegate remaining tasks to runParallel logic by continuing from current state
+          return this.runParallel(resumedState);
+        }
+      }
+
+      if (
+        resumedState.status === WorkflowStatus.EXECUTING ||
+        resumedState.status === WorkflowStatus.VERIFYING
+      ) {
+        resumedState = { ...resumedState, status: WorkflowStatus.COMPLETED };
+      }
+
+      return resumedState;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        ...updatedState,
+        error: `Error resuming: ${errorMessage}`,
+        status: WorkflowStatus.FAILED,
+      };
+    }
   }
 
   private async executeNode(
@@ -476,6 +488,15 @@ export class SwarmGraph extends EventEmitter {
    */
   async runParallel(initialState: SwarmState): Promise<SwarmState> {
     let state: SwarmState = { ...initialState };
+
+    // Immediate budget gate: if already over budget on entry, fail fast
+    if (state.maxCostUsd != null && state.accumulatedCostUsd >= state.maxCostUsd) {
+      return {
+        ...state,
+        error: `Workflow budget exceeded: $${state.accumulatedCostUsd.toFixed(4)} of $${state.maxCostUsd.toFixed(2)} limit`,
+        status: WorkflowStatus.FAILED,
+      };
+    }
 
     // Phase 1: Run commander + planner + router sequentially (planning phase)
     const planningNodes: NodeName[] = ['commander', 'planner', 'router'];
@@ -568,13 +589,43 @@ export class SwarmGraph extends EventEmitter {
         batches.push(readyTasks.slice(i, i + MAX_CONCURRENT_TASKS));
       }
 
+      // Pre-batch budget gate: if budget is already exceeded, stop before spending more
+      if (state.maxCostUsd && state.accumulatedCostUsd >= state.maxCostUsd) {
+        state = {
+          ...state,
+          error: `Workflow budget exceeded: $${state.accumulatedCostUsd.toFixed(4)} of $${state.maxCostUsd.toFixed(2)} limit`,
+          status: WorkflowStatus.FAILED,
+        };
+        break;
+      }
+
       const allResults: PromiseSettledResult<{ taskId: string; updates: Partial<SwarmState>; success: boolean }>[] = [];
+      let budgetBreached = false;
       for (const batch of batches) {
+        // Pre-batch budget check: stop scheduling new batches if over budget
+        if (state.maxCostUsd && state.accumulatedCostUsd >= state.maxCostUsd) {
+          budgetBreached = true;
+          break;
+        }
+
         const taskPromises = batch.map((task) =>
           this.executeTaskPipeline(state, task, completedIds, failedIds),
         );
         const batchResults = await Promise.allSettled(taskPromises);
         allResults.push(...batchResults);
+
+        // Accumulate cost from this batch immediately so next batch check is accurate
+        for (const br of batchResults) {
+          if (br.status === 'fulfilled') {
+            const batchCost = (br.value.updates.traces ?? []).reduce((sum: number, t: { costUsd?: unknown }) => {
+              const cost = typeof t.costUsd === 'number' && Number.isFinite(t.costUsd) ? t.costUsd : 0;
+              return sum + cost;
+            }, 0);
+            if (batchCost > 0) {
+              state = { ...state, accumulatedCostUsd: (state.accumulatedCostUsd ?? 0) + batchCost };
+            }
+          }
+        }
       }
 
       const results = allResults;
@@ -602,6 +653,16 @@ export class SwarmGraph extends EventEmitter {
         completedTaskIds: [...completedIds],
         failedTaskIds: [...failedIds],
       };
+
+      // Post-batch budget enforcement: fail workflow if cost exceeded
+      if (budgetBreached || (state.maxCostUsd && state.accumulatedCostUsd > state.maxCostUsd)) {
+        state = {
+          ...state,
+          error: `Workflow budget exceeded: $${state.accumulatedCostUsd.toFixed(4)} of $${state.maxCostUsd?.toFixed(2)} limit`,
+          status: WorkflowStatus.FAILED,
+        };
+        break;
+      }
 
       // Check if we need to stop (all remaining tasks depend on failed tasks)
       const latestPlan = state.plan ?? plan;

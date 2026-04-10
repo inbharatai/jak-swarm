@@ -104,20 +104,19 @@ JAK Swarm is a production-grade autonomous multi-agent platform designed to auto
 1. User submits goal via POST /workflows
 2. API validates JWT/ApiKey and extracts TenantContext
 3. API creates Workflow record in DB (status=PENDING)
-4. API enqueues Temporal workflow execution
-5. Temporal starts SwarmWorkflow with workflowId
-6. Commander agent receives goal + tenant context
-7. Commander enriches with IndustryPack data
-8. Planner decomposes into WorkflowPlan
-9. Guardrail validates plan
-10. Router dispatches tasks sequentially/in parallel
-11. Each task executes via Worker agent + tool calls
-12. High-risk tasks pause for ApprovalRequest creation
-13. Human reviewer approves/rejects via API
-14. On all tasks done, Verifier validates output
-15. Commander synthesises final result
-16. Workflow record updated to COMPLETED
-17. SSE event pushed to client
+4. SwarmExecutionService runs the workflow in-process (Temporal integration is infrastructure-ready but not yet wired into this path)
+5. Commander agent receives goal + tenant context
+6. Commander enriches with IndustryPack data
+7. Planner decomposes into WorkflowPlan
+8. Guardrail validates plan
+9. Router dispatches tasks sequentially/in parallel
+10. Each task executes via Worker agent + tool calls
+11. High-risk tasks pause for ApprovalRequest creation
+12. Human reviewer approves/rejects via API
+13. On all tasks done, Verifier validates output
+14. Commander synthesises final result
+15. Workflow record updated to COMPLETED
+16. SSE event pushed to client
 ```
 
 ### Approval Flow
@@ -152,7 +151,7 @@ Agents communicate via structured handoffs, not direct function calls. Each hand
 The pattern enforces:
 - **Loose coupling** — agents do not import each other
 - **Full auditability** — the complete chain of reasoning is preserved
-- **Temporal durability** — Temporal activities wrap each agent run, providing automatic retry and state persistence
+- **Durability** — Workflow state is persisted to DB after every node. Temporal worker/activities exist in `packages/workflows/` for future distributed execution but are not yet wired into the API execution path.
 
 ---
 
@@ -171,10 +170,10 @@ Level 3: Workers      — one instance per task (N workers can run in parallel)
 ```
 
 **Parallelism:**
-The Router analyses the dependency graph and dispatches all tasks with no unresolved dependencies simultaneously, subject to `tenant.maxConcurrentWorkflows`. Temporal's `Promise.all` semantics handle parallel activity execution.
+The Router analyses the dependency graph and dispatches all tasks with no unresolved dependencies simultaneously, subject to `tenant.maxConcurrentWorkflows`. Parallel execution uses `Promise.all` within the SwarmExecutionService.
 
 **Durability:**
-Every agent run is a Temporal Activity. If the worker process crashes mid-execution, Temporal replays the workflow from the last completed activity. Tool calls include idempotency keys to prevent double-execution on replay.
+Workflow state is persisted to PostgreSQL after every node completes. If the process crashes, the workflow can be resumed from the last persisted state. Temporal worker and activity definitions exist in `packages/workflows/` and are infrastructure-ready for distributed execution, but the API currently runs workflows in-process via SwarmExecutionService.
 
 ---
 

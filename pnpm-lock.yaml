@@ -50,6 +50,9 @@ importers:
       '@jak-swarm/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@jak-swarm/security':
+        specifier: workspace:*
+        version: link:../../packages/security
       '@jak-swarm/shared':
         specifier: workspace:*
         version: link:../../packages/shared

@@ -184,10 +184,10 @@ PRs welcome. Especially for new agents and tools.
 
 ---
 
-## Thread 3: "What I Learned Building 33 AI Agents"
+## Thread 3: "What I Learned Building 38 AI Agents"
 
 **Tweet 1:**
-I spent 14 months building 33 AI agents.
+I spent 14 months building 38 AI agents.
 
 Here are the hard lessons nobody talks about:
 

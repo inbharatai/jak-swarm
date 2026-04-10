@@ -12,6 +12,8 @@ import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
 import type { SwarmResult } from '@jak-swarm/swarm';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
+import { detectPII, detectInjection, AuditLogger, AuditAction } from '@jak-swarm/security';
+import type { AuditPrismaClient } from '@jak-swarm/security';
 import { WorkflowService } from './workflow.service.js';
 import { DbWorkflowStateStore } from './db-state-store.js';
 
@@ -65,6 +67,7 @@ export interface CancelParams {
 export class SwarmExecutionService extends EventEmitter {
   private readonly runner: SwarmRunner;
   private readonly workflowService: WorkflowService;
+  private readonly audit: AuditLogger;
 
   constructor(
     private readonly db: PrismaClient,
@@ -74,6 +77,7 @@ export class SwarmExecutionService extends EventEmitter {
     const stateStore = new DbWorkflowStateStore(db);
     this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
     this.workflowService = new WorkflowService(db, log);
+    this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
   }
 
   /**
@@ -93,9 +97,54 @@ export class SwarmExecutionService extends EventEmitter {
 
     this.log.info({ workflowId, tenantId }, '[Swarm] Starting async execution');
 
+    // ── Guardrail: injection detection ───────────────────────────────────
+    const injectionResult = detectInjection(goal);
+    if (injectionResult.detected && injectionResult.risk === 'HIGH') {
+      this.log.warn({ workflowId, patterns: injectionResult.patterns }, '[Guardrail] Injection attempt detected in goal');
+      void this.audit.log({
+        action: AuditAction.INJECTION_DETECTED,
+        tenantId,
+        userId,
+        resource: 'workflow',
+        resourceId: workflowId,
+        details: { patterns: injectionResult.patterns, confidence: injectionResult.confidence },
+      });
+      await this.workflowService.updateWorkflowStatus(
+        workflowId,
+        'FAILED',
+        'Goal rejected: potential prompt injection detected.',
+      );
+      this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: 'Goal rejected: potential prompt injection detected.', timestamp: new Date().toISOString() });
+      return;
+    }
+
+    // ── Guardrail: PII detection ─────────────────────────────────────────
+    const piiResult = detectPII(goal);
+    if (piiResult.containsPII) {
+      this.log.warn({ workflowId, piiTypes: piiResult.found }, '[Guardrail] PII detected in goal');
+      void this.audit.log({
+        action: AuditAction.PII_DETECTED,
+        tenantId,
+        userId,
+        resource: 'workflow',
+        resourceId: workflowId,
+        details: { types: piiResult.found },
+      });
+    }
+
     try {
       await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
       this.emit(`workflow:${workflowId}`, { type: 'started', workflowId, timestamp: new Date().toISOString() });
+
+      // Audit: workflow started
+      void this.audit.log({
+        action: AuditAction.WORKFLOW_STARTED,
+        tenantId,
+        userId,
+        resource: 'workflow',
+        resourceId: workflowId,
+        details: { goal, industry },
+      });
 
       // Publish to supervisor bus for cross-cutting coordination
       supervisorBus.publish('workflow:started', {
@@ -153,8 +202,24 @@ export class SwarmExecutionService extends EventEmitter {
 
       if (dbStatus === 'COMPLETED') {
         this.emit(`workflow:${workflowId}`, { type: 'completed', workflowId, status: dbStatus, timestamp: new Date().toISOString() });
+        void this.audit.log({
+          action: AuditAction.WORKFLOW_COMPLETED,
+          tenantId,
+          userId,
+          resource: 'workflow',
+          resourceId: workflowId,
+          details: { durationMs: result.durationMs, traceCount: result.traces.length },
+        });
       } else if (dbStatus === 'FAILED') {
         this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: result.error, timestamp: new Date().toISOString() });
+        void this.audit.log({
+          action: AuditAction.WORKFLOW_FAILED,
+          tenantId,
+          userId,
+          resource: 'workflow',
+          resourceId: workflowId,
+          details: { error: result.error, durationMs: result.durationMs },
+        });
       }
 
       // Publish completion to supervisor bus

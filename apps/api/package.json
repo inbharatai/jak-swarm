@@ -21,6 +21,7 @@
     "@fastify/swagger-ui": "^5.2.1",
     "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/db": "workspace:*",
+    "@jak-swarm/security": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/swarm": "workspace:*",
     "@jak-swarm/tools": "workspace:*",

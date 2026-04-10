@@ -135,14 +135,37 @@ async function buildApp() {
   await fastify.register(layoutRoutes, { prefix: '/layouts' });
 
   // -------------------------------------------------------------------------
-  // Health check
+  // Health check — probes DB + Redis connectivity
   // -------------------------------------------------------------------------
   fastify.get('/health', async (_request, reply) => {
-    return reply.status(200).send({
-      status: 'ok',
+    const checks: Record<string, { status: string; latencyMs?: number; error?: string }> = {};
+
+    // Database
+    const dbStart = Date.now();
+    try {
+      await fastify.db.$queryRaw`SELECT 1`;
+      checks.database = { status: 'ok', latencyMs: Date.now() - dbStart };
+    } catch (e) {
+      checks.database = { status: 'error', latencyMs: Date.now() - dbStart, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // Redis
+    const redisStart = Date.now();
+    try {
+      await fastify.redis.ping();
+      checks.redis = { status: 'ok', latencyMs: Date.now() - redisStart };
+    } catch (e) {
+      checks.redis = { status: 'error', latencyMs: Date.now() - redisStart, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    const allHealthy = Object.values(checks).every((c) => c.status === 'ok');
+
+    return reply.status(allHealthy ? 200 : 503).send({
+      status: allHealthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       version: '0.1.0',
       environment: config.nodeEnv,
+      checks,
     });
   });
 

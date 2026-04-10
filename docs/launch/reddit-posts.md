@@ -34,7 +34,7 @@ MIT licensed: https://github.com/inbharatai/jak-swarm
 
 ## Post 2: r/LocalLLaMA
 
-**Title:** Built an open-source multi-agent platform that works with Ollama -- run 33 AI agents entirely locally
+**Title:** Built an open-source multi-agent platform that works with Ollama -- run 38 AI agents entirely locally
 
 **Body:**
 
@@ -77,7 +77,7 @@ The journey in numbers:
 
 - Started: Early 2025
 - Time invested: ~1,400 hours of evenings and weekends
-- Agents built: 33
+- Agents built: 38
 - Tools integrated: 79
 - LLM providers supported: 6
 - Lines of Python: ~15,000
@@ -109,13 +109,13 @@ Happy to answer questions about the build process, architecture decisions, or th
 
 ## Post 4: r/webdev
 
-**Title:** How I built a tool-use system for 33 AI agents -- architecture patterns that might be useful for your projects
+**Title:** How I built a tool-use system for 38 AI agents -- architecture patterns that might be useful for your projects
 
 **Body:**
 
 I recently open-sourced JAK Swarm, a multi-agent AI platform, and I wanted to share some of the architecture patterns that webdevs building AI features might find useful.
 
-The challenge: I needed 33 different AI agents to be able to discover and use 79 different tools (web scraping, file I/O, API calls, code execution, etc.) without hardcoding every combination.
+The challenge: I needed 38 different AI agents to be able to discover and use 79 different tools (web scraping, file I/O, API calls, code execution, etc.) without hardcoding every combination.
 
 The solution has three parts:
 

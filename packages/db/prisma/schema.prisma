@@ -224,6 +224,7 @@ model AuditLog {
   details    Json?
   ip         String?
   userAgent  String?
+  severity   String   @default("INFO") // INFO | WARN | ERROR | CRITICAL
   createdAt  DateTime @default(now())
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
@@ -405,4 +406,67 @@ model UserLayout {
   updatedAt DateTime @updatedAt
 
   @@map("user_layouts")
+}
+
+// ─── Built-in CRM Models ────────────────────────────────────────────────────
+
+model CrmContact {
+  id           String    @id @default(cuid())
+  tenantId     String
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  company      String?
+  title        String?
+  stage        String    @default("LEAD") // LEAD | QUALIFIED | OPPORTUNITY | CUSTOMER | CHURNED
+  tags         String[]  @default([])
+  assignedTo   String?
+  lastActivity DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  notes        CrmNote[]
+  deals        CrmDeal[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, stage])
+  @@index([tenantId, company])
+  @@map("crm_contacts")
+}
+
+model CrmNote {
+  id         String   @id @default(cuid())
+  contactId  String
+  content    String   @db.Text
+  authorId   String
+  authorName String
+  createdAt  DateTime @default(now())
+
+  contact    CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("crm_notes")
+}
+
+model CrmDeal {
+  id                String    @id @default(cuid())
+  tenantId          String
+  contactId         String
+  name              String
+  amount            Float     @default(0)
+  currency          String    @default("USD")
+  stage             String    @default("PROSPECT") // PROSPECT | NEGOTIATION | PROPOSAL | CLOSED_WON | CLOSED_LOST
+  probability       Float     @default(0)
+  expectedCloseDate DateTime?
+  assignedTo        String?
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  contact           CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, stage])
+  @@index([contactId])
+  @@map("crm_deals")
 }

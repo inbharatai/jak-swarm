@@ -45,7 +45,7 @@ const STANDARD_PATTERNS: InjectionPattern[] = [
     description: 'Code block system injection',
   },
   {
-    pattern: /act\s+as\s+(a\s+)?(?:different|new|unrestricted|unfiltered|uncensored|free|evil|jailbroken)/i,
+    pattern: /act\s+as\s+(an?\s+)?(?:different|new|unrestricted|unfiltered|uncensored|free|evil|jailbroken)/i,
     risk: 'HIGH',
     description: 'Act as unrestricted AI',
   },

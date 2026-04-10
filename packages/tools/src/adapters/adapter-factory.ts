@@ -1,9 +1,10 @@
 import type { EmailAdapter } from './email/email.interface.js';
 import type { CalendarAdapter } from './calendar/calendar.interface.js';
-import { MockEmailAdapter } from './email/mock-email.adapter.js';
-import { MockCalendarAdapter } from './calendar/mock-calendar.adapter.js';
+import type { CRMAdapter } from './crm/crm.interface.js';
+import { UnconfiguredEmailAdapter, UnconfiguredCalendarAdapter } from './unconfigured.js';
 import { GmailImapAdapter } from './email/gmail-imap.adapter.js';
 import { CalDAVCalendarAdapter } from './calendar/caldav-calendar.adapter.js';
+import { PrismaCRMAdapter } from './crm/prisma-crm.adapter.js';
 
 export interface GmailCredentials {
   email: string;
@@ -28,22 +29,22 @@ function resolveGmailCredentials(): GmailCredentials | null {
 /**
  * Get an email adapter instance.
  * Uses real Gmail IMAP adapter if credentials are available,
- * otherwise falls back to the mock adapter.
+ * otherwise returns an unconfigured stub that throws on use.
  */
-export function getEmailAdapter(industry?: string): EmailAdapter {
+export function getEmailAdapter(): EmailAdapter {
   const creds = resolveGmailCredentials();
 
   if (creds) {
     return new GmailImapAdapter(creds);
   }
 
-  return new MockEmailAdapter(industry);
+  return new UnconfiguredEmailAdapter();
 }
 
 /**
  * Get a calendar adapter instance.
- * Uses real CalDAV adapter if Gmail credentials are available,
- * otherwise falls back to the mock adapter.
+ * Uses real CalDAV adapter if credentials are available,
+ * otherwise returns an unconfigured stub that throws on use.
  */
 export function getCalendarAdapter(): CalendarAdapter {
   const creds = resolveGmailCredentials();
@@ -52,7 +53,7 @@ export function getCalendarAdapter(): CalendarAdapter {
     return new CalDAVCalendarAdapter(creds);
   }
 
-  return new MockCalendarAdapter();
+  return new UnconfiguredCalendarAdapter();
 }
 
 /**
@@ -60,4 +61,17 @@ export function getCalendarAdapter(): CalendarAdapter {
  */
 export function hasRealAdapters(): boolean {
   return resolveGmailCredentials() !== null;
+}
+
+/**
+ * Get a CRM adapter backed by Prisma/PostgreSQL.
+ * Requires a Prisma client and tenant ID (for row-level isolation).
+ * If no db is provided, returns undefined — the caller can decide
+ * whether to fall back to the unconfigured stub.
+ */
+export function getCRMAdapter(db: unknown, tenantId: string): CRMAdapter | undefined {
+  if (db && typeof db === 'object' && 'crmContact' in db) {
+    return new PrismaCRMAdapter(db as any, tenantId);
+  }
+  return undefined;
 }

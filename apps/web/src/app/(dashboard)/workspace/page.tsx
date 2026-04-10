@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { PlusCircle, StopCircle, CheckCircle2, Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, EmptyState } from '@/components/ui';
@@ -29,12 +29,21 @@ export default function WorkspacePage() {
   const [planViewMode, setPlanViewMode] = useState<'graph' | 'list'>('graph');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { workflow, isLoading: workflowLoading, refresh: refreshWorkflow } = useWorkflow(activeWorkflowId);
+  const { latestEvent, isConnected } = useWorkflowStream(activeWorkflowId);
+
+  // Disable SWR polling when SSE stream is connected to avoid race conditions
+  const { workflow, isLoading: workflowLoading, refresh: refreshWorkflow } = useWorkflow(activeWorkflowId, { disablePolling: isConnected });
   const { workflows: activeWorkflows } = useActiveWorkflows();
   const { approvals, pendingCount, isLoading: approvalsLoading, refresh: refreshApprovals } = useApprovals();
 
-  const { latestEvent, isConnected } = useWorkflowStream(activeWorkflowId);
   const voice = useVoice();
+
+  // Refresh SWR data when SSE events arrive (replaces polling while connected)
+  useEffect(() => {
+    if (latestEvent && isConnected) {
+      refreshWorkflow();
+    }
+  }, [latestEvent, isConnected, refreshWorkflow]);
 
   const handleSubmit = useCallback(async (command: string, industry: Industry) => {
     setIsSubmitting(true);
@@ -274,16 +283,16 @@ export default function WorkspacePage() {
                 {/* Workflow controls */}
                 {workflow?.status === 'RUNNING' && (
                   <div className="flex gap-1.5">
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={async () => { await workflowApi.pause(workflow.id); refreshWorkflow(); }}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={async () => { try { await workflowApi.pause(workflow.id); refreshWorkflow(); } catch (err) { toast.error('Failed to pause workflow', err instanceof Error ? err.message : 'Please try again.'); } }}>
                       Pause
                     </Button>
-                    <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={async () => { await workflowApi.stop(workflow.id); refreshWorkflow(); }}>
+                    <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={async () => { try { await workflowApi.stop(workflow.id); refreshWorkflow(); } catch (err) { toast.error('Failed to stop workflow', err instanceof Error ? err.message : 'Please try again.'); } }}>
                       Stop
                     </Button>
                   </div>
                 )}
                 {workflow?.status === 'PAUSED' && (
-                  <Button size="sm" className="h-7 text-xs" onClick={async () => { await workflowApi.unpause(workflow.id); refreshWorkflow(); }}>
+                  <Button size="sm" className="h-7 text-xs" onClick={async () => { try { await workflowApi.unpause(workflow.id); refreshWorkflow(); } catch (err) { toast.error('Failed to resume workflow', err instanceof Error ? err.message : 'Please try again.'); } }}>
                     Resume
                   </Button>
                 )}

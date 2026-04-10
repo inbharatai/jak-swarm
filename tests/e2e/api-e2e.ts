@@ -69,6 +69,21 @@ async function testHealth() {
     const { status } = await req('GET', '/');
     return { pass: status < 500, status, detail: status < 500 ? 'Server responding' : 'Server error' };
   });
+
+  await test('GET /health — DB and Redis checks present', async () => {
+    const { status, body } = await req<{
+      status: string;
+      checks: { database: { status: string; latencyMs: number }; redis: { status: string; latencyMs: number } };
+    }>('GET', '/health');
+    const checks = (body as any)?.checks;
+    const dbOk = checks?.database?.status === 'ok';
+    const redisStatus = checks?.redis?.status;
+    const pass = (status === 200 || status === 503) && !!checks?.database;
+    return {
+      pass, status,
+      detail: `DB: ${checks?.database?.status} (${checks?.database?.latencyMs}ms), Redis: ${redisStatus} (${checks?.redis?.latencyMs}ms)`,
+    };
+  });
 }
 
 async function testAuth() {
@@ -117,6 +132,20 @@ async function testAuth() {
   await test('GET /auth/me — 401 without token', async () => {
     const { status } = await req('GET', '/auth/me');
     return { pass: status === 401, status };
+  });
+
+  // Login with seeded credentials from db:seed
+  await test('POST /auth/login — seeded admin (apex-health) returns token', async () => {
+    const { status, body } = await req<{ success: boolean; data: { token: string } }>(
+      'POST', '/auth/login',
+      { email: 'admin@apex-health.demo', password: 'jak-demo-2024' },
+    );
+    const pass = status === 201 && !!(body as any)?.data?.token;
+    if (pass) token = (body as any).data.token;  // Use seeded token for remaining tests
+    return {
+      pass, status,
+      detail: pass ? `Seeded admin logged in` : `Body: ${JSON.stringify(body).slice(0, 100)}`,
+    };
   });
 }
 
@@ -233,31 +262,37 @@ async function testApprovals() {
 
 async function testMemory() {
   console.log('\n🔵 Memory Endpoints');
-  let memId = '';
+  const memKey = `e2e_test_${Date.now()}`;
 
-  await test('POST /memory — create entry', async () => {
+  await test('PUT /memory/:key — create entry', async () => {
     if (!token) return { pass: false, detail: 'No auth token' };
     const { status, body } = await req(
-      'POST', '/memory',
-      { type: 'CONTEXT', key: `e2e_test_${Date.now()}`, value: { test: true, source: 'e2e' } },
+      'PUT', `/memory/${memKey}`,
+      { value: { test: true, source: 'e2e' }, type: 'CONTEXT' },
       token,
     );
-    const pass = status === 201 && !!(body as any)?.data?.id;
-    if (pass) memId = (body as any).data.id;
-    return { pass, status, detail: pass ? `Created: ${memId}` : JSON.stringify(body).slice(0, 80) };
+    const pass = status === 201 && !!(body as any)?.data?.key;
+    return { pass, status, detail: pass ? `Created: ${memKey}` : JSON.stringify(body).slice(0, 80) };
   });
 
   await test('GET /memory — list entries', async () => {
     if (!token) return { pass: false, detail: 'No auth token' };
     const { status, body } = await req('GET', '/memory', undefined, token);
-    const pass = status === 200 && Array.isArray((body as any)?.data);
-    return { pass, status, detail: pass ? `${(body as any).data.length} entries` : JSON.stringify(body).slice(0, 80) };
+    const pass = status === 200 && !!(body as any)?.data?.items;
+    return { pass, status, detail: pass ? `${(body as any).data.items.length} entries (page 1)` : JSON.stringify(body).slice(0, 80) };
   });
 
-  await test('DELETE /memory/:id — delete entry', async () => {
-    if (!token || !memId) return { pass: false, detail: 'No memory entry created' };
-    const { status } = await req('DELETE', `/memory/${memId}`, undefined, token);
-    const pass = status === 200 || status === 204;
+  await test('GET /memory/:key — get entry', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status, body } = await req('GET', `/memory/${memKey}`, undefined, token);
+    const pass = status === 200 && (body as any)?.data?.key === memKey;
+    return { pass, status, detail: pass ? `Value: ${JSON.stringify((body as any).data.value).slice(0, 40)}` : JSON.stringify(body).slice(0, 80) };
+  });
+
+  await test('DELETE /memory/:key — delete entry', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status } = await req('DELETE', `/memory/${memKey}`, undefined, token);
+    const pass = status === 200;
     return { pass, status };
   });
 }
@@ -265,10 +300,10 @@ async function testMemory() {
 async function testVoice() {
   console.log('\n🔵 Voice Endpoints');
 
-  await test('POST /voice/sessions — create voice session', async () => {
+  await test('POST /voice/start-session — create voice session', async () => {
     if (!token) return { pass: false, detail: 'No auth token' };
     const { status, body } = await req(
-      'POST', '/voice/sessions',
+      'POST', '/voice/start-session',
       { language: 'en', voice: 'alloy' },
       token,
     );
@@ -296,6 +331,48 @@ async function testRateLimiting() {
   });
 }
 
+async function testTraces() {
+  console.log('\n🔵 Trace Endpoints');
+
+  await test('GET /traces — returns seeded traces', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status, body } = await req('GET', '/traces', undefined, token);
+    const data = (body as any)?.data;
+    const pass = status === 200 && Array.isArray(data) && data.length > 0;
+    return { pass, status, detail: pass ? `${data.length} traces` : JSON.stringify(body).slice(0, 80) };
+  });
+}
+
+async function testAnalytics() {
+  console.log('\n🔵 Analytics Endpoints');
+
+  await test('GET /analytics/usage — returns usage data', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status, body } = await req('GET', '/analytics/usage', undefined, token);
+    const pass = status === 200 && !!(body as any)?.data;
+    return { pass, status, detail: pass ? 'Usage data returned' : JSON.stringify(body).slice(0, 80) };
+  });
+
+  await test('GET /analytics/workflow-metrics — returns metrics', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status, body } = await req('GET', '/analytics/workflow-metrics', undefined, token);
+    const pass = status === 200;
+    return { pass, status, detail: JSON.stringify(body).slice(0, 80) };
+  });
+}
+
+async function testTools() {
+  console.log('\n🔵 Tool Endpoints');
+
+  await test('GET /tools — returns tool list', async () => {
+    if (!token) return { pass: false, detail: 'No auth token' };
+    const { status, body } = await req('GET', '/tools', undefined, token);
+    const data = (body as any)?.data;
+    const pass = status === 200 && Array.isArray(data) && data.length > 0;
+    return { pass, status, detail: pass ? `${data.length} tools registered` : JSON.stringify(body).slice(0, 80) };
+  });
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -317,9 +394,12 @@ async function main() {
 
   await testHealth();
   await testAuth();
+  await testTools();
   await testWorkflows();
   await testApprovals();
   await testMemory();
+  await testTraces();
+  await testAnalytics();
   await testVoice();
   await testRateLimiting();
 

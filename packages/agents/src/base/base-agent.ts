@@ -48,9 +48,9 @@ export abstract class BaseAgent {
 
     const resolvedKey = apiKey ?? process.env['OPENAI_API_KEY'];
     if (!resolvedKey && !this.provider) {
-      this.logger.warn(
+      this.logger.error(
         { role },
-        '[BaseAgent] No OPENAI_API_KEY or ANTHROPIC_API_KEY set — LLM calls will fail at runtime.',
+        '[BaseAgent] No OPENAI_API_KEY or ANTHROPIC_API_KEY set — LLM calls will fail. Set at least one API key in your environment.',
       );
     }
 
@@ -67,6 +67,14 @@ export abstract class BaseAgent {
     // If an LLM provider is configured, use it and convert the response
     if (this.provider) {
       return this.callLLMViaProvider(messages, tools, options);
+    }
+
+    // Fail loudly if no API key is configured — do not silently return empty results
+    if (!process.env['OPENAI_API_KEY']) {
+      throw new Error(
+        `[${this.role}] No OPENAI_API_KEY set. Cannot make LLM calls. ` +
+        'Set OPENAI_API_KEY in your environment or configure an LLM provider.',
+      );
     }
 
     // When no tools are passed, enable JSON mode if the system prompt asks for JSON.

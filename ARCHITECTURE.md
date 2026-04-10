@@ -95,14 +95,14 @@ The core execution engine. Contains:
 - **ToolRegistry** (`registry/tool-registry.ts`): Singleton. Tools register with metadata (name, description, category, risk class, input/output schemas) and an executor function. Supports input validation and execution timing.
 
 - **Adapters** (`adapters/`): Pluggable backends behind interfaces.
-  - `EmailAdapter`: Interface with `GmailImapAdapter` (real IMAP/SMTP) and `MockEmailAdapter`.
-  - `CalendarAdapter`: Interface with `CalDAVCalendarAdapter` (real CalDAV) and `MockCalendarAdapter`.
-  - `CRMAdapter`: Interface with `MockCRMAdapter` (pluggable for Salesforce, HubSpot, etc.).
+  - `EmailAdapter`: Interface with `GmailImapAdapter` (real IMAP/SMTP). Throws if not configured.
+  - `CalendarAdapter`: Interface with `CalDAVCalendarAdapter` (real CalDAV). Throws if not configured.
+  - `CRMAdapter`: Interface with `PrismaCRMAdapter` (database-backed, tenant-scoped) and `UnconfiguredCRMAdapter` fallback.
   - `BrowserAdapter`: Playwright-based. Singleton engine manages browser lifecycle.
   - `MemoryAdapter`: In-memory or database-backed key-value store.
   - `PhoringAdapter`: HTTP client for Phoring.ai forecasting and knowledge graph APIs.
 
-- **Adapter Factory** (`adapters/adapter-factory.ts`): Detects environment variables and returns real or mock adapters. `hasRealAdapters()` checks if Gmail/Calendar credentials are configured.
+- **Adapter Factory** (`adapters/adapter-factory.ts`): Detects environment variables and returns real adapters or unconfigured stubs that throw on use. No fake data is ever returned.
 
 - **MCP Bridge** (`mcp/`):
   - `McpClientManager`: Manages MCP server processes (spawn, connect, disconnect). Each provider gets its own stdio-based MCP server.
@@ -195,17 +195,17 @@ Risk classes determine approval requirements:
 
 ---
 
-## Anti-Hallucination Pipeline
+## Hallucination Detection Pipeline
 
-Every agent output passes through four checks before acceptance:
+Every agent output passes through four heuristic checks before acceptance. These are **regex/rule-based detectors**, not AI-powered:
 
 1. **Invented Statistics**: Regex detection of specific percentages, dollar amounts, and large numbers that appear without source attribution.
 
-2. **Fabricated Sources**: Detects academic-style citations (Author et al., year), URL references, and paper titles that the agent may have invented.
+2. **Fabricated Sources**: Pattern matching for academic-style citations (Author et al., year), URL references, and paper titles that the agent may have invented.
 
 3. **Overconfidence**: Flags absolute statements ("always", "never", "guaranteed") and certainty claims without evidence.
 
-4. **Impossible Claims**: Catches logically inconsistent or physically impossible assertions.
+4. **Impossible Claims**: Rule-based detection of logically inconsistent or physically impossible assertions.
 
 Each check contributes to a grounding score (0.0 to 1.0). If the combined score falls below threshold, the Verifier flags the output for re-generation or human review.
 

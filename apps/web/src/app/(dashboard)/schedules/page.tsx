@@ -92,7 +92,7 @@ function cronToHuman(cron: string): string {
 export default function SchedulesPage() {
   const toast = useToast();
   const { data, isLoading, mutate } = useSWR<{ data: WorkflowSchedule[] }>('/schedules', fetcher);
-  const schedules = (data as any)?.data ?? [];
+  const schedules = data?.data ?? [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -141,13 +141,13 @@ export default function SchedulesPage() {
       if (editingId) {
         await scheduleApi.update(editingId, body);
       } else {
-        await scheduleApi.create(body as any);
+        await scheduleApi.create(body);
       }
 
       setDialogOpen(false);
       mutate();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to save schedule');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save schedule');
     } finally {
       setSaving(false);
     }
