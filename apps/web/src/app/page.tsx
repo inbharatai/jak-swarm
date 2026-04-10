@@ -151,8 +151,8 @@ const AGENTS = [
 const STATS = [
   { value: 38, label: 'Agents', suffix: '' },
   { value: 108, label: 'Tools', suffix: '' },
+  { value: 20, label: 'Integrations', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
-  { value: 20, label: 'Browser Tools', suffix: '' },
 ];
 
 const WORKFLOW_STEPS = [
@@ -177,30 +177,41 @@ const PRICING = [
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'For individuals exploring AI automation.',
-    features: ['5 workflows / day', '1 user', 'Basic agents', 'Community support', 'Public templates'],
+    description: 'Explore AI automation with your own API keys.',
+    features: ['3 workflows / day', '1 vibe coding project', 'Core agents (Email, Calendar, Research, Browser)', 'BYO API keys', 'Community support'],
     cta: 'Start Free',
     href: '/register',
     highlighted: false,
     accent: '',
   },
   {
-    name: 'Pro',
-    price: '$49',
+    name: 'Builder',
+    price: '$29',
     period: '/mo',
-    description: 'For teams shipping with AI at scale.',
-    features: ['Unlimited workflows', '5 team members', 'All 38 agents', 'All integrations', 'Priority support', 'Custom templates', 'API access'],
-    cta: 'Start Pro',
+    description: 'For developers building with AI.',
+    features: ['Unlimited workflows', '5 vibe coding projects', 'All 38 agents', 'All 20 integrations', 'Vercel deployment', 'BYO API keys', 'Email support'],
+    cta: 'Start Building',
+    href: '/register',
+    highlighted: false,
+    accent: '',
+  },
+  {
+    name: 'Pro',
+    price: '$99',
+    period: '/mo',
+    description: 'For teams shipping at scale.',
+    features: ['Everything in Builder', 'Unlimited projects', 'Managed LLM keys', 'Priority LLM routing', 'GitHub sync', 'Custom skills', 'Voice input', 'Priority support'],
+    cta: 'Go Pro',
     href: '/register',
     highlighted: true,
     accent: 'emerald',
   },
   {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    description: 'For organizations with advanced needs.',
-    features: ['Everything in Pro', 'Unlimited team', 'SSO / SAML', 'Dedicated support', 'SLA guarantee', 'On-prem deployment', 'Custom agent training'],
+    name: 'Team',
+    price: '$249',
+    period: '/mo',
+    description: 'For organizations that need control.',
+    features: ['Everything in Pro', '5 team seats', 'Shared workspace', 'Admin console + RBAC', 'Audit logs', 'SSO (coming soon)', 'Dedicated support'],
     cta: 'Contact Us',
     href: 'mailto:contact@inbharat.ai',
     highlighted: false,
@@ -427,7 +438,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                38 AI agents. 112 tools. 6 LLM providers. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
+                38 AI agents. 108 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -681,7 +692,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">112 Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">108 Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
@@ -886,7 +897,7 @@ export default function HomePage() {
               <p className="mt-4 text-slate-400 max-w-xl mx-auto font-sans">Start free and scale as you grow. No hidden fees.</p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3 max-w-5xl mx-auto items-start">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto items-start">
               {PRICING.map((tier) => (
                 <div
                   key={tier.name}
@@ -1034,7 +1045,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 38 agents, 112 tools, vibe coding built in.
+                  The autonomous AI workforce platform. 38 agents, 108 tools, 20 integrations, vibe coding built in.
                 </p>
               </div>
 

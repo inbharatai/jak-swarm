@@ -1,66 +1,48 @@
 # JAK Swarm — Project Memory
 
-## Platform Stats (verified April 6, 2026 — LATEST)
-- **Agents:** 33 (6 orchestrators + 27 workers)
-- **Tools:** 104 (79 core + 25 C-suite execution tools)
-- **Agent Actions:** ~114 total across all agents
-- **Pages:** 15 UI pages
+## Platform Stats (verified April 10, 2026 — LATEST)
+- **Agents:** 38 (6 orchestrators + 27 workers + 5 vibe coding)
+- **Tools:** 108 built-in (excluding Phoring — not yet connected)
+- **Pages:** 22 UI pages
 - **LLM Providers:** 6 (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, Ollama)
-- **Integration Connectors:** 8 (Gmail, Calendar, Slack, GitHub, Notion, HubSpot, Drive, Phoring)
-- **MCP Providers:** 3 (Slack, GitHub, Notion)
-- **Browser Tools:** 22 Playwright tools
-- **Build:** 11/11 packages
-- **Tests:** 56/56 unit + 40/40 human simulator (100%)
-- **Human Simulator:** 40/40 (100%) with 5 test agents (Sarah CEO, Dev Engineer, Maya Marketing, Alex Ops, BrowserBot)
-- **README:** 953 lines with 7 screenshots
-- **Git Commits:** 14 on main branch
-- **GitHub:** github.com/inbharatai/jak-swarm (public)
-- **GitHub:** github.com/inbharatai/jak-swarm (public)
+- **MCP Providers:** 20 (HubSpot, Salesforce, Pipedrive, Zoho CRM, Freshsales, Jira, Linear, Asana, ClickUp, Slack, Discord, Twilio, SendGrid, Supabase, Airtable, Google Drive, Stripe, Google Analytics, GitHub, Notion)
+- **Browser Tools:** 20 Playwright + 7 sandbox
+- **DB Models:** 22 Prisma models
+- **Skills Marketplace:** 16 verified skills
+- **CI/CD:** GitHub Actions (green), Dockerfile
+- **GitHub:** github.com/inbharatai/jak-swarm (public, MIT)
 
-## Key Architecture Decisions
-- LangGraph-style DAG execution (not linear chain)
-- 4-layer anti-hallucination: prompt rules → reflectAndCorrect → verifier → auto-repair
-- Gmail/Calendar via IMAP/SMTP + CalDAV (app passwords, no OAuth)
-- MCP gateway for Slack/GitHub/Notion (official MCP servers)
-- Persistent memory: DB-backed with in-memory fallback
-- Cost controls: per-workflow budget, auto-approve low-risk tasks
-- Error recovery: listener cleanup, state store TTL, concurrency limit (20), node timeout (120s)
+## Pricing Tiers
+- **Free:** $0, 3 workflows/day, 1 project, core agents, BYO API keys
+- **Builder:** $29/mo, unlimited workflows, 5 projects, all agents, all integrations
+- **Pro:** $99/mo, managed LLM keys, priority routing, GitHub sync, custom skills, voice
+- **Team:** $249/mo, 5 seats, shared workspace, admin, RBAC, audit logs, SSO
 
-## Social Media Auto-Posting
-- DALL-E image generation tool (generate_image)
-- post_to_twitter, post_to_linkedin, post_to_reddit tools
-- discover_posting_platforms tool
-- 5 pre-built scheduled workflows in scripts/seed-community-schedules.js
-- Twitter login saved in Playwright persistent profile (~/.jak-swarm/browser-profile)
-- LinkedIn and Reddit need login sessions saved
+## Architecture
+- DAG execution with parallel scheduling + auto-repair
+- 3-tier LLM routing (cost → balanced → premium)
+- Circuit breaker for LLM calls
+- DB-backed state persistence
+- Multi-tenant: row-level isolation, per-tenant MCP + tool registry
+- AES-256-GCM credential encryption
+- Fetch-based SSE (secure, no token in URL)
+- Supabase Auth + PostgreSQL (managed)
+- Real CRM adapter (Prisma-backed, NOT mock)
 
-## Pricing
-- Free: $0, 5 workflows/day, 1 user, basic agents
-- Pro: $49/mo, unlimited workflows, 5 team members, all 33 agents, all integrations
-- Enterprise: Custom, unlimited team, SSO/SAML, dedicated support
+## Phoring.ai
+- NOT yet connected — user will share link to plan integration
+- 4 tool stubs exist (forecast, graph_query, validate, simulate)
 
-## Domain
-- jaks.ai: TAKEN
-- jakswarm.com: Available $11.25/yr (recommended)
-- jakswarm.ai: Available $160/2yr
+## Key Decisions
+- BYO API keys on Free/Builder tiers (zero LLM cost for us)
+- Managed keys on Pro tier (buy wholesale, mark up 30-40%)
+- Deploy: Vercel (frontend) + Railway/Render (API) + managed Supabase
+- No self-hosted infra until revenue > $5K/mo
 
-## User's Other Products
-- Phoring.ai (C:\Users\reetu\Desktop\Phoring.ai) — Decision intelligence/forecasting platform
-- Agent Arcade Gateway (C:\Users\reetu\Desktop\agent-arcade-gateway) — Agent control dashboard
-- SahaayakSeva (C:\Users\reetu\Desktop\SahaayakSeva) — Personal assistant with Gmail/Calendar
-
-## Key Decisions Made
-1. Phoring.ai stays as external API — JAK connects via 4 phoring_* tools
-2. Agent Arcade features built NATIVELY (not as SDK dependency) — no pixel art
-3. Voice system is scaffolding — needs 3 pieces to work end-to-end
-4. Coder agent cannot replace Claude Code — different scope
-5. Browser auto-posting works for Twitter, needs API for LinkedIn/Reddit at scale
-6. Supabase auth configured (optional, needs NEXT_PUBLIC_SUPABASE_URL)
-
-## What Needs Doing Next
-1. Deploy to Vercel
-2. Buy domain (jakswarm.com recommended)
-3. Set up Supabase project for auth
-4. Get first 5 users
-5. Post on HN "Show HN", Product Hunt, IndieHackers
-6. Set up Twitter API ($100/mo) for reliable auto-posting
+## Mock Tools Status
+- CRM: NOW REAL (Prisma-backed prisma-crm.adapter.ts)
+- Email: Real (Gmail IMAP/SMTP)
+- Calendar: Real (CalDAV)
+- Browser: Real (Playwright)
+- Document tools: LLM-passthrough (functional but delegate to AI)
+- All tools are live — user requirement: NO mock tools

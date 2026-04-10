@@ -48,9 +48,9 @@ const PROVIDER_NAMES = ['openai', 'anthropic', 'gemini', 'deepseek', 'openrouter
 type ProviderName = (typeof PROVIDER_NAMES)[number];
 
 const PROVIDER_ENV_KEYS: Record<ProviderName, { apiKeyEnv: string; modelEnv: string; defaultModel: string }> = {
-  openai: { apiKeyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-4o' },
+  openai: { apiKeyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-4.1' },
   anthropic: { apiKeyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'ANTHROPIC_MODEL', defaultModel: 'claude-sonnet-4-20250514' },
-  gemini: { apiKeyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', defaultModel: 'gemini-2.0-flash' },
+  gemini: { apiKeyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', defaultModel: 'gemini-2.5-flash' },
   deepseek: { apiKeyEnv: 'DEEPSEEK_API_KEY', modelEnv: 'DEEPSEEK_MODEL', defaultModel: 'deepseek-chat' },
   openrouter: { apiKeyEnv: 'OPENROUTER_API_KEY', modelEnv: 'OPENROUTER_MODEL', defaultModel: 'meta-llama/llama-3.1-70b-instruct' },
   ollama: { apiKeyEnv: '', modelEnv: 'OLLAMA_MODEL', defaultModel: 'llama3.1' },

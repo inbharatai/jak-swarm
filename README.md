@@ -5,7 +5,7 @@
 ### The Autonomous AI Company — 38 Agents That Run Your Business
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-112-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tools](https://img.shields.io/badge/Tools-108-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
@@ -127,7 +127,7 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators + 32 workers |
-| 🔧 | **112 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision (98 production + 14 utility/mock) |
+| 🔧 | **108 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision (98 production + 14 utility/mock) |
 | ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
 | 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, AI generates React + Tailwind components |
@@ -338,7 +338,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 112 tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 108 tools.*
 
 </div>
 
@@ -450,7 +450,7 @@ flowchart TD
 | **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **112 business tools** | ✅ | ❌ | ❌ | ❌ |
+| **108 business tools** | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
 | **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
@@ -570,7 +570,7 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (112 Tools)
+## 🔧 Tool Inventory (108 Tools)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
@@ -591,7 +591,7 @@ http://localhost:3000
 | **Phoring.ai** | 4 | phoring_forecast, phoring_graph_query, phoring_validate, phoring_simulate | ✅ Real (needs API key) |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion tools loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 112 tools (98 production + 2 mock + 4 LLM-passthrough + 8 thin wrappers)**
+**Total: 108 tools (98 production + 2 mock + 4 LLM-passthrough + 8 thin wrappers)**
 
 ---
 
@@ -669,7 +669,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
-| Tools | **112** | 50+ | Custom | ~10 |
+| Tools | **108** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
@@ -801,7 +801,7 @@ jak-swarm/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 32 worker agents
-│   ├── tools/                  # 112 tool implementations
+│   ├── tools/                  # 108 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools
