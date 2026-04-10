@@ -72,6 +72,7 @@ model Session {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([expiresAt])
   @@map("sessions")
 }
 
@@ -87,6 +88,8 @@ model ApiKey {
 
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
+  @@index([expiresAt])
   @@map("api_keys")
 }
 
@@ -114,6 +117,7 @@ model Workflow {
   approvalRequests ApprovalRequest[]
 
   @@index([tenantId, status])
+  @@index([updatedAt])
   @@map("workflows")
 }
 
@@ -139,6 +143,7 @@ model AgentTrace {
 
   @@index([workflowId])
   @@index([traceId])
+  @@index([tenantId])
   @@map("agent_traces")
 }
 

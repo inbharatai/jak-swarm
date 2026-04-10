@@ -39,8 +39,8 @@ const PII_PATTERNS: PIIPattern[] = [
   },
   {
     type: PIIType.SSN,
-    // Matches ###-##-#### or ######### (9 digits)
-    pattern: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
+    // Matches ###-##-#### with required separators to avoid matching random 9-digit numbers
+    pattern: /\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/g,
     redactedLabel: '[REDACTED-SSN]',
   },
   {
@@ -71,8 +71,8 @@ const PII_PATTERNS: PIIPattern[] = [
   },
   {
     type: PIIType.PASSPORT,
-    // US and common international passport formats
-    pattern: /\b(?:Passport[#:\s]+)?[A-Z]{1,2}\d{6,9}\b/g,
+    // Only match when preceded by "Passport" keyword to reduce false positives
+    pattern: /\b(?:Passport)[#:\s]+[A-Z]{1,2}\d{6,9}\b/g,
     redactedLabel: '[REDACTED-PASSPORT]',
   },
   {

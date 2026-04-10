@@ -15,47 +15,74 @@ export function useWorkflowStream(workflowId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [latestEvent, setLatestEvent] = useState<WorkflowEvent | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const retryCount = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const terminalRef = useRef(false);
 
   useEffect(() => {
     if (!workflowId) return;
+    retryCount.current = 0;
+    terminalRef.current = false;
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jak_token') : null;
-    if (!token) return;
+    function connect() {
+      if (terminalRef.current) return;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-    const url = `${apiUrl}/workflows/${workflowId}/stream?token=${encodeURIComponent(token)}`;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('jak_token') : null;
+      if (!token) return;
 
-    try {
-      const es = new EventSource(url);
-      esRef.current = es;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+      const url = `${apiUrl}/workflows/${workflowId}/stream?token=${encodeURIComponent(token)}`;
 
-      es.onopen = () => setIsConnected(true);
+      try {
+        const es = new EventSource(url);
+        esRef.current = es;
 
-      es.onmessage = (evt) => {
-        try {
-          const event = JSON.parse(evt.data) as WorkflowEvent;
-          setLatestEvent(event);
-          setEvents((prev) => [...prev.slice(-49), event]);
+        es.onopen = () => {
+          setIsConnected(true);
+          retryCount.current = 0;
+        };
 
-          if (event.type === 'completed' || event.type === 'failed' || event.type === 'cancelled') {
-            es.close();
-            setIsConnected(false);
+        es.onmessage = (evt) => {
+          try {
+            const event = JSON.parse(evt.data) as WorkflowEvent;
+            setLatestEvent(event);
+            setEvents((prev) => [...prev.slice(-49), event]);
+
+            if (event.type === 'completed' || event.type === 'failed' || event.type === 'cancelled') {
+              terminalRef.current = true;
+              es.close();
+              setIsConnected(false);
+            }
+          } catch { /* ignore malformed */ }
+        };
+
+        es.onerror = () => {
+          setIsConnected(false);
+          es.close();
+          esRef.current = null;
+
+          if (!terminalRef.current && retryCount.current < 5) {
+            const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
+            retryCount.current++;
+            retryTimer.current = setTimeout(connect, delay);
           }
-        } catch { /* ignore */ }
-      };
-
-      es.onerror = () => {
-        setIsConnected(false);
-        es.close();
-      };
-
-      return () => {
-        es.close();
-        setIsConnected(false);
-      };
-    } catch {
-      return undefined;
+        };
+      } catch {
+        // EventSource constructor failed
+      }
     }
+
+    connect();
+
+    return () => {
+      terminalRef.current = true;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
+      setIsConnected(false);
+    };
   }, [workflowId]);
 
   const clear = useCallback(() => {

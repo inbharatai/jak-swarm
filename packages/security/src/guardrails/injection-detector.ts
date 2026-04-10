@@ -170,6 +170,10 @@ export function detectInjection(
   text: string,
   isBrowserContent = false,
 ): InjectionDetectionResult {
+  // Guard against ReDoS: truncate excessively long inputs
+  const MAX_SCAN_LENGTH = 50_000;
+  const scanText = text.length > MAX_SCAN_LENGTH ? text.slice(0, MAX_SCAN_LENGTH) : text;
+
   const patterns = isBrowserContent ? BROWSER_CONTENT_PATTERNS : STANDARD_PATTERNS;
   const matchedPatterns: string[] = [];
   let highRisk = false;
@@ -178,7 +182,7 @@ export function detectInjection(
   for (const { pattern, risk, description } of patterns) {
     // Clone pattern to reset lastIndex
     const testPattern = new RegExp(pattern.source, pattern.flags);
-    if (testPattern.test(text)) {
+    if (testPattern.test(scanText)) {
       matchedPatterns.push(description);
       matchCount++;
       if (risk === 'HIGH') highRisk = true;

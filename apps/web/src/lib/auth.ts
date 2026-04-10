@@ -48,8 +48,16 @@ export function getRawToken(): string | null {
 // ─── Session check ───────────────────────────────────────────────────────────
 
 export function isAuthenticated(): boolean {
-  // This is a sync check — for actual auth state, use the useAuth hook
-  return false;
+  if (typeof window === 'undefined') return false;
+  // Sync check: Supabase stores auth tokens in localStorage
+  const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+  if (!storageKey) return false;
+  try {
+    const data = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
+    return !!data?.access_token;
+  } catch {
+    return false;
+  }
 }
 
 // ─── useAuth hook (Supabase-powered) ────────────────────────────────────────
