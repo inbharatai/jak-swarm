@@ -48,6 +48,12 @@ const SKILL_MARKETPLACE = [
   { id: 'lead-scoring', name: 'Lead Scoring', description: 'Score leads based on engagement, fit criteria, and behavioral signals for sales prioritization (score_lead + predict_churn tools)', tier: 1, riskLevel: 'LOW', category: 'Sales' },
   { id: 'sandbox-runner', name: 'Code Sandbox', description: 'Execute code in isolated E2B or Docker sandboxes with file system access, npm install, and dev server preview (sandbox_create + sandbox_exec tools)', tier: 1, riskLevel: 'HIGH', category: 'Engineering' },
   { id: 'webhook-sender', name: 'Webhook Sender', description: 'Send HTTP webhooks to any URL with custom headers, body, and method. Supports JSON and form-encoded payloads. (send_webhook + api_call tools)', tier: 1, riskLevel: 'MEDIUM', category: 'Integration' },
+  // ── VERIFICATION & RISK INTELLIGENCE ──────────────────────────────────
+  { id: 'email-threat-detector', name: 'Email Threat Detector', description: 'Detect phishing, spoofing, BEC, credential harvesting, and social engineering in emails. 4-layer analysis: rules → AI → premium → human review. (verify_email tool)', tier: 1, riskLevel: 'LOW', category: 'Security' },
+  { id: 'document-verifier', name: 'Document Verifier', description: 'Check documents for tampering, forgery indicators, metadata anomalies, and fake certificates. (verify_document tool)', tier: 1, riskLevel: 'LOW', category: 'Security' },
+  { id: 'transaction-risk', name: 'Transaction Risk Analyzer', description: 'Detect invoice fraud, payment anomalies, bank detail changes (BEC), duplicate invoices, and suspicious amounts. (verify_transaction tool)', tier: 1, riskLevel: 'LOW', category: 'Security' },
+  { id: 'identity-verifier', name: 'Identity Verifier', description: 'Verify resumes, credentials, and identity documents for timeline consistency, impossible claims, and credential validity. (verify_identity tool)', tier: 1, riskLevel: 'LOW', category: 'Security' },
+  { id: 'cross-evidence', name: 'Cross-Evidence Analyzer', description: 'Correlate findings across emails, documents, transactions, and identities to detect coordinated fraud like BEC attacks. (cross_verify tool)', tier: 1, riskLevel: 'LOW', category: 'Security' },
 ];
 
 interface Skill {

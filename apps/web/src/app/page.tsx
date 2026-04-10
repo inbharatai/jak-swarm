@@ -888,6 +888,34 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── 5c. Verification & Risk Intelligence ─────────────────────────── */}
+        <section className="px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <p className="text-sm font-semibold uppercase tracking-widest text-red-400 mb-3 font-sans">Security</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Verify Before You Act</h2>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Built-in risk intelligence engine. Every email, document, invoice, and credential passes through 4 layers of verification before your agents act on it.</p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { icon: '📧', title: 'Email Threat Detection', desc: 'Phishing, spoofing, BEC fraud, credential harvesting, social engineering. SPF/DKIM validation, sender reputation, content analysis.', color: '#ef4444' },
+                { icon: '📄', title: 'Document Verification', desc: 'Metadata tampering, forgery indicators, font anomalies, author mismatches. Catches fake certificates and altered contracts.', color: '#f59e0b' },
+                { icon: '💳', title: 'Transaction Risk Analysis', desc: 'Invoice fraud, duplicate detection, bank detail changes (BEC pattern), suspicious amounts, crypto payment flags.', color: '#8b5cf6' },
+                { icon: '🎓', title: 'Identity Verification', desc: 'Resume timeline validation, impossible experience claims, credential anomalies, skill inflation detection.', color: '#06b6d4' },
+                { icon: '🔗', title: 'Cross-Evidence Correlation', desc: 'Connects findings across emails + documents + transactions + identities to detect coordinated fraud that single-type analysis misses.', color: '#ec4899' },
+                { icon: '🛡️', title: '4-Layer Escalation', desc: 'Free rules first ($0). Then AI Tier 1 ($0.01). Premium AI only on ambiguity ($0.50). Human review as last resort. 70% of checks stop at Layer 1.', color: '#34d399' },
+              ].map((feature) => (
+                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
+                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
         <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">

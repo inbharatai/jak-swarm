@@ -127,7 +127,7 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators + 32 workers |
-| 🔧 | **113 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision (98 production + 14 utility/mock) |
+| 🔧 | **113 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision, verification (108 production + 5 verification) |
 | ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
 | 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
 | 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, AI generates React + Tailwind components |
@@ -136,7 +136,8 @@ flowchart LR
 | 🧩 | **Skills Marketplace** | Browse, install, and create custom skills with sandbox testing and approval workflow |
 | ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
 | 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
-| 🛡️ | **4-Layer Hallucination Detection** | Regex pattern detection → citation validation → confidence flagging → inconsistency detection |
+| 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
+| 🔐 | **Verification Engine** | Email threat detection, document forgery analysis, transaction risk scoring, identity verification, cross-evidence correlation. 4-layer escalation: rules($0) → AI Tier 1($0.01) → AI Tier 3($0.50) → human review |
 | 🌐 | **20 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
 | 📊 | **React Flow DAG Graph** | Real-time visualization of agent execution |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, onboarding wizard |
