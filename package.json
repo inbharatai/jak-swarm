@@ -15,11 +15,13 @@
     "db:migrate:deploy": "pnpm --filter @jak-swarm/db run db:migrate:deploy",
     "db:migrate:status": "pnpm --filter @jak-swarm/db run db:migrate:status",
     "db:migrate:reset": "pnpm --filter @jak-swarm/db run db:migrate:reset",
+    "db:execute": "pnpm --filter @jak-swarm/db run db:execute --",
     "db:seed": "pnpm --filter @jak-swarm/db db:seed",
     "db:studio": "pnpm --filter @jak-swarm/db run db:studio",
     "start:dev": "bash scripts/start-dev.sh"
   },
   "devDependencies": {
+    "prisma": "^6.19.3",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3",
     "prettier": "^3.4.2",

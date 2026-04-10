@@ -252,6 +252,26 @@ pnpm db:migrate:deploy
 pnpm db:seed
 ```
 
+For raw SQL execution (for example checking `_prisma_migrations`), use:
+
+```bash
+# PowerShell example
+'SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 5;' | pnpm db:execute --url "$env:DATABASE_URL"
+```
+
+Do not use Bash heredoc syntax like `<<<` in PowerShell.
+
+### `pnpm db:migrate:status` fails with P1001 on port 5432
+
+If your direct DB port is blocked but the Supabase pooler (`:6543`) works, `pnpm db:migrate:status` now auto-retries with `DIRECT_URL=DATABASE_URL`.
+
+You can also force it manually in PowerShell:
+
+```bash
+$env:DIRECT_URL = $env:DATABASE_URL
+pnpm db:migrate:status
+```
+
 ### `pnpm dev` fails — "Cannot find module @jak-swarm/shared"
 
 Build shared packages first:
