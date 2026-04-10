@@ -8,10 +8,15 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "prisma": "node scripts/prisma-guard.js",
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",
     "db:migrate": "turbo run db:migrate",
+    "db:migrate:deploy": "pnpm --filter @jak-swarm/db run db:migrate:deploy",
+    "db:migrate:status": "pnpm --filter @jak-swarm/db run db:migrate:status",
+    "db:migrate:reset": "pnpm --filter @jak-swarm/db run db:migrate:reset",
     "db:seed": "pnpm --filter @jak-swarm/db db:seed",
+    "db:studio": "pnpm --filter @jak-swarm/db run db:studio",
     "start:dev": "bash scripts/start-dev.sh"
   },
   "devDependencies": {

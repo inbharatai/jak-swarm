@@ -236,6 +236,22 @@ pnpm install
 pnpm db:generate
 ```
 
+### `npx prisma ...` fails with `P1012` (`url/directUrl no longer supported`)
+
+This repo is pinned to Prisma 6 in `packages/db`.
+Running `npx prisma ...` can download Prisma 7, which is incompatible with the current schema datasource config.
+
+Use the workspace-pinned commands instead:
+
+```bash
+pnpm db:generate
+pnpm db:push
+pnpm db:migrate
+pnpm db:migrate:status
+pnpm db:migrate:deploy
+pnpm db:seed
+```
+
 ### `pnpm dev` fails — "Cannot find module @jak-swarm/shared"
 
 Build shared packages first:
