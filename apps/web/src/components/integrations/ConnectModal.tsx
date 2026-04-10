@@ -74,9 +74,6 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             { key: 'clientId', label: 'OAuth Client ID', placeholder: 'xxxx.apps.googleusercontent.com', type: 'text', helpUrl: 'https://console.cloud.google.com/apis/credentials' },
             { key: 'clientSecret', label: 'OAuth Client Secret', placeholder: 'GOCSPX-...', type: 'password' },
           ],
-          PHORING: [
-            { key: 'apiKey', label: 'API Key', placeholder: 'ph_...', type: 'password', helpUrl: 'https://phoring.ai/settings/api' },
-          ],
         };
         setFields(fallbacks[provider] ?? []);
         setStatus('idle');

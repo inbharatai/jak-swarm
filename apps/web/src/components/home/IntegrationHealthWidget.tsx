@@ -16,7 +16,6 @@ const PROVIDER_EMOJI: Record<IntegrationProvider, string> = {
   NOTION: '\uD83D\uDCD3',
   HUBSPOT: '\uD83E\uDDF2',
   DRIVE: '\uD83D\uDCC1',
-  PHORING: '\uD83D\uDD2E',
 };
 
 export function IntegrationHealthWidget() {

@@ -55,12 +55,6 @@ export const PROVIDER_META: Record<IntegrationProvider, ProviderMeta> = {
     description: 'Access and manage files in Google Drive',
     agents: ['Document Agent', 'Research Agent'],
   },
-  PHORING: {
-    name: 'Phoring.ai',
-    emoji: '\uD83D\uDD2E',
-    description: 'AI-powered forecasting, knowledge graphs, and multi-AI consensus validation.',
-    agents: ['Analytics Agent', 'Strategist Agent', 'Research Agent'],
-  },
 };
 
 interface IntegrationCardProps {

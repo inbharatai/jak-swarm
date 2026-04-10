@@ -706,7 +706,7 @@ export default function HomePage() {
                 { icon: '📄', category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, export', color: '#8B5CF6' },
                 { icon: '📊', category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
                 { icon: '👤', category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
-                { icon: '🔍', category: 'Research', count: 11, tools: 'Web search, fetch, SEO audit, keywords, SERP, Phoring.ai', color: '#06B6D4' },
+                { icon: '🔍', category: 'Research', count: 6, tools: 'Web search, fetch, SEO audit, keywords, SERP analysis', color: '#06B6D4' },
                 { icon: '🧠', category: 'Knowledge', count: 7, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
                 { icon: '⚙️', category: 'Ops', count: 3, tools: 'Webhooks, file I/O, code execution', color: '#fb923c' },
                 { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC sessions via OpenAI Realtime API', color: '#f472b6' },

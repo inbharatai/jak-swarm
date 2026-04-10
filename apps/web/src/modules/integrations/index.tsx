@@ -11,7 +11,7 @@ import type { Integration, IntegrationProvider } from '@/types';
 import type { ModuleProps } from '@/modules/registry';
 
 const ALL_PROVIDERS: IntegrationProvider[] = [
-  'GMAIL', 'GCAL', 'SLACK', 'GITHUB', 'NOTION', 'HUBSPOT', 'DRIVE', 'PHORING',
+  'GMAIL', 'GCAL', 'SLACK', 'GITHUB', 'NOTION', 'HUBSPOT', 'DRIVE',
 ];
 
 export default function IntegrationsModule({ moduleId, isActive }: ModuleProps) {

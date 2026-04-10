@@ -588,8 +588,7 @@ http://localhost:3000
 | **SEO** | 4 | audit_seo, research_keywords, analyze_serp, monitor_rankings | ✅ Built-in |
 | **Email Sequences** | 5 | create_email_sequence, personalize_email, schedule_email, track_email_engagement, analyze_engagement | ✅ Built-in |
 | **Growth** | 2 | generate_winback, predict_churn | ✅ Built-in |
-| **Phoring.ai** | 4 | phoring_forecast, phoring_graph_query, phoring_validate, phoring_simulate | ✅ Real (needs API key) |
-| **MCP (external)** | Dynamic | Slack, GitHub, Notion tools loaded at runtime | ✅ Real (MCP servers) |
+| **MCP (external)** | Dynamic | Slack, GitHub, Notion + 17 more loaded at runtime | ✅ Real (MCP servers) |
 
 **Total: 108 tools (98 production + 2 mock + 4 LLM-passthrough + 8 thin wrappers)**
 
@@ -1048,8 +1047,6 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | `DEEPGRAM_API_KEY` | No | -- | Deepgram STT adapter |
 | `ELEVENLABS_API_KEY` | No | -- | ElevenLabs TTS adapter |
 | `ELEVENLABS_VOICE_ID` | No | -- | ElevenLabs voice ID |
-| `PHORING_API_URL` | No | -- | Phoring.ai API endpoint |
-| `PHORING_API_KEY` | No | -- | Phoring.ai API key |
 | `TEMPORAL_ADDRESS` | No | `localhost:7233` | Temporal server (infrastructure-ready, API execution path not yet wired) |
 | `TEMPORAL_NAMESPACE` | No | `jak-swarm` | Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | No | `jak-main` | Temporal task queue |

@@ -30,8 +30,10 @@
 - Real CRM adapter (Prisma-backed, NOT mock)
 
 ## Phoring.ai
-- NOT yet connected — user will share link to plan integration
-- 4 tool stubs exist (forecast, graph_query, validate, simulate)
+- HIDDEN from all user-facing surfaces (Option A: dormant)
+- Backend tools exist but not promoted (4 tools: forecast, graph_query, validate, simulate)
+- Adapter works if env vars are set — graceful "not connected" otherwise
+- Decision: don't integrate until Phoring has its own traction
 
 ## Key Decisions
 - BYO API keys on Free/Builder tiers (zero LLM cost for us)

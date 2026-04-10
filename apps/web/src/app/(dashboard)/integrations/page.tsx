@@ -17,7 +17,6 @@ const ALL_PROVIDERS: IntegrationProvider[] = [
   'NOTION',
   'HUBSPOT',
   'DRIVE',
-  'PHORING',
 ];
 
 export default function IntegrationsPage() {
