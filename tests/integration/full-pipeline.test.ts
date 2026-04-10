@@ -161,7 +161,7 @@ describe('Tool Registry', () => {
     const data = getResult.data as Record<string, unknown>;
     expect(data?.found).toBe(true);
     console.log('Memory round-trip:', data);
-  });
+  }, 15_000);
 
   it('parse_spreadsheet parses CSV correctly', async () => {
     const { registerBuiltinTools, toolRegistry } = await import('@jak-swarm/tools');

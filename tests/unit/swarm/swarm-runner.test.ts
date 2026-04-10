@@ -71,7 +71,7 @@ describe('SwarmRunner', () => {
       userId: 'usr_test',
     });
 
-    const state = runner.getState(result.workflowId);
+    const state = await runner.getState(result.workflowId);
     expect(state).toBeDefined();
     expect(state?.workflowId).toBe(result.workflowId);
     expect(state?.goal).toBe('Prepare onboarding documents for new hire');
@@ -85,7 +85,7 @@ describe('SwarmRunner', () => {
     });
 
     await runner.cancel(result.workflowId);
-    const state = runner.getState(result.workflowId);
+    const state = await runner.getState(result.workflowId);
     expect(state?.status).toBe(WorkflowStatus.CANCELLED);
   });
 

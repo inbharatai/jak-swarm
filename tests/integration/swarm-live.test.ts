@@ -94,9 +94,9 @@ describe('SwarmRunner — structural validation (no API key needed)', () => {
     expect(typeof runner.getState).toBe('function');
   });
 
-  it('getState returns null/undefined for unknown workflowId', () => {
+  it('getState returns null/undefined for unknown workflowId', async () => {
     const runner = new SwarmRunner();
-    const state = runner.getState('nonexistent-id');
+    const state = await runner.getState('nonexistent-id');
     // SwarmRunner returns undefined (or null) for unknown IDs — both are falsy
     expect(state).toBeFalsy();
   });
