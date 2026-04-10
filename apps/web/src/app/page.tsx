@@ -150,7 +150,7 @@ const AGENTS = [
 
 const STATS = [
   { value: 38, label: 'Agents', suffix: '' },
-  { value: 108, label: 'Tools', suffix: '' },
+  { value: 113, label: 'Tools', suffix: '' },
   { value: 20, label: 'Integrations', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
 ];
@@ -438,7 +438,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                38 AI agents. 108 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
+                38 AI agents. 113 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -692,7 +692,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">108 Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">113 Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
@@ -1045,7 +1045,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 38 agents, 108 tools, 20 integrations, vibe coding built in.
+                  The autonomous AI workforce platform. 38 agents, 113 tools, 20 integrations, vibe coding built in.
                 </p>
               </div>
 

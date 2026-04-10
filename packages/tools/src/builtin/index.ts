@@ -5035,4 +5035,184 @@ Date: _______________`;
       return { success: true };
     },
   );
+
+  // ─── VERIFICATION & RISK INTELLIGENCE TOOLS ───────────────────────────────
+
+  toolRegistry.register(
+    {
+      name: 'verify_email',
+      description: 'Analyze an email for phishing, spoofing, spam, and social engineering threats. Returns risk score, findings, and recommended actions.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Email body text' },
+          metadata: {
+            type: 'object',
+            properties: {
+              from: { type: 'string', description: 'Sender email address' },
+              fromName: { type: 'string', description: 'Sender display name' },
+              subject: { type: 'string', description: 'Email subject line' },
+              headers: { type: 'string', description: 'Raw email headers (for SPF/DKIM)' },
+            },
+          },
+        },
+        required: ['content'],
+      },
+      outputSchema: { type: 'object', description: 'VerificationResult with risk score, findings, actions, audit' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { verify } = await import('@jak-swarm/verification');
+      const { content, metadata } = input as { content: string; metadata?: Record<string, unknown> };
+      return verify({ type: 'EMAIL', content, contentType: 'message/rfc822', metadata, tenantId: context.tenantId, userId: context.userId, workflowId: context.workflowId });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'verify_document',
+      description: 'Check a document for tampering, forgery indicators, and metadata anomalies. Works with PDFs, certificates, contracts.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Document text content or base64' },
+          metadata: {
+            type: 'object',
+            properties: {
+              createdDate: { type: 'string', description: 'Document creation date (ISO)' },
+              modifiedDate: { type: 'string', description: 'Last modification date (ISO)' },
+              author: { type: 'string', description: 'Metadata author field' },
+              signer: { type: 'string', description: 'Who signed the document' },
+              fontCount: { type: 'number', description: 'Number of distinct fonts used' },
+            },
+          },
+        },
+        required: ['content'],
+      },
+      outputSchema: { type: 'object', description: 'VerificationResult with risk score, findings, actions, audit' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { verify } = await import('@jak-swarm/verification');
+      const { content, metadata } = input as { content: string; metadata?: Record<string, unknown> };
+      return verify({ type: 'DOCUMENT', content, contentType: 'application/pdf', metadata, tenantId: context.tenantId, userId: context.userId, workflowId: context.workflowId });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'verify_transaction',
+      description: 'Analyze invoices, payments, and financial transactions for anomalies, fraud indicators, and suspicious patterns.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Invoice/transaction text content' },
+          metadata: {
+            type: 'object',
+            properties: {
+              vendor: { type: 'string', description: 'Vendor/supplier name' },
+              amount: { type: 'number', description: 'Transaction amount' },
+              currency: { type: 'string', description: 'Currency code' },
+              previousVendorBank: { type: 'string', description: 'Previously known bank details for this vendor' },
+            },
+          },
+        },
+        required: ['content'],
+      },
+      outputSchema: { type: 'object', description: 'VerificationResult with risk score, findings, actions, audit' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { verify } = await import('@jak-swarm/verification');
+      const { content, metadata } = input as { content: string; metadata?: Record<string, unknown> };
+      return verify({ type: 'TRANSACTION', content, contentType: 'text/plain', metadata, tenantId: context.tenantId, userId: context.userId, workflowId: context.workflowId });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'verify_identity',
+      description: 'Verify resumes, credentials, and identity documents for accuracy, timeline consistency, and credential validity.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Resume/credential text content' },
+          metadata: {
+            type: 'object',
+            properties: {
+              candidateName: { type: 'string', description: 'Name of the person' },
+              linkedinUrl: { type: 'string', description: 'LinkedIn profile URL for cross-reference' },
+            },
+          },
+        },
+        required: ['content'],
+      },
+      outputSchema: { type: 'object', description: 'VerificationResult with risk score, findings, actions, audit' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { verify } = await import('@jak-swarm/verification');
+      const { content, metadata } = input as { content: string; metadata?: Record<string, unknown> };
+      return verify({ type: 'IDENTITY', content, contentType: 'text/plain', metadata, tenantId: context.tenantId, userId: context.userId, workflowId: context.workflowId });
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'cross_verify',
+      description: 'Cross-reference multiple items (emails, documents, transactions, identities) to detect coordinated fraud patterns that single-type analysis would miss.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Primary item content' },
+          contentType: { type: 'string', description: 'Primary item type' },
+          type: { type: 'string', enum: ['EMAIL', 'DOCUMENT', 'TRANSACTION', 'IDENTITY'], description: 'Primary item verification type' },
+          relatedItems: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['EMAIL', 'DOCUMENT', 'TRANSACTION', 'IDENTITY'] },
+                content: { type: 'string' },
+                contentType: { type: 'string' },
+              },
+              required: ['type', 'content', 'contentType'],
+            },
+            description: 'Related items to cross-reference',
+          },
+        },
+        required: ['content', 'type', 'relatedItems'],
+      },
+      outputSchema: { type: 'object', description: 'VerificationResult with cross-evidence findings' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { verify } = await import('@jak-swarm/verification');
+      const data = input as { content: string; type: string; contentType?: string; relatedItems: Array<{ type: string; content: string; contentType: string }> };
+      return verify({
+        type: 'CROSS_VERIFY',
+        content: data.content,
+        contentType: data.contentType ?? 'text/plain',
+        relatedItems: data.relatedItems.map(item => ({ ...item, type: item.type as 'EMAIL' | 'DOCUMENT' | 'TRANSACTION' | 'IDENTITY' })),
+        tenantId: context.tenantId,
+        userId: context.userId,
+        workflowId: context.workflowId,
+      });
+    },
+  );
 }
