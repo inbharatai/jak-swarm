@@ -151,7 +151,7 @@ const AGENTS = [
 const STATS = [
   { value: 38, label: 'Agents', suffix: '' },
   { value: 113, label: 'Tools', suffix: '' },
-  { value: 20, label: 'Integrations', suffix: '' },
+  { value: 21, label: 'Integrations', suffix: '' },
   { value: 6, label: 'LLM Providers', suffix: '' },
 ];
 
@@ -189,7 +189,7 @@ const PRICING = [
     price: '$29',
     period: '/mo',
     description: 'For developers building with AI.',
-    features: ['Unlimited workflows', '5 vibe coding projects', 'All 38 agents', 'All 20 integrations', 'Vercel deployment', 'BYO API keys', 'Email support'],
+    features: ['Unlimited workflows', '5 vibe coding projects', 'All 38 agents', 'All 21 integrations', 'Vercel deployment', 'BYO API keys', 'Email support'],
     cta: 'Start Building',
     href: '/register',
     highlighted: false,
@@ -438,7 +438,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                38 AI agents. 113 tools. 20 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
+                38 AI agents. 113 tools. 21 integrations. Vibe coding built in. Deploy autonomous agent swarms that plan, execute, and deliver&nbsp;&mdash; or describe an app and watch it build itself.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -1073,7 +1073,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  The autonomous AI workforce platform. 38 agents, 113 tools, 20 integrations, vibe coding built in.
+                  The autonomous AI workforce platform. 38 agents, 113 tools, 21 integrations, vibe coding built in.
                 </p>
               </div>
 
