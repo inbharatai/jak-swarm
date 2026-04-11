@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { PlatformShell } from '@/components/shell/PlatformShell';
 import { useAuth } from '@/lib/auth';
 import { Spinner } from '@/components/ui/spinner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const AUTH_PATHS = ['/login', '/register', '/'];
 
@@ -40,19 +41,21 @@ export function AppShell({ children }: AppShellProps) {
   // Dashboard routes → PlatformShell (module-based desktop OS)
   const isDashboard = DASHBOARD_PREFIX.some(p => pathname.startsWith(p));
   if (isDashboard) {
-    return <PlatformShell />;
+    return <ErrorBoundary><PlatformShell /></ErrorBoundary>;
   }
 
   // Fallback: legacy layout for any remaining routes
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col min-w-0">
-        <Header />
-        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
+    <ErrorBoundary>
+      <div className="flex min-h-screen bg-background">
+        <Sidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <Header />
+          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

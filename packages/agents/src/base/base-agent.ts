@@ -4,6 +4,7 @@ import { generateId, createLogger, calculateCost } from '@jak-swarm/shared';
 import type { Logger } from '@jak-swarm/shared';
 import type { AgentContext } from './agent-context.js';
 import type { LLMProvider } from './llm-provider.js';
+import { getModelOverride } from './provider-router.js';
 
 /** Result of a multi-turn tool execution loop */
 export interface ToolLoopResult {
@@ -86,8 +87,11 @@ export abstract class BaseAgent {
       (!hasTools && /respond with json|output.*json|return.*json/i.test(systemContent));
 
     // Direct OpenAI SDK path with retry logic
+    // Per-agent model override: check AGENT_MODEL_MAP first, then env, then default
+    const agentModel = getModelOverride(this.role) ?? process.env['OPENAI_MODEL'] ?? 'gpt-4o';
+
     const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-      model: process.env['OPENAI_MODEL'] ?? 'gpt-4o',
+      model: agentModel,
       messages,
       max_tokens: options?.maxTokens ?? 4096,
       temperature: options?.temperature ?? 0.2,

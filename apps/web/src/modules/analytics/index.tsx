@@ -3,9 +3,12 @@
 import React, { useState } from 'react';
 import { BarChart3, DollarSign, Zap, Activity, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Spinner } from '@/components/ui';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import type { ModuleProps } from '@/modules/registry';
+
+const CHART_COLORS = ['#34d399', '#fbbf24', '#f472b6', '#38bdf8', '#c084fc', '#fb923c', '#ef4444', '#06b6d4'];
 
 type Period = '7d' | '30d' | '90d';
 
@@ -78,26 +81,40 @@ export default function AnalyticsModule({ moduleId, isActive }: ModuleProps) {
         <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-muted-foreground mb-1"><TrendingUp className="h-4 w-4" /><span className="text-xs">Avg Cost/Workflow</span></div><p className="text-2xl font-bold">{summary?.totals?.workflows ? formatCost((summary.totals.costUsd ?? 0) / summary.totals.workflows) : '$0.00'}</p></CardContent></Card>
       </div>
 
-      {/* Cost by provider */}
+      {/* Cost by provider — Recharts bar chart */}
       {summary?.costByProvider && Object.keys(summary.costByProvider).length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-sm">Cost by Provider</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(summary.costByProvider).sort(([,a],[,b]) => (b as number) - (a as number)).map(([provider, cost]) => (
-              <HorizontalBar key={provider} label={provider} value={cost as number} maxValue={Math.max(...Object.values(summary.costByProvider).map(Number))} color="bg-primary" />
-            ))}
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={Object.entries(summary.costByProvider).sort(([,a],[,b]) => (b as number) - (a as number)).map(([name, value]) => ({ name, value: Number(value) }))} layout="vertical" margin={{ left: 60, right: 20, top: 5, bottom: 5 }}>
+                <XAxis type="number" tickFormatter={(v: number) => `$${v.toFixed(2)}`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} width={55} />
+                <Tooltip formatter={(v) => [`$${Number(v).toFixed(4)}`, 'Cost']} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {Object.keys(summary.costByProvider).map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       )}
 
-      {/* Cost by agent */}
+      {/* Cost by agent — Recharts bar chart */}
       {summary?.costByAgent && Object.keys(summary.costByAgent).length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-sm">Cost by Agent Role</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(summary.costByAgent).sort(([,a],[,b]) => (b as number) - (a as number)).slice(0, 10).map(([agent, cost]) => (
-              <HorizontalBar key={agent} label={agent} value={cost as number} maxValue={Math.max(...Object.values(summary.costByAgent).map(Number))} color="bg-amber-500" />
-            ))}
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(200, Math.min(Object.keys(summary.costByAgent).length, 10) * 32)}>
+              <BarChart data={Object.entries(summary.costByAgent).sort(([,a],[,b]) => (b as number) - (a as number)).slice(0, 10).map(([name, value]) => ({ name: name.replace('WORKER_', ''), value: Number(value) }))} layout="vertical" margin={{ left: 80, right: 20, top: 5, bottom: 5 }}>
+                <XAxis type="number" tickFormatter={(v: number) => `$${v.toFixed(2)}`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} width={75} />
+                <Tooltip formatter={(v) => [`$${Number(v).toFixed(4)}`, 'Cost']} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="value" fill="#fbbf24" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       )}

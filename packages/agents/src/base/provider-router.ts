@@ -14,6 +14,73 @@ export type ProviderTier = 1 | 2 | 3;
 /** Controls how the router orders available providers */
 export type RoutingStrategy = 'cost_optimized' | 'quality_first' | 'local_first';
 
+// ─── Per-Agent Model Override ───────────────────────────────────────────────
+
+/**
+ * Agents can specify which tier and optionally which exact model to use.
+ * This is read by BaseAgent when calling the LLM.
+ *
+ * Usage in an agent constructor:
+ *   AGENT_TIER_MAP['WORKER_APP_DEBUGGER'] = 1;  // always use cheap tier
+ *   AGENT_MODEL_MAP['WORKER_APP_ARCHITECT'] = 'claude-opus-4-20250514'; // specific model
+ */
+export const AGENT_TIER_MAP: Record<string, ProviderTier> = {
+  // Orchestrators — always premium
+  COMMANDER: 3,
+  PLANNER: 3,
+  VERIFIER: 3,
+  GUARDRAIL: 1, // heuristic, no LLM needed
+  APPROVAL: 1,
+
+  // Vibe coding — tiered by task cost sensitivity
+  WORKER_APP_ARCHITECT: 3,       // Architecture needs best reasoning
+  WORKER_APP_GENERATOR: 2,       // Code gen — balanced cost/quality
+  WORKER_APP_DEBUGGER: 1,        // Debug loop — high volume, needs speed
+  WORKER_APP_DEPLOYER: 1,        // Mostly tool calls
+  WORKER_SCREENSHOT_TO_CODE: 3,  // Vision analysis needs best model
+
+  // Executive agents — tier 2 (balanced)
+  WORKER_STRATEGIST: 2,
+  WORKER_TECHNICAL: 2,
+  WORKER_FINANCE: 2,
+  WORKER_MARKETING: 2,
+
+  // Core workers — tier 1 (cost-optimized)
+  WORKER_EMAIL: 1,
+  WORKER_CALENDAR: 1,
+  WORKER_CRM: 1,
+  WORKER_DOCUMENT: 1,
+  WORKER_SPREADSHEET: 1,
+  WORKER_BROWSER: 1,
+  WORKER_RESEARCH: 2,
+  WORKER_KNOWLEDGE: 1,
+  WORKER_SUPPORT: 1,
+  WORKER_OPS: 1,
+  WORKER_VOICE: 1,
+  WORKER_CODER: 2,
+  WORKER_DESIGNER: 2,
+};
+
+/** Optional: force a specific model for an agent role (overrides tier-based selection) */
+export const AGENT_MODEL_MAP: Record<string, string> = {
+  // Example: WORKER_APP_ARCHITECT: 'claude-opus-4-20250514',
+};
+
+/**
+ * Get the recommended tier for a given agent role.
+ * Falls back to tier 2 if not mapped.
+ */
+export function getTierForAgent(role: string): ProviderTier {
+  return AGENT_TIER_MAP[role] ?? 2;
+}
+
+/**
+ * Get a specific model override for an agent role, if any.
+ */
+export function getModelOverride(role: string): string | undefined {
+  return AGENT_MODEL_MAP[role];
+}
+
 // ─── Provider detection helpers ─────────────────────────────────────────────
 
 interface AvailableProviders {
