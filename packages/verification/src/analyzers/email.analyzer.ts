@@ -7,7 +7,7 @@
 
 import type { Analyzer, Finding, VerificationRequest } from '../types.js';
 import { runRules } from '../rules/rule-engine.js';
-import { shouldEscalate, selectModel } from '../routing/model-router.js';
+import { shouldEscalate } from '../routing/model-router.js';
 
 export const emailAnalyzer: Analyzer = {
   name: 'EmailAnalyzer',

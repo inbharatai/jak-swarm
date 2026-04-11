@@ -44,7 +44,7 @@ export const transactionAnalyzer: Analyzer = {
   },
 };
 
-function analyzeTransactionContent(content: string, metadata?: Record<string, unknown>): Finding[] {
+function analyzeTransactionContent(content: string, _metadata?: Record<string, unknown>): Finding[] {
   const findings: Finding[] = [];
 
   // Duplicate invoice detection

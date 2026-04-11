@@ -48,7 +48,7 @@ function analyzeDocumentContent(content: string, metadata?: Record<string, unkno
   const findings: Finding[] = [];
 
   // Check for known fake certificate/degree templates
-  const fakeCertPatterns = [
+  const _fakeCertPatterns = [
     /this\s+is\s+to\s+certify\s+that.*has\s+successfully\s+completed/i,
   ];
   const hasFormatIssues = metadata?.fontCount && (metadata.fontCount as number) > 15;

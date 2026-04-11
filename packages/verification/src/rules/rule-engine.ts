@@ -64,7 +64,7 @@ const EMAIL_RULES: Rule[] = [
     description: 'Sender domain matches known phishing patterns',
     category: 'PHISHING',
     severity: 'CRITICAL',
-    check: (content, metadata) => {
+    check: (_content, metadata) => {
       const from = String(metadata?.from ?? '');
       const phishingPatterns = [
         /paypal.*security.*@(?!paypal\.com)/i,

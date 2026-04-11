@@ -49,7 +49,7 @@ export async function verify(request: VerificationRequest): Promise<Verification
   }
 
   // Run the appropriate analyzer
-  const { findings, riskContribution, confidence } = await analyzer.analyze(request);
+  const { findings, riskContribution: _riskContribution, confidence } = await analyzer.analyze(request);
 
   // Calculate unified risk score
   const risk = calculateRiskScore(findings, confidence);
