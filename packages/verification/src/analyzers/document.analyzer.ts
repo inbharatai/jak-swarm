@@ -48,9 +48,24 @@ function analyzeDocumentContent(content: string, metadata?: Record<string, unkno
   const findings: Finding[] = [];
 
   // Check for known fake certificate/degree templates
-  const _fakeCertPatterns = [
+  const fakeCertPatterns = [
     /this\s+is\s+to\s+certify\s+that.*has\s+successfully\s+completed/i,
   ];
+  for (const pattern of fakeCertPatterns) {
+    if (pattern.test(content)) {
+      findings.push({
+        id: 'doc-fake-cert-template',
+        category: 'FORGERY_INDICATOR',
+        severity: 'WARNING',
+        title: 'Known Fake Certificate Template',
+        description: 'Document matches a known fake certificate/degree template pattern.',
+        evidence: 'Certificate template language detected',
+        source: 'AI_TIER1',
+      });
+      break;
+    }
+  }
+
   const hasFormatIssues = metadata?.fontCount && (metadata.fontCount as number) > 15;
   if (hasFormatIssues) {
     findings.push({
