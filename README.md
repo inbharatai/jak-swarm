@@ -22,6 +22,8 @@
 
 *Give it a goal in plain English. Watch 38 agents plan, execute, and deliver — in real time.*
 
+![JAK Swarm Platform](docs/jak-swarm-full-page.png)
+
 </div>
 
 ---
