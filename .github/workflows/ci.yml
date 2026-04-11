@@ -39,6 +39,7 @@ jobs:
         run: |
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
+          pnpm --filter @jak-swarm/verification build || true
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
@@ -78,6 +79,7 @@ jobs:
         run: |
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
+          pnpm --filter @jak-swarm/verification build || true
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
 

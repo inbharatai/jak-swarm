@@ -308,23 +308,28 @@ graph LR
 
 ## 📸 Screenshots
 
-### Landing Page
+### Landing Page — Hero
 ![JAK Swarm Hero](docs/screenshots/01-hero.png)
 
-### Agent Network — 6 Specialist Roles
+### Agent Network — 38 Agents in 5 Layers
 ![Agent Network](docs/screenshots/02-agents.png)
 
 ### Workflow — From Command to Result in Seconds
 ![Workflow](docs/screenshots/03-workflow.png)
 
-### Pricing — Free / Pro ($49/mo) / Enterprise
+### Pricing — Free / Builder ($29) / Pro ($99) / Team ($249)
 ![Pricing](docs/screenshots/04-pricing.png)
+
+### Vibe Coding — Build Apps with AI
+> 5-step pipeline: Describe → Architect → Generate → Debug → Preview
+> Builder IDE with Monaco editor, file tree, chat panel, and live preview
+
+### Verification Engine — Verify Before You Act
+> Email threat detection, document verification, transaction risk analysis,
+> identity verification, cross-evidence correlation with 4-layer escalation
 
 ### Onboarding Wizard — 4-Step Setup
 ![Onboarding](docs/screenshots/07-onboarding.png)
-
-### Dashboard Home
-![Dashboard](docs/screenshots/08-dashboard.png)
 
 ### Login & Registration
 | Login | Registration |
