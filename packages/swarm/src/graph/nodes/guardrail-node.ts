@@ -69,7 +69,6 @@ export async function guardrailNode(state: SwarmState): Promise<Partial<SwarmSta
   };
 
   const result = await agent.execute(guardrailInput, context);
-  const traces = context.getTraces();
 
   // ─── Verification Engine: auto-verify when task involves sensitive content ──
   const verificationType = detectVerificationType(task.description, task.toolsRequired);

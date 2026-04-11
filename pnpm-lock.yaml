@@ -342,6 +342,9 @@ importers:
       '@jak-swarm/tools':
         specifier: workspace:^
         version: link:../tools
+      '@jak-swarm/verification':
+        specifier: workspace:^
+        version: link:../verification
       pino:
         specifier: ^9.5.0
         version: 9.14.0
