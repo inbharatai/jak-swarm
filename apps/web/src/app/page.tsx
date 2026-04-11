@@ -429,16 +429,16 @@ export default function HomePage() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">Open Source &middot; MIT License</span>
+                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">Automate &middot; Build &middot; Verify &middot; Deploy</span>
               </div>
 
               <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[0.95]">
-                <span className="block text-white/90">AI Agents That</span>
-                <span className="block mt-2 gradient-text">Run Your Business.</span>
+                <span className="block text-white/90">The Only AI Platform That</span>
+                <span className="block mt-2 gradient-text">Builds, Verifies &amp; Executes.</span>
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                Give it a goal in plain English. 38 AI agents plan, execute, and deliver&nbsp;&mdash; from emails to code to compliance. Or describe an app and watch it build itself.
+                38 agents that automate your business. A vibe coding engine that builds full-stack apps. A verification layer that catches fraud before your AI acts. No other platform does all three.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
