@@ -22,7 +22,30 @@
 
 *Give it a goal in plain English. Watch 38 agents plan, execute, and deliver — in real time.*
 
-![JAK Swarm Platform](docs/jak-swarm-full-page.png)
+![JAK Swarm — Hero](docs/screenshot-hero.png)
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+#### Orchestration Engine
+![Orchestration Engine](docs/screenshot-orchestration.png)
+
+#### Agent Network
+![Agent Grid](docs/screenshot-agents.png)
+
+#### Capability Architecture
+![Capability Map](docs/screenshot-capability-map.png)
+
+#### Live Execution Trace
+![Live Demo](docs/screenshot-live-demo.png)
+
+#### Pricing
+![Pricing](docs/screenshot-pricing.png)
+
+#### Mobile
+![Mobile](docs/screenshot-mobile-hero.png)
+
+</details>
 
 </div>
 
