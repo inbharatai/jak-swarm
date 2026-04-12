@@ -98,7 +98,7 @@ export default function CapabilityMap() {
   return (
     <section
       ref={ref}
-      className="relative px-4 py-32 sm:px-6 lg:px-8 overflow-hidden"
+      className="relative px-4 py-16 sm:py-32 sm:px-6 lg:px-8 overflow-hidden"
       aria-label="Capability Architecture Map"
     >
       {/* Background radial */}
@@ -308,7 +308,7 @@ export default function CapabilityMap() {
         </div>
 
         {/* Ring legend */}
-        <div className="flex items-center justify-center gap-8 mt-8 text-xs font-mono text-slate-500">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-6 sm:mt-8 text-[10px] sm:text-xs font-mono text-slate-500">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full border border-emerald-400/30 bg-emerald-400/10" />
             <span>Core Agents (6)</span>

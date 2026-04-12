@@ -32,8 +32,10 @@ function NetworkBackground({ isActive }: { isActive: boolean }) {
     // Initialize nodes
     const colors = ['#34d399', '#fbbf24', '#f472b6', '#38bdf8', '#c084fc'];
     const rect = canvas.getBoundingClientRect();
+    const isMobile = rect.width < 640;
+    const nodeCount = isMobile ? 15 : 30;
     if (nodesRef.current.length === 0) {
-      nodesRef.current = Array.from({ length: 30 }, () => ({
+      nodesRef.current = Array.from({ length: nodeCount }, () => ({
         x: Math.random() * rect.width,
         y: Math.random() * rect.height,
         vx: (Math.random() - 0.5) * 0.3,
@@ -128,7 +130,7 @@ export default function PremiumCTA() {
   return (
     <section
       ref={ref}
-      className="relative px-4 py-32 sm:px-6 lg:px-8 overflow-hidden"
+      className="relative px-4 py-16 sm:py-32 sm:px-6 lg:px-8 overflow-hidden"
       aria-label="Get started with JAK"
     >
       {/* Network background */}
@@ -158,7 +160,7 @@ export default function PremiumCTA() {
       <div className="relative mx-auto max-w-4xl z-10">
         {/* Scale indicator */}
         <motion.div
-          className="flex items-center justify-center gap-8 sm:gap-12 mb-16"
+          className="grid grid-cols-2 sm:flex sm:items-center sm:justify-center gap-6 sm:gap-12 mb-10 sm:mb-16"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}

@@ -31,6 +31,20 @@ export const metadata: Metadata = {
     'Production-grade autonomous swarm agent platform. Deploy intelligent multi-agent workflows across any industry.',
   keywords: ['AI agents', 'swarm intelligence', 'automation', 'workflow', 'enterprise AI'],
   authors: [{ name: 'JAK Swarm' }],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'JAK Swarm',
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/icons/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
+    ],
+  },
   openGraph: {
     title: 'JAK Swarm — Autonomous Agent Platform',
     description: 'Deploy intelligent multi-agent workflows across any industry.',
@@ -39,6 +53,7 @@ export const metadata: Metadata = {
   other: {
     'theme-color': '#09090b',
     'color-scheme': 'dark',
+    'mobile-web-app-capable': 'yes',
   },
 };
 
@@ -51,6 +66,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={`${syne.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`} style={{ colorScheme: 'dark' }}>
       <head>
         <meta name="theme-color" content="#09090b" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js')})}`,
+          }}
+        />
       </head>
       <body>
         <ThemeProvider

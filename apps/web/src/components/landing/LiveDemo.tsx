@@ -112,7 +112,7 @@ export default function LiveDemo() {
   return (
     <section
       ref={ref}
-      className="relative px-4 py-32 sm:px-6 lg:px-8"
+      className="relative px-4 py-16 sm:py-32 sm:px-6 lg:px-8"
       aria-label="Live execution demo"
     >
       <div className="mx-auto max-w-4xl">
@@ -166,11 +166,11 @@ export default function LiveDemo() {
           </div>
 
           {/* Content */}
-          <div className="p-5 sm:p-6 space-y-4 min-h-[400px]">
+          <div className="p-3 sm:p-5 md:p-6 space-y-3 sm:space-y-4 min-h-[300px] sm:min-h-[400px]">
             {/* Command input */}
-            <div className="flex items-start gap-3">
-              <span className="text-emerald-400 font-mono text-sm shrink-0 mt-0.5">{'>'}</span>
-              <div className="font-mono text-sm text-white/90">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <span className="text-emerald-400 font-mono text-xs sm:text-sm shrink-0 mt-0.5">{'>'}</span>
+              <div className="font-mono text-xs sm:text-sm text-white/90 break-words min-w-0">
                 {typedText}
                 {typing && (
                   <span
@@ -214,9 +214,9 @@ export default function LiveDemo() {
 
                     {/* Step content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-start sm:items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span
-                          className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+                          className="text-[9px] sm:text-[10px] font-mono font-bold px-1 sm:px-1.5 py-0.5 rounded shrink-0"
                           style={{
                             color: step.color,
                             background: `${step.color}10`,
@@ -225,7 +225,7 @@ export default function LiveDemo() {
                         >
                           {step.agent}
                         </span>
-                        <span className="text-xs text-slate-400 font-sans truncate">
+                        <span className="text-[11px] sm:text-xs text-slate-400 font-sans break-words min-w-0">
                           {step.action}
                         </span>
                       </div>
@@ -259,7 +259,7 @@ export default function LiveDemo() {
           </div>
 
           {/* Bottom status bar */}
-          <div className="border-t border-white/5 px-5 py-2.5 flex items-center gap-4 text-[10px] font-mono text-slate-600">
+          <div className="border-t border-white/5 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] font-mono text-slate-600 overflow-x-auto">
             <span>scenario {scenarioIndex + 1}/{DEMO_SCENARIOS.length}</span>
             <span className="text-slate-700">|</span>
             <span>{visibleSteps}/{scenario.steps.length} steps</span>

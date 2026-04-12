@@ -833,9 +833,9 @@ export default function HomePage() {
                 </div>
                 <span className="text-xs text-slate-500 font-mono ml-2">JAK Builder — My Task Manager</span>
               </div>
-              <div className="grid grid-cols-12 min-h-[300px]">
+              <div className="grid grid-cols-12 min-h-[200px] sm:min-h-[300px]">
                 {/* File tree */}
-                <div className="col-span-3 border-r border-white/5 p-3 text-xs text-slate-400 font-mono space-y-1">
+                <div className="hidden sm:block col-span-3 border-r border-white/5 p-3 text-xs text-slate-400 font-mono space-y-1">
                   <div className="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Files</div>
                   <div className="text-emerald-400">{'>'} src/</div>
                   <div className="pl-3">{'>'} app/</div>
@@ -849,7 +849,7 @@ export default function HomePage() {
                   <div>tailwind.config.ts</div>
                 </div>
                 {/* Editor */}
-                <div className="col-span-5 border-r border-white/5 p-3">
+                <div className="col-span-7 sm:col-span-5 border-r border-white/5 p-2 sm:p-3">
                   <div className="flex gap-2 mb-3 text-xs">
                     <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400">Code</span>
                     <span className="px-2 py-1 rounded text-slate-500">Preview</span>
@@ -868,7 +868,7 @@ export default function HomePage() {
                   </pre>
                 </div>
                 {/* Chat */}
-                <div className="col-span-4 p-3 text-xs space-y-3">
+                <div className="col-span-5 sm:col-span-4 p-2 sm:p-3 text-xs space-y-2 sm:space-y-3">
                   <div className="text-[10px] text-slate-600 uppercase tracking-widest">Chat</div>
                   <div className="rounded-lg bg-emerald-500/10 px-3 py-2 text-emerald-300">
                     Build a task manager with drag-and-drop boards and dark mode

@@ -87,7 +87,7 @@ export default function OrchestrationEngine() {
   return (
     <section
       ref={ref}
-      className="relative px-4 py-32 sm:px-6 lg:px-8 overflow-hidden"
+      className="relative px-4 py-16 sm:py-32 sm:px-6 lg:px-8 overflow-hidden"
       aria-label="Orchestration Engine Visualization"
     >
       {/* Subtle grid background */}
@@ -103,7 +103,7 @@ export default function OrchestrationEngine() {
       <div className="mx-auto max-w-6xl relative z-10">
         {/* Section header */}
         <motion.div
-          className="text-center mb-20"
+          className="text-center mb-10 sm:mb-20"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
@@ -118,7 +118,7 @@ export default function OrchestrationEngine() {
         </motion.div>
 
         {/* Main orchestration visual */}
-        <div className="relative mx-auto" style={{ maxWidth: 720, aspectRatio: '1' }}>
+        <div className="relative mx-auto w-full" style={{ maxWidth: 720, aspectRatio: '1', maxHeight: '80vh' }}>
           {/* SVG connections layer */}
           <svg
             className="absolute inset-0 w-full h-full"
@@ -172,7 +172,7 @@ export default function OrchestrationEngine() {
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
           >
             <motion.div
-              className="relative w-28 h-28 rounded-3xl flex items-center justify-center"
+              className="relative w-20 h-20 sm:w-28 sm:h-28 rounded-2xl sm:rounded-3xl flex items-center justify-center"
               style={{
                 background: phase === 'executing'
                   ? 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(251,191,36,0.15))'
@@ -230,7 +230,7 @@ export default function OrchestrationEngine() {
                 transition={{ duration: 1.5, repeat: isActive ? Infinity : 0 }}
               >
                 <div
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-500"
+                  className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-500"
                   style={{
                     background: isActive ? `${mod.color}20` : 'rgba(255,255,255,0.03)',
                     border: `1px solid ${isActive ? `${mod.color}60` : 'rgba(255,255,255,0.06)'}`,
@@ -238,7 +238,7 @@ export default function OrchestrationEngine() {
                   }}
                 >
                   <svg
-                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6"
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={1.5}
@@ -252,7 +252,7 @@ export default function OrchestrationEngine() {
                     <path strokeLinecap="round" strokeLinejoin="round" d={mod.icon} />
                   </svg>
                   <span
-                    className="text-[8px] sm:text-[9px] font-mono uppercase tracking-wider"
+                    className="text-[6px] sm:text-[8px] md:text-[9px] font-mono uppercase tracking-wider hidden sm:block"
                     style={{
                       color: isActive ? mod.color : 'rgba(255,255,255,0.2)',
                       transition: 'color 0.5s ease',

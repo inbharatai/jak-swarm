@@ -65,14 +65,14 @@ export default function ExecutionFlow() {
   return (
     <section
       ref={containerRef}
-      className="relative px-4 py-32 sm:px-6 lg:px-8"
+      className="relative px-4 py-16 sm:py-32 sm:px-6 lg:px-8"
       id="execution-flow"
       aria-label="How JAK executes commands"
     >
       <div className="mx-auto max-w-5xl">
         {/* Section header */}
         <motion.div
-          className="text-center mb-24"
+          className="text-center mb-12 sm:mb-24"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
@@ -98,7 +98,7 @@ export default function ExecutionFlow() {
           </div>
 
           {/* Steps */}
-          <div className="space-y-16 lg:space-y-24">
+          <div className="space-y-12 sm:space-y-16 lg:space-y-24">
             {FLOW_STEPS.map((step, i) => {
               const isEven = i % 2 === 0;
               return (
@@ -148,7 +148,7 @@ function FlowStep({
       />
 
       {/* Content side */}
-      <div className={`sm:pl-20 lg:pl-0 ${isEven ? 'lg:pr-16 lg:text-right' : 'lg:col-start-2 lg:pl-16'}`}>
+      <div className={`pl-6 sm:pl-20 lg:pl-0 ${isEven ? 'lg:pr-16 lg:text-right' : 'lg:col-start-2 lg:pl-16'}`}>
         <div className={`flex items-center gap-3 mb-4 ${isEven ? 'lg:justify-end' : ''}`}>
           <span
             className="text-xs font-mono font-bold px-2.5 py-1 rounded-md"
@@ -182,7 +182,7 @@ function FlowStep({
 
         {/* Detail card */}
         <div
-          className="inline-block rounded-xl px-4 py-3 text-left max-w-md"
+          className="rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-left max-w-full sm:max-w-md sm:inline-block"
           style={{
             background: 'rgba(255,255,255,0.02)',
             border: '1px solid rgba(255,255,255,0.06)',

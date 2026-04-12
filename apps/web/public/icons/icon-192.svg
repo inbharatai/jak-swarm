@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#09090b" rx="28.799999999999997"/>
+  <circle cx="96" cy="96" r="80.64" fill="none" stroke="rgba(52,211,153,0.15)" stroke-width="1.5"/>
+  <circle cx="38.400000000000006" cy="38.400000000000006" r="3.84" fill="#34d399" opacity="0.4"/>
+  <circle cx="157.44" cy="42.24" r="3.4559999999999995" fill="#fbbf24" opacity="0.3"/>
+  <circle cx="28.799999999999997" cy="157.44" r="2.88" fill="#34d399" opacity="0.3"/>
+  <circle cx="163.2" cy="153.60000000000002" r="3.84" fill="#f472b6" opacity="0.4"/>
+  <line x1="38.400000000000006" y1="38.400000000000006" x2="61.44" y2="72.96000000000001" stroke="#34d399" stroke-width="0.8" opacity="0.2"/>
+  <line x1="157.44" y1="42.24" x2="134.39999999999998" y2="72.96000000000001" stroke="#fbbf24" stroke-width="0.8" opacity="0.2"/>
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <text x="96" y="119.3472" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="72.96000000000001" letter-spacing="-2.9184000000000005" fill="url(#g)">JAK</text>
+</svg>
