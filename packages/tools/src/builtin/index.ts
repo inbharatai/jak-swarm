@@ -240,8 +240,33 @@ export function registerBuiltinTools(): void {
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { query, maxResults = 5 } = input as { query: string; maxResults?: number };
+
+      // 1. Try vector semantic search first (highest quality)
       try {
-        // Try loading Prisma to search the TenantMemory table directly
+        const { getVectorMemoryAdapter } = await import('../adapters/memory/vector-memory.adapter.js');
+        const vectorAdapter = getVectorMemoryAdapter();
+        const vectorResults = await vectorAdapter.search(context.tenantId, query, maxResults, 0.5);
+        if (vectorResults.length > 0) {
+          return {
+            results: vectorResults.map((r) => ({
+              content: r.content,
+              score: Math.round(r.score * 100) / 100,
+              type: r.sourceType,
+              source: r.sourceKey ?? 'vector_store',
+              metadata: r.metadata,
+            })),
+            query,
+            totalFound: vectorResults.length,
+            connected: true,
+            searchMethod: 'vector',
+          };
+        }
+      } catch {
+        // Vector search not available — fall through to keyword search
+      }
+
+      // 2. Fall back to keyword search on TenantMemory table
+      try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const dbModule = require('@jak-swarm/db');
         const prisma = dbModule.prisma;
@@ -258,35 +283,101 @@ export function registerBuiltinTools(): void {
             orderBy: { updatedAt: 'desc' },
             take: maxResults,
           });
-          return {
-            results: entries.map((e: { key: string; value: unknown; memoryType: string; source: string; updatedAt: Date | string }) => ({
-              key: e.key,
-              value: e.value,
-              type: e.memoryType,
-              source: e.source,
-              updatedAt: e.updatedAt instanceof Date ? e.updatedAt.toISOString() : String(e.updatedAt),
-            })),
-            query,
-            totalFound: entries.length,
-            connected: true,
-          };
+          if (entries.length > 0) {
+            return {
+              results: entries.map((e: { key: string; value: unknown; memoryType: string; source: string; updatedAt: Date | string }) => ({
+                key: e.key,
+                value: e.value,
+                type: e.memoryType,
+                source: e.source,
+                updatedAt: e.updatedAt instanceof Date ? e.updatedAt.toISOString() : String(e.updatedAt),
+              })),
+              query,
+              totalFound: entries.length,
+              connected: true,
+              searchMethod: 'keyword',
+            };
+          }
         }
       } catch {
         // DB not available — fall back to memory adapter
       }
-      // Fallback: search via memory adapter (in-memory or DB-backed)
+
+      // 3. Final fallback: exact key lookup via memory adapter
       const adapter = getMemoryAdapter();
       const result = await adapter.get(query, context.tenantId);
       if (result) {
-        return { results: [result], query, totalFound: 1, connected: true };
+        return { results: [result], query, totalFound: 1, connected: true, searchMethod: 'exact' };
       }
       return {
         results: [],
         query,
         totalFound: 0,
         connected: false,
-        message: `No stored knowledge found for "${query}". Try memory_store to add entries, or use web_search for external information.`,
+        searchMethod: 'none',
+        message: `No stored knowledge found for "${query}". Use ingest_document to add documents to the knowledge base, memory_store for key-value data, or web_search for external information.`,
       };
+    },
+  );
+
+  // ─── VECTOR INGESTION TOOL ──────────────────────────────────────────────
+
+  toolRegistry.register(
+    {
+      name: 'ingest_document',
+      description: 'Ingest a document (text or PDF) into the vector knowledge base for semantic search. Chunks the content, generates embeddings, and stores for future retrieval via search_knowledge.',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.WRITE,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'The text content to ingest' },
+          title: { type: 'string', description: 'Document title for metadata' },
+          sourceType: { type: 'string', description: 'Type: DOCUMENT, KNOWLEDGE, POLICY, UPLOAD (default: DOCUMENT)' },
+          sourceKey: { type: 'string', description: 'Unique key for this source (for re-ingestion/deletion)' },
+        },
+        required: ['content'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          chunksCreated: { type: 'number' },
+          sourceKey: { type: 'string' },
+          sourceType: { type: 'string' },
+        },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { content, title, sourceType, sourceKey } = input as {
+        content: string;
+        title?: string;
+        sourceType?: string;
+        sourceKey?: string;
+      };
+
+      if (!content || content.trim().length === 0) {
+        return { error: 'Content is empty — nothing to ingest.' };
+      }
+
+      try {
+        const { getDocumentIngestor } = await import('../adapters/memory/document-ingestor.js');
+        const ingestor = getDocumentIngestor();
+        const result = await ingestor.ingestText(context.tenantId, content, {
+          title,
+          sourceType,
+          sourceKey,
+        });
+        return {
+          ...result,
+          message: `Ingested "${title ?? 'untitled'}" into knowledge base (${result.chunksCreated} chunks).`,
+        };
+      } catch (err) {
+        return {
+          error: `Ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
     },
   );
 
@@ -5213,6 +5304,328 @@ Date: _______________`;
         userId: context.userId,
         workflowId: context.workflowId,
       });
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DEPLOYMENT TOOLS (Vercel + GitHub)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  toolRegistry.register(
+    {
+      name: 'deploy_to_vercel',
+      description: 'Deploy a project to Vercel. Requires VERCEL_TOKEN env var.',
+      category: ToolCategory.WEBHOOK,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectName: { type: 'string', description: 'Vercel project name' },
+          gitRepo: { type: 'string', description: 'GitHub repo (owner/name) to deploy from' },
+          framework: { type: 'string', description: 'Framework (nextjs, vite, etc.)' },
+          environmentVariables: { type: 'object', description: 'Env vars as key-value pairs' },
+        },
+        required: ['projectName'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['VERCEL_TOKEN'];
+      if (!token) return { success: false, error: 'VERCEL_TOKEN not configured. Set it in environment variables.' };
+
+      const { projectName, gitRepo, framework } = input as {
+        projectName: string; gitRepo?: string; framework?: string;
+        environmentVariables?: Record<string, string>;
+      };
+
+      const body: Record<string, unknown> = {
+        name: projectName,
+        ...(gitRepo ? { gitSource: { type: 'github', repo: gitRepo, ref: 'main' } } : {}),
+        ...(framework ? { framework } : {}),
+      };
+
+      const res = await fetch('https://api.vercel.com/v13/deployments', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        return { success: false, error: `Vercel API ${res.status}: ${err}` };
+      }
+
+      const data = await res.json() as { id: string; url: string; readyState: string };
+      return { success: true, deploymentId: data.id, url: `https://${data.url}`, status: data.readyState };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'github_create_repo',
+      description: 'Create a new GitHub repository. Requires GITHUB_PAT env var.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Repository name' },
+          description: { type: 'string', description: 'Repository description' },
+          private: { type: 'boolean', description: 'Make repo private (default: false)' },
+          autoInit: { type: 'boolean', description: 'Initialize with README (default: true)' },
+        },
+        required: ['name'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['GITHUB_PAT'];
+      if (!token) return { success: false, error: 'GITHUB_PAT not configured.' };
+
+      const { name, description, private: isPrivate, autoInit } = input as {
+        name: string; description?: string; private?: boolean; autoInit?: boolean;
+      };
+
+      const res = await fetch('https://api.github.com/user/repos', {
+        method: 'POST',
+        headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'JAK-Swarm' },
+        body: JSON.stringify({ name, description, private: isPrivate ?? false, auto_init: autoInit ?? true }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        return { success: false, error: `GitHub API ${res.status}: ${err}` };
+      }
+
+      const data = await res.json() as { full_name: string; html_url: string; clone_url: string };
+      return { success: true, fullName: data.full_name, url: data.html_url, cloneUrl: data.clone_url };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'github_push_files',
+      description: 'Push multiple files to a GitHub repo in a single commit. Uses the Git Trees API. Requires GITHUB_PAT.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string', description: 'Repository owner' },
+          repo: { type: 'string', description: 'Repository name' },
+          branch: { type: 'string', description: 'Branch name (default: main)' },
+          files: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
+          commitMessage: { type: 'string', description: 'Commit message' },
+        },
+        required: ['owner', 'repo', 'files', 'commitMessage'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['GITHUB_PAT'];
+      if (!token) return { success: false, error: 'GITHUB_PAT not configured.' };
+
+      const { owner, repo, branch = 'main', files, commitMessage } = input as {
+        owner: string; repo: string; branch?: string;
+        files: Array<{ path: string; content: string }>; commitMessage: string;
+      };
+
+      const headers = { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'JAK-Swarm' };
+      const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
+
+      try {
+        // 1. Get current commit SHA for the branch
+        const refRes = await fetch(`${apiBase}/git/ref/heads/${branch}`, { headers });
+        if (!refRes.ok) return { success: false, error: `Branch '${branch}' not found.` };
+        const refData = await refRes.json() as { object: { sha: string } };
+        const baseSha = refData.object.sha;
+
+        // 2. Create blobs for each file
+        const treeItems: Array<{ path: string; mode: string; type: string; sha: string }> = [];
+        for (const file of files) {
+          const blobRes = await fetch(`${apiBase}/git/blobs`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ content: file.content, encoding: 'utf-8' }),
+          });
+          const blobData = await blobRes.json() as { sha: string };
+          treeItems.push({ path: file.path, mode: '100644', type: 'blob', sha: blobData.sha });
+        }
+
+        // 3. Create tree
+        const treeRes = await fetch(`${apiBase}/git/trees`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
+        });
+        const treeData = await treeRes.json() as { sha: string };
+
+        // 4. Create commit
+        const commitRes = await fetch(`${apiBase}/git/commits`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ message: commitMessage, tree: treeData.sha, parents: [baseSha] }),
+        });
+        const commitData = await commitRes.json() as { sha: string; html_url: string };
+
+        // 5. Update branch ref
+        await fetch(`${apiBase}/git/refs/heads/${branch}`, {
+          method: 'PATCH', headers,
+          body: JSON.stringify({ sha: commitData.sha }),
+        });
+
+        return { success: true, commitSha: commitData.sha, url: commitData.html_url, filesPushed: files.length };
+      } catch (err) {
+        return { success: false, error: `GitHub push failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'github_review_pr',
+      description: 'Fetch a GitHub pull request with diff for code review. Requires GITHUB_PAT.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string' },
+          repo: { type: 'string' },
+          pullNumber: { type: 'number' },
+        },
+        required: ['owner', 'repo', 'pullNumber'],
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['GITHUB_PAT'];
+      const { owner, repo, pullNumber } = input as { owner: string; repo: string; pullNumber: number };
+      const headers: Record<string, string> = { 'User-Agent': 'JAK-Swarm', 'Accept': 'application/json' };
+      if (token) headers['Authorization'] = `token ${token}`;
+
+      const [prRes, diffRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`, {
+          headers: { ...headers, Accept: 'application/vnd.github.v3.diff' },
+        }),
+      ]);
+
+      if (!prRes.ok) return { success: false, error: `PR not found: ${prRes.status}` };
+
+      const pr = await prRes.json() as {
+        title: string; body: string; user: { login: string }; state: string;
+        mergeable: boolean | null; changed_files: number; additions: number; deletions: number;
+      };
+      const diff = await diffRes.text();
+
+      return {
+        success: true,
+        title: pr.title,
+        description: pr.body,
+        author: pr.user.login,
+        state: pr.state,
+        mergeable: pr.mergeable,
+        changedFiles: pr.changed_files,
+        additions: pr.additions,
+        deletions: pr.deletions,
+        diff: diff.slice(0, 15000), // Truncate large diffs
+      };
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CEO EXECUTIVE SUMMARY TOOL
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  toolRegistry.register(
+    {
+      name: 'compile_executive_summary',
+      description: 'Compile an executive dashboard summary from recent workflows, memory, and traces. Used by the Strategist/CEO agent.',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          timeRangeDays: { type: 'number', description: 'Number of days to look back (default: 7)' },
+        },
+      },
+      outputSchema: { type: 'object' },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { timeRangeDays = 7 } = input as { timeRangeDays?: number };
+      const since = new Date(Date.now() - timeRangeDays * 24 * 60 * 60 * 1000);
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const dbModule = require('@jak-swarm/db');
+        const prisma = dbModule.prisma;
+        if (!prisma) return { error: 'Database not available.' };
+
+        const [workflows, recentMemory, recentTraces] = await Promise.all([
+          prisma.workflow.findMany({
+            where: { tenantId: context.tenantId, createdAt: { gte: since } },
+            select: { id: true, goal: true, status: true, totalCostUsd: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          }),
+          prisma.tenantMemory.findMany({
+            where: { tenantId: context.tenantId, memoryType: { in: ['KNOWLEDGE', 'POLICY'] } },
+            orderBy: { updatedAt: 'desc' },
+            take: 20,
+          }),
+          prisma.agentTrace.findMany({
+            where: {
+              workflow: { tenantId: context.tenantId },
+              startedAt: { gte: since },
+            },
+            select: { agentRole: true, durationMs: true, error: true },
+            take: 200,
+          }),
+        ]);
+
+        // Aggregate
+        const statusCounts: Record<string, number> = {};
+        let totalCost = 0;
+        for (const w of workflows) {
+          statusCounts[w.status] = (statusCounts[w.status] ?? 0) + 1;
+          totalCost += w.totalCostUsd ?? 0;
+        }
+
+        const agentUsage: Record<string, { calls: number; errors: number; avgDurationMs: number }> = {};
+        for (const t of recentTraces) {
+          const role = t.agentRole;
+          if (!agentUsage[role]) agentUsage[role] = { calls: 0, errors: 0, avgDurationMs: 0 };
+          agentUsage[role]!.calls++;
+          if (t.error) agentUsage[role]!.errors++;
+          agentUsage[role]!.avgDurationMs += (t.durationMs ?? 0);
+        }
+        for (const role of Object.keys(agentUsage)) {
+          agentUsage[role]!.avgDurationMs = Math.round(agentUsage[role]!.avgDurationMs / agentUsage[role]!.calls);
+        }
+
+        return {
+          period: { days: timeRangeDays, since: since.toISOString() },
+          workflows: {
+            total: workflows.length,
+            statusBreakdown: statusCounts,
+            totalCostUsd: Math.round(totalCost * 100) / 100,
+            recentGoals: workflows.slice(0, 10).map((w: { goal: string; status: string }) => ({ goal: w.goal, status: w.status })),
+          },
+          agentUsage,
+          knowledgeEntries: recentMemory.length,
+          connected: true,
+        };
+      } catch {
+        return { error: 'Failed to compile executive summary — database unavailable.', connected: false };
+      }
     },
   );
 }

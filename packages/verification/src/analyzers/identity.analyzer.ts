@@ -23,8 +23,23 @@ export const identityAnalyzer: Analyzer = {
     );
     allFindings.push(...ruleFindings);
 
-    // Layer 2: Heuristic analysis
-    const heuristicFindings = analyzeIdentityContent(request.content);
+    // Layer 2: AI analysis (LLM when available, heuristics as fallback)
+    let heuristicFindings: Finding[] = [];
+    try {
+      const { callVerificationLLM } = await import('./llm-analyzer.js');
+      const llmResult = await callVerificationLLM(1, 'IDENTITY', request.content);
+      if (llmResult && llmResult.findings.length > 0) {
+        heuristicFindings = llmResult.findings.map((f) => ({
+          id: f.id, severity: f.severity, category: f.category, title: f.description.slice(0, 80),
+          description: f.description, evidence: f.evidence,
+          source: (f.source === 'AI_TIER1' || f.source === 'AI_TIER3' ? f.source : 'AI_TIER1') as 'AI_TIER1' | 'AI_TIER3',
+          ruleId: f.id,
+        }));
+      }
+    } catch { /* LLM not available */ }
+    if (heuristicFindings.length === 0) {
+      heuristicFindings = analyzeIdentityContent(request.content);
+    }
     allFindings.push(...heuristicFindings);
 
     let riskContribution = ruleScore;

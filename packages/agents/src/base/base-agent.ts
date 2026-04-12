@@ -692,6 +692,36 @@ RESEARCH & PLANNING METHODOLOGY:
     return supplement ? `${base}\n\n${supplement}` : base;
   }
 
+  /**
+   * Retrieve semantically relevant context from the vector knowledge base.
+   * Returns a formatted string ready to inject into system prompts.
+   * Returns empty string if no relevant context found or vector search unavailable.
+   */
+  protected async buildRAGContext(query: string, tenantId: string, topK = 3): Promise<string> {
+    try {
+      // Dynamic import to avoid circular deps and handle missing vector module gracefully
+      const toolsModule = await import('@jak-swarm/tools');
+      const getAdapter = (toolsModule as Record<string, unknown>)['getVectorMemoryAdapter'] as
+        | (() => { search: (tenantId: string, query: string, topK: number, threshold: number) => Promise<Array<{ content: string; score: number }>> })
+        | undefined;
+
+      if (!getAdapter) return '';
+
+      const adapter = getAdapter();
+      const results = await adapter.search(tenantId, query, topK, 0.55);
+
+      if (results.length === 0) return '';
+
+      const contextBlocks = results.map((r: { content: string; score: number }, i: number) =>
+        `[${i + 1}] (relevance: ${Math.round(r.score * 100)}%) ${r.content}`,
+      );
+
+      return `\n\n## Relevant Knowledge Base Context\nThe following was retrieved from the organization's knowledge base. Use it to inform your response:\n${contextBlocks.join('\n\n')}`;
+    } catch {
+      return '';
+    }
+  }
+
   protected recordTrace(
     context: AgentContext,
     input: unknown,

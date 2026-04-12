@@ -41,17 +41,43 @@ export const emailAnalyzer: Analyzer = {
       return { findings: allFindings, riskContribution: ruleScore, confidence };
     }
 
-    // ─── Layer 2: AI Tier 1 Analysis (placeholder — needs LLM call) ──
-    // In production, this calls Gemini Flash for content classification.
-    // For now, we use enhanced rule-based heuristics as a proxy.
+    // ─── Layer 2: AI Tier 1 Analysis ──────────────────────────────
+    // Calls LLM when API keys are configured, falls back to heuristics.
 
     if (escalation === 'TIER1' || escalation === 'TIER3') {
-      const aiFindings = analyzeContentHeuristics(request.content, request.metadata);
-      allFindings.push(...aiFindings);
+      let usedLLM = false;
 
-      // Update confidence based on combined findings
-      const totalFindings = allFindings.length;
-      confidence = totalFindings === 0 ? 0.9 : totalFindings <= 2 ? 0.75 : 0.6;
+      try {
+        const { callVerificationLLM } = await import('./llm-analyzer.js');
+        const tier = escalation === 'TIER3' ? 3 : 1;
+        const llmResult = await callVerificationLLM(tier as 1 | 3, 'EMAIL', request.content);
+
+        if (llmResult && llmResult.findings.length > 0) {
+          usedLLM = true;
+          for (const f of llmResult.findings) {
+            allFindings.push({
+              id: f.id,
+              severity: f.severity,
+              category: f.category,
+              title: f.description.slice(0, 80),
+              description: f.description,
+              evidence: f.evidence,
+              source: (f.source === 'AI_TIER1' || f.source === 'AI_TIER3') ? f.source as 'AI_TIER1' | 'AI_TIER3' : 'AI_TIER1',
+              ruleId: f.id,
+            });
+          }
+          confidence = llmResult.confidence;
+        }
+      } catch {
+        // LLM not available — fall through to heuristics
+      }
+
+      if (!usedLLM) {
+        const aiFindings = analyzeContentHeuristics(request.content, request.metadata);
+        allFindings.push(...aiFindings);
+        const totalFindings = allFindings.length;
+        confidence = totalFindings === 0 ? 0.9 : totalFindings <= 2 ? 0.75 : 0.6;
+      }
     }
 
     // Calculate risk contribution

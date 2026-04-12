@@ -75,3 +75,31 @@ export function getCRMAdapter(db: unknown, tenantId: string): CRMAdapter | undef
   }
   return undefined;
 }
+
+/**
+ * Get the best available CRM adapter from environment.
+ * Priority: HubSpot API > Prisma DB > undefined
+ */
+export function getCRMAdapterFromEnv(tenantId?: string): CRMAdapter | undefined {
+  // 1. Try HubSpot
+  const hubspotKey = process.env['HUBSPOT_API_KEY'];
+  if (hubspotKey) {
+    // Dynamic import to avoid bundling when not used
+    const { HubSpotCRMAdapter } = require('./crm/hubspot-crm.adapter.js');
+    return new HubSpotCRMAdapter(hubspotKey);
+  }
+
+  // 2. Try Prisma DB
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dbModule = require('@jak-swarm/db');
+    const prisma = dbModule.prisma;
+    if (prisma?.crmContact) {
+      return new PrismaCRMAdapter(prisma, tenantId ?? 'default');
+    }
+  } catch {
+    // DB not available
+  }
+
+  return undefined;
+}

@@ -188,10 +188,13 @@ export class StrategistAgent extends BaseAgent {
       { type: 'function' as const, function: { name: 'generate_board_report', description: 'Compile a board-level executive summary report', parameters: { type: 'object', properties: { companyName: { type: 'string' }, period: { type: 'string' }, metrics: { type: 'object' }, highlights: { type: 'array', items: { type: 'string' } } }, required: ['companyName', 'period'] } } },
     ];
 
+    // Inject RAG context from vector knowledge base
+    const ragContext = await this.buildRAGContext(task.description ?? task.action, context.tenantId);
+
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: this.buildSystemMessage(STRATEGIST_SUPPLEMENT),
+        content: this.buildSystemMessage(STRATEGIST_SUPPLEMENT) + ragContext,
       },
       {
         role: 'user',

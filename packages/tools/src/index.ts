@@ -29,7 +29,7 @@ export { UnconfiguredCalendarAdapter } from './adapters/unconfigured.js';
 export { CalDAVCalendarAdapter } from './adapters/calendar/caldav-calendar.adapter.js';
 
 // Adapter factory
-export { getEmailAdapter, getCalendarAdapter, getCRMAdapter, hasRealAdapters } from './adapters/adapter-factory.js';
+export { getEmailAdapter, getCalendarAdapter, getCRMAdapter, getCRMAdapterFromEnv, hasRealAdapters } from './adapters/adapter-factory.js';
 
 // CRM adapter
 export type {
@@ -41,6 +41,12 @@ export type {
 } from './adapters/crm/crm.interface.js';
 export { UnconfiguredCRMAdapter } from './adapters/unconfigured.js';
 export { PrismaCRMAdapter } from './adapters/crm/prisma-crm.adapter.js';
+export { HubSpotCRMAdapter } from './adapters/crm/hubspot-crm.adapter.js';
+
+// Social media adapters
+export type { SocialMediaAdapter, SocialPostInput, SocialPostResult } from './adapters/social/social.interface.js';
+export { getSocialAdapter, getTwitterAdapter, getLinkedInAdapter, getRedditAdapter } from './adapters/social/social-factory.js';
+export { DraftSocialAdapter } from './adapters/social/draft-social.adapter.js';
 
 // Browser adapter
 export type {
@@ -68,6 +74,13 @@ export {
   getMemoryAdapter,
   resetMemoryAdapter,
 } from './adapters/memory/db-memory.adapter.js';
+
+// Vector memory (semantic search)
+export type { EmbeddingService } from './adapters/memory/embedding.service.js';
+export { getEmbeddingService, resetEmbeddingService } from './adapters/memory/embedding.service.js';
+export type { VectorMemoryAdapter, VectorSearchResult } from './adapters/memory/vector-memory.adapter.js';
+export { getVectorMemoryAdapter, resetVectorMemoryAdapter, InMemoryVectorAdapter, PgVectorAdapter } from './adapters/memory/vector-memory.adapter.js';
+export { DocumentIngestor, getDocumentIngestor, resetDocumentIngestor } from './adapters/memory/document-ingestor.js';
 
 // MCP Bridge
 export {

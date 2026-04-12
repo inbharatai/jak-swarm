@@ -35,6 +35,7 @@ model Tenant {
   onboardingState OnboardingState?
   schedules       WorkflowSchedule[]
   projects        Project[]
+  vectorDocuments VectorDocument[]
 
   @@map("tenants")
 }
@@ -212,6 +213,24 @@ model TenantMemory {
   @@unique([tenantId, key])
   @@index([tenantId, memoryType])
   @@map("tenant_memory")
+}
+
+model VectorDocument {
+  id         String   @id @default(cuid())
+  tenantId   String
+  content    String   @db.Text
+  // embedding stored via raw SQL (pgvector); Prisma doesn't natively support vector type
+  metadata   Json?
+  sourceKey  String?
+  sourceType String   @default("DOCUMENT")
+  chunkIndex Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sourceType])
+  @@map("vector_documents")
 }
 
 model AuditLog {

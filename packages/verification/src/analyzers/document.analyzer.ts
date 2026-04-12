@@ -23,8 +23,23 @@ export const documentAnalyzer: Analyzer = {
     );
     allFindings.push(...ruleFindings);
 
-    // Layer 2: Content heuristics
-    const contentFindings = analyzeDocumentContent(request.content, request.metadata);
+    // Layer 2: AI analysis (LLM when available, heuristics as fallback)
+    let contentFindings: Finding[] = [];
+    try {
+      const { callVerificationLLM } = await import('./llm-analyzer.js');
+      const llmResult = await callVerificationLLM(1, 'DOCUMENT', request.content);
+      if (llmResult && llmResult.findings.length > 0) {
+        contentFindings = llmResult.findings.map((f) => ({
+          id: f.id, severity: f.severity, category: f.category, title: f.description.slice(0, 80),
+          description: f.description, evidence: f.evidence,
+          source: (f.source === 'AI_TIER1' || f.source === 'AI_TIER3' ? f.source : 'AI_TIER1') as 'AI_TIER1' | 'AI_TIER3',
+          ruleId: f.id,
+        }));
+      }
+    } catch { /* LLM not available */ }
+    if (contentFindings.length === 0) {
+      contentFindings = analyzeDocumentContent(request.content, request.metadata);
+    }
     allFindings.push(...contentFindings);
 
     let riskContribution = ruleScore;
