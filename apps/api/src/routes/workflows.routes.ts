@@ -9,6 +9,7 @@ import type { WorkflowStatus } from '../types.js';
 const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
   industry: z.string().max(120).optional(),
+  maxCostUsd: z.number().positive().max(1000).optional(),
 });
 
 const resumeWorkflowBodySchema = z.object({
@@ -36,13 +37,13 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
       }
 
-      const { goal, industry } = parseResult.data;
+      const { goal, industry, maxCostUsd } = parseResult.data;
       const { tenantId, userId } = request.user;
 
       try {
         // 1. Persist the workflow record (PENDING)
         const workflow = await workflowService.createWorkflow(tenantId, userId, goal, industry);
-        await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, { goal });
+        await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, { goal, maxCostUsd });
 
         // 2. Fire-and-forget: run the swarm in the background
         //    setImmediate defers past the current event-loop tick so the HTTP
@@ -54,6 +55,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             userId,
             goal,
             industry,
+            maxCostUsd,
           });
         });
 

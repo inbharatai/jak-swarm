@@ -74,8 +74,32 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
 
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
   swarmService.setLockProvider(locks); // Distributed lock for workflow execution
+  // Inject distributed circuit breaker factory for shared failure state across instances
+  try {
+    swarmService.setCircuitBreakerFactory((name, opts) =>
+      getDistributedCircuitBreaker(fastify.redis, name, opts));
+  } catch {
+    fastify.log.warn('[Swarm] Distributed circuit breaker not available — using in-process breakers');
+  }
+
+  // Enable cross-instance SSE relay if Redis is available
+  if (subscriberRedis) {
+    // Create a second subscriber connection for SSE events (separate from signals subscriber)
+    try {
+      const { Redis } = await import('ioredis');
+      const sseSubscriber = new Redis(config.redisUrl, { maxRetriesPerRequest: 3 });
+      swarmService.enableRedisRelay(fastify.redis, sseSubscriber);
+
+      fastify.addHook('onClose', async () => {
+        await sseSubscriber.quit().catch(() => {});
+      });
+    } catch {
+      fastify.log.warn('[Swarm] SSE Redis relay not available — SSE requires sticky sessions');
+    }
+  }
+
   fastify.decorate('swarm', swarmService);
-  fastify.log.info('[Swarm] SwarmExecutionService registered (with distributed lock)');
+  fastify.log.info('[Swarm] SwarmExecutionService registered (with distributed lock + SSE relay)');
 
   // Wire workflow signals: when another instance sends pause/stop, apply locally
   signals.subscribe((signal) => {

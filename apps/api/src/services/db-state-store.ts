@@ -17,28 +17,24 @@ export interface WorkflowStateStore {
  * DbWorkflowStateStore — production state store backed by PostgreSQL.
  *
  * Stores SwarmState in the `Workflow.stateJson` column so state survives
- * server restarts. Uses an in-memory LRU cache for hot-path reads during
- * active execution (avoids DB round-trip on every node transition).
+ * server restarts.
  *
- * The cache is write-through: every `set()` writes to both cache and DB.
- * On `get()`, cache is checked first, then DB if miss.
+ * IMPORTANT: No local cache. Every read goes to the database. This is
+ * intentional for multi-instance correctness — local caches cause stale
+ * state when multiple instances read/write the same workflow.
+ *
+ * Performance impact is minimal: single-row PK lookup on an indexed table
+ * is ~1-2ms on a local DB and ~5-10ms on a managed DB. This is negligible
+ * compared to the LLM calls (100ms-30s) that dominate workflow execution.
  */
 export class DbWorkflowStateStore implements WorkflowStateStore {
   private readonly db: PrismaClient;
-  private readonly cache = new Map<string, SwarmState>();
-  private readonly maxCacheSize: number;
 
-  constructor(db: PrismaClient, maxCacheSize = 200) {
+  constructor(db: PrismaClient) {
     this.db = db;
-    this.maxCacheSize = maxCacheSize;
   }
 
   async get(workflowId: string): Promise<SwarmState | undefined> {
-    // Check in-memory cache first
-    const cached = this.cache.get(workflowId);
-    if (cached) return cached;
-
-    // Fall back to DB
     try {
       const workflow = await this.db.workflow.findUnique({
         where: { id: workflowId },
@@ -46,58 +42,33 @@ export class DbWorkflowStateStore implements WorkflowStateStore {
       });
 
       if (!workflow?.stateJson) return undefined;
-
-      const state = workflow.stateJson as unknown as SwarmState;
-      this.cacheSet(workflowId, state);
-      return state;
+      return workflow.stateJson as unknown as SwarmState;
     } catch {
       return undefined;
     }
   }
 
   async set(workflowId: string, state: SwarmState): Promise<void> {
-    this.cacheSet(workflowId, state);
-
-    // Write-through to DB (non-blocking for performance, but we await for correctness)
     try {
       await this.db.workflow.update({
         where: { id: workflowId },
         data: { stateJson: state as unknown as Prisma.InputJsonValue },
       });
-    } catch {
-      // DB write failed — state is still in cache for this server instance.
-      // On restart the state will be lost, but recoverStaleWorkflows handles that.
+    } catch (err) {
+      // Log the error — state persistence failure is serious, not "non-critical"
+      console.error(`[state-store] Failed to persist state for workflow ${workflowId}:`, err instanceof Error ? err.message : String(err));
+      throw err; // Propagate — caller must handle persistence failures
     }
   }
 
   async delete(workflowId: string): Promise<void> {
-    this.cache.delete(workflowId);
     // Don't delete from DB — the workflow record itself should persist.
-    // Just clear the in-memory cache entry.
+    // This is a no-op since we no longer have a cache.
+    void workflowId;
   }
 
   async has(workflowId: string): Promise<boolean> {
-    if (this.cache.has(workflowId)) return true;
     const state = await this.get(workflowId);
     return state !== undefined;
-  }
-
-  /** Evict a specific workflow from the cache (e.g., after completion). */
-  evict(workflowId: string): void {
-    this.cache.delete(workflowId);
-  }
-
-  /** Clear the entire cache (for testing or shutdown). */
-  clearCache(): void {
-    this.cache.clear();
-  }
-
-  private cacheSet(workflowId: string, state: SwarmState): void {
-    // Simple LRU: if cache is full, evict the oldest entry
-    if (this.cache.size >= this.maxCacheSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) this.cache.delete(firstKey);
-    }
-    this.cache.set(workflowId, state);
   }
 }

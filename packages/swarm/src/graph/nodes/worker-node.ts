@@ -72,17 +72,20 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       const taskInput = buildTaskInput(task, state);
 
       // Execute through circuit breaker — prevents cascading failures
-      // when a particular agent role fails repeatedly
-      const breaker = getCircuitBreaker(`worker:${task.agentRole}`, {
-        failureThreshold: 5,
-        resetTimeoutMs: 30_000,
-        tenantId: state.tenantId,
-      });
+      // when a particular agent role fails repeatedly.
+      // Uses distributed breaker if provided (multi-instance), else local.
+      const breakerFactory = (state as unknown as Record<string, unknown>)['circuitBreakerFactory'] as
+        | ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> })
+        | undefined;
+
+      const breaker = breakerFactory
+        ? breakerFactory(`worker:${task.agentRole}`, { failureThreshold: 5, resetTimeoutMs: 30_000 })
+        : getCircuitBreaker(`worker:${task.agentRole}`, { failureThreshold: 5, resetTimeoutMs: 30_000, tenantId: state.tenantId });
 
       try {
         output = await breaker.call<unknown>(() => agent.execute(taskInput, context));
       } catch (err) {
-        if (err instanceof CircuitOpenError) {
+        if (err instanceof CircuitOpenError || (err instanceof Error && err.message.includes('circuit breaker'))) {
           taskFailed = true;
           output = {
             error: `Circuit breaker open for ${task.agentRole}: ${err.message}`,

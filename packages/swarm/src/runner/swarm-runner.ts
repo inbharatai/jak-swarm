@@ -21,6 +21,8 @@ export interface RunParams {
   maxCostUsd?: number;
   approvalThreshold?: string;
   loadState?: (id: string) => Promise<unknown | undefined>;
+  /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
+  circuitBreakerFactory?: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
 }
 
 export interface SwarmResult {
@@ -125,15 +127,19 @@ export class SwarmRunner {
       workflowId,
     });
 
-    const initialState = createInitialSwarmState({
-      goal: params.goal,
-      tenantId: params.tenantId,
-      userId: params.userId,
-      workflowId,
-      industry: params.industry,
-      maxCostUsd: params.maxCostUsd,
-      approvalThreshold: params.approvalThreshold,
-    });
+    const initialState = {
+      ...createInitialSwarmState({
+        goal: params.goal,
+        tenantId: params.tenantId,
+        userId: params.userId,
+        workflowId,
+        industry: params.industry,
+        maxCostUsd: params.maxCostUsd,
+        approvalThreshold: params.approvalThreshold,
+      }),
+      // Inject distributed circuit breaker factory if provided
+      ...(params.circuitBreakerFactory ? { circuitBreakerFactory: params.circuitBreakerFactory } : {}),
+    };
 
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 

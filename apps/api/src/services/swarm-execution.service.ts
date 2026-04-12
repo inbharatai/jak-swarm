@@ -70,6 +70,8 @@ export class SwarmExecutionService extends EventEmitter {
   private readonly workflowService: WorkflowService;
   private readonly audit: AuditLogger;
   private lockProvider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> } | null = null;
+  private redisPublisher: { publish: (ch: string, msg: string) => Promise<unknown> } | null = null;
+  private instanceId = `jak-${process.pid}-${Date.now().toString(36)}`;
 
   constructor(
     private readonly db: PrismaClient,
@@ -85,6 +87,57 @@ export class SwarmExecutionService extends EventEmitter {
   /** Inject distributed lock provider for multi-instance safety. */
   setLockProvider(provider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> }): void {
     this.lockProvider = provider;
+  }
+
+  private circuitBreakerFactory: ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }) | undefined;
+
+  /** Inject distributed circuit breaker factory for multi-instance safety. */
+  setCircuitBreakerFactory(factory: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }): void {
+    this.circuitBreakerFactory = factory;
+  }
+
+  /**
+   * Enable cross-instance SSE event relay via Redis pub/sub.
+   * When this is set, all .emit() calls also publish to a Redis channel,
+   * and events from other instances are re-emitted locally.
+   */
+  enableRedisRelay(publisherRedis: unknown, subscriberRedis: unknown): void {
+    this.redisPublisher = publisherRedis as SwarmExecutionService['redisPublisher'];
+
+    const sub = subscriberRedis as { subscribe: (ch: string) => Promise<unknown>; on: (event: string, fn: (...args: unknown[]) => void) => void };
+    sub.subscribe('jak:sse:events').catch((err: unknown) => {
+      this.log.warn({ err }, '[SSE relay] Failed to subscribe to Redis channel');
+    });
+
+    sub.on('message', (_channel: unknown, message: unknown) => {
+      try {
+        const parsed = JSON.parse(String(message)) as { eventName: string; data: unknown; sourceInstance: string };
+        // Only re-emit events from OTHER instances
+        if (parsed.sourceInstance !== this.instanceId) {
+          super.emit(parsed.eventName, parsed.data);
+        }
+      } catch {
+        // Malformed message
+      }
+    });
+
+    this.log.info('[SSE relay] Cross-instance event relay enabled via Redis');
+  }
+
+  /** Override emit to also publish to Redis for cross-instance SSE. */
+  override emit(eventName: string | symbol, ...args: unknown[]): boolean {
+    const result = super.emit(eventName, ...args);
+
+    // Publish to Redis for other instances (only for workflow/project events)
+    if (this.redisPublisher && typeof eventName === 'string' && (eventName.startsWith('workflow:') || eventName.startsWith('project:'))) {
+      this.redisPublisher.publish('jak:sse:events', JSON.stringify({
+        eventName,
+        data: args[0],
+        sourceInstance: this.instanceId,
+      })).catch(() => { /* Redis unavailable — local-only mode */ });
+    }
+
+    return result;
   }
 
   /**
@@ -179,6 +232,7 @@ export class SwarmExecutionService extends EventEmitter {
         goal,
         industry,
         maxCostUsd: params.maxCostUsd,
+        ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;
@@ -190,7 +244,10 @@ export class SwarmExecutionService extends EventEmitter {
                 totalCostUsd: (s.accumulatedCostUsd as number) ?? 0,
               },
             });
-          } catch { /* non-critical */ }
+          } catch (stateErr) {
+            this.log.error({ workflowId: wfId, err: stateErr instanceof Error ? stateErr.message : String(stateErr) },
+              '[Swarm] CRITICAL: Failed to persist workflow state — state may be lost on restart');
+          }
         },
         approvalThreshold: (tenant as any)?.approvalThreshold ?? undefined,
         onAgentActivity: (data: unknown) => {
@@ -213,7 +270,10 @@ export class SwarmExecutionService extends EventEmitter {
           where: { id: workflowId },
           data: { finalOutput },
         });
-      } catch { /* non-critical */ }
+      } catch (outErr) {
+        this.log.warn({ workflowId, err: outErr instanceof Error ? outErr.message : String(outErr) },
+          '[Swarm] Failed to persist final output');
+      }
 
       const dbStatus = mapSwarmStatusToDb(result.status);
       await this.workflowService.updateWorkflowStatus(workflowId, dbStatus, result.error);
@@ -393,19 +453,27 @@ export class SwarmExecutionService extends EventEmitter {
     try {
       const stale = await this.db.workflow.findMany({
         where: { status: { in: ['RUNNING', 'EXECUTING', 'VERIFYING'] } },
+        select: { id: true, tenantId: true, goal: true, status: true, updatedAt: true },
       });
       for (const wf of stale) {
+        const staleDurationMs = Date.now() - new Date(wf.updatedAt).getTime();
         await this.db.workflow.update({
           where: { id: wf.id },
           data: {
             status: 'FAILED',
-            error: 'Server restarted during execution. Workflow state preserved — resubmit to retry.',
+            error: `Server restarted during execution (was ${wf.status} for ${Math.round(staleDurationMs / 1000)}s). Workflow state preserved in stateJson — resubmit to retry.`,
             completedAt: new Date(),
           },
         });
+        this.log.warn({
+          workflowId: wf.id,
+          tenantId: wf.tenantId,
+          previousStatus: wf.status,
+          staleDurationMs,
+        }, '[recovery] Marked stale workflow as FAILED');
       }
       if (stale.length > 0) {
-        this.log.info(`[recovery] Marked ${stale.length} stale workflows as FAILED`);
+        this.log.info({ count: stale.length }, '[recovery] Stale workflow recovery complete');
       }
     } catch (err) {
       this.log.error({ err }, '[recovery] Failed to recover stale workflows');
