@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { ok, err } from '../types.js';
 
 const updateOnboardingSchema = z.object({
   completedSteps: z.array(z.string()).optional(),
@@ -15,7 +16,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
     const state = await app.db.onboardingState.findUnique({
       where: { tenantId },
     });
-    return reply.send({ data: state ?? { completedSteps: [], dismissed: false } });
+    return reply.send(ok(state ?? { completedSteps: [], dismissed: false }));
   });
 
   // POST update onboarding state
@@ -25,7 +26,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
     const { tenantId } = request.user;
     const parsed = updateOnboardingSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.message });
+      return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
     }
     const { completedSteps, dismissed } = parsed.data;
     const state = await app.db.onboardingState.upsert({
@@ -40,6 +41,6 @@ export async function onboardingRoutes(app: FastifyInstance) {
         dismissed: dismissed ?? false,
       },
     });
-    return reply.send({ data: state });
+    return reply.send(ok(state));
   });
 }

@@ -386,7 +386,8 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const project = await projectService.getProject(tenantId, id);
       if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
 
-      // SSE stream
+      // SSE stream — hijack the response so Fastify doesn't try to auto-close it
+      reply.hijack();
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

@@ -383,7 +383,8 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: 'Workflow not found' });
       }
 
-      // Set SSE headers using raw response
+      // SSE stream — hijack the response so Fastify doesn't try to auto-close it
+      reply.hijack();
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
