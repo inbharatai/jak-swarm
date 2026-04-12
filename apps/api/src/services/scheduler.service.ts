@@ -23,13 +23,16 @@ export class SchedulerService {
   private interval: ReturnType<typeof setInterval> | null = null;
   private db: PrismaClient;
   private executeWorkflow: (params: SchedulerExecuteParams) => Promise<string>;
+  private isLeader: () => Promise<boolean>;
 
   constructor(
     db: PrismaClient,
     executeWorkflow: (params: SchedulerExecuteParams) => Promise<string>,
+    options?: { isLeader?: () => Promise<boolean> },
   ) {
     this.db = db;
     this.executeWorkflow = executeWorkflow;
+    this.isLeader = options?.isLeader ?? (async () => true); // Default: always leader (single instance)
   }
 
   start(): void {
@@ -83,6 +86,10 @@ export class SchedulerService {
 
   private async tick(): Promise<void> {
     try {
+      // Only the leader instance should execute scheduled jobs
+      const leader = await this.isLeader();
+      if (!leader) return;
+
       const now = new Date();
       const due = await this.db.workflowSchedule.findMany({
         where: { enabled: true, nextRunAt: { lte: now } },

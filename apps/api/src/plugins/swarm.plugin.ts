@@ -7,49 +7,113 @@
  */
 import fp from 'fastify-plugin';
 import type { FastifyPluginAsync } from 'fastify';
+import { Redis } from 'ioredis';
 import { SwarmExecutionService } from '../services/swarm-execution.service.js';
 import { SchedulerService } from '../services/scheduler.service.js';
 import { WorkflowService } from '../services/workflow.service.js';
+import {
+  RedisSchedulerLeader,
+  InMemorySchedulerLeader,
+  RedisWorkflowSignalBus,
+  InMemoryWorkflowSignalBus,
+  RedisLockProvider,
+  InMemoryLockProvider,
+  withLock,
+  type SchedulerLeader,
+  type WorkflowSignalBus,
+  type LockProvider,
+} from '../coordination/index.js';
+import { config } from '../config.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     swarm: SwarmExecutionService;
+    coordination: {
+      locks: LockProvider;
+      signals: WorkflowSignalBus;
+      leader: SchedulerLeader;
+    };
   }
 }
 
 const swarmPlugin: FastifyPluginAsync = async (fastify) => {
+  // ── Distributed Coordination Layer ──────────────────────────────────
+  let locks: LockProvider;
+  let signals: WorkflowSignalBus;
+  let leader: SchedulerLeader;
+  let subscriberRedis: Redis | null = null;
+
+  try {
+    // Use Redis for coordination if available
+    locks = new RedisLockProvider(fastify.redis);
+    leader = new RedisSchedulerLeader(fastify.redis);
+
+    // Redis pub/sub requires a SEPARATE connection (subscriber is blocking)
+    subscriberRedis = new Redis(config.redisUrl, { maxRetriesPerRequest: 3 });
+    signals = new RedisWorkflowSignalBus(fastify.redis, subscriberRedis);
+
+    fastify.log.info('[Coordination] Using Redis for distributed locks, signals, and leader election');
+  } catch {
+    locks = new InMemoryLockProvider();
+    signals = new InMemoryWorkflowSignalBus();
+    leader = new InMemorySchedulerLeader();
+    fastify.log.warn('[Coordination] Redis not available — using in-memory coordination (single-instance only)');
+  }
+
+  fastify.decorate('coordination', { locks, signals, leader });
+
+  // Start leader election
+  leader.start();
+
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
   fastify.decorate('swarm', swarmService);
   fastify.log.info('[Swarm] SwarmExecutionService registered');
 
-  // Recover any workflows that were mid-execution when the server last stopped
-  setImmediate(() => {
-    swarmService.recoverStaleWorkflows().catch((err) => {
-      fastify.log.error({ err }, '[Swarm] Failed to recover stale workflows on startup');
-    });
+  // Wire workflow signals: when another instance sends pause/stop, apply locally
+  signals.subscribe((signal) => {
+    if (signal.type === 'pause') {
+      swarmService.pauseWorkflow(signal.workflowId);
+    } else if (signal.type === 'stop') {
+      swarmService.stopWorkflow(signal.workflowId);
+    }
+    fastify.log.info({ signal }, '[Coordination] Received workflow signal');
   });
 
-  // Start the workflow scheduler
-  const workflowService = new WorkflowService(fastify.db, fastify.log);
-  const scheduler = new SchedulerService(fastify.db, async (params) => {
-    // Create a workflow record, fire execution, return the workflow ID
-    const workflow = await workflowService.createWorkflow(
-      params.tenantId,
-      params.userId,
-      params.goal,
-      params.industry,
-    );
-    setImmediate(() => {
-      void swarmService.executeAsync({
-        workflowId: workflow.id,
-        tenantId: params.tenantId,
-        userId: params.userId,
-        goal: params.goal,
-        industry: params.industry,
-      });
+  // Recover stale workflows (use lock to prevent duplicate recovery across instances)
+  setImmediate(async () => {
+    const recovered = await withLock(locks, 'stale-workflow-recovery', 60_000, async () => {
+      await swarmService.recoverStaleWorkflows();
+      return true;
     });
-    return workflow.id;
+    if (recovered === null) {
+      fastify.log.info('[Swarm] Stale workflow recovery skipped (another instance is handling it)');
+    }
   });
+
+  // Start the workflow scheduler with leader election
+  const workflowService = new WorkflowService(fastify.db, fastify.log);
+  const scheduler = new SchedulerService(
+    fastify.db,
+    async (params) => {
+      const workflow = await workflowService.createWorkflow(
+        params.tenantId,
+        params.userId,
+        params.goal,
+        params.industry,
+      );
+      setImmediate(() => {
+        void swarmService.executeAsync({
+          workflowId: workflow.id,
+          tenantId: params.tenantId,
+          userId: params.userId,
+          goal: params.goal,
+          industry: params.industry,
+        });
+      });
+      return workflow.id;
+    },
+    { isLeader: () => leader.isLeader() },
+  );
   scheduler.start();
 
   // Auto-reconnect previously connected MCP integrations (tenant-scoped)
@@ -110,14 +174,20 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     }
   }, 10 * 60 * 1000); // Run every 10 minutes
 
-  // Clean up scheduler and purge interval on server close
-  fastify.addHook('onClose', () => {
+  // Clean up scheduler, purge interval, and coordination resources on server close
+  fastify.addHook('onClose', async () => {
     scheduler.stop();
     clearInterval(purgeInterval);
+    await leader.stop();
+    await signals.close();
+    if (subscriberRedis) {
+      await subscriberRedis.quit().catch(() => {});
+    }
+    fastify.log.info('[Coordination] Cleanup complete');
   });
 };
 
 export default fp(swarmPlugin, {
   name: 'swarm-plugin',
-  dependencies: ['db-plugin'],
+  dependencies: ['db-plugin', 'redis-plugin'],
 });

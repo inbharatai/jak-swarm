@@ -225,7 +225,14 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send(err('BAD_REQUEST', `Cannot pause workflow in ${workflow.status} status`));
       }
 
-      fastify.swarm.pauseWorkflow(workflowId);
+      // Broadcast pause signal to ALL instances (the one running the workflow will act on it)
+      fastify.swarm.pauseWorkflow(workflowId); // Local instance
+      await fastify.coordination.signals.publish({
+        type: 'pause',
+        workflowId,
+        issuedBy: request.user.userId,
+        timestamp: new Date().toISOString(),
+      });
       await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'PAUSED' } });
 
       return reply.send(ok({ success: true, message: 'Workflow will pause after current node completes' }));
@@ -273,7 +280,14 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
       const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
       if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
 
-      fastify.swarm.stopWorkflow(workflowId);
+      // Broadcast stop signal to ALL instances
+      fastify.swarm.stopWorkflow(workflowId); // Local instance
+      await fastify.coordination.signals.publish({
+        type: 'stop',
+        workflowId,
+        issuedBy: request.user.userId,
+        timestamp: new Date().toISOString(),
+      });
       await fastify.db.workflow.update({
         where: { id: workflowId },
         data: { status: 'CANCELLED', error: 'Stopped by user', completedAt: new Date() },
