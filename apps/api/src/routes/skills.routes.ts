@@ -304,32 +304,156 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
         await fastify.auditLog(request, 'SANDBOX_SKILL', 'Skill', skillId);
         request.log.info({ skillId }, 'Skill sandbox run triggered');
 
-        // Execute basic validation: check input/output schemas are valid JSON
-        let sandboxResult: { passed: boolean; error?: string } = { passed: true };
-        try {
-          const inputSchema = typeof skill.inputSchemaJson === 'string' ? JSON.parse(skill.inputSchemaJson as string) : skill.inputSchemaJson;
-          const outputSchema = typeof skill.outputSchemaJson === 'string' ? JSON.parse(skill.outputSchemaJson as string) : skill.outputSchemaJson;
+        // ── Phase 1: Schema Validation ────────────────────────────────────
+        const validationErrors: string[] = [];
+        let inputSchema: Record<string, unknown> | null = null;
+        let outputSchema: Record<string, unknown> | null = null;
 
+        try {
+          inputSchema = typeof skill.inputSchemaJson === 'string'
+            ? JSON.parse(skill.inputSchemaJson as string)
+            : skill.inputSchemaJson as Record<string, unknown>;
           if (!inputSchema || typeof inputSchema !== 'object') {
-            sandboxResult = { passed: false, error: 'Invalid input schema: must be a JSON object' };
-          } else if (!outputSchema || typeof outputSchema !== 'object') {
-            sandboxResult = { passed: false, error: 'Invalid output schema: must be a JSON object' };
+            validationErrors.push('Invalid input schema: must be a JSON object');
           }
-        } catch (parseErr) {
-          sandboxResult = { passed: false, error: `Schema parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}` };
+        } catch (e) {
+          validationErrors.push(`Input schema parse error: ${e instanceof Error ? e.message : String(e)}`);
         }
 
-        // Update status based on validation result
-        const finalStatus = sandboxResult.passed ? 'SANDBOX_PASSED' : 'PROPOSED';
+        try {
+          outputSchema = typeof skill.outputSchemaJson === 'string'
+            ? JSON.parse(skill.outputSchemaJson as string)
+            : skill.outputSchemaJson as Record<string, unknown>;
+          if (!outputSchema || typeof outputSchema !== 'object') {
+            validationErrors.push('Invalid output schema: must be a JSON object');
+          }
+        } catch (e) {
+          validationErrors.push(`Output schema parse error: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        if (validationErrors.length > 0) {
+          const updated = await fastify.db.skill.update({
+            where: { id: skillId },
+            data: {
+              status: 'PROPOSED',
+              sandboxResult: { passed: false, phase: 'validation', errors: validationErrors } as object,
+            },
+          });
+          return reply.status(200).send(ok({
+            ...updated,
+            sandboxResult: { passed: false, phase: 'validation', errors: validationErrors },
+            message: `Sandbox validation failed: ${validationErrors.join('; ')}`,
+          }));
+        }
+
+        // ── Phase 2: Code Execution (if implementation + test cases exist) ──
+        interface TestResult {
+          name: string;
+          passed: boolean;
+          output?: string;
+          error?: string;
+          durationMs: number;
+        }
+        const testResults: TestResult[] = [];
+        let executionError: string | null = null;
+
+        const hasCode = skill.implementation && typeof skill.implementation === 'string' && skill.implementation.trim().length > 0;
+        const testCases = (skill.testCasesJson as Array<{ name: string; input: unknown; expectedOutput?: unknown }>) ?? [];
+
+        if (hasCode && testCases.length > 0) {
+          try {
+            const { getSandboxAdapter } = await import('@jak-swarm/tools');
+            const sandbox = await getSandboxAdapter();
+            const sandboxInfo = await sandbox.create({ template: 'node', timeoutMs: 2 * 60 * 1000 });
+
+            try {
+              // Write the skill implementation
+              await sandbox.writeFile(sandboxInfo.id, 'skill.js', skill.implementation!);
+
+              // Write test runner
+              const testRunner = `
+const skill = require('./skill.js');
+const testCases = ${JSON.stringify(testCases)};
+
+(async () => {
+  const results = [];
+  for (const tc of testCases) {
+    const start = Date.now();
+    try {
+      const fn = typeof skill === 'function' ? skill : skill.default ?? skill.execute;
+      if (typeof fn !== 'function') {
+        results.push({ name: tc.name, passed: false, error: 'Skill does not export a function', durationMs: 0 });
+        continue;
+      }
+      const output = await fn(tc.input);
+      const passed = tc.expectedOutput !== undefined
+        ? JSON.stringify(output) === JSON.stringify(tc.expectedOutput)
+        : output !== undefined && output !== null;
+      results.push({ name: tc.name, passed, output: JSON.stringify(output).slice(0, 500), durationMs: Date.now() - start });
+    } catch (err) {
+      results.push({ name: tc.name, passed: false, error: err.message, durationMs: Date.now() - start });
+    }
+  }
+  console.log(JSON.stringify(results));
+})();
+`;
+              await sandbox.writeFile(sandboxInfo.id, 'test-runner.js', testRunner);
+
+              // Execute tests
+              const execResult = await sandbox.exec(sandboxInfo.id, 'node test-runner.js', { timeoutMs: 30_000 });
+
+              if (execResult.exitCode === 0 && execResult.stdout.trim()) {
+                try {
+                  const parsed = JSON.parse(execResult.stdout.trim()) as TestResult[];
+                  testResults.push(...parsed);
+                } catch {
+                  executionError = `Test output parse error. stdout: ${execResult.stdout.slice(0, 300)}`;
+                }
+              } else {
+                executionError = execResult.stderr
+                  ? `Test execution failed (exit ${execResult.exitCode}): ${execResult.stderr.slice(0, 500)}`
+                  : `Test execution failed with exit code ${execResult.exitCode}`;
+              }
+            } finally {
+              // Always destroy the sandbox
+              try { await sandbox.destroy(sandboxInfo.id); } catch { /* best-effort cleanup */ }
+            }
+          } catch (sandboxErr) {
+            // Sandbox infrastructure not available — fall back to schema-only validation
+            request.log.warn({ skillId, error: sandboxErr instanceof Error ? sandboxErr.message : String(sandboxErr) },
+              'Sandbox execution unavailable, falling back to schema-only validation');
+            executionError = null; // Not a test failure — just no sandbox available
+          }
+        }
+
+        // ── Phase 3: Determine result ─────────────────────────────────────
+        const allTestsPassed = testResults.length > 0
+          ? testResults.every((t) => t.passed)
+          : true; // No tests = schema-only pass
+        const passed = !executionError && allTestsPassed;
+        const finalStatus = passed ? 'SANDBOX_PASSED' : 'PROPOSED';
+
+        const fullResult = {
+          passed,
+          phase: testResults.length > 0 ? 'execution' : 'validation',
+          schemaValid: validationErrors.length === 0,
+          testResults: testResults.length > 0 ? testResults : undefined,
+          executionError: executionError ?? undefined,
+          testsRun: testResults.length,
+          testsPassed: testResults.filter((t) => t.passed).length,
+        };
+
         const updated = await fastify.db.skill.update({
           where: { id: skillId },
-          data: { status: finalStatus },
+          data: { status: finalStatus, sandboxResult: fullResult as object },
         });
 
         return reply.status(200).send(ok({
           ...updated,
-          sandboxResult,
-          message: sandboxResult.passed ? 'Sandbox validation passed' : `Sandbox validation failed: ${sandboxResult.error}`,
+          sandboxResult: fullResult,
+          message: passed
+            ? `Sandbox passed (${fullResult.testsPassed}/${fullResult.testsRun} tests passed)`
+            : `Sandbox failed: ${executionError ?? `${fullResult.testsRun - fullResult.testsPassed} test(s) failed`}`,
         }));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));

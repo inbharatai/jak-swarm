@@ -2351,7 +2351,7 @@ export function registerBuiltinTools(): void {
             },
           );
           // Safety: kill if it somehow exceeds timeout
-          setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, timeoutMs + 1000);
+          setTimeout(() => { try { proc.kill('SIGKILL'); } catch (killErr) { console.warn('[code_execute] Failed to kill process:', killErr instanceof Error ? killErr.message : String(killErr)); } }, timeoutMs + 1000);
         });
       }
 

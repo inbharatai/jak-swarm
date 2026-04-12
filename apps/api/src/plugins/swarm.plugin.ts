@@ -86,8 +86,34 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // Clean up scheduler on server close
-  fastify.addHook('onClose', () => { scheduler.stop(); });
+  // Periodic cleanup: purge stale workflows and idle circuit breakers
+  const purgeInterval = setInterval(async () => {
+    try {
+      const { supervisorBus } = await import('@jak-swarm/swarm');
+      const purgedWorkflows = supervisorBus.purgeStaleWorkflows(30 * 60 * 1000); // 30 min
+      if (purgedWorkflows > 0) {
+        fastify.log.warn({ purgedWorkflows }, '[Supervisor] Purged stale workflows');
+      }
+    } catch {
+      // Supervisor module not available — skip
+    }
+
+    try {
+      const { purgeIdleCircuitBreakers } = await import('@jak-swarm/swarm');
+      const purgedBreakers = (purgeIdleCircuitBreakers as (maxIdleMs?: number) => number)(60 * 60 * 1000); // 1 hour
+      if (purgedBreakers > 0) {
+        fastify.log.info({ purgedBreakers }, '[Supervisor] Purged idle circuit breakers');
+      }
+    } catch {
+      // Circuit breaker module not available — skip
+    }
+  }, 10 * 60 * 1000); // Run every 10 minutes
+
+  // Clean up scheduler and purge interval on server close
+  fastify.addHook('onClose', () => {
+    scheduler.stop();
+    clearInterval(purgeInterval);
+  });
 };
 
 export default fp(swarmPlugin, {

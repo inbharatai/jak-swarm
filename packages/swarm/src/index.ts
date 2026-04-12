@@ -58,5 +58,6 @@ export {
   CircuitOpenError,
   getCircuitBreaker,
   resetAllCircuitBreakers,
+  purgeIdleCircuitBreakers,
 } from './supervisor/circuit-breaker.js';
 export type { CircuitBreakerOptions, CircuitState } from './supervisor/circuit-breaker.js';
