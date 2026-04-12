@@ -33,6 +33,7 @@ import { onboardingRoutes } from './routes/onboarding.routes.js';
 import { integrationRoutes } from './routes/integrations.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import layoutRoutes from './routes/layouts.routes.js';
+import { registerObservability } from './observability/index.js';
 
 async function buildApp() {
   const fastify = Fastify({
@@ -74,7 +75,7 @@ async function buildApp() {
     global: true,
     max: 100,
     timeWindow: '1 minute',
-    errorResponseBuilder: (_request, context) => ({
+    errorResponseBuilder: (_request, _context) => ({
       success: false,
       error: {
         code: 'RATE_LIMIT_EXCEEDED',
@@ -115,6 +116,11 @@ async function buildApp() {
   await fastify.register(redisPlugin);
   await fastify.register(authPlugin);
   await fastify.register(swarmPlugin);
+
+  // -------------------------------------------------------------------------
+  // Observability (metrics, health probes, request instrumentation)
+  // -------------------------------------------------------------------------
+  await fastify.register(registerObservability);
 
   // -------------------------------------------------------------------------
   // Routes

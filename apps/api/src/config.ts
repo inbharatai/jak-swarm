@@ -42,6 +42,12 @@ export const config = {
   temporalAddress: process.env['TEMPORAL_ADDRESS'] ?? 'localhost:7233',
   temporalNamespace: process.env['TEMPORAL_NAMESPACE'] ?? 'jak-swarm',
   temporalTaskQueue: process.env['TEMPORAL_TASK_QUEUE'] ?? 'jak-main',
+
+  // Observability
+  metricsEnabled: (process.env['METRICS_ENABLED'] ?? 'true') === 'true',
+  otelExporterUrl: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ?? '', // empty = disabled
+  otelServiceName: process.env['OTEL_SERVICE_NAME'] ?? 'jak-swarm-api',
+  shutdownDrainTimeoutMs: parseInt(process.env['SHUTDOWN_DRAIN_TIMEOUT_MS'] ?? '30000', 10),
 } as const;
 
 export type Config = typeof config;

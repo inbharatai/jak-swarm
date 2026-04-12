@@ -89,23 +89,24 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   // Periodic cleanup: purge stale workflows and idle circuit breakers
   const purgeInterval = setInterval(async () => {
     try {
-      const { supervisorBus } = await import('@jak-swarm/swarm');
-      const purgedWorkflows = supervisorBus.purgeStaleWorkflows(30 * 60 * 1000); // 30 min
-      if (purgedWorkflows > 0) {
-        fastify.log.warn({ purgedWorkflows }, '[Supervisor] Purged stale workflows');
+      const swarmModule = await import('@jak-swarm/swarm') as Record<string, unknown>;
+      const bus = swarmModule['supervisorBus'] as { purgeStaleWorkflows?: (ms: number) => number } | undefined;
+      if (bus?.purgeStaleWorkflows) {
+        const purgedWorkflows = bus.purgeStaleWorkflows(30 * 60 * 1000);
+        if (purgedWorkflows > 0) {
+          fastify.log.warn({ purgedWorkflows }, '[Supervisor] Purged stale workflows');
+        }
       }
-    } catch {
-      // Supervisor module not available — skip
-    }
 
-    try {
-      const { purgeIdleCircuitBreakers } = await import('@jak-swarm/swarm');
-      const purgedBreakers = (purgeIdleCircuitBreakers as (maxIdleMs?: number) => number)(60 * 60 * 1000); // 1 hour
-      if (purgedBreakers > 0) {
-        fastify.log.info({ purgedBreakers }, '[Supervisor] Purged idle circuit breakers');
+      const purgeFn = swarmModule['purgeIdleCircuitBreakers'] as ((ms: number) => number) | undefined;
+      if (purgeFn) {
+        const purgedBreakers = purgeFn(60 * 60 * 1000);
+        if (purgedBreakers > 0) {
+          fastify.log.info({ purgedBreakers }, '[Supervisor] Purged idle circuit breakers');
+        }
       }
     } catch {
-      // Circuit breaker module not available — skip
+      // Swarm module not available — skip periodic cleanup
     }
   }, 10 * 60 * 1000); // Run every 10 minutes
 
