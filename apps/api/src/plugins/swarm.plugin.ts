@@ -19,6 +19,7 @@ import {
   RedisLockProvider,
   InMemoryLockProvider,
   withLock,
+  getDistributedCircuitBreaker,
   type SchedulerLeader,
   type WorkflowSignalBus,
   type LockProvider,
@@ -60,14 +61,21 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.log.warn('[Coordination] Redis not available — using in-memory coordination (single-instance only)');
   }
 
-  fastify.decorate('coordination', { locks, signals, leader });
+  fastify.decorate('coordination', {
+    locks,
+    signals,
+    leader,
+    getCircuitBreaker: (name: string, opts?: { failureThreshold?: number; resetTimeoutMs?: number }) =>
+      getDistributedCircuitBreaker(fastify.redis, name, opts),
+  });
 
   // Start leader election
   leader.start();
 
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
+  swarmService.setLockProvider(locks); // Distributed lock for workflow execution
   fastify.decorate('swarm', swarmService);
-  fastify.log.info('[Swarm] SwarmExecutionService registered');
+  fastify.log.info('[Swarm] SwarmExecutionService registered (with distributed lock)');
 
   // Wire workflow signals: when another instance sends pause/stop, apply locally
   signals.subscribe((signal) => {

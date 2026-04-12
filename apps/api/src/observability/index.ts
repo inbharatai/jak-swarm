@@ -14,3 +14,4 @@
 
 export { metrics, metricsRegistry } from './metrics.js';
 export { registerObservability } from './plugin.js';
+export { initTracing } from './tracing.js';

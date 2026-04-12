@@ -50,6 +50,7 @@ export interface ExecuteAsyncParams {
   userId: string;
   goal: string;
   industry?: string;
+  maxCostUsd?: number;
 }
 
 export interface ResumeParams {
@@ -68,6 +69,7 @@ export class SwarmExecutionService extends EventEmitter {
   private readonly runner: SwarmRunner;
   private readonly workflowService: WorkflowService;
   private readonly audit: AuditLogger;
+  private lockProvider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> } | null = null;
 
   constructor(
     private readonly db: PrismaClient,
@@ -78,6 +80,11 @@ export class SwarmExecutionService extends EventEmitter {
     this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
+  }
+
+  /** Inject distributed lock provider for multi-instance safety. */
+  setLockProvider(provider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> }): void {
+    this.lockProvider = provider;
   }
 
   /**
@@ -94,6 +101,16 @@ export class SwarmExecutionService extends EventEmitter {
    */
   async executeAsync(params: ExecuteAsyncParams): Promise<void> {
     const { workflowId, tenantId, userId, goal, industry } = params;
+
+    // ── Distributed lock: prevent duplicate execution across instances ───
+    let lockToken: string | null = null;
+    if (this.lockProvider) {
+      lockToken = await this.lockProvider.acquire(`workflow:exec:${workflowId}`, 10 * 60 * 1000); // 10 min TTL
+      if (!lockToken) {
+        this.log.warn({ workflowId }, '[Swarm] Workflow already running on another instance — skipping');
+        return;
+      }
+    }
 
     this.log.info({ workflowId, tenantId }, '[Swarm] Starting async execution');
 
@@ -161,6 +178,7 @@ export class SwarmExecutionService extends EventEmitter {
         userId,
         goal,
         industry,
+        maxCostUsd: params.maxCostUsd,
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;
@@ -245,6 +263,13 @@ export class SwarmExecutionService extends EventEmitter {
         await this.workflowService.updateWorkflowStatus(workflowId, 'FAILED', message);
       } catch (dbErr) {
         this.log.error({ workflowId, dbErr }, '[Swarm] Failed to mark workflow FAILED after error');
+      }
+    } finally {
+      // ── Release distributed lock ──────────────────────────────────────
+      if (this.lockProvider && lockToken) {
+        await this.lockProvider.release(`workflow:exec:${workflowId}`, lockToken).catch((relErr) => {
+          this.log.warn({ workflowId, err: relErr }, '[Swarm] Failed to release workflow lock (will expire via TTL)');
+        });
       }
     }
   }

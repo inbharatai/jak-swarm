@@ -18,3 +18,5 @@ export { RedisWorkflowSignalBus, InMemoryWorkflowSignalBus } from './workflow-si
 
 export type { SchedulerLeader } from './scheduler-leader.js';
 export { RedisSchedulerLeader, InMemorySchedulerLeader } from './scheduler-leader.js';
+
+export { DistributedCircuitBreaker, DistributedCircuitOpenError, getDistributedCircuitBreaker, resetDistributedCircuitBreakers } from './distributed-circuit-breaker.js';

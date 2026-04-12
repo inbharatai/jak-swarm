@@ -133,47 +133,94 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
   // Workflows routes can check isInShutdown() before accepting new work.
   // This is an informational hook — the /ready probe already returns 503.
 
-  // ── 7. Wire SupervisorBus events to metrics ───────────────────────────
+  // ── 7. Wire SupervisorBus events to metrics + Redis cross-instance relay ──
   try {
     const { supervisorBus } = await import('@jak-swarm/swarm');
+    const instanceId = `jak-${process.pid}-${Date.now().toString(36)}`;
+    const SUPERVISOR_CHANNEL = 'jak:supervisor:events';
 
-    supervisorBus.subscribe('workflow:started', (event) => {
-      metrics.workflowsTotal.inc({ status: 'started', tenant_id: event.tenantId });
-      metrics.activeWorkflows.inc({ tenant_id: event.tenantId });
-      trackWorkflowStart();
-    });
-
-    supervisorBus.subscribe('workflow:completed', (event) => {
-      const status = (event as any).status ?? 'completed';
-      metrics.workflowsTotal.inc({ status, tenant_id: event.tenantId });
-      metrics.activeWorkflows.dec({ tenant_id: event.tenantId });
-      trackWorkflowEnd();
-
-      if ((event as any).durationMs) {
-        metrics.workflowDuration.observe(
-          { status, tenant_id: event.tenantId },
-          (event as any).durationMs / 1000,
-        );
+    // Helper: apply event to local metrics (called for both local and remote events)
+    const applyEventToMetrics = (type: string, event: Record<string, unknown>) => {
+      if (type === 'workflow:started') {
+        metrics.workflowsTotal.inc({ status: 'started', tenant_id: String(event['tenantId'] ?? '') });
+        metrics.activeWorkflows.inc({ tenant_id: String(event['tenantId'] ?? '') });
+        trackWorkflowStart();
+      } else if (type === 'workflow:completed') {
+        const status = String(event['status'] ?? 'completed');
+        metrics.workflowsTotal.inc({ status, tenant_id: String(event['tenantId'] ?? '') });
+        metrics.activeWorkflows.dec({ tenant_id: String(event['tenantId'] ?? '') });
+        trackWorkflowEnd();
+        if (typeof event['durationMs'] === 'number') {
+          metrics.workflowDuration.observe({ status, tenant_id: String(event['tenantId'] ?? '') }, event['durationMs'] / 1000);
+        }
+      } else if (type === 'node:completed') {
+        if (event['node'] && typeof event['durationMs'] === 'number') {
+          metrics.agentExecutions.inc({ agent_role: String(event['node']), status: event['success'] ? 'success' : 'failure' });
+          metrics.agentDuration.observe({ agent_role: String(event['node']) }, event['durationMs'] / 1000);
+        }
+      } else if (type === 'circuit:open') {
+        metrics.circuitBreakerTrips.inc({ breaker_name: String(event['service'] ?? 'unknown') });
+        metrics.circuitBreakerState.set({ breaker_name: String(event['service'] ?? 'unknown') }, 1);
+      } else if (type === 'approval:required') {
+        metrics.approvalRequests.inc({ decision: 'pending' });
       }
-    });
+    };
 
-    supervisorBus.subscribe('node:completed', (event) => {
-      const e = event as any;
-      if (e.node && e.durationMs) {
-        metrics.agentExecutions.inc({ agent_role: e.node, status: e.success ? 'success' : 'failure' });
-        metrics.agentDuration.observe({ agent_role: e.node }, e.durationMs / 1000);
+    // Subscribe to LOCAL supervisor events → publish to Redis + apply metrics
+    const eventTypes = ['workflow:started', 'workflow:completed', 'node:entered', 'node:completed', 'circuit:open', 'approval:required', 'budget:exceeded'] as const;
+    for (const eventType of eventTypes) {
+      supervisorBus.subscribe(eventType, (event: unknown) => {
+        const e = event as Record<string, unknown>;
+        applyEventToMetrics(eventType, e);
+
+        // Publish to Redis for cross-instance propagation
+        try {
+          const redis = (fastify as unknown as { redis?: { publish: (ch: string, msg: string) => void } }).redis;
+          if (redis) {
+            redis.publish(SUPERVISOR_CHANNEL, JSON.stringify({ type: eventType, event: e, sourceInstance: instanceId }));
+          }
+        } catch {
+          // Redis not available — local-only mode
+        }
+      });
+    }
+
+    // Subscribe to REMOTE supervisor events from Redis → re-emit locally for SSE consumers
+    try {
+      const redis = (fastify as unknown as { redis?: unknown }).redis;
+      if (redis) {
+        const { Redis } = await import('ioredis');
+        const config = (await import('../config.js')).config;
+        const subscriber = new Redis(config.redisUrl, { maxRetriesPerRequest: 3 });
+
+        subscriber.subscribe(SUPERVISOR_CHANNEL).catch((err: unknown) => {
+          fastify.log.warn({ err }, '[observability] Failed to subscribe to supervisor Redis channel');
+        });
+
+        subscriber.on('message', (_channel: unknown, message: unknown) => {
+          try {
+            const parsed = JSON.parse(String(message)) as { type: string; event: Record<string, unknown>; sourceInstance: string };
+            // Only process events from OTHER instances (avoid double-counting local events)
+            if (parsed.sourceInstance !== instanceId) {
+              // Re-emit on local supervisor bus so SSE handlers receive it
+              supervisorBus.emit(parsed.type, parsed.event);
+              // Note: metrics NOT applied here — the emitting instance already applied them locally.
+              // Remote instances only need the event for SSE forwarding.
+            }
+          } catch {
+            // Malformed message — ignore
+          }
+        });
+
+        fastify.addHook('onClose', async () => {
+          await subscriber.quit().catch(() => {});
+        });
+
+        fastify.log.info('[observability] SupervisorBus Redis cross-instance relay active');
       }
-    });
-
-    supervisorBus.subscribe('circuit:open', (event) => {
-      const e = event as any;
-      metrics.circuitBreakerTrips.inc({ breaker_name: e.service ?? 'unknown' });
-      metrics.circuitBreakerState.set({ breaker_name: e.service ?? 'unknown' }, 1); // 1 = OPEN
-    });
-
-    supervisorBus.subscribe('approval:required', () => {
-      metrics.approvalRequests.inc({ decision: 'pending' });
-    });
+    } catch {
+      fastify.log.warn('[observability] Redis relay not available — supervisor events local only');
+    }
 
     fastify.log.info('[observability] SupervisorBus metrics bridge wired');
   } catch {

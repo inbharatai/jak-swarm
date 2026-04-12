@@ -1,3 +1,7 @@
+// OTel MUST be initialized before any other import for proper auto-instrumentation
+import { initTracing } from './observability/tracing.js';
+await initTracing();
+
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
