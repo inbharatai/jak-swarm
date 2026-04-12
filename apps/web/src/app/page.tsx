@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA } from '@/components/landing';
 
 /* ─── Animated Counter Hook ──────────────────────────────────────────────── */
 
@@ -519,6 +520,9 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── 2b. Orchestration Engine Visual ────────────────────────────── */}
+        <OrchestrationEngine />
+
         {/* ── 3. Agent Grid ────────────────────────────────────────────────── */}
         <section id="agents" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay">
           <div ref={agentGrid.ref} className={`fade-section ${agentGrid.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
@@ -594,6 +598,9 @@ export default function HomePage() {
             <span className="text-xs text-slate-500 ml-2 font-sans">Agents collaborate autonomously</span>
           </div>
         </div>
+
+        {/* ── 3b. Execution Flow - Animated Architecture ─────────────────── */}
+        <ExecutionFlow />
 
         {/* ── 4. Workflow Animation ────────────────────────────────────────── */}
         <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 diagonal-cut" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(251,191,36,0.02), transparent)' }}>
@@ -764,6 +771,9 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── 5a. Capability Architecture Map ──────────────────────────────── */}
+        <CapabilityMap />
+
         {/* ── 5b. Vibe Coding Deep Dive ────────────────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
@@ -916,6 +926,9 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── 5d. Live Execution Demo ─────────────────────────────────────── */}
+        <LiveDemo />
+
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
         <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
@@ -1033,33 +1046,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 8. CTA ───────────────────────────────────────────────────────── */}
-        <section className="relative px-4 py-24 sm:px-6 lg:px-8 overflow-hidden grain-overlay">
-          {/* Background glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, rgba(52,211,153,0.08) 0%, rgba(251,191,36,0.04) 40%, transparent 60%)' }} aria-hidden="true" />
-
-          {/* Floating elements */}
-          <div className="absolute top-10 left-[10%] w-2 h-2 rounded-full bg-emerald-500/30" style={{ animation: 'float-slow 8s ease-in-out infinite' }} aria-hidden="true" />
-          <div className="absolute bottom-20 right-[15%] w-3 h-3 rounded-full bg-amber-500/20" style={{ animation: 'float-slow 10s ease-in-out infinite 2s' }} aria-hidden="true" />
-          <div className="absolute top-1/2 left-[5%] w-1.5 h-1.5 rounded-full bg-pink-500/25" style={{ animation: 'float-slow 12s ease-in-out infinite 4s' }} aria-hidden="true" />
-
-          <div className="relative mx-auto max-w-3xl text-center z-10">
-            <h2 className="text-4xl font-display font-bold mb-4 sm:text-5xl tracking-tight gradient-text">
-              Start Automating in 2&nbsp;Minutes
-            </h2>
-            <p className="text-lg text-slate-400 mb-10 max-w-xl mx-auto font-sans">
-              Deploy your autonomous AI workforce today. Free to start, no credit card required.
-            </p>
-
-            {/* Animated gradient border button */}
-            <div className="inline-block rounded-xl p-[2px]" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24, #f472b6, #34d399)', backgroundSize: '300% 300%', animation: 'gradient-shift 4s ease infinite' }}>
-              <Link href="/register" className="group inline-flex items-center gap-2 rounded-[10px] bg-[#09090b] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-transparent hover:text-[#09090b] focus-visible:ring-2 focus-visible:ring-emerald-400" style={{ touchAction: 'manipulation' }}>
-                Get Started Free
-                <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
-          </div>
-        </section>
+        {/* ── 8. Premium CTA ─────────────────────────────────────────────── */}
+        <PremiumCTA />
 
         {/* ── 9. Footer ────────────────────────────────────────────────────── */}
         <div className="h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" aria-hidden="true" />
