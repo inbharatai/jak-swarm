@@ -281,6 +281,11 @@ const tenantsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
+        // Security: Users can only update their own profile, unless they are TENANT_ADMIN
+        if (userId !== request.user.userId && request.user.role !== 'TENANT_ADMIN' && request.user.role !== 'SYSTEM_ADMIN') {
+          return reply.status(403).send(err('FORBIDDEN', 'You can only update your own profile'));
+        }
+
         const target = await fastify.db.user.findFirst({ where: { id: userId, tenantId } });
         if (!target) throw new NotFoundError('User', userId);
 

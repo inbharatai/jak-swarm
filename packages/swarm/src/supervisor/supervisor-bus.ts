@@ -173,6 +173,25 @@ export class SupervisorBus extends EventEmitter {
     );
   }
 
+  /**
+   * Purge stale workflows that have been active for longer than maxAgeMs.
+   * Guards against memory leaks from workflows that crash without publishing workflow:completed.
+   */
+  purgeStaleWorkflows(maxAgeMs = 30 * 60 * 1000 /* 30 min */): number {
+    const now = Date.now();
+    let purged = 0;
+    for (const [id, info] of this.activeWorkflows) {
+      if (now - info.startedAt.getTime() > maxAgeMs) {
+        this.activeWorkflows.delete(id);
+        purged++;
+      }
+    }
+    if (purged > 0) {
+      console.warn(`[supervisor] Purged ${purged} stale workflows (older than ${maxAgeMs / 1000}s)`);
+    }
+    return purged;
+  }
+
   /** Reset (for testing). */
   reset(): void {
     this.removeAllListeners();

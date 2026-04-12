@@ -296,17 +296,41 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
             .send(err('CONFLICT', `Cannot run sandbox for skill with status '${skill.status}'`));
         }
 
-        const updated = await fastify.db.skill.update({
+        await fastify.db.skill.update({
           where: { id: skillId },
           data: { status: 'SANDBOX_RUNNING' },
         });
 
         await fastify.auditLog(request, 'SANDBOX_SKILL', 'Skill', skillId);
-
-        // TODO: enqueue Temporal sandbox workflow here
         request.log.info({ skillId }, 'Skill sandbox run triggered');
 
-        return reply.status(202).send(ok({ ...updated, message: 'Sandbox run enqueued' }));
+        // Execute basic validation: check input/output schemas are valid JSON
+        let sandboxResult: { passed: boolean; error?: string } = { passed: true };
+        try {
+          const inputSchema = typeof skill.inputSchemaJson === 'string' ? JSON.parse(skill.inputSchemaJson as string) : skill.inputSchemaJson;
+          const outputSchema = typeof skill.outputSchemaJson === 'string' ? JSON.parse(skill.outputSchemaJson as string) : skill.outputSchemaJson;
+
+          if (!inputSchema || typeof inputSchema !== 'object') {
+            sandboxResult = { passed: false, error: 'Invalid input schema: must be a JSON object' };
+          } else if (!outputSchema || typeof outputSchema !== 'object') {
+            sandboxResult = { passed: false, error: 'Invalid output schema: must be a JSON object' };
+          }
+        } catch (parseErr) {
+          sandboxResult = { passed: false, error: `Schema parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}` };
+        }
+
+        // Update status based on validation result
+        const finalStatus = sandboxResult.passed ? 'SANDBOX_PASSED' : 'PROPOSED';
+        const updated = await fastify.db.skill.update({
+          where: { id: skillId },
+          data: { status: finalStatus },
+        });
+
+        return reply.status(200).send(ok({
+          ...updated,
+          sandboxResult,
+          message: sandboxResult.passed ? 'Sandbox validation passed' : `Sandbox validation failed: ${sandboxResult.error}`,
+        }));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;

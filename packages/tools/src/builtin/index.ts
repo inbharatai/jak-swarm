@@ -4,11 +4,11 @@ import { toolRegistry } from '../registry/tool-registry.js';
 import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
 import { registerPhoringTools } from './phoring.tools.js';
-import { getEmailAdapter, getCalendarAdapter, hasRealAdapters } from '../adapters/adapter-factory.js';
+import { getEmailAdapter, getCalendarAdapter, getCRMAdapterFromEnv, hasRealAdapters } from '../adapters/adapter-factory.js';
 
 const emailAdapter = getEmailAdapter();
 const calendarAdapter = getCalendarAdapter();
-const crmAdapter = new UnconfiguredCRMAdapter();
+const crmAdapter = getCRMAdapterFromEnv() ?? new UnconfiguredCRMAdapter();
 
 if (hasRealAdapters()) {
   console.log('[tools] Using REAL Gmail + Calendar adapters');
@@ -261,8 +261,8 @@ export function registerBuiltinTools(): void {
             searchMethod: 'vector',
           };
         }
-      } catch {
-        // Vector search not available — fall through to keyword search
+      } catch (vecErr) {
+        console.warn('[search_knowledge] Vector search failed, falling back to keyword search:', vecErr instanceof Error ? vecErr.message : String(vecErr));
       }
 
       // 2. Fall back to keyword search on TenantMemory table
@@ -299,8 +299,8 @@ export function registerBuiltinTools(): void {
             };
           }
         }
-      } catch {
-        // DB not available — fall back to memory adapter
+      } catch (dbErr) {
+        console.warn('[search_knowledge] DB keyword search failed, falling back to memory adapter:', dbErr instanceof Error ? dbErr.message : String(dbErr));
       }
 
       // 3. Final fallback: exact key lookup via memory adapter

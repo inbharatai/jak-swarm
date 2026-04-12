@@ -28,23 +28,36 @@ export class CircuitBreaker {
   readonly name: string;
   private state: CircuitState = 'CLOSED';
   private failureCount = 0;
+  private consecutiveOpens = 0; // tracks how many times circuit re-opened after probe failure
   private lastFailureTime = 0;
+  /** @internal Used by purgeIdleCircuitBreakers */
+  lastAccessTime = Date.now();
   private probeInFlight = false;
   private readonly failureThreshold: number;
-  private readonly resetTimeoutMs: number;
+  private readonly baseResetTimeoutMs: number;
+  private readonly maxResetTimeoutMs: number;
   private readonly tenantId: string;
 
   constructor(name: string, options?: CircuitBreakerOptions) {
     this.name = name;
     this.failureThreshold = options?.failureThreshold ?? 5;
-    this.resetTimeoutMs = options?.resetTimeoutMs ?? 30_000;
+    this.baseResetTimeoutMs = options?.resetTimeoutMs ?? 30_000;
+    this.maxResetTimeoutMs = 5 * 60 * 1000; // 5 min max
     this.tenantId = options?.tenantId ?? 'system';
   }
 
+  /** Current effective reset timeout with exponential backoff. */
+  private get currentResetTimeoutMs(): number {
+    // Exponential backoff: 30s, 60s, 120s, 240s, capped at 5min
+    const timeout = this.baseResetTimeoutMs * Math.pow(2, this.consecutiveOpens);
+    return Math.min(timeout, this.maxResetTimeoutMs);
+  }
+
   getState(): CircuitState {
+    this.lastAccessTime = Date.now();
     if (this.state === 'OPEN') {
       // Check if reset timeout has elapsed → transition to HALF_OPEN
-      if (Date.now() - this.lastFailureTime >= this.resetTimeoutMs) {
+      if (Date.now() - this.lastFailureTime >= this.currentResetTimeoutMs) {
         this.state = 'HALF_OPEN';
       }
     }
@@ -59,12 +72,12 @@ export class CircuitBreaker {
     const currentState = this.getState();
 
     if (currentState === 'OPEN') {
-      throw new CircuitOpenError(this.name, this.failureCount, this.resetTimeoutMs);
+      throw new CircuitOpenError(this.name, this.failureCount, this.currentResetTimeoutMs);
     }
 
     // In HALF_OPEN, only one probe call is allowed at a time
     if (currentState === 'HALF_OPEN' && this.probeInFlight) {
-      throw new CircuitOpenError(this.name, this.failureCount, this.resetTimeoutMs);
+      throw new CircuitOpenError(this.name, this.failureCount, this.currentResetTimeoutMs);
     }
 
     if (currentState === 'HALF_OPEN') {
@@ -85,6 +98,7 @@ export class CircuitBreaker {
 
   private onSuccess(): void {
     this.failureCount = 0;
+    this.consecutiveOpens = 0; // Reset backoff on successful recovery
     this.state = 'CLOSED';
   }
 
@@ -93,6 +107,9 @@ export class CircuitBreaker {
     this.lastFailureTime = Date.now();
 
     if (this.failureCount >= this.failureThreshold) {
+      if (this.state === 'HALF_OPEN') {
+        this.consecutiveOpens++; // Probe failed — increase backoff
+      }
       this.state = 'OPEN';
       const errorMessage = err instanceof Error ? err.message : String(err);
 
@@ -145,4 +162,20 @@ export function getCircuitBreaker(name: string, options?: CircuitBreakerOptions)
 export function resetAllCircuitBreakers(): void {
   for (const breaker of breakers.values()) breaker.reset();
   breakers.clear();
+}
+
+/**
+ * Purge circuit breakers that haven't been accessed for longer than maxIdleMs.
+ * Prevents memory leaks from accumulating breakers for historical agent roles.
+ */
+export function purgeIdleCircuitBreakers(maxIdleMs = 60 * 60 * 1000 /* 1 hour */): number {
+  const now = Date.now();
+  let purged = 0;
+  for (const [name, breaker] of breakers) {
+    if (now - breaker.lastAccessTime > maxIdleMs) {
+      breakers.delete(name);
+      purged++;
+    }
+  }
+  return purged;
 }

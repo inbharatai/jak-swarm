@@ -98,12 +98,12 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const raw = await fastify.redis.get(`voice:session:${sessionId}`);
         if (!raw) throw new NotFoundError('VoiceSession', sessionId);
 
-        const session = JSON.parse(raw) as {
-          userId: string;
-          tenantId: string;
-          voice: string;
-          language: string;
-        };
+        let session: { userId: string; tenantId: string; voice: string; language: string };
+        try {
+          session = JSON.parse(raw);
+        } catch {
+          throw new AppError(500, 'CORRUPTED_SESSION', 'Voice session data is corrupted');
+        }
 
         if (
           session.tenantId !== request.user.tenantId &&
@@ -195,7 +195,8 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const raw = await fastify.redis.get(`voice:session:${sessionId}`);
         if (!raw) throw new NotFoundError('VoiceSession', sessionId);
 
-        const session = JSON.parse(raw) as { userId: string; tenantId: string };
+        let session: { userId: string; tenantId: string };
+        try { session = JSON.parse(raw); } catch { throw new AppError(500, 'CORRUPTED_SESSION', 'Voice session data is corrupted'); }
 
         // Only the session owner or an admin may end the session
         if (
@@ -241,7 +242,8 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Parse session to check ownership
         if (sessionRaw) {
-          const session = JSON.parse(sessionRaw) as { userId: string; tenantId: string };
+          let session: { userId: string; tenantId: string };
+          try { session = JSON.parse(sessionRaw); } catch { throw new AppError(500, 'CORRUPTED_SESSION', 'Voice session data is corrupted'); }
           if (
             session.tenantId !== request.user.tenantId &&
             request.user.role !== 'SYSTEM_ADMIN'
@@ -250,9 +252,10 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        const transcript = transcriptRaw
-          ? (JSON.parse(transcriptRaw) as Array<{ role: string; content: string; timestamp: string }>)
-          : [];
+        let transcript: Array<{ role: string; content: string; timestamp: string }> = [];
+        if (transcriptRaw) {
+          try { transcript = JSON.parse(transcriptRaw); } catch { transcript = []; }
+        }
 
         return reply.status(200).send(ok({ sessionId, transcript }));
       } catch (e) {

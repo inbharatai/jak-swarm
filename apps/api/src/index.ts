@@ -45,6 +45,8 @@ async function buildApp() {
     },
     // Attach request id to all log lines
     genReqId: () => `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    // Global body size limit: 10MB (individual routes can override)
+    bodyLimit: 10 * 1024 * 1024,
   });
 
   // -------------------------------------------------------------------------
@@ -76,7 +78,7 @@ async function buildApp() {
       success: false,
       error: {
         code: 'RATE_LIMIT_EXCEEDED',
-        message: `Rate limit exceeded. Try again in ${Math.ceil(context.ttl / 1000)} seconds.`,
+        message: 'Rate limit exceeded. Please try again later.',
       },
     }),
   });
