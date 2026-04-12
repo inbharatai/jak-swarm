@@ -169,6 +169,66 @@ flowchart LR
 | 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel (requires Vercel API token — experimental) |
 | 🔀 | **Version Control** | Every change creates a snapshot. Rollback to any version instantly |
 | 📸 | **Image-to-Code** | Drag-drop a Figma screenshot, AI replicates the design |
+| 🧠 | **Supervisor Module** | Central nervous system — event bus, circuit breakers, workflow telemetry, approval gates |
+
+---
+
+## 🧠 Supervisor Module — System Intelligence
+
+The Supervisor is JAK's observability and resilience layer. It ensures workflows are **observable**, **resilient**, and **controllable** — even when individual agents fail.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      SupervisorBus                           │
+│              (Typed Event Pub-Sub — Singleton)                │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Publishers:                    Subscribers:                 │
+│  ├─ SwarmRunner                 ├─ SSE → Frontend            │
+│  ├─ WorkerNode                  ├─ Database persistence       │
+│  ├─ CircuitBreaker              ├─ Audit logging             │
+│  └─ ApprovalGate                └─ Cost tracking             │
+│                                                              │
+├───── Event Types ────────────────────────────────────────────┤
+│  workflow:requested  │  workflow:started  │  workflow:completed│
+│  node:entered        │  node:completed    │  approval:required │
+│  budget:exceeded     │  circuit:open      │                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Circuit Breaker
+
+Every agent execution is wrapped in a per-role circuit breaker:
+
+```
+CLOSED ──(5 failures)──→ OPEN ──(30s timeout)──→ HALF-OPEN ──(probe succeeds)──→ CLOSED
+                           │                        │
+                           └── calls fail instantly  └── one test call allowed
+```
+
+- **`worker:email`**, **`worker:crm`**, **`worker:browser`** — each agent role gets its own breaker
+- When a circuit opens, the Supervisor publishes `circuit:open` to the event bus
+- Prevents one broken integration (e.g. Gmail API outage) from cascading to the entire workflow
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `packages/swarm/src/supervisor/supervisor-bus.ts` | Event pub-sub with multi-tenant workflow tracking |
+| `packages/swarm/src/supervisor/circuit-breaker.ts` | State machine protecting agent execution |
+| `packages/swarm/src/runner/swarm-runner.ts` | Publishes workflow lifecycle events |
+| `packages/swarm/src/graph/nodes/worker-node.ts` | Wraps agent calls in circuit breakers |
+
+### Why This Matters
+
+Most AI agent platforms have **zero resilience**. If an LLM call fails, the whole workflow crashes. JAK's Supervisor module means:
+
+- **One broken agent can't take down everything** — circuit breakers isolate failures
+- **You can watch execution in real time** — every node entry/exit streams to the frontend
+- **High-risk actions require approval** — budget limits and human gates prevent runaway costs
+- **Full audit trail** — every event is timestamped, tenant-scoped, and persisted
 
 ---
 

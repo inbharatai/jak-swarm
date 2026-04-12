@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA } from '@/components/landing';
+import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection } from '@/components/landing';
 
 /* ─── Animated Counter Hook ──────────────────────────────────────────────── */
 
@@ -926,7 +926,10 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 5d. Live Execution Demo ─────────────────────────────────────── */}
+        {/* ── 5d. Supervisor — System Intelligence ────────────────────────── */}
+        <SupervisorSection />
+
+        {/* ── 5e. Live Execution Demo ─────────────────────────────────────── */}
         <LiveDemo />
 
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
