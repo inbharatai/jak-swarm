@@ -37,8 +37,8 @@ RUN pnpm --filter @jak-swarm/db exec prisma generate
 RUN pnpm --filter @jak-swarm/shared build && \
     pnpm --filter @jak-swarm/security build && \
     pnpm --filter @jak-swarm/verification build && \
-    pnpm --filter @jak-swarm/agents build && \
     pnpm --filter @jak-swarm/tools build && \
+    pnpm --filter @jak-swarm/agents build && \
     pnpm --filter @jak-swarm/swarm build && \
     pnpm --filter @jak-swarm/api build
 
