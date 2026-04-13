@@ -8,3 +8,5 @@ dist/
 coverage/
 *.log
 prisma/migrations/
+
+.vercel
