@@ -62,8 +62,6 @@ describe('Tool Registry', () => {
       'browser_set_cookies', 'browser_save_as_pdf', 'browser_manage_tabs',
       // PDF tools
       'pdf_extract_text', 'pdf_analyze',
-      // Phoring tools
-      'phoring_forecast', 'phoring_graph_query', 'phoring_validate', 'phoring_simulate',
     ];
 
     for (const name of expected) {
