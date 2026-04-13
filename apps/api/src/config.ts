@@ -30,7 +30,7 @@ export const config = {
   // Database URL is required in all environments once the DB is up.
   databaseUrl: required('DATABASE_URL', 'postgresql://jakswarm:jakswarm@localhost:5432/jakswarm'),
 
-  redisUrl: process.env['REDIS_URL'] ?? 'redis://localhost:6379',
+  redisUrl: process.env['REDIS_URL']?.trim() || null,
 
   // OPENAI_API_KEY is required for LLM calls. Agents log a warning if missing.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',

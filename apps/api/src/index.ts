@@ -166,12 +166,16 @@ async function buildApp() {
     }
 
     // Redis
-    const redisStart = Date.now();
-    try {
-      await fastify.redis.ping();
-      checks.redis = { status: 'ok', latencyMs: Date.now() - redisStart };
-    } catch (e) {
-      checks.redis = { status: 'error', latencyMs: Date.now() - redisStart, error: e instanceof Error ? e.message : String(e) };
+    if (config.redisUrl) {
+      const redisStart = Date.now();
+      try {
+        await fastify.redis.ping();
+        checks.redis = { status: 'ok', latencyMs: Date.now() - redisStart };
+      } catch (e) {
+        checks.redis = { status: 'error', latencyMs: Date.now() - redisStart, error: e instanceof Error ? e.message : String(e) };
+      }
+    } else {
+      checks.redis = { status: 'disabled' };
     }
 
     const allHealthy = Object.values(checks).every((c) => c.status === 'ok');

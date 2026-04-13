@@ -12,6 +12,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { metrics, metricsRegistry } from './metrics.js';
+import { config } from '../config.js';
 
 // ─── Shutdown state ─────────────────────────────────────────────────────────
 
@@ -84,15 +85,19 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Redis check
-    try {
-      const redisStart = Date.now();
-      await (fastify as any).redis?.ping();
-      const redisLatency = Date.now() - redisStart;
-      checks['redis'] = { status: 'ok', latencyMs: redisLatency };
-      metrics.healthCheckDuration.observe({ dependency: 'redis' }, redisLatency / 1000);
-    } catch {
-      checks['redis'] = { status: 'unavailable', latencyMs: -1 };
-      // Redis is optional — don't fail readiness for it
+    if (config.redisUrl) {
+      try {
+        const redisStart = Date.now();
+        await (fastify as any).redis?.ping();
+        const redisLatency = Date.now() - redisStart;
+        checks['redis'] = { status: 'ok', latencyMs: redisLatency };
+        metrics.healthCheckDuration.observe({ dependency: 'redis' }, redisLatency / 1000);
+      } catch {
+        checks['redis'] = { status: 'unavailable', latencyMs: -1 };
+        // Redis is optional — don't fail readiness for it
+      }
+    } else {
+      checks['redis'] = { status: 'disabled', latencyMs: 0 };
     }
 
     // LLM provider health
@@ -187,7 +192,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
         // Publish to Redis for cross-instance propagation
         try {
           const redis = (fastify as unknown as { redis?: { publish: (ch: string, msg: string) => void } }).redis;
-          if (redis) {
+          if (config.redisUrl && redis) {
             redis.publish(SUPERVISOR_CHANNEL, JSON.stringify({ type: eventType, event: e, sourceInstance: instanceId }));
           }
         } catch {
@@ -199,9 +204,8 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     // Subscribe to REMOTE supervisor events from Redis → re-emit locally for SSE consumers
     try {
       const redis = (fastify as unknown as { redis?: unknown }).redis;
-      if (redis) {
+      if (config.redisUrl && redis) {
         const { Redis } = await import('ioredis');
-        const config = (await import('../config.js')).config;
         const subscriber = new Redis(config.redisUrl, { maxRetriesPerRequest: 3 });
 
         subscriber.subscribe(SUPERVISOR_CHANNEL).catch((err: unknown) => {

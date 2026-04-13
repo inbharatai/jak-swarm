@@ -44,7 +44,8 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   let leader: SchedulerLeader;
   let subscriberRedis: Redis | null = null;
 
-  try {
+  if (config.redisUrl) {
+    try {
     // Use Redis for coordination if available
     locks = new RedisLockProvider(fastify.redis);
     leader = new RedisSchedulerLeader(fastify.redis);
@@ -54,11 +55,17 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     signals = new RedisWorkflowSignalBus(fastify.redis, subscriberRedis);
 
     fastify.log.info('[Coordination] Using Redis for distributed locks, signals, and leader election');
-  } catch {
+    } catch {
+      locks = new InMemoryLockProvider();
+      signals = new InMemoryWorkflowSignalBus();
+      leader = new InMemorySchedulerLeader();
+      fastify.log.warn('[Coordination] Redis unavailable — using in-memory coordination (single-instance only)');
+    }
+  } else {
     locks = new InMemoryLockProvider();
     signals = new InMemoryWorkflowSignalBus();
     leader = new InMemorySchedulerLeader();
-    fastify.log.warn('[Coordination] Redis not available — using in-memory coordination (single-instance only)');
+    fastify.log.warn('[Coordination] REDIS_URL not set — using in-memory coordination (single-instance only)');
   }
 
   fastify.decorate('coordination', {
@@ -66,7 +73,9 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     signals,
     leader,
     getCircuitBreaker: (name: string, opts?: { failureThreshold?: number; resetTimeoutMs?: number }) =>
-      getDistributedCircuitBreaker(fastify.redis, name, opts),
+      config.redisUrl
+        ? getDistributedCircuitBreaker(fastify.redis, name, opts)
+        : getDistributedCircuitBreaker(undefined, name, opts),
   });
 
   // Start leader election
@@ -123,15 +132,17 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.log.warn('[billing] CreditService not available — usage ledger will not be recorded');
   }
   // Inject distributed circuit breaker factory for shared failure state across instances
-  try {
+  if (config.redisUrl) {
+    try {
     swarmService.setCircuitBreakerFactory((name, opts) =>
       getDistributedCircuitBreaker(fastify.redis, name, opts));
-  } catch {
-    fastify.log.warn('[Swarm] Distributed circuit breaker not available — using in-process breakers');
+    } catch {
+      fastify.log.warn('[Swarm] Distributed circuit breaker not available — using in-process breakers');
+    }
   }
 
   // Enable cross-instance SSE relay if Redis is available
-  if (subscriberRedis) {
+  if (config.redisUrl && subscriberRedis) {
     // Create a second subscriber connection for SSE events (separate from signals subscriber)
     try {
       const { Redis } = await import('ioredis');
