@@ -121,6 +121,26 @@ export const healthCheckDuration = new client.Histogram({
   buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1],
 });
 
+// ─── Routing & Billing Metrics ───────────────────────────────────────────────
+
+export const routingDecisions = new client.Counter({
+  name: 'jak_routing_decisions_total',
+  help: 'Model routing decisions by task type, model, and tier',
+  labelNames: ['task_type', 'model', 'tier'] as const,
+});
+
+export const creditReservations = new client.Counter({
+  name: 'jak_credit_reservations_total',
+  help: 'Credit reservations by result (allowed/denied)',
+  labelNames: ['result', 'reason'] as const,
+});
+
+export const creditReconciliations = new client.Counter({
+  name: 'jak_credit_reconciliations_total',
+  help: 'Credit reconciliations after execution',
+  labelNames: ['status'] as const,
+});
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const metricsRegistry = client.register;
@@ -140,5 +160,8 @@ export const metrics = {
   approvalRequests,
   httpRequestDuration,
   healthCheckDuration,
+  routingDecisions,
+  creditReservations,
+  creditReconciliations,
   registry: metricsRegistry,
 };

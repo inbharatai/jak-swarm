@@ -90,10 +90,16 @@ export class SwarmExecutionService extends EventEmitter {
   }
 
   private circuitBreakerFactory: ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }) | undefined;
+  private creditServiceInstance: { reconcile: (params: Record<string, unknown>) => Promise<void> } | null = null;
 
   /** Inject distributed circuit breaker factory for multi-instance safety. */
   setCircuitBreakerFactory(factory: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }): void {
     this.circuitBreakerFactory = factory;
+  }
+
+  /** Inject credit service for post-execution reconciliation. */
+  setCreditService(service: { reconcile: (params: Record<string, unknown>) => Promise<void> }): void {
+    this.creditServiceInstance = service;
   }
 
   /**
@@ -310,6 +316,37 @@ export class SwarmExecutionService extends EventEmitter {
         taskCount: result.traces.length,
         failedCount: result.traces.filter(t => t.error).length,
       });
+
+      // ── Credit reconciliation: record actual usage to ledger ──────────
+      if (this.creditServiceInstance) {
+        try {
+          const actualCostUsd = result.traces.reduce((sum: number, t: { costUsd?: number }) =>
+            sum + (typeof t.costUsd === 'number' ? t.costUsd : 0), 0);
+          const actualCredits = Math.max(1, Math.ceil(actualCostUsd * 100));
+          const totalTokens = result.traces.reduce((sum: number, t: { tokenUsage?: { totalTokens?: number } }) =>
+            sum + (t.tokenUsage?.totalTokens ?? 0), 0);
+
+          await this.creditServiceInstance.reconcile({
+            tenantId,
+            userId,
+            workflowId,
+            taskType: 'agent_workflow',
+            modelUsed: 'mixed',
+            provider: 'mixed',
+            inputTokens: Math.round(totalTokens * 0.6),
+            outputTokens: Math.round(totalTokens * 0.4),
+            actualCredits,
+            reservedCredits: actualCredits, // Best estimate; real reservation tracked upstream
+            usdCost: actualCostUsd,
+            latencyMs: result.durationMs,
+            status: dbStatus === 'COMPLETED' ? 'completed' : 'failed',
+          });
+          this.log.debug({ workflowId, actualCredits, actualCostUsd }, '[billing] Workflow usage reconciled');
+        } catch (reconcileErr) {
+          this.log.warn({ workflowId, err: reconcileErr instanceof Error ? reconcileErr.message : String(reconcileErr) },
+            '[billing] Credit reconciliation failed');
+        }
+      }
 
       this.log.info(
         { workflowId, dbStatus, durationMs: result.durationMs, traces: result.traces.length },

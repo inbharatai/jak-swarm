@@ -10,3 +10,10 @@ export {
   type ModelSelection,
   type RouteEntry,
 } from './model-router.js';
+export {
+  startProviderHealthChecks,
+  stopProviderHealthChecks,
+  getProviderHealth,
+  getAllProviderHealth,
+  isProviderAvailable,
+} from './provider-health.js';

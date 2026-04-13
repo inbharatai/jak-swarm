@@ -101,6 +101,18 @@ const usageRoutes: FastifyPluginAsync = async (fastify) => {
         : `This task needs ~${estimate.estimatedCredits} credits but you have ${Math.min(usage.daily.remaining, usage.credits.remaining)} remaining`,
     }));
   });
+
+  /**
+   * GET /usage/providers — LLM provider health status
+   */
+  fastify.get('/providers', { preHandler }, async (_request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { getAllProviderHealth } = await import('../billing/provider-health.js');
+      return reply.send(ok(getAllProviderHealth()));
+    } catch {
+      return reply.send(ok([]));
+    }
+  });
 };
 
 export default usageRoutes;

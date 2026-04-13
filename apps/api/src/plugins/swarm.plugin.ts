@@ -102,6 +102,26 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
 
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
   swarmService.setLockProvider(locks); // Distributed lock for workflow execution
+
+  // Start LLM provider health monitoring
+  try {
+    const { startProviderHealthChecks, stopProviderHealthChecks } = await import('../billing/provider-health.js');
+    startProviderHealthChecks();
+    fastify.addHook('onClose', () => { stopProviderHealthChecks(); });
+    fastify.log.info('[health] LLM provider health checks started (60s interval)');
+  } catch {
+    fastify.log.warn('[health] Provider health checks not available');
+  }
+
+  // Wire credit service for post-execution reconciliation
+  try {
+    const { CreditService } = await import('../billing/credit-service.js');
+    const creditService = new CreditService(fastify.db);
+    swarmService.setCreditService(creditService as any);
+    fastify.log.info('[billing] Credit reconciliation wired to workflow execution');
+  } catch {
+    fastify.log.warn('[billing] CreditService not available — usage ledger will not be recorded');
+  }
   // Inject distributed circuit breaker factory for shared failure state across instances
   try {
     swarmService.setCircuitBreakerFactory((name, opts) =>

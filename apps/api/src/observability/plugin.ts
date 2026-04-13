@@ -95,6 +95,17 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
       // Redis is optional — don't fail readiness for it
     }
 
+    // LLM provider health
+    try {
+      const { getAllProviderHealth } = await import('../billing/provider-health.js');
+      const providers = getAllProviderHealth();
+      for (const p of providers) {
+        checks[`llm_${p.provider}`] = { status: p.status, latencyMs: p.avgLatencyMs };
+      }
+    } catch {
+      // Provider health not available
+    }
+
     return reply.status(allHealthy ? 200 : 503).send({
       status: allHealthy ? 'ready' : 'not_ready',
       checks,
