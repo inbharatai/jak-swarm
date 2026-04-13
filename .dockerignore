@@ -1,0 +1,17 @@
+node_modules
+.git
+.github
+.vercel
+.vscode
+.next
+dist
+*.md
+docs
+docker
+scripts
+tests
+community-content
+apps/web/node_modules
+apps/web/.next
+apps/web/dist
+packages/docs
