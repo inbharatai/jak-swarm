@@ -1,0 +1,45 @@
+# Render Blueprint — JAK Swarm API
+# https://render.com/docs/blueprint-spec
+#
+# Deploy: Connect this repo to Render, it auto-detects this file.
+# The API runs as a web service. Frontend deploys separately on Vercel.
+#
+# Required env vars (set in Render dashboard):
+#   DATABASE_URL, DIRECT_URL, AUTH_SECRET, OPENAI_API_KEY
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+services:
+  - type: web
+    name: jak-swarm-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: oregon # Closest to most US users + Supabase default region
+    plan: starter # $7/mo — persistent process, no sleep
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: API_PORT
+        value: "4000"
+      - key: LOG_LEVEL
+        value: warn
+      - key: CORS_ORIGINS
+        value: https://jakswarm.com,https://www.jakswarm.com
+      # Set these in Render dashboard (secret):
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true # Render auto-generates a random string
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false # Optional — skip for now, add Upstash later
