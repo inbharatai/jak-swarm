@@ -19,7 +19,7 @@ const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED']
 export interface ListWorkflowsOptions {
   page: number;
   limit: number;
-  status?: WorkflowStatus;
+  status?: WorkflowStatus | WorkflowStatus[];
 }
 
 export interface SaveTraceInput {
@@ -109,10 +109,11 @@ export class WorkflowService {
   ): Promise<PaginatedResult<Workflow>> {
     const { page, limit, status } = options;
     const skip = (page - 1) * limit;
+    const statuses = Array.isArray(status) ? status : status ? [status] : undefined;
 
     const where = {
       tenantId,
-      ...(status ? { status } : {}),
+      ...(statuses?.length ? { status: { in: statuses } } : {}),
     };
 
     const [total, rows] = await Promise.all([

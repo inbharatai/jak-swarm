@@ -114,21 +114,25 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
       };
       const page = Math.max(1, parseInt(query.page ?? '1', 10));
       const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const status = query.status as WorkflowStatus | undefined;
+      const statuses = query.status
+        ?.split(',')
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean) as WorkflowStatus[] | undefined;
 
       const VALID_STATUSES: WorkflowStatus[] = [
         'PENDING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED',
       ];
 
-      if (status && !VALID_STATUSES.includes(status)) {
-        return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${status}'`));
+      const invalidStatus = statuses?.find((value) => !VALID_STATUSES.includes(value));
+      if (invalidStatus) {
+        return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${invalidStatus}'`));
       }
 
       try {
         const result = await workflowService.listWorkflows(request.user.tenantId, {
           page,
           limit,
-          status,
+          status: statuses?.length === 1 ? statuses[0] : statuses,
         });
         return reply.status(200).send(ok(result));
       } catch (e) {
@@ -312,7 +316,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
       const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
       if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-
+        await fastify.authenticate(request, reply);
       // Broadcast stop signal to ALL instances
       fastify.swarm.stopWorkflow(workflowId); // Local instance
       await fastify.coordination.signals.publish({
@@ -414,7 +418,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         request.headers.authorization = `Bearer ${query.token}`;
       }
       try {
-        await request.jwtVerify();
+        await fastify.authenticate(request, reply);
       } catch {
         return reply.code(401).send({ error: 'Unauthorized' });
       }

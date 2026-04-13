@@ -10,12 +10,14 @@ const PUBLIC_PATHS = new Set([
   '/login',
   '/register',
   '/forgot-password',
+  '/reset-password',
   '/auth/callback',
   '/auth/confirm',
 ]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  if (pathname.startsWith('/login/')) return true;
   // Allow static assets and API routes
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) return true;
   // Allow static file extensions only (not arbitrary dots in paths)

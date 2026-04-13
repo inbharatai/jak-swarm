@@ -4,14 +4,14 @@ import React from 'react';
 import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { PlayCircle, Loader2, CheckCircle2 } from 'lucide-react';
-import { fetcher } from '@/lib/api-client';
+import { dataFetcher } from '@/lib/api-client';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, EmptyState } from '@/components/ui';
 import type { Workflow, PaginatedResult } from '@/types';
 
 export function RunningWorkflowsWidget() {
   const { data, isLoading } = useSWR<PaginatedResult<Workflow>>(
     '/workflows?status=RUNNING&limit=5',
-    fetcher,
+    dataFetcher,
     { refreshInterval: 5000 },
   );
 

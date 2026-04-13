@@ -4,7 +4,7 @@ import React from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { Plug, ArrowRight, Loader2 } from 'lucide-react';
-import { fetcher } from '@/lib/api-client';
+import { dataFetcher } from '@/lib/api-client';
 import { Card, CardHeader, CardTitle, CardContent, StatusDot, EmptyState } from '@/components/ui';
 import type { Integration, IntegrationProvider } from '@/types';
 
@@ -19,15 +19,13 @@ const PROVIDER_EMOJI: Record<IntegrationProvider, string> = {
 };
 
 export function IntegrationHealthWidget() {
-  // integrationApi.list() calls GET /integrations and unwraps .data
-  // For SWR we hit the raw endpoint which returns { data: Integration[] }
-  const { data, isLoading } = useSWR<{ data: Integration[] }>(
+  const { data, isLoading } = useSWR<Integration[]>(
     '/integrations',
-    fetcher,
+    dataFetcher,
     { refreshInterval: 60000 },
   );
 
-  const integrations = data?.data ?? [];
+  const integrations = data ?? [];
   const connected = integrations.filter((i) => i.status === 'CONNECTED');
 
   return (

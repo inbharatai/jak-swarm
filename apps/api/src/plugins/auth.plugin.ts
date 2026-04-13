@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import type { AuthSession, UserRole } from '../types.js';
+import { AuthService } from '../services/auth.service.js';
 import { UnauthorizedError, ForbiddenError } from '../errors.js';
 
 // Augment @fastify/jwt so that request.user is typed as AuthSession
@@ -26,6 +27,8 @@ declare module 'fastify' {
 }
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
+  const authService = new AuthService(fastify.db, fastify);
+
   /**
    * authenticate — verifies the Bearer JWT and populates request.user.
    * Throws 401 if the token is missing or invalid.
@@ -34,13 +37,31 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     request: FastifyRequest,
     _reply: FastifyReply,
   ): Promise<void> => {
+    const authHeader = request.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+
+    if (!token) {
+      throw new UnauthorizedError('Missing authorization token');
+    }
+
     try {
       // @fastify/jwt attaches jwtVerify to the request
       await request.jwtVerify<AuthSession>();
-    } catch (err) {
-      throw new UnauthorizedError(
-        err instanceof Error ? err.message : 'Invalid or expired token',
-      );
+      return;
+    } catch (localJwtError) {
+      try {
+        const session = await authService.authenticateSupabaseToken(token);
+        (request as FastifyRequest & { user: AuthSession }).user = session;
+        return;
+      } catch (supabaseError) {
+        throw new UnauthorizedError(
+          supabaseError instanceof Error
+            ? supabaseError.message
+            : localJwtError instanceof Error
+              ? localJwtError.message
+              : 'Invalid or expired token',
+        );
+      }
     }
   };
 

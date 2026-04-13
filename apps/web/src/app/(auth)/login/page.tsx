@@ -151,6 +151,13 @@ export default function LoginPage() {
                 'Sign In'
               )}
             </button>
+
+            <Link
+              href="/login/magic"
+              className="block text-center text-sm text-primary hover:underline"
+            >
+              Use magic PIN instead
+            </Link>
           </form>
         </div>
 

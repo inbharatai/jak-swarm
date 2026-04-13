@@ -8,5 +8,7 @@ dist/
 coverage/
 *.log
 prisma/migrations/
+*.tsbuildinfo
 
 .vercel
+scripts/create-render-service.ps1

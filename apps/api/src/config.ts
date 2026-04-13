@@ -39,6 +39,9 @@ export const config = {
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
 
+  supabaseUrl: process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim() ?? '',
+  supabaseAnonKey: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim() ?? '',
+
   temporalAddress: process.env['TEMPORAL_ADDRESS'] ?? 'localhost:7233',
   temporalNamespace: process.env['TEMPORAL_NAMESPACE'] ?? 'jak-swarm',
   temporalTaskQueue: process.env['TEMPORAL_TASK_QUEUE'] ?? 'jak-main',

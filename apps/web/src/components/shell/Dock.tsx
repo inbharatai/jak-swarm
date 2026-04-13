@@ -47,8 +47,9 @@ function DockIcon({ module, isOpen, isActive, isMinimized, onClick }: {
       {...attributes}
       {...listeners}
       onClick={onClick}
+      aria-label={module.title}
       className={cn(
-        'group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200',
+        'group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive
           ? 'bg-primary/15 text-primary shadow-sm shadow-primary/20'
           : isOpen
@@ -165,9 +166,15 @@ export function Dock() {
     <>
       <aside className="flex h-full w-14 flex-col items-center border-r border-border/40 bg-background/80 backdrop-blur-xl py-3 shrink-0">
         {/* Logo */}
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary mb-4 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
+        <button
+          type="button"
+          onClick={() => openModule('dashboard-home')}
+          aria-label="Open dashboard home"
+          className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Dashboard home"
+        >
           <Zap className="h-4.5 w-4.5 text-primary-foreground" />
-        </div>
+        </button>
 
         {/* Module icons */}
         <nav className="flex-1 flex flex-col items-center gap-0.5 overflow-y-auto w-full px-2 scrollbar-none">

@@ -4,18 +4,18 @@ import React from 'react';
 import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import { ShieldCheck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { fetcher, approvalApi } from '@/lib/api-client';
+import { dataFetcher, approvalApi } from '@/lib/api-client';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, EmptyState } from '@/components/ui';
-import type { ApprovalRequest } from '@/types';
+import type { ApprovalRequest, PaginatedResult } from '@/types';
 
 export function ApprovalsSummary() {
-  const { data, isLoading, mutate } = useSWR<ApprovalRequest[]>(
+  const { data, isLoading, mutate } = useSWR<PaginatedResult<ApprovalRequest>>(
     '/approvals?status=PENDING',
-    fetcher,
+    dataFetcher,
     { refreshInterval: 10000 },
   );
 
-  const approvals = Array.isArray(data) ? data : [];
+  const approvals = data?.items ?? [];
   const topThree = approvals.slice(0, 3);
 
   const handleDecision = async (id: string, decision: 'APPROVED' | 'REJECTED') => {

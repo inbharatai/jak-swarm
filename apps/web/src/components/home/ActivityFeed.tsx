@@ -12,7 +12,7 @@ import {
   PlayCircle,
   PauseCircle,
 } from 'lucide-react';
-import { fetcher } from '@/lib/api-client';
+import { dataFetcher } from '@/lib/api-client';
 import { Card, CardHeader, CardTitle, CardContent, Badge, EmptyState } from '@/components/ui';
 import type { Workflow, WorkflowStatus, PaginatedResult } from '@/types';
 
@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<WorkflowStatus, { icon: React.ElementType; color: st
 export function ActivityFeed() {
   const { data, isLoading } = useSWR<PaginatedResult<Workflow>>(
     '/workflows?limit=10',
-    fetcher,
+    dataFetcher,
     { refreshInterval: 15000 },
   );
 

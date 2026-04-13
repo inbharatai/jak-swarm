@@ -70,6 +70,8 @@ interface AuthState {
 
 interface UseAuthReturn extends AuthState {
   login: (email: string, password: string) => Promise<void>;
+  requestMagicPin: (email: string) => Promise<void>;
+  verifyMagicPin: (email: string, token: string) => Promise<void>;
   register: (data: {
     email: string;
     password: string;
@@ -77,8 +79,15 @@ interface UseAuthReturn extends AuthState {
     tenantName: string;
     industry: string;
   }) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+}
+
+function buildAbsoluteUrl(path: string): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return new URL(path, window.location.origin).toString();
 }
 
 export function useAuth(): UseAuthReturn {
@@ -126,6 +135,44 @@ export function useAuth(): UseAuthReturn {
     }
   }, []);
 
+  const requestMagicPin = useCallback(async (email: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    const { error } = await getClient().auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: buildAbsoluteUrl('/auth/confirm?next=/workspace'),
+      },
+    });
+    if (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      throw new Error(error.message);
+    }
+
+    setState(prev => ({ ...prev, isLoading: false, error: null }));
+  }, []);
+
+  const verifyMagicPin = useCallback(async (email: string, token: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    const { error } = await getClient().auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+    if (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      throw new Error(error.message);
+    }
+  }, []);
+
   const register = useCallback(
     async (data: {
       email: string;
@@ -160,6 +207,45 @@ export function useAuth(): UseAuthReturn {
     [],
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    const { error } = await getClient().auth.resetPasswordForEmail(email, {
+      redirectTo: buildAbsoluteUrl('/auth/confirm?next=/reset-password'),
+    });
+
+    if (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      throw new Error(error.message);
+    }
+
+    setState(prev => ({ ...prev, isLoading: false, error: null }));
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    const { error } = await getClient().auth.updateUser({ password });
+
+    if (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      throw new Error(error.message);
+    }
+
+    const { data } = await getClient().auth.getUser();
+    setState({
+      user: data.user ? mapSupabaseUser(data.user) : null,
+      isLoading: false,
+      error: null,
+    });
+  }, []);
+
   const logout = useCallback(async () => {
     await getClient().auth.signOut();
     setState({ user: null, isLoading: false, error: null });
@@ -171,7 +257,11 @@ export function useAuth(): UseAuthReturn {
   return {
     ...state,
     login,
+    requestMagicPin,
+    verifyMagicPin,
     register,
+    requestPasswordReset,
+    updatePassword,
     logout,
     isAuthenticated: state.user !== null,
   };

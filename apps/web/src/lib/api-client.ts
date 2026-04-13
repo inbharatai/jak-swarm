@@ -1,7 +1,7 @@
-import type { ApiError, Integration } from '@/types';
+import type { ApiError, ApprovalRequest, Integration, PaginatedResult, Workflow } from '@/types';
 import { createClient } from './supabase';
 
-const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000';
+const BASE_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').trim();
 
 async function getToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
@@ -72,6 +72,29 @@ async function request<T>(
   return json as T;
 }
 
+function unwrapApiData<T>(payload: unknown): T {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    (payload as { success?: unknown }).success === true &&
+    'data' in payload
+  ) {
+    return (payload as { data: T }).data;
+  }
+
+  return payload as T;
+}
+
+async function requestData<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const payload = await request<unknown>(method, path, body);
+  return unwrapApiData<T>(payload);
+}
+
 export const apiClient = {
   get<T>(path: string): Promise<T> {
     return request<T>('GET', path);
@@ -99,10 +122,21 @@ export function fetcher<T>(url: string): Promise<T> {
   return apiClient.get<T>(url);
 }
 
+/** SWR-compatible fetcher that unwraps { success: true, data } envelopes. */
+export function dataFetcher<T>(url: string): Promise<T> {
+  return requestData<T>('GET', url);
+}
+
 /** Generic fetch helper for use in components */
 export function apiFetch<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
   const method = options?.method ?? 'GET';
   return request<T>(method, path, options?.body);
+}
+
+/** Generic fetch helper that unwraps { success: true, data } envelopes. */
+export function apiDataFetch<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
+  const method = options?.method ?? 'GET';
+  return requestData<T>(method, path, options?.body);
 }
 
 // ─── Typed API endpoints ──────────────────────────────────────────────────────
@@ -133,74 +167,77 @@ export const workflowApi = {
     const qs = params
       ? '?' + new URLSearchParams(params as Record<string, string>).toString()
       : '';
-    return apiClient.get<unknown>(`/workflows${qs}`);
+    return apiDataFetch<PaginatedResult<Workflow>>(`/workflows${qs}`);
   },
 
   /** GET /workflows/:id */
-  get: (id: string) => apiClient.get<unknown>(`/workflows/${id}`),
+  get: (id: string) => apiDataFetch<Workflow>(`/workflows/${id}`),
 
   /**
    * POST /workflows — returns 202 Accepted immediately.
    * Use workflowApi.get() to poll for status changes.
    */
   create: (goal: string, industry?: string) =>
-    apiClient.post<unknown>('/workflows', { goal, industry }),
+    apiDataFetch<Workflow & { estimatedCredits?: number; creditsReserved?: number; taskType?: string; model?: string }>(
+      '/workflows',
+      { method: 'POST', body: { goal, industry } },
+    ),
 
   /**
    * POST /workflows/:id/resume — send approval decision to resume a PAUSED workflow.
    * decision: 'APPROVED' | 'REJECTED' | 'DEFERRED'
    */
   resume: (id: string, decision: 'APPROVED' | 'REJECTED' | 'DEFERRED', comment?: string) =>
-    apiClient.post<unknown>(`/workflows/${id}/resume`, { decision, comment }),
+    apiDataFetch<unknown>(`/workflows/${id}/resume`, { method: 'POST', body: { decision, comment } }),
 
   /** DELETE /workflows/:id — cancel a running workflow */
-  cancel: (id: string) => apiClient.delete<unknown>(`/workflows/${id}`),
+  cancel: (id: string) => apiDataFetch<unknown>(`/workflows/${id}`, { method: 'DELETE' }),
 
   /** Pause a running workflow (pauses between nodes) */
-  pause: (id: string) => apiClient.post<unknown>(`/workflows/${id}/pause`),
+  pause: (id: string) => apiDataFetch<unknown>(`/workflows/${id}/pause`, { method: 'POST' }),
 
   /** Resume a paused workflow */
-  unpause: (id: string) => apiClient.post<unknown>(`/workflows/${id}/unpause`),
+  unpause: (id: string) => apiDataFetch<unknown>(`/workflows/${id}/unpause`, { method: 'POST' }),
 
   /** Alias: stop = cancel */
-  stop: (id: string) => apiClient.post<unknown>(`/workflows/${id}/stop`),
+  stop: (id: string) => apiDataFetch<unknown>(`/workflows/${id}/stop`, { method: 'POST' }),
   stopAll: async () => {
-    const res = await workflowApi.list({ status: 'RUNNING' }) as { data?: { id: string }[] };
-    const running = res?.data ?? [];
+    const res = await workflowApi.list({ status: 'RUNNING' });
+    const running = res.items ?? [];
     await Promise.allSettled(running.map(w => workflowApi.cancel(w.id)));
   },
 
   /** GET /workflows/:id/traces */
-  traces: (id: string) => apiClient.get<unknown>(`/workflows/${id}/traces`),
+  traces: (id: string) => apiDataFetch<unknown>(`/workflows/${id}/traces`),
 
   /** GET /workflows/:id/approvals */
-  approvals: (id: string) => apiClient.get<unknown>(`/workflows/${id}/approvals`),
+  approvals: (id: string) => apiDataFetch<ApprovalRequest[]>(`/workflows/${id}/approvals`),
 };
 
 export const approvalApi = {
   /** GET /approvals?status=PENDING */
   list: (status?: string) =>
-    apiClient.get<unknown>(`/approvals${status ? `?status=${status}` : ''}`),
+    apiDataFetch<PaginatedResult<ApprovalRequest>>(`/approvals${status ? `?status=${status}` : ''}`),
 
   /** GET /approvals/:id */
-  get: (id: string) => apiClient.get<unknown>(`/approvals/${id}`),
+  get: (id: string) => apiDataFetch<ApprovalRequest>(`/approvals/${id}`),
 
   /**
    * POST /approvals/:id/decide — unified decision endpoint.
    * decision: 'APPROVED' | 'REJECTED' | 'DEFERRED'
    */
   decide: (id: string, decision: 'APPROVED' | 'REJECTED' | 'DEFERRED', comment?: string) =>
-    apiClient.post<unknown>(`/approvals/${id}/decide`, { decision, comment }),
+    apiDataFetch<ApprovalRequest>(`/approvals/${id}/decide`, { method: 'POST', body: { decision, comment } }),
 
   approve: (id: string, comment?: string) =>
-    apiClient.post<unknown>(`/approvals/${id}/decide`, { decision: 'APPROVED', comment }),
+    apiDataFetch<ApprovalRequest>(`/approvals/${id}/decide`, { method: 'POST', body: { decision: 'APPROVED', comment } }),
 
   reject: (id: string, comment?: string) =>
-    apiClient.post<unknown>(`/approvals/${id}/decide`, { decision: 'REJECTED', comment }),
+    apiDataFetch<ApprovalRequest>(`/approvals/${id}/decide`, { method: 'POST', body: { decision: 'REJECTED', comment } }),
 
   /** POST /approvals/:id/defer */
   defer: (id: string, comment?: string) =>
-    apiClient.post<unknown>(`/approvals/${id}/defer`, { comment }),
+    apiDataFetch<ApprovalRequest>(`/approvals/${id}/defer`, { method: 'POST', body: { comment } }),
 };
 
 export const traceApi = {
@@ -319,19 +356,19 @@ export const voiceApi = {
 // ─── Admin API ────────────────────────────────────────────────────────────────
 
 export const integrationApi = {
-  list: () => apiClient.get<{ data: Integration[] }>('/integrations').then(r => r.data),
-  disconnect: (id: string) => apiClient.delete<void>(`/integrations/${id}`),
+  list: () => apiDataFetch<Integration[]>('/integrations'),
+  disconnect: (id: string) => apiDataFetch<void>(`/integrations/${id}`, { method: 'DELETE' }),
   connect: (provider: string, credentials: Record<string, string>) =>
-    apiFetch<{ id: string; provider: string; status: string; toolsRegistered: string[] }>(
+    apiDataFetch<{ id: string; provider: string; status: string; toolsRegistered: string[] }>(
       '/integrations/connect',
       { method: 'POST', body: { provider, credentials } },
     ),
   getProviderInfo: (provider: string) =>
-    apiFetch<{ name: string; description: string; credentialFields: Array<{ key: string; label: string; placeholder: string; type: string; helpUrl?: string }>; setupInstructions: string }>(
+    apiDataFetch<{ name: string; description: string; credentialFields: Array<{ key: string; label: string; placeholder: string; type: string; helpUrl?: string }>; setupInstructions: string }>(
       `/integrations/providers/${provider}`,
     ),
   test: (id: string) =>
-    apiFetch<{ connected: boolean; toolCount: number; tools: string[] }>(
+    apiDataFetch<{ connected: boolean; toolCount: number; tools: string[] }>(
       `/integrations/${id}/test`,
       { method: 'POST' },
     ),
@@ -339,9 +376,9 @@ export const integrationApi = {
 
 export const onboardingApi = {
   getState: () =>
-    apiClient.get<{ data: { completedSteps: string[]; dismissed: boolean } }>('/onboarding/state').then(r => r.data),
+    apiDataFetch<{ completedSteps: string[]; dismissed: boolean }>('/onboarding/state'),
   updateState: (body: { completedSteps?: string[]; dismissed?: boolean }) =>
-    apiClient.post<{ data: { completedSteps: string[]; dismissed: boolean } }>('/onboarding/state', body).then(r => r.data),
+    apiDataFetch<{ completedSteps: string[]; dismissed: boolean }>('/onboarding/state', { method: 'POST', body }),
 };
 
 export const approvalsApi = {
@@ -426,7 +463,7 @@ export const projectApi = {
 
 export const usageApi = {
   /** Current credit balance and limits */
-  getUsage: () => apiClient.get<{
+  getUsage: () => apiDataFetch<{
     plan: string;
     credits: { used: number; total: number; remaining: number };
     premium: { used: number; total: number; remaining: number };
@@ -439,11 +476,11 @@ export const usageApi = {
   /** Recent usage history */
   getHistory: (params?: { limit?: number; offset?: number }) => {
     const qs = params ? `?${new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString()}` : '';
-    return apiClient.get<{ entries: Array<{ id: string; taskType: string; modelUsed: string; creditsCost: number; status: string; createdAt: string }>; total: number }>(`/usage/history${qs}`);
+    return apiDataFetch<{ entries: Array<{ id: string; taskType: string; modelUsed: string; creditsCost: number; status: string; createdAt: string }>; total: number }>(`/usage/history${qs}`);
   },
 
   /** Pre-execution cost estimate */
-  estimate: (goal: string) => apiClient.post<{
+  estimate: (goal: string) => apiDataFetch<{
     taskType: string;
     estimatedCredits: number;
     model: string;
@@ -451,5 +488,5 @@ export const usageApi = {
     canAfford: boolean;
     remaining: { daily: number; monthly: number };
     message: string;
-  }>('/usage/estimate', { goal }),
+  }>('/usage/estimate', { method: 'POST', body: { goal } }),
 };

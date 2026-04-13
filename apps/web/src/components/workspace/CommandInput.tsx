@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -178,28 +179,32 @@ export function CommandInput({
     <div className={cn('space-y-2', className)}>
       {/* Textarea */}
       <div className={cn(
-        'relative rounded-xl border bg-background transition-shadow',
+        'relative overflow-hidden rounded-xl border bg-background transition-shadow',
         isLoading ? 'opacity-80' : 'focus-within:shadow-md focus-within:ring-1 focus-within:ring-ring',
       )}>
         <textarea
           ref={textareaRef}
+          name="command"
+          aria-label="Command"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Give your swarm a command… (Enter to send, Shift+Enter for new line)"
+          placeholder="Give your swarm a command…"
+          autoComplete="off"
+          spellCheck={false}
           disabled={isLoading}
           rows={3}
-          className="w-full resize-none rounded-xl bg-transparent px-4 pt-4 pb-12 text-sm placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          className="min-h-[180px] w-full resize-none rounded-xl bg-transparent px-4 pt-4 pb-24 text-sm placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
 
         {/* Bottom toolbar */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between rounded-b-xl border-t bg-muted/30 px-3 py-2">
-          <div className="flex items-center gap-2">
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap items-end justify-between gap-2 rounded-b-xl border-t bg-muted/30 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Industry selector */}
             <div className="relative">
               <button
                 onClick={() => setShowIndustryPicker(!showIndustryPicker)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>{selectedIndustryOption?.emoji}</span>
                 <span>{selectedIndustryOption?.label}</span>
@@ -239,7 +244,7 @@ export function CommandInput({
             <div className="relative">
               <button
                 onClick={() => setShowExamples(!showExamples)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Sparkles className="h-3 w-3" />
                 Examples
@@ -248,7 +253,7 @@ export function CommandInput({
               {showExamples && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowExamples(false)} />
-                  <div className="absolute bottom-full left-0 z-20 mb-1 w-80 rounded-lg border bg-card shadow-lg">
+                  <div className="absolute bottom-full left-0 z-20 mb-1 max-h-72 w-80 overflow-auto rounded-lg border bg-card shadow-lg">
                     <div className="border-b px-3 py-2">
                       <p className="text-xs font-medium">Example commands — {selectedIndustryOption?.label}</p>
                     </div>
@@ -273,7 +278,7 @@ export function CommandInput({
             {onVoiceMode && (
               <button
                 onClick={onVoiceMode}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Mic className="h-3 w-3" />
                 Voice
@@ -281,7 +286,7 @@ export function CommandInput({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 self-end">
             {/* Word/char count */}
             {text && (
               <span className="text-xs text-muted-foreground">
@@ -315,10 +320,10 @@ export function CommandInput({
       {/* Integration context chips + hint */}
       <div className="flex items-center gap-2 flex-wrap">
         {connectedIntegrations.length === 0 ? (
-          <a href="/integrations" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+          <Link href="/integrations" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
             <Plug className="h-3 w-3" />
             No integrations connected — <span className="underline">connect your tools</span>
-          </a>
+          </Link>
         ) : (
           connectedIntegrations.map((i: Integration) => {
             const icons: Record<string, string> = { GMAIL: '📧', GCAL: '📅', SLACK: '💬', GITHUB: '🐙', NOTION: '📝', HUBSPOT: '🔶', DRIVE: '📁' };
@@ -330,7 +335,7 @@ export function CommandInput({
             );
           })
         )}
-        <span className="text-xs text-muted-foreground ml-auto">
+        <span className="text-xs text-muted-foreground sm:ml-auto">
           <kbd className="rounded border px-1 py-0.5 font-mono text-[10px]">Enter</kbd> to send
         </span>
       </div>
@@ -342,7 +347,7 @@ export function CommandInput({
           <span>Template loaded: <strong>{templateKey.replace(/-/g, ' ')}</strong></span>
           <button
             onClick={() => setText('')}
-            className="ml-auto text-muted-foreground hover:text-foreground"
+            className="ml-auto text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             Clear
           </button>

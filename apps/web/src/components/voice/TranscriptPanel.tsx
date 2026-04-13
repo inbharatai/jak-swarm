@@ -71,6 +71,7 @@ export function TranscriptPanel({
             size="icon"
             className="h-7 w-7"
             onClick={handleCopy}
+            aria-label="Copy transcript"
             title="Copy transcript"
             disabled={segments.length === 0}
           >
@@ -81,6 +82,7 @@ export function TranscriptPanel({
             size="icon"
             className="h-7 w-7"
             onClick={handleExport}
+            aria-label="Export transcript"
             title="Export transcript"
             disabled={segments.length === 0}
           >

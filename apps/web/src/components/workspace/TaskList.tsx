@@ -149,6 +149,7 @@ function TaskItem({ task, workflowId, onStop }: TaskItemProps) {
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={onStop}
+              aria-label={`Stop task ${task.taskName}`}
               title="Request stop"
             >
               <Square className="h-3.5 w-3.5" />
@@ -157,6 +158,7 @@ function TaskItem({ task, workflowId, onStop }: TaskItemProps) {
           {task.toolCalls && task.toolCalls.length > 0 && (
             <button
               onClick={() => setExpanded(!expanded)}
+              aria-label={expanded ? `Collapse details for ${task.taskName}` : `Expand details for ${task.taskName}`}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}

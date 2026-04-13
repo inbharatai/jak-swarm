@@ -37,7 +37,7 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
         'PENDING', 'APPROVED', 'REJECTED', 'DEFERRED', 'EXPIRED',
       ];
 
-      const status = (query.status ?? 'PENDING') as ApprovalStatus;
+      const status = (query.status ?? 'PENDING').toUpperCase() as ApprovalStatus;
       if (!VALID_STATUSES.includes(status)) {
         return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${status}'`));
       }

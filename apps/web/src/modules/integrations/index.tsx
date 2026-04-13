@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Plug } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { fetcher, integrationApi } from '@/lib/api-client';
+import { dataFetcher, integrationApi } from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
 import type { Integration, IntegrationProvider } from '@/types';
@@ -16,12 +16,12 @@ const ALL_PROVIDERS: IntegrationProvider[] = [
 
 export default function IntegrationsModule({ moduleId, isActive }: ModuleProps) {
   const toast = useToast();
-  const { data, mutate } = useSWR<{ data: Integration[] }>('/integrations', fetcher, { refreshInterval: 30000 });
+  const { data, mutate } = useSWR<Integration[]>('/integrations', dataFetcher, { refreshInterval: 30000 });
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<IntegrationProvider | null>(null);
 
-  const integrations = data?.data ?? [];
+  const integrations = data ?? [];
 
   const integrationByProvider = (provider: IntegrationProvider) =>
     integrations.find(i => i.provider === provider);

@@ -30,28 +30,34 @@ function ModuleTab({ moduleId }: { moduleId: string }) {
   const Icon = moduleDef.icon;
 
   return (
-    <button
-      onClick={() => setActiveModule(moduleId)}
-      onAuxClick={(e) => { if (e.button === 1) closeModule(moduleId); }}
+    <div
       className={cn(
-        'group flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap',
+        'group flex items-center gap-1 rounded-md border px-1.5 py-1 text-xs font-medium transition-all whitespace-nowrap',
         isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          ? 'border-primary/30 bg-primary/10 text-primary'
+          : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground',
         isMinimized && 'opacity-50 italic',
       )}
     >
-      <Icon className="h-3 w-3 shrink-0" />
-      <span>{moduleDef.shortTitle}</span>
+      <button
+        type="button"
+        onClick={() => setActiveModule(moduleId)}
+        onAuxClick={(e) => { if (e.button === 1) closeModule(moduleId); }}
+        aria-label={`Open ${moduleDef.title}`}
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Icon className="h-3 w-3 shrink-0" />
+        <span className="truncate">{moduleDef.shortTitle}</span>
+      </button>
       <button
         type="button"
         aria-label={`Close ${moduleDef.shortTitle}`}
-        onClick={(e) => { e.stopPropagation(); closeModule(moduleId); }}
-        className="ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-accent transition-all"
+        onClick={() => closeModule(moduleId)}
+        className="rounded-sm p-0.5 opacity-0 transition-all hover:bg-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
       >
         <X className="h-2.5 w-2.5" />
       </button>
-    </button>
+    </div>
   );
 }
 
@@ -63,6 +69,7 @@ function NotificationBell() {
   return (
     <button
       onClick={toggle}
+      aria-label="Open notifications"
       className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors"
       title={`${unreadCount} unread notifications`}
     >
@@ -149,23 +156,28 @@ export function ShellHeader() {
   };
 
   return (
-    <header className="flex h-11 items-center border-b border-border/40 bg-background/80 backdrop-blur-xl px-3 gap-2 shrink-0">
+    <header className="flex h-12 items-center border-b border-border/40 bg-background/80 backdrop-blur-xl px-3 gap-3 shrink-0">
       {/* Module tabs - scrollable */}
       <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
-        {openModuleIds.map(id => (
-          <ModuleTab key={id} moduleId={id} />
-        ))}
+        {openModuleIds.length === 0 ? (
+          <span className="px-2 text-xs text-muted-foreground">Open a module from the dock to begin.</span>
+        ) : (
+          openModuleIds.map(id => (
+            <ModuleTab key={id} moduleId={id} />
+          ))
+        )}
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
         {/* Search trigger — opens command center */}
         <button
           onClick={() => useShellStore.getState().openModule('command-center')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+          aria-label="Open command center"
+          className="flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Search className="h-3.5 w-3.5" />
-          <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[9px] font-mono">⌘K</kbd>
+          <span className="hidden lg:inline">Command Center</span>
         </button>
 
         <PresetSelector />
@@ -187,9 +199,13 @@ export function ShellHeader() {
 
         {/* Approvals badge */}
         {pendingCount > 0 && (
-          <Badge variant="warning" className="text-[10px] px-1.5">
+          <button
+            type="button"
+            onClick={() => useShellStore.getState().openModule('command-center')}
+            className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"
+          >
             {pendingCount} pending
-          </Badge>
+          </button>
         )}
 
         <NotificationBell />
@@ -197,6 +213,7 @@ export function ShellHeader() {
         {/* Theme toggle */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
         >
           {theme === 'dark' ? (
@@ -210,6 +227,7 @@ export function ShellHeader() {
         <div className="relative">
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
+            aria-label="Open user menu"
             className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/50 transition-colors"
           >
             <Avatar name={user?.name} size="sm" />

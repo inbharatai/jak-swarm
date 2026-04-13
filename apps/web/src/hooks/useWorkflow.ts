@@ -1,18 +1,18 @@
 'use client';
 
 import useSWR, { type SWRConfiguration } from 'swr';
-import { apiClient } from '@/lib/api-client';
+import { dataFetcher } from '@/lib/api-client';
 import type {
   Workflow,
   WorkflowFilters,
   ApprovalRequest,
-  PaginatedResponse,
+  PaginatedResult,
 } from '@/types';
 
 // ─── Fetcher ──────────────────────────────────────────────────────────────────
 
 async function fetcher<T>(url: string): Promise<T> {
-  return apiClient.get<T>(url);
+  return dataFetcher<T>(url);
 }
 
 // ─── Terminal statuses that don't need polling ────────────────────────────────
@@ -74,7 +74,7 @@ export function useWorkflows(filters?: WorkflowFilters, config?: SWRConfiguratio
   const qs = params.toString();
   const key = `/workflows${qs ? `?${qs}` : ''}`;
 
-  const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Workflow>>(
+  const { data, error, isLoading, mutate } = useSWR<PaginatedResult<Workflow>>(
     key,
     fetcher,
     {
@@ -84,9 +84,9 @@ export function useWorkflows(filters?: WorkflowFilters, config?: SWRConfiguratio
   );
 
   return {
-    workflows: data?.data ?? [],
+    workflows: data?.items ?? [],
     total: data?.total ?? 0,
-    totalPages: data?.totalPages ?? 0,
+    totalPages: data ? Math.ceil(data.total / data.limit) : 0,
     isLoading,
     error,
     refresh: mutate,
@@ -96,8 +96,9 @@ export function useWorkflows(filters?: WorkflowFilters, config?: SWRConfiguratio
 // ─── useApprovals ─────────────────────────────────────────────────────────────
 
 export function useApprovals(status: 'pending' | 'all' = 'pending') {
-  const { data, error, isLoading, mutate } = useSWR<ApprovalRequest[]>(
-    `/approvals${status !== 'all' ? `?status=${status}` : ''}`,
+  const queryStatus = status === 'all' ? undefined : 'PENDING';
+  const { data, error, isLoading, mutate } = useSWR<PaginatedResult<ApprovalRequest>>(
+    `/approvals${queryStatus ? `?status=${queryStatus}` : ''}`,
 
     fetcher,
     {
@@ -107,8 +108,8 @@ export function useApprovals(status: 'pending' | 'all' = 'pending') {
   );
 
   return {
-    approvals: data ?? [],
-    pendingCount: data?.filter(a => a.status === 'PENDING').length ?? 0,
+    approvals: data?.items ?? [],
+    pendingCount: data?.items.filter(a => a.status === 'PENDING').length ?? 0,
     isLoading,
     error,
     refresh: mutate,

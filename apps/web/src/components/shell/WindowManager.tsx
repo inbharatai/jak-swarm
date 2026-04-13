@@ -11,7 +11,7 @@ import 'react-mosaic-component/react-mosaic-component.css';
 // ─── Custom toolbar for mosaic windows ───────────────────────────────────────
 
 function EmptyToolbar() {
-  return <></>;
+  return <div aria-hidden="true" className="mosaic-window-title" />;
 }
 
 // ─── Window Manager ──────────────────────────────────────────────────────────
