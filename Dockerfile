@@ -20,6 +20,8 @@ COPY packages/voice/package.json packages/voice/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/industry-packs/package.json packages/industry-packs/
 COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY tests/package.json tests/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile --ignore-scripts
