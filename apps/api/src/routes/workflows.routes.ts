@@ -41,13 +41,38 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId, userId } = request.user;
 
       try {
+        // ── Credit check: estimate cost and verify user has budget ───────
+        const { CreditService } = await import('../billing/credit-service.js');
+        const { detectTaskType, estimateCredits } = await import('../billing/model-router.js');
+        const creditService = new CreditService(fastify.db);
+
+        const taskType = detectTaskType(goal);
+        const usage = await creditService.getUsage(tenantId);
+        const maxTier = usage?.maxModelTier ?? 1;
+        const estimate = estimateCredits(goal, taskType, maxTier);
+
+        const creditCheck = await creditService.checkCredits(tenantId, estimate.estimatedCredits);
+        if (!creditCheck.allowed) {
+          return reply.status(429).send(err('CREDIT_LIMIT', creditCheck.message ?? 'Credit limit reached', {
+            reason: creditCheck.reason,
+            remaining: creditCheck.remaining,
+            estimatedCost: estimate.estimatedCredits,
+          }));
+        }
+
+        // Reserve credits before execution
+        const reservation = await creditService.reserveCredits(tenantId, estimate.estimatedCredits);
+        if (!reservation.allowed) {
+          return reply.status(429).send(err('CREDIT_RESERVE_FAILED', reservation.message ?? 'Could not reserve credits'));
+        }
+
         // 1. Persist the workflow record (PENDING)
         const workflow = await workflowService.createWorkflow(tenantId, userId, goal, industry);
-        await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, { goal, maxCostUsd });
+        await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, {
+          goal, maxCostUsd, estimatedCredits: estimate.estimatedCredits, taskType,
+        });
 
         // 2. Fire-and-forget: run the swarm in the background
-        //    setImmediate defers past the current event-loop tick so the HTTP
-        //    response is sent before any swarm work begins.
         setImmediate(() => {
           void fastify.swarm.executeAsync({
             workflowId: workflow.id,
@@ -59,8 +84,14 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           });
         });
 
-        // 3. Return 202 with the created workflow
-        return reply.status(202).send(ok(workflow));
+        // 3. Return 202 with the created workflow + cost estimate
+        return reply.status(202).send(ok({
+          ...workflow,
+          estimatedCredits: estimate.estimatedCredits,
+          creditsReserved: reservation.reserved,
+          taskType,
+          model: estimate.model,
+        }));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;

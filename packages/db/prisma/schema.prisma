@@ -36,6 +36,7 @@ model Tenant {
   schedules       WorkflowSchedule[]
   projects        Project[]
   vectorDocuments VectorDocument[]
+  subscription    Subscription?
 
   @@map("tenants")
 }
@@ -488,4 +489,73 @@ model CrmDeal {
   @@index([tenantId, stage])
   @@index([contactId])
   @@map("crm_deals")
+}
+
+// ─── Managed AI: Subscriptions & Usage ──────────────────────────────────────
+
+model Subscription {
+  id              String    @id @default(cuid())
+  tenantId        String    @unique // One active subscription per tenant
+  planId          String    @default("free") // free | pro | team | enterprise
+  status          String    @default("active") // active | cancelled | past_due | trialing
+  creditsTotal    Int       @default(200)    // Monthly allocation
+  creditsUsed     Int       @default(0)      // Used this billing period
+  premiumTotal    Int       @default(0)      // Premium model (Tier 3) allocation
+  premiumUsed     Int       @default(0)
+  dailyUsed       Int       @default(0)      // Resets daily at midnight UTC
+  dailyCap        Int       @default(30)     // Max credits per day
+  perTaskCap      Int       @default(10)     // Max credits per single task
+  concurrentCap   Int       @default(1)      // Max concurrent workflows
+  maxModelTier    Int       @default(1)      // 1=cheap, 2=balanced, 3=premium
+  periodStart     DateTime  @default(now())
+  periodEnd       DateTime
+  dailyResetAt    DateTime  @default(now())
+  paddleSubId     String?   // Paddle subscription ID
+  paddleCustomerId String?  // Paddle customer ID
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([paddleSubId])
+  @@map("subscriptions")
+}
+
+model UsageLedger {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  workflowId      String?
+  taskType        String   // chat, coding, analysis, research, etc.
+  modelUsed       String   // gpt-4o, claude-sonnet-4, gemini-2.0-flash, etc.
+  provider        String   // openai, anthropic, google
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  creditsCost     Int      @default(0)    // Credits consumed
+  creditsReserved Int?                     // What was reserved pre-execution
+  usdCost         Float    @default(0)    // Actual $ cost to Jaak
+  latencyMs       Int?
+  status          String   @default("completed") // completed, failed, cancelled
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([workflowId])
+  @@map("usage_ledger")
+}
+
+model RoutingLog {
+  id              String   @id @default(cuid())
+  taskType        String
+  selectedModel   String
+  selectedProvider String
+  fallbackUsed    Boolean  @default(false)
+  score           Float?
+  reason          String?
+  userPlan        String
+  inputTokens     Int?
+  createdAt       DateTime @default(now())
+
+  @@index([taskType, createdAt])
+  @@map("routing_log")
 }

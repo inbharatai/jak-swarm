@@ -66,6 +66,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         const result = await authService.register(email, password, name, tenantName, tenantSlug);
+
+        // Create free subscription for the new tenant
+        try {
+          const { CreditService } = await import('../billing/credit-service.js');
+          const creditService = new CreditService(fastify.db);
+          await creditService.createFreeSubscription(result.user.tenantId);
+        } catch (subErr) {
+          fastify.log.warn({ tenantId: result.user.tenantId, err: subErr }, '[auth] Failed to create free subscription');
+        }
+
         return reply.status(201).send(ok(result));
       } catch (e) {
         if (e instanceof AppError) {
