@@ -35,6 +35,7 @@ RUN pnpm --filter @jak-swarm/db exec prisma generate
 
 # Build all packages in dependency order
 RUN pnpm --filter @jak-swarm/shared build && \
+    pnpm --filter @jak-swarm/db build && \
     pnpm --filter @jak-swarm/security build && \
     pnpm --filter @jak-swarm/verification build && \
     pnpm --filter @jak-swarm/tools build && \
