@@ -26,10 +26,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'JAK Swarm — Autonomous Agent Platform',
+  title: 'JAK Swarm — Autonomous Multi-Agent AI Platform',
   description:
-    'Production-grade autonomous swarm agent platform. Deploy intelligent multi-agent workflows across any industry.',
-  keywords: ['AI agents', 'swarm intelligence', 'automation', 'workflow', 'enterprise AI'],
+    'Autonomous multi-agent AI platform — 38 agents, 56 production tools, 3 managed AI providers. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. No API keys needed.',
+  keywords: ['AI agents', 'multi-agent platform', 'automation', 'workflow', 'enterprise AI', 'vibe coding', 'managed AI'],
   authors: [{ name: 'JAK Swarm' }],
   manifest: '/manifest.json',
   appleWebApp: {

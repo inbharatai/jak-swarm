@@ -2,25 +2,23 @@
 
 # 🐝 JAK Swarm
 
-### The Autonomous AI Company — 38 Agents That Run Your Business
+### Autonomous Multi-Agent AI Platform
 
-[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tools](https://img.shields.io/badge/Tools-113-green?style=for-the-badge&logo=playwright&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![LLM Providers](https://img.shields.io/badge/LLM_Providers-6-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
+[![Tools](https://img.shields.io/badge/Production_Tools-56-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
+[![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
+[![LLM Providers](https://img.shields.io/badge/AI_Providers-3_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-63_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-85_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**Open-source multi-agent AI platform that replaces entire departments.**
-**CEO • CTO • CMO • Engineer • Legal • Finance • HR • Marketing — all autonomous.**
-**Now with Vibe Coding: describe an app, watch it build, deploy in minutes.**
+**38 AI agents, 56 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Production-grade SaaS with managed AI — no API keys required.**
 
-[Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [API Reference](#-api-reference) • [Documentation](ARCHITECTURE.md)
+[Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
 ---
 
-*Give it a goal in plain English. Watch 38 agents plan, execute, and deliver — in real time.*
+*Give it a goal in plain English. JAK decomposes, routes, executes, and verifies — in real time.*
 
 ![JAK Swarm — Hero](docs/screenshot-hero.png)
 
@@ -151,25 +149,24 @@ flowchart LR
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **38 AI Agents** | 6 orchestrators + 32 workers |
-| 🔧 | **113 Tools** | Web search, browser, email, calendar, code execution, sandbox, PDF, vision, verification (108 production + 5 verification) |
-| ⚡ | **Vibe Coding Builder** | Describe an app in plain English, get a live full-stack app. Architect → Generate → Build → Preview → Deploy |
-| 🔄 | **DAG Execution** | Parallel task scheduling with dependency tracking and auto-repair |
-| 👁️ | **Screenshot-to-Code** | Upload a UI screenshot, AI generates React + Tailwind components |
-| 📧 | **Real Gmail/Calendar** | IMAP/SMTP + CalDAV — no OAuth needed, just app password |
-| 🔌 | **MCP Provider Templates** | 21 verified providers: HubSpot, Salesforce, Pipedrive, Jira, Linear, Slack, GitHub, Notion, Stripe, Supabase, Airtable, Asana, ClickUp, Twilio, SendGrid, Discord, Google Drive, Zoho, Freshsales, Google Analytics (connect via API keys) |
-| 🧩 | **Skills Marketplace** | Browse, install, and create custom skills with sandbox testing and approval workflow |
-| ⏰ | **Workflow Scheduling** | Cron-based recurring tasks with UI |
-| 💰 | **Cost Controls** | Per-workflow budgets, 3-tier LLM routing for cost optimization |
-| 🛡️ | **4-Layer Anti-Hallucination** | Prompt rules → self-correction → verification → auto-repair |
-| 🔐 | **Verification Engine** | Email threat detection, document forgery analysis, transaction risk scoring, identity verification, cross-evidence correlation. 4-layer escalation: rules($0) → AI Tier 1($0.01) → AI Tier 3($0.50) → human review |
-| 🌐 | **20 Browser Tools** | Full Playwright: keyboard, mouse, cookies, tabs, PDF export, vision |
-| 📊 | **React Flow DAG Graph** | Real-time visualization of agent execution |
-| 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, onboarding wizard |
-| 🚀 | **One-Click Deploy** | Deploy generated apps to Vercel (requires Vercel API token — experimental) |
-| 🔀 | **Version Control** | Every change creates a snapshot. Rollback to any version instantly |
-| 📸 | **Image-to-Code** | Drag-drop a Figma screenshot, AI replicates the design |
-| 🧠 | **Supervisor Module** | Central nervous system — event bus, circuit breakers, workflow telemetry, approval gates |
+| 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
+| 🔧 | **56 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), 20 browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
+| 🔍 | **26 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
+| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
+| 🧠 | **3 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini). Dynamic routing per task type. No API keys needed for users |
+| 💰 | **Credit-Based Billing** | 4 plans (Free/Pro/Team/Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard, Paddle payments |
+| 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
+| 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
+| 🔌 | **21 MCP Integrations** | Slack, GitHub, Notion, HubSpot, Salesforce, Stripe, Linear, Jira, Supabase, Discord, and 11 more via Model Context Protocol |
+| 🌐 | **20 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
+| 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, /healthz + /ready probes, structured Pino logging |
+| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers |
+| 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
+| 📧 | **Real Email/Calendar** | Gmail via IMAP/SMTP, Google Calendar via CalDAV. Real send, real events — not mocks |
+| 🧩 | **Skills Marketplace** | Create, sandbox-test, and deploy custom agent skills with approval workflow |
+| ⏰ | **Workflow Scheduling** | Cron-based recurring workflows with leader-elected scheduler (no duplicate execution) |
+| 📸 | **Screenshot-to-Code** | Upload a UI design → AI generates matching React + Tailwind components |
+| 🛡️ | **Supervisor Module** | Event bus, circuit breakers (exponential backoff), workflow telemetry, budget enforcement |
 
 ---
 
@@ -429,7 +426,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 113 tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 56 production tools + 26 research tools.*
 
 </div>
 
@@ -541,7 +538,7 @@ flowchart TD
 | **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **113 business tools** | ✅ | ❌ | ❌ | ❌ |
+| **56 production tools** | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
 | **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
@@ -661,7 +658,7 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (113 Tools)
+## 🔧 Tool Inventory (119 Registered — 56 Production, 26 Research, 18 Utilities)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
@@ -681,7 +678,7 @@ http://localhost:3000
 | **Growth** | 2 | generate_winback, predict_churn | ✅ Built-in |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion + 17 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 113 tools (98 production + 2 mock + 4 LLM-passthrough + 8 thin wrappers)**
+**Total: 119 registered tools — 56 production (real API/browser/DB calls), 26 research (web search + analysis), 18 utilities (local compute + memory), 8 verification, 11 other**
 
 ---
 
@@ -759,7 +756,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
-| Tools | **113** | 50+ | Custom | ~10 |
+| Tools | **119 (56 production)** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
@@ -891,7 +888,7 @@ jak-swarm/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 32 worker agents
-│   ├── tools/                  # 113 tool implementations
+│   ├── tools/                  # 119 tool implementations (56 production + 26 research + utilities)
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools
