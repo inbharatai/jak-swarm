@@ -72,6 +72,34 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   // Start leader election
   leader.start();
 
+  // Wire per-call LLM billing hook into BaseAgent
+  try {
+    const agentsModule = await import('@jak-swarm/agents');
+    const BaseAgentClass = (agentsModule as Record<string, unknown>)['BaseAgent'] as Record<string, unknown> | undefined;
+    const { metrics } = await import('../observability/metrics.js');
+
+    if (BaseAgentClass) {
+    (BaseAgentClass as any)['onLLMCallComplete'] = (info: { model: string; provider: string; promptTokens: number; completionTokens: number; costUsd: number; agentRole: string; tenantId?: string }) => {
+      // Track in Prometheus metrics
+      metrics.llmTokensTotal.inc({ model: info.model, direction: 'prompt' }, info.promptTokens);
+      metrics.llmTokensTotal.inc({ model: info.model, direction: 'completion' }, info.completionTokens);
+      metrics.llmCostTotal.inc({ model: info.model, tenant_id: info.tenantId ?? 'unknown' }, info.costUsd);
+
+      fastify.log.debug({
+        model: info.model,
+        provider: info.provider,
+        tokens: info.promptTokens + info.completionTokens,
+        costUsd: info.costUsd,
+        agent: info.agentRole,
+      }, '[billing] LLM call tracked');
+    };
+    }
+
+    fastify.log.info('[billing] Per-call LLM cost tracking hook wired');
+  } catch (hookErr) {
+    fastify.log.warn({ err: hookErr }, '[billing] Failed to wire LLM billing hook');
+  }
+
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
   swarmService.setLockProvider(locks); // Distributed lock for workflow execution
   // Inject distributed circuit breaker factory for shared failure state across instances

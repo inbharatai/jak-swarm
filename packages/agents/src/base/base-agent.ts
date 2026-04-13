@@ -58,6 +58,23 @@ export abstract class BaseAgent {
     this.openai = new OpenAI({ apiKey: resolvedKey });
   }
 
+  /**
+   * Global hook called after every LLM call with cost information.
+   * Set by the API layer to track per-call credit usage.
+   * When not set, cost is still logged but not deducted from credits.
+   */
+  static onLLMCallComplete: ((info: {
+    model: string;
+    provider: string;
+    promptTokens: number;
+    completionTokens: number;
+    costUsd: number;
+    agentRole: string;
+    tenantId?: string;
+    userId?: string;
+    workflowId?: string;
+  }) => void) | null = null;
+
   abstract execute(input: unknown, context: AgentContext): Promise<unknown>;
 
   protected async callLLM(
@@ -120,6 +137,20 @@ export abstract class BaseAgent {
           },
           'LLM call cost',
         );
+
+        // Notify billing hook if registered (for per-call credit tracking)
+        if (BaseAgent.onLLMCallComplete) {
+          try {
+            BaseAgent.onLLMCallComplete({
+              model,
+              provider: 'openai',
+              promptTokens: promptTok,
+              completionTokens: completionTok,
+              costUsd,
+              agentRole: this.role,
+            });
+          } catch { /* billing hook failure must not break LLM calls */ }
+        }
 
         return completion;
       } catch (err) {
@@ -212,6 +243,20 @@ export abstract class BaseAgent {
           },
           'LLM call cost',
         );
+
+        // Notify billing hook if registered
+        if (BaseAgent.onLLMCallComplete) {
+          try {
+            BaseAgent.onLLMCallComplete({
+              model: providerModel,
+              provider: this.provider!.name,
+              promptTokens: response.usage.promptTokens,
+              completionTokens: response.usage.completionTokens,
+              costUsd,
+              agentRole: this.role,
+            });
+          } catch { /* billing hook failure must not break LLM calls */ }
+        }
 
         return completion;
       } catch (err) {

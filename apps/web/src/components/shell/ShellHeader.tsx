@@ -8,6 +8,7 @@ import { useShellStore } from '@/store/shell-store';
 import { useNotificationStore } from '@/store/notification-store';
 import { getModule, LAYOUT_PRESETS } from '@/modules/registry';
 import { useAuth } from '@/lib/auth';
+import { UsageIndicator } from '@/components/billing/UsageIndicator';
 import { Avatar, Badge, Button } from '@/components/ui';
 import { useApprovals } from '@/hooks/useWorkflow';
 import { workflowApi } from '@/lib/api-client';
@@ -168,6 +169,9 @@ export function ShellHeader() {
         </button>
 
         <PresetSelector />
+
+        {/* Usage credits indicator */}
+        <UsageIndicator />
 
         {/* Kill all */}
         <Button

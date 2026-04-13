@@ -421,3 +421,35 @@ export const projectApi = {
   conversations: (id: string) => apiClient.get<unknown>(`/projects/${id}/conversations`),
   delete: (id: string) => apiClient.delete<unknown>(`/projects/${id}`),
 };
+
+// ─── Usage & Billing ──────────────────────────────────────────────────
+
+export const usageApi = {
+  /** Current credit balance and limits */
+  getUsage: () => apiClient.get<{
+    plan: string;
+    credits: { used: number; total: number; remaining: number };
+    premium: { used: number; total: number; remaining: number };
+    daily: { used: number; cap: number; remaining: number; resetsAt: string };
+    monthly: { resetsAt: string };
+    perTaskCap: number;
+    maxModelTier: number;
+  }>('/usage'),
+
+  /** Recent usage history */
+  getHistory: (params?: { limit?: number; offset?: number }) => {
+    const qs = params ? `?${new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString()}` : '';
+    return apiClient.get<{ entries: Array<{ id: string; taskType: string; modelUsed: string; creditsCost: number; status: string; createdAt: string }>; total: number }>(`/usage/history${qs}`);
+  },
+
+  /** Pre-execution cost estimate */
+  estimate: (goal: string) => apiClient.post<{
+    taskType: string;
+    estimatedCredits: number;
+    model: string;
+    tier: number;
+    canAfford: boolean;
+    remaining: { daily: number; monthly: number };
+    message: string;
+  }>('/usage/estimate', { goal }),
+};
