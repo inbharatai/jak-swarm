@@ -6,7 +6,7 @@
  * raw AgentTrace rows and actionable observability insights.
  */
 
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@jak-swarm/db';
 import { calculateCost } from '@jak-swarm/shared';
 
 /* ---------------------------------------------------------------------- */

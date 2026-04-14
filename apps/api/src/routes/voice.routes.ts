@@ -338,8 +338,8 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
             userId,
             goal: prefixedGoal,
             status: 'PENDING',
-            source: 'VOICE',
-            metadata: {
+            stateJson: {
+              source: 'VOICE',
               voiceSessionId: sessionId,
               originalGoal: goal,
             },

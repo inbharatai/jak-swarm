@@ -88,15 +88,15 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
   } | null> {
     const integration = await fastify.db.integration.findFirst({
       where: { provider: 'SLACK', status: 'CONNECTED', metadata: { path: ['team_id'], equals: teamId } },
-      include: { credential: true },
+      include: { credentials: true },
     });
-    if (!integration?.credential) return null;
+    if (!integration?.credentials) return null;
 
     // Decrypt token — the credential stores the full JSON blob
     let creds: Record<string, string>;
     try {
       const { decrypt } = await import('../utils/crypto.js');
-      creds = JSON.parse(decrypt(integration.credential.accessTokenEnc)) as Record<string, string>;
+      creds = JSON.parse(decrypt(integration.credentials.accessTokenEnc)) as Record<string, string>;
     } catch (decryptErr) {
       fastify.log.error({ teamId, err: decryptErr }, '[slack] Failed to decrypt/parse credentials');
       return null;
@@ -139,9 +139,7 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post(
     '/events',
-    {
-      config: { rawBody: true },
-    },
+    {},
     async (request: FastifyRequest, reply: FastifyReply) => {
       const rawBody = typeof request.body === 'string'
         ? request.body
@@ -226,8 +224,7 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
         const existingWorkflow = await fastify.db.workflow.findFirst({
           where: {
             tenantId: tenant.tenantId,
-            source: 'SLACK',
-            metadata: { path: ['slackIdempotencyKey'], equals: idempotencyKey },
+            stateJson: { path: ['slackIdempotencyKey'], equals: idempotencyKey },
           },
         });
         if (existingWorkflow) {
@@ -242,8 +239,8 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
             userId: slackEvent.user ?? 'slack-bot',
             goal: text,
             status: 'PENDING',
-            source: 'SLACK',
-            metadata: {
+            stateJson: {
+              source: 'SLACK',
               slackChannel: channel,
               slackThread: threadTs,
               slackUser: slackEvent.user,
@@ -267,13 +264,11 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
               // Post completion back to Slack thread
               const completed = await fastify.db.workflow.findUnique({
                 where: { id: workflow.id },
-                select: { result: true, status: true },
+                select: { finalOutput: true, status: true },
               });
 
-              if (completed?.result) {
-                const resultText = typeof completed.result === 'string'
-                  ? completed.result
-                  : JSON.stringify(completed.result, null, 2);
+              if (completed?.finalOutput) {
+                const resultText = completed.finalOutput;
                 await postSlackReply(
                   tenant.accessToken,
                   channel,
