@@ -301,7 +301,7 @@ importers:
         specifier: ^22.10.7
         version: 22.19.15
       prisma:
-        specifier: ^6.2.1
+        specifier: ^6.19.3
         version: 6.19.3(typescript@5.9.3)
       tsx:
         specifier: ^4.19.2
