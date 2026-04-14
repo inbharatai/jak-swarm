@@ -30,6 +30,8 @@ model Tenant {
   skills           Skill[]
   auditLogs        AuditLog[]
   memory           TenantMemory[]
+  memoryItems      MemoryItem[]
+  memoryEvents     MemoryEvent[]
   apiKeys          ApiKey[]
   integrations    Integration[]
   onboardingState OnboardingState?
@@ -216,6 +218,60 @@ model TenantMemory {
   @@map("tenant_memory")
 }
 
+model MemoryItem {
+  id             String    @id @default(cuid())
+  tenantId       String
+  scopeType      String
+  scopeId        String
+  key            String
+  value          Json
+  memoryType     String
+  confidence     Float?
+  source         String?
+  sourceRunId    String?
+  idempotencyKey String?
+  contentHash    String?
+  version        Int       @default(1)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  lastAccessedAt DateTime?
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events         MemoryEvent[]
+
+  @@unique([tenantId, scopeType, scopeId, key])
+  @@index([tenantId, scopeType, scopeId])
+  @@index([tenantId, memoryType])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, deletedAt])
+  @@map("memory_items")
+}
+
+model MemoryEvent {
+  id             String    @id @default(cuid())
+  tenantId       String
+  memoryItemId   String?
+  scopeType      String
+  scopeId        String
+  key            String
+  action         String
+  actorId        String?
+  runId          String?
+  idempotencyKey String?
+  diff           Json?
+  createdAt      DateTime  @default(now())
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memoryItem     MemoryItem? @relation(fields: [memoryItemId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@map("memory_events")
+}
+
 model VectorDocument {
   id         String   @id @default(cuid())
   tenantId   String
@@ -225,12 +281,17 @@ model VectorDocument {
   sourceKey  String?
   sourceType String   @default("DOCUMENT")
   chunkIndex Int      @default(0)
+  scopeType  String?
+  scopeId    String?
+  contentHash String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, sourceType])
+  @@index([tenantId, scopeType, scopeId])
+  @@index([tenantId, sourceKey])
   @@map("vector_documents")
 }
 

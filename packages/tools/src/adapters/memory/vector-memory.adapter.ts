@@ -27,6 +27,7 @@ export interface VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType?: string,
     sourceKey?: string,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<number>; // returns chunk count
 
   search(
@@ -34,9 +35,10 @@ export interface VectorMemoryAdapter {
     query: string,
     topK?: number,
     scoreThreshold?: number,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<VectorSearchResult[]>;
 
-  delete(tenantId: string, sourceKey: string): Promise<number>; // returns deleted count
+  delete(tenantId: string, sourceKey: string, opts?: { scopeType?: string; scopeId?: string }): Promise<number>; // returns deleted count
 }
 
 // ─── Text Chunking ──────────────────────────────────────────────────────────
@@ -107,6 +109,8 @@ interface InMemoryDoc {
   sourceType: string;
   chunkIndex: number;
   tenantId: string;
+  scopeType: string;
+  scopeId: string;
 }
 
 export class InMemoryVectorAdapter implements VectorMemoryAdapter {
@@ -123,9 +127,21 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType = 'DOCUMENT',
     sourceKey?: string,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<number> {
     const chunks = chunkText(content);
     const embeddings = await this.embedder.embedBatch(chunks);
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
+
+    if (sourceKey) {
+      this.docs = this.docs.filter((d) => !(
+        d.tenantId === tenantId &&
+        d.scopeType === scopeType &&
+        d.scopeId === scopeId &&
+        d.sourceKey === sourceKey
+      ));
+    }
 
     for (let i = 0; i < chunks.length; i++) {
       this.docs.push({
@@ -136,6 +152,8 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
         sourceType,
         chunkIndex: i,
         tenantId,
+        scopeType,
+        scopeId,
       });
     }
 
@@ -147,9 +165,14 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
     query: string,
     topK = 5,
     scoreThreshold = 0.5,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<VectorSearchResult[]> {
     const queryEmb = await this.embedder.embed(query);
-    const tenantDocs = this.docs.filter((d) => d.tenantId === tenantId);
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
+    const tenantDocs = this.docs.filter((d) =>
+      d.tenantId === tenantId && d.scopeType === scopeType && d.scopeId === scopeId,
+    );
 
     const scored = tenantDocs
       .map((doc) => ({
@@ -170,10 +193,17 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
     }));
   }
 
-  async delete(tenantId: string, sourceKey: string): Promise<number> {
+  async delete(tenantId: string, sourceKey: string, opts?: { scopeType?: string; scopeId?: string }): Promise<number> {
     const before = this.docs.length;
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
     this.docs = this.docs.filter(
-      (d) => !(d.tenantId === tenantId && d.sourceKey === sourceKey),
+      (d) => !(
+        d.tenantId === tenantId &&
+        d.scopeType === scopeType &&
+        d.scopeId === scopeId &&
+        d.sourceKey === sourceKey
+      ),
     );
     return before - this.docs.length;
   }
@@ -196,26 +226,56 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType = 'DOCUMENT',
     sourceKey?: string,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<number> {
     const chunks = chunkText(content);
     const embeddings = await this.embedder.embedBatch(chunks);
     const db = this.prisma as { $executeRawUnsafe: (query: string, ...args: unknown[]) => Promise<number> };
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
 
     for (let i = 0; i < chunks.length; i++) {
       const emb = embeddings[i] ?? [];
       const vecStr = `[${emb.join(',')}]`;
       const meta = metadata ? JSON.stringify(metadata) : null;
+      const contentHash = hashString(chunks[i] ?? '');
 
       await db.$executeRawUnsafe(
-        `INSERT INTO vector_documents ("id", "tenantId", content, embedding, metadata, "sourceKey", "sourceType", "chunkIndex", "createdAt", "updatedAt")
-         VALUES (gen_random_uuid(), $1, $2, $3::vector, $4::jsonb, $5, $6, $7, NOW(), NOW())`,
+        `INSERT INTO vector_documents ("id", "tenantId", "scopeType", "scopeId", content, embedding, metadata, "sourceKey", "sourceType", "chunkIndex", "contentHash", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector, $6::jsonb, $7, $8, $9, $10, NOW(), NOW())
+         ON CONFLICT ("tenantId", "scopeType", "scopeId", "sourceKey", "chunkIndex") DO UPDATE SET
+           content = EXCLUDED.content,
+           embedding = EXCLUDED.embedding,
+           metadata = EXCLUDED.metadata,
+           "sourceType" = EXCLUDED."sourceType",
+           "contentHash" = EXCLUDED."contentHash",
+           "updatedAt" = NOW()`,
         tenantId,
+        scopeType,
+        scopeId,
         chunks[i] ?? '',
         vecStr,
         meta,
         sourceKey ?? null,
         sourceType,
         i,
+        contentHash,
+      );
+    }
+
+    if (sourceKey) {
+      await db.$executeRawUnsafe(
+        `DELETE FROM vector_documents
+         WHERE "tenantId" = $1
+           AND "scopeType" = $2
+           AND "scopeId" = $3
+           AND "sourceKey" = $4
+           AND "chunkIndex" >= $5`,
+        tenantId,
+        scopeType,
+        scopeId,
+        sourceKey,
+        chunks.length,
       );
     }
 
@@ -227,9 +287,12 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
     query: string,
     topK = 5,
     scoreThreshold = 0.5,
+    opts?: { scopeType?: string; scopeId?: string },
   ): Promise<VectorSearchResult[]> {
     const queryEmb = await this.embedder.embed(query);
     const vecStr = `[${queryEmb.join(',')}]`;
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
     const db = this.prisma as {
       $queryRawUnsafe: (query: string, ...args: unknown[]) => Promise<unknown[]>;
     };
@@ -239,12 +302,16 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
               1 - (embedding <=> $1::vector) AS score
        FROM vector_documents
        WHERE "tenantId" = $2
+         AND "scopeType" = $3
+         AND "scopeId" = $4
          AND embedding IS NOT NULL
-         AND 1 - (embedding <=> $1::vector) >= $3
+         AND 1 - (embedding <=> $1::vector) >= $5
        ORDER BY embedding <=> $1::vector
-       LIMIT $4`,
+       LIMIT $6`,
       vecStr,
       tenantId,
+      scopeType,
+      scopeId,
       scoreThreshold,
       topK,
     );
@@ -259,11 +326,15 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
     }));
   }
 
-  async delete(tenantId: string, sourceKey: string): Promise<number> {
+  async delete(tenantId: string, sourceKey: string, opts?: { scopeType?: string; scopeId?: string }): Promise<number> {
     const db = this.prisma as { $executeRawUnsafe: (query: string, ...args: unknown[]) => Promise<number> };
+    const scopeType = opts?.scopeType ?? 'TENANT';
+    const scopeId = opts?.scopeId ?? tenantId;
     return db.$executeRawUnsafe(
-      `DELETE FROM vector_documents WHERE "tenantId" = $1 AND "sourceKey" = $2`,
+      `DELETE FROM vector_documents WHERE "tenantId" = $1 AND "scopeType" = $2 AND "scopeId" = $3 AND "sourceKey" = $4`,
       tenantId,
+      scopeType,
+      scopeId,
       sourceKey,
     );
   }
@@ -275,6 +346,9 @@ let _vectorAdapter: VectorMemoryAdapter | null = null;
 
 export function getVectorMemoryAdapter(): VectorMemoryAdapter {
   if (_vectorAdapter) return _vectorAdapter;
+
+  const allowFallback = process.env['MEMORY_ALLOW_IN_MEMORY_FALLBACK'] === 'true'
+    || process.env['NODE_ENV'] !== 'production';
 
   try {
     // Try loading Prisma for pgvector
@@ -292,6 +366,10 @@ export function getVectorMemoryAdapter(): VectorMemoryAdapter {
     // pgvector or Prisma not available
   }
 
+  if (!allowFallback) {
+    throw new Error('[vector] Persistent vector store required but database is unavailable.');
+  }
+
   console.warn('[vector] pgvector not available — using in-memory vector search (non-persistent).');
   _vectorAdapter = new InMemoryVectorAdapter();
   return _vectorAdapter;
@@ -299,4 +377,10 @@ export function getVectorMemoryAdapter(): VectorMemoryAdapter {
 
 export function resetVectorMemoryAdapter(): void {
   _vectorAdapter = null;
+}
+
+function hashString(input: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createHash } = require('crypto') as typeof import('crypto');
+  return createHash('sha256').update(input).digest('hex');
 }

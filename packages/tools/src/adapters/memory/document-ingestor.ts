@@ -27,7 +27,7 @@ export class DocumentIngestor {
   async ingestText(
     tenantId: string,
     text: string,
-    opts?: { title?: string; sourceType?: string; sourceKey?: string; metadata?: Record<string, unknown> },
+    opts?: { title?: string; sourceType?: string; sourceKey?: string; metadata?: Record<string, unknown>; scopeType?: string; scopeId?: string },
   ): Promise<IngestResult> {
     const sourceKey = opts?.sourceKey ?? `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const sourceType = opts?.sourceType ?? 'DOCUMENT';
@@ -37,15 +37,13 @@ export class DocumentIngestor {
       ingestedAt: new Date().toISOString(),
     };
 
-    // Delete existing chunks for this source (re-ingest)
-    await this.adapter.delete(tenantId, sourceKey);
-
     const chunksCreated = await this.adapter.ingest(
       tenantId,
       text,
       metadata,
       sourceType,
       sourceKey,
+      { scopeType: opts?.scopeType, scopeId: opts?.scopeId },
     );
 
     return { chunksCreated, sourceKey, sourceType };
@@ -57,7 +55,7 @@ export class DocumentIngestor {
   async ingestPDF(
     tenantId: string,
     buffer: Buffer,
-    opts?: { title?: string; sourceKey?: string; metadata?: Record<string, unknown> },
+    opts?: { title?: string; sourceKey?: string; metadata?: Record<string, unknown>; scopeType?: string; scopeId?: string },
   ): Promise<IngestResult> {
     let text: string;
 
@@ -93,8 +91,9 @@ export class DocumentIngestor {
     query: string,
     topK = 5,
     scoreThreshold = 0.5,
+    opts?: { scopeType?: string; scopeId?: string },
   ) {
-    return this.adapter.search(tenantId, query, topK, scoreThreshold);
+    return this.adapter.search(tenantId, query, topK, scoreThreshold, opts);
   }
 }
 

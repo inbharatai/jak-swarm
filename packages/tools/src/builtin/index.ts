@@ -232,6 +232,8 @@ export function registerBuiltinTools(): void {
         properties: {
           query: { type: 'string', description: 'Search query' },
           maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+          scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+          scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
         },
         required: ['query'],
       },
@@ -239,13 +241,15 @@ export function registerBuiltinTools(): void {
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
-      const { query, maxResults = 5 } = input as { query: string; maxResults?: number };
+      const { query, maxResults = 5, scopeType, scopeId } = input as { query: string; maxResults?: number; scopeType?: string; scopeId?: string };
+      const resolvedScopeType = scopeType ?? 'TENANT';
+      const resolvedScopeId = scopeId ?? context.tenantId;
 
       // 1. Try vector semantic search first (highest quality)
       try {
         const { getVectorMemoryAdapter } = await import('../adapters/memory/vector-memory.adapter.js');
         const vectorAdapter = getVectorMemoryAdapter();
-        const vectorResults = await vectorAdapter.search(context.tenantId, query, maxResults, 0.5);
+        const vectorResults = await vectorAdapter.search(context.tenantId, query, maxResults, 0.5, { scopeType: resolvedScopeType, scopeId: resolvedScopeId });
         if (vectorResults.length > 0) {
           return {
             results: vectorResults.map((r) => ({
@@ -265,20 +269,20 @@ export function registerBuiltinTools(): void {
         console.warn('[search_knowledge] Vector search failed, falling back to keyword search:', vecErr instanceof Error ? vecErr.message : String(vecErr));
       }
 
-      // 2. Fall back to keyword search on TenantMemory table
+      // 2. Fall back to keyword search on MemoryItem table
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const dbModule = require('@jak-swarm/db');
         const prisma = dbModule.prisma;
-        if (prisma?.tenantMemory) {
-          const entries = await prisma.tenantMemory.findMany({
+        if (prisma?.memoryItem) {
+          const entries = await prisma.memoryItem.findMany({
             where: {
               tenantId: context.tenantId,
-              OR: [
-                { key: { contains: query, mode: 'insensitive' } },
-                { memoryType: 'KNOWLEDGE' },
-                { memoryType: 'POLICY' },
-              ],
+              scopeType: resolvedScopeType,
+              scopeId: resolvedScopeId,
+              deletedAt: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              key: { contains: query, mode: 'insensitive' },
             },
             orderBy: { updatedAt: 'desc' },
             take: maxResults,
@@ -2074,6 +2078,11 @@ export function registerBuiltinTools(): void {
           value: { type: 'object', description: 'Value to store (any JSON-serializable data)' },
           type: { type: 'string', description: 'Memory type: KNOWLEDGE | POLICY | WORKFLOW | USER_PREF' },
           source: { type: 'string', description: 'Source that created this memory' },
+          scopeType: { type: 'string', description: 'Scope type (TENANT, USER, WORKFLOW, PROJECT, AGENT)' },
+          scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
+          idempotencyKey: { type: 'string', description: 'Idempotency key for safe retries' },
+          confidence: { type: 'number', description: 'Confidence score 0-1 (optional)' },
+          expiresAt: { type: 'string', description: 'ISO-8601 expiry datetime (optional)' },
         },
         required: ['key', 'value'],
       },
@@ -2081,12 +2090,42 @@ export function registerBuiltinTools(): void {
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
-      const { key, value, type = 'KNOWLEDGE', source = 'agent' } = input as {
-        key: string; value: unknown; type?: string; source?: string;
+      const {
+        key,
+        value,
+        type = 'KNOWLEDGE',
+        source = 'agent',
+        scopeType,
+        scopeId,
+        idempotencyKey,
+        confidence,
+        expiresAt,
+      } = input as {
+        key: string;
+        value: unknown;
+        type?: string;
+        source?: string;
+        scopeType?: string;
+        scopeId?: string;
+        idempotencyKey?: string;
+        confidence?: number;
+        expiresAt?: string;
       };
+      const resolvedScopeType = scopeType ?? 'TENANT';
+      const resolvedScopeId = scopeId ?? context.tenantId;
+      const resolvedIdempotencyKey = idempotencyKey ?? buildIdempotencyKey(context, key, resolvedScopeType, resolvedScopeId, value);
       const adapter = getMemoryAdapter();
-      await adapter.set(key, value, context.tenantId, { type, source });
-      return { stored: true, key, type };
+      await adapter.set(key, value, context.tenantId, {
+        type,
+        source,
+        scopeType: resolvedScopeType,
+        scopeId: resolvedScopeId,
+        idempotencyKey: resolvedIdempotencyKey,
+        confidence,
+        expiresAt,
+        sourceRunId: context.runId,
+      });
+      return { stored: true, key, type, scopeType: resolvedScopeType, scopeId: resolvedScopeId };
     },
   );
 
@@ -2101,6 +2140,9 @@ export function registerBuiltinTools(): void {
         type: 'object',
         properties: {
           key: { type: 'string', description: 'Memory key to retrieve' },
+          scopeType: { type: 'string', description: 'Scope type (TENANT, USER, WORKFLOW, PROJECT, AGENT)' },
+          scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
+          includeDeleted: { type: 'boolean', description: 'Include soft-deleted items (admin only)' },
         },
         required: ['key'],
       },
@@ -2108,13 +2150,21 @@ export function registerBuiltinTools(): void {
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
-      const { key } = input as { key: string };
+      const { key, scopeType, scopeId, includeDeleted } = input as {
+        key: string; scopeType?: string; scopeId?: string; includeDeleted?: boolean;
+      };
+      const resolvedScopeType = scopeType ?? 'TENANT';
+      const resolvedScopeId = scopeId ?? context.tenantId;
       const adapter = getMemoryAdapter();
-      const result = await adapter.get(key, context.tenantId);
+      const result = await adapter.get(key, context.tenantId, {
+        scopeType: resolvedScopeType,
+        scopeId: resolvedScopeId,
+        includeDeleted,
+      });
       if (!result) {
         return { found: false, key, value: null };
       }
-      return { found: true, key, ...(result as Record<string, unknown>) };
+      return { found: true, key, scopeType: resolvedScopeType, scopeId: resolvedScopeId, ...(result as Record<string, unknown>) };
     },
   );
 
@@ -5576,8 +5626,14 @@ Date: _______________`;
             orderBy: { createdAt: 'desc' },
             take: 50,
           }),
-          prisma.tenantMemory.findMany({
-            where: { tenantId: context.tenantId, memoryType: { in: ['KNOWLEDGE', 'POLICY'] } },
+          prisma.memoryItem.findMany({
+            where: {
+              tenantId: context.tenantId,
+              scopeType: 'TENANT',
+              scopeId: context.tenantId,
+              memoryType: { in: ['KNOWLEDGE', 'POLICY'] },
+              deletedAt: null,
+            },
             orderBy: { updatedAt: 'desc' },
             take: 20,
           }),
@@ -5628,4 +5684,21 @@ Date: _______________`;
       }
     },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Module-level helpers
+// ---------------------------------------------------------------------------
+
+function buildIdempotencyKey(
+  context: ToolExecutionContext,
+  key: string,
+  scopeType: string,
+  scopeId: string,
+  value: unknown,
+): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createHash } = require('crypto') as typeof import('crypto');
+  const content = `${context.tenantId}:${scopeType}:${scopeId}:${key}:${context.runId ?? ''}:${JSON.stringify(value ?? null)}`;
+  return createHash('sha256').update(content).digest('hex').slice(0, 48);
 }

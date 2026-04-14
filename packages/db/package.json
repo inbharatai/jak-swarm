@@ -25,15 +25,15 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.1",
     "@jak-swarm/shared": "workspace:*",
+    "@prisma/client": "^6.2.1",
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
-    "prisma": "^6.2.1",
-    "typescript": "^5.7.3",
-    "@types/node": "^22.10.7",
     "@types/bcryptjs": "^2.4.6",
-    "tsx": "^4.19.2"
+    "@types/node": "^22.10.7",
+    "prisma": "^6.19.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }
