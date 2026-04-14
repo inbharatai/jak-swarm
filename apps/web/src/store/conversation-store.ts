@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { RoleId } from '@/lib/role-config';
+import { ROLE_IDS, type RoleId } from '@/lib/role-config';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,140 @@ export interface ConversationActions {
   setDrawerOpen: (open: boolean) => void;
 }
 
+type PersistedConversationState = Pick<
+  ConversationState,
+  'conversations' | 'activeConversationId' | 'messages' | 'activeRoles'
+>;
+
+const DEFAULT_ACTIVE_ROLES: RoleId[] = ['cto'];
+
+function isRoleId(value: unknown): value is RoleId {
+  return typeof value === 'string' && ROLE_IDS.includes(value as RoleId);
+}
+
+function normalizeRoles(value: unknown): RoleId[] {
+  const roles = Array.isArray(value)
+    ? value.filter(isRoleId)
+    : isRoleId(value)
+      ? [value]
+      : [];
+
+  return roles.length > 0 ? Array.from(new Set(roles)) : DEFAULT_ACTIVE_ROLES;
+}
+
+function normalizeConversations(value: unknown): Conversation[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return [];
+    }
+
+    const record = entry as Record<string, unknown>;
+    if (typeof record.id !== 'string' || record.id.length === 0) {
+      return [];
+    }
+
+    const createdAt = typeof record.createdAt === 'number' ? record.createdAt : Date.now();
+    const updatedAt = typeof record.updatedAt === 'number' ? record.updatedAt : createdAt;
+
+    return [{
+      id: record.id,
+      title: typeof record.title === 'string' && record.title.trim().length > 0
+        ? record.title
+        : 'New conversation',
+      roles: normalizeRoles(record.roles),
+      createdAt,
+      updatedAt,
+      projectId: typeof record.projectId === 'string' ? record.projectId : undefined,
+    }];
+  });
+}
+
+function normalizeMessages(value: unknown): Record<string, Message[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, Message[]> = {};
+
+  for (const [conversationId, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(entry)) {
+      continue;
+    }
+
+    normalized[conversationId] = entry.flatMap((item) => {
+      if (!item || typeof item !== 'object') {
+        return [];
+      }
+
+      const record = item as Record<string, unknown>;
+      if (typeof record.content !== 'string' || (record.role !== 'user' && record.role !== 'assistant')) {
+        return [];
+      }
+
+      const executionTrace =
+        record.executionTrace && typeof record.executionTrace === 'object'
+          ? (() => {
+              const trace = record.executionTrace as Record<string, unknown>;
+              const steps = Array.isArray(trace.steps)
+                ? trace.steps.flatMap((step) => {
+                    if (!step || typeof step !== 'object') {
+                      return [];
+                    }
+                    const stepRecord = step as Record<string, unknown>;
+                    if (typeof stepRecord.name !== 'string' || typeof stepRecord.status !== 'string') {
+                      return [];
+                    }
+                    return [{
+                      name: stepRecord.name,
+                      status: stepRecord.status,
+                      duration: typeof stepRecord.duration === 'number' ? stepRecord.duration : undefined,
+                    }];
+                  })
+                : undefined;
+
+              return {
+                workflowId: typeof trace.workflowId === 'string' ? trace.workflowId : undefined,
+                steps,
+              };
+            })()
+          : undefined;
+
+      return [{
+        id: typeof record.id === 'string' ? record.id : generateId(),
+        conversationId,
+        role: record.role,
+        agentRole: isRoleId(record.agentRole) ? record.agentRole : null,
+        content: record.content,
+        createdAt: typeof record.createdAt === 'number' ? record.createdAt : Date.now(),
+        executionTrace,
+      }];
+    });
+  }
+
+  return normalized;
+}
+
+function sanitizeConversationState(value: unknown): PersistedConversationState {
+  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const conversations = normalizeConversations(record.conversations);
+  const messages = normalizeMessages(record.messages);
+  const activeConversationId =
+    typeof record.activeConversationId === 'string' && conversations.some((conv) => conv.id === record.activeConversationId)
+      ? record.activeConversationId
+      : conversations[0]?.id ?? null;
+
+  return {
+    conversations,
+    activeConversationId,
+    messages,
+    activeRoles: normalizeRoles(record.activeRoles),
+  };
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 function generateId(): string {
@@ -69,14 +203,14 @@ export const useConversationStore = create<ConversationState & ConversationActio
       conversations: [],
       activeConversationId: null,
       messages: {},
-      activeRoles: ['cto'],
+      activeRoles: DEFAULT_ACTIVE_ROLES,
       sidebarCollapsed: false,
       drawerOpen: false,
 
       // Actions
       createConversation: (roles) => {
         const id = generateId();
-        const selectedRoles = roles ?? get().activeRoles;
+        const selectedRoles = normalizeRoles(roles ?? get().activeRoles);
         const conversation: Conversation = {
           id,
           title: 'New conversation',
@@ -111,24 +245,25 @@ export const useConversationStore = create<ConversationState & ConversationActio
       switchConversation: (id) => {
         const conv = get().conversations.find((c) => c.id === id);
         if (conv) {
-          set({ activeConversationId: id, activeRoles: conv.roles });
+          set({ activeConversationId: id, activeRoles: normalizeRoles(conv.roles) });
         }
       },
 
       setActiveRoles: (roles) => {
-        set({ activeRoles: roles });
+        const normalizedRoles = normalizeRoles(roles);
+        set({ activeRoles: normalizedRoles });
         const activeId = get().activeConversationId;
         if (activeId) {
           set((state) => ({
             conversations: state.conversations.map((c) =>
-              c.id === activeId ? { ...c, roles } : c,
+              c.id === activeId ? { ...c, roles: normalizedRoles } : c,
             ),
           }));
         }
       },
 
       toggleRole: (role) => {
-        const current = get().activeRoles;
+        const current = normalizeRoles(get().activeRoles);
         const next = current.includes(role)
           ? current.filter((r) => r !== role)
           : [...current, role];
@@ -180,11 +315,17 @@ export const useConversationStore = create<ConversationState & ConversationActio
     }),
     {
       name: 'jak-conversations',
+      version: 1,
+      migrate: (persistedState) => sanitizeConversationState(persistedState),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizeConversationState(persistedState),
+      }),
       partialize: (state) => ({
         conversations: state.conversations,
         activeConversationId: state.activeConversationId,
         messages: state.messages,
-        activeRoles: state.activeRoles,
+        activeRoles: normalizeRoles(state.activeRoles),
       }),
     },
   ),
