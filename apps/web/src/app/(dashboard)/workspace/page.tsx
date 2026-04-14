@@ -1,7 +1,7 @@
 'use client';
 
-import { WorkspaceDashboard } from '@/components/workspace/WorkspaceDashboard';
+import { ChatWorkspace } from '@/components/chat/ChatWorkspace';
 
 export default function WorkspacePage() {
-  return <WorkspaceDashboard title="Workspace" />;
+  return <ChatWorkspace />;
 }

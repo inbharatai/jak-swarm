@@ -4,7 +4,7 @@
 
 ## Title
 
-Show HN: JAK Swarm -- Open-source multi-agent AI platform (38 agents, 112 tools, 6 LLM providers)
+Show HN: JAK Swarm -- Open-source multi-agent AI platform (39 agents, 119 tools, 6 LLM providers)
 
 ---
 
@@ -21,7 +21,7 @@ GitHub: https://github.com/inbharatai/jak-swarm
 JAK Swarm lets you orchestrate multiple specialized AI agents that work together on complex tasks. Instead of sending one giant prompt to one model, you break work into pieces and let focused agents handle each part.
 
 - 38 pre-built agents (research, code analysis, data processing, content generation, etc.)
-- 112 tools (web scraping, file I/O, API calls, code execution, database queries, etc.)
+- 119 tools (web scraping, file I/O, API calls, code execution, database queries, etc.)
 - 6 LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, Groq)
 - Shared context system for inter-agent communication
 - Dynamic tool selection and agent delegation

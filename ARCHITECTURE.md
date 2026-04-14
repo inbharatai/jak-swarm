@@ -75,7 +75,7 @@ The core execution engine. Contains:
 
 ### `packages/agents` -- Agent Implementations
 
-38 agents organized by role:
+39 agents organized by role:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
@@ -86,11 +86,11 @@ The core execution engine. Contains:
 
 - **Orchestrator Agents** (`roles/`): Commander, Planner, Router, Verifier, Guardrail, Approval. Each extends BaseAgent with role-specific system prompts and output schemas.
 
-- **Worker Agents** (`workers/`): 27 domain specialists. Each declares which tools it needs and has a specialized system prompt for its domain.
+- **Worker Agents** (`workers/`): 33 domain specialists. Each declares which tools it needs and has a specialized system prompt for its domain.
 
 ### `packages/tools` -- Tool System
 
-112 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
+119 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
 
 - **ToolRegistry** (`registry/tool-registry.ts`): Singleton. Tools register with metadata (name, description, category, risk class, input/output schemas) and an executor function. Supports input validation and execution timing.
 

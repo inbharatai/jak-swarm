@@ -11,6 +11,9 @@ const PUBLIC_PATHS = new Set([
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/onboarding',
+  '/privacy',
+  '/terms',
   '/auth/callback',
   '/auth/confirm',
 ]);

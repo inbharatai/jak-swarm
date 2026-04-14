@@ -37,6 +37,15 @@
     --jak-coral: #f472b6;
     --jak-slate: #09090b;
     --jak-ivory: #fafaf9;
+
+    /* Role Colors */
+    --role-cto: 220 75% 55%;
+    --role-cmo: 340 70% 60%;
+    --role-ceo: 42 85% 55%;
+    --role-coding: 150 70% 45%;
+    --role-research: 270 60% 55%;
+    --role-design: 175 65% 50%;
+    --role-automation: 25 80% 55%;
   }
 
   .dark {
@@ -419,4 +428,61 @@
 
 .jak-floating-window:focus-within {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px hsl(var(--primary) / 0.3);
+}
+
+/* ─── Chat-First UI Utilities ──────────────────────────────────────────────── */
+
+@keyframes message-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+.animate-message-appear {
+  animation: message-appear 0.3s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* Role chip: small colored pill */
+.role-chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-all;
+}
+
+/* Chat message bubble left border accent */
+.role-border-cto { border-left: 3px solid hsl(var(--role-cto)); }
+.role-border-cmo { border-left: 3px solid hsl(var(--role-cmo)); }
+.role-border-ceo { border-left: 3px solid hsl(var(--role-ceo)); }
+.role-border-coding { border-left: 3px solid hsl(var(--role-coding)); }
+.role-border-research { border-left: 3px solid hsl(var(--role-research)); }
+.role-border-design { border-left: 3px solid hsl(var(--role-design)); }
+.role-border-automation { border-left: 3px solid hsl(var(--role-automation)); }
+
+/* Chat sidebar */
+.chat-sidebar {
+  @apply flex flex-col border-r border-border bg-card;
+  transition: width 0.2s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Chat input area glass effect */
+.chat-input-area {
+  @apply border-t border-border bg-background/80 backdrop-blur-md;
+}
+
+/* Scrollable message area with fade edges */
+.message-scroll {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%);
+}
+
+/* Hide scrollbar but keep scrollable */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

@@ -150,10 +150,10 @@ const AGENTS = [
 ];
 
 const STATS = [
-  { value: 38, label: 'Agents', suffix: '' },
-  { value: 56, label: 'Production Tools', suffix: '' },
+  { value: 39, label: 'Agents', suffix: '' },
+  { value: 119, label: 'Production Tools', suffix: '' },
   { value: 21, label: 'Integrations', suffix: '' },
-  { value: 3, label: 'AI Providers', suffix: '' },
+  { value: 6, label: 'AI Providers', suffix: '' },
 ];
 
 const WORKFLOW_STEPS = [
@@ -190,7 +190,7 @@ const PRICING = [
     price: '$29',
     period: '/mo',
     description: 'For builders shipping with AI.',
-    features: ['3,000 credits / month', '200 credits / day', 'All 38 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
+    features: ['3,000 credits / month', '200 credits / day', 'All 39 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
     cta: 'Go Pro',
     href: '/register',
     highlighted: true,
@@ -222,12 +222,12 @@ const PRICING = [
 
 /* ─── Stat Card Component ────────────────────────────────────────────────── */
 
-function StatCard({ value, label }: { value: number; label: string; suffix: string }) {
+function StatCard({ value, label, suffix }: { value: number; label: string; suffix: string }) {
   const { count, ref } = useCountUp(value, 1800);
   return (
     <div ref={ref} className="glass-card rounded-xl p-6 text-center">
       <div className="text-5xl sm:text-6xl font-display font-bold tracking-tight tabular-nums" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-        {count}
+        {count}{suffix}
       </div>
       <div className="mt-2 text-sm font-medium text-slate-400 uppercase tracking-widest font-sans">{label}</div>
     </div>
@@ -247,10 +247,11 @@ export default function HomePage() {
   const integrationSection = useFadeIn();
   const testimonialSection = useFadeIn();
 
-  // Check auth on client side
+  // Redirect authenticated users to workspace
+  // (Supabase middleware handles this at the edge, but this is a client-side safety net)
   useEffect(() => {
-    const token = document.cookie.split(';').find(c => c.trim().startsWith('jak_token='));
-    if (token) router.replace('/home');
+    const supabaseCookie = document.cookie.split(';').find(c => c.trim().startsWith('sb-'));
+    if (supabaseCookie) router.replace('/workspace');
   }, [router]);
 
   // Hero entrance animation
@@ -430,7 +431,7 @@ export default function HomePage() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
+                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">39 Agents Live</span>
               </div>
 
               <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[0.95]">
@@ -699,7 +700,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">56 Production Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Production Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
@@ -709,12 +710,12 @@ export default function HomePage() {
               {[
                 { icon: '📧', category: 'Email', count: 10, tools: 'Read, draft, send, search, sequences, personalize, track', color: '#EA4335' },
                 { icon: '📅', category: 'Calendar', count: 3, tools: 'List events, create events, find availability', color: '#4285F4' },
-                { icon: '🌐', category: 'Browser', count: 20, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
-                { icon: '📄', category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, export', color: '#8B5CF6' },
+                { icon: '🌐', category: 'Browser', count: 27, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
+                { icon: '📄', category: 'Document', count: 15, tools: 'Read, write, summarize, extract data, PDF analysis, export', color: '#8B5CF6' },
                 { icon: '📊', category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
                 { icon: '👤', category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
-                { icon: '🔍', category: 'Research', count: 6, tools: 'Web search, fetch, SEO audit, keywords, SERP analysis', color: '#06B6D4' },
-                { icon: '🧠', category: 'Knowledge', count: 7, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
+                { icon: '🔍', category: 'Research', count: 30, tools: 'Web search, fetch, SEO audit, keywords, SERP analysis', color: '#06B6D4' },
+                { icon: '🧠', category: 'Knowledge', count: 9, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
                 { icon: '⚙️', category: 'Ops', count: 3, tools: 'Webhooks, file I/O, code execution', color: '#fb923c' },
                 { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC sessions via OpenAI Realtime API', color: '#f472b6' },
                 { icon: '🔌', category: 'MCP', count: 0, tools: 'Slack, GitHub, Notion, HubSpot, Jira, Linear, Stripe — loaded at runtime', color: '#38bdf8' },
@@ -1064,7 +1065,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Autonomous multi-agent AI platform. 38 agents, 56 production tools, 21 integrations, managed AI, vibe coding.
+                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, vibe coding.
                 </p>
               </div>
 

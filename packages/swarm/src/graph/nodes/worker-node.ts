@@ -268,7 +268,7 @@ function buildTaskInput(
     case AgentRole.WORKER_BROWSER:
       return {
         actions: [{ type: 'EXTRACT' as const, selector: 'body' }],
-        allowedDomains: [],
+        allowedDomains: state.allowedDomains ?? [],
         dependencyResults,
       };
     case AgentRole.WORKER_SUPPORT:

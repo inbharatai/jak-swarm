@@ -55,6 +55,9 @@ export interface SwarmState {
   // Auto-approval threshold
   approvalThreshold?: string;
 
+  // Tenant browser config
+  allowedDomains: string[];
+
   // Final state
   status: WorkflowStatus;
   error: string | undefined;
@@ -70,6 +73,7 @@ export function createInitialSwarmState(params: {
   industry?: string;
   maxCostUsd?: number;
   approvalThreshold?: string;
+  allowedDomains?: string[];
 }): SwarmState {
   return {
     goal: params.goal,
@@ -94,6 +98,7 @@ export function createInitialSwarmState(params: {
     accumulatedCostUsd: 0,
     maxCostUsd: params.maxCostUsd,
     approvalThreshold: params.approvalThreshold,
+    allowedDomains: params.allowedDomains ?? [],
     status: WS.PENDING,
     error: undefined,
     outputs: [],

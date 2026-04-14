@@ -1,6 +1,7 @@
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import * as net from 'node:net';
 
 /**
  * Singleton Playwright browser engine for JAK Swarm.
@@ -127,9 +128,63 @@ class PlaywrightEngine {
   // ─── Core Operations ──────────────────────────────────────────────────
 
   /**
+   * Validate a URL is safe to navigate to (SSRF protection).
+   * Blocks private/reserved IPs and non-http(s) schemes.
+   */
+  private validateUrl(url: string): BrowserErrorResult | null {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { error: `Invalid URL: ${url}`, code: 'INVALID_URL' };
+    }
+
+    // Only allow http/https
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { error: `Blocked scheme: ${parsed.protocol}`, code: 'SSRF_BLOCKED' };
+    }
+
+    const hostname = parsed.hostname;
+
+    // Block localhost variants
+    if (hostname === 'localhost' || hostname === '[::1]') {
+      return { error: 'Navigation to localhost is blocked', code: 'SSRF_BLOCKED' };
+    }
+
+    // Block private/reserved IPv4 and IPv6 ranges
+    if (net.isIP(hostname)) {
+      if (net.isIPv4(hostname)) {
+        const parts = hostname.split('.').map(Number);
+        const isPrivate =
+          parts[0] === 10 ||                                              // 10.0.0.0/8
+          parts[0] === 127 ||                                             // 127.0.0.0/8
+          (parts[0] === 172 && parts[1]! >= 16 && parts[1]! <= 31) ||    // 172.16.0.0/12
+          (parts[0] === 192 && parts[1] === 168) ||                       // 192.168.0.0/16
+          (parts[0] === 169 && parts[1] === 254) ||                       // 169.254.0.0/16 (link-local)
+          parts[0] === 0;                                                  // 0.0.0.0/8
+        if (isPrivate) {
+          return { error: `Navigation to private IP ${hostname} is blocked`, code: 'SSRF_BLOCKED' };
+        }
+      } else {
+        // Block all IPv6 except public addresses (conservative approach)
+        const lower = hostname.toLowerCase().replace(/[\[\]]/g, '');
+        if (lower.startsWith('fd') || lower.startsWith('fc') || lower.startsWith('fe80') || lower === '::1' || lower === '::') {
+          return { error: `Navigation to private IPv6 ${hostname} is blocked`, code: 'SSRF_BLOCKED' };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Navigate to a URL, wait for load, return page info and cleaned text.
    */
   async navigate(url: string): Promise<NavigateResult | BrowserErrorResult> {
+    // SSRF protection: block private IPs and non-http schemes
+    const ssrfError = this.validateUrl(url);
+    if (ssrfError) return ssrfError;
+
     let page: Page | null = null;
     try {
       page = await this.getPage();

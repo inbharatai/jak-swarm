@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { WorkflowService } from '../services/workflow.service.js';
 import { ok, err } from '../types.js';
-import { AppError, NotFoundError, ForbiddenError } from '../errors.js';
+import { AppError, NotFoundError } from '../errors.js';
 import type { ApprovalStatus } from '../types.js';
 
 const decideBodySchema = z.object({
@@ -80,14 +80,15 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
       const tenantId = request.user.tenantId;
 
       try {
-        const approval = await fastify.db.approvalRequest.findUnique({
-          where: { id: approvalId },
+        const whereClause = request.user.role === 'SYSTEM_ADMIN'
+          ? { id: approvalId }
+          : { id: approvalId, tenantId };
+
+        const approval = await fastify.db.approvalRequest.findFirst({
+          where: whereClause,
         });
 
         if (!approval) throw new NotFoundError('ApprovalRequest', approvalId);
-        if (approval.tenantId !== tenantId && request.user.role !== 'SYSTEM_ADMIN') {
-          throw new ForbiddenError('Access to approval request in another tenant is not allowed');
-        }
 
         return reply.status(200).send(ok(approval));
       } catch (e) {

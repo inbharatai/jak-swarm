@@ -19,6 +19,30 @@ class InMemoryRedisShim {
     return this.store.get(key) ?? null;
   }
 
+  async set(key: string, value: string, ...args: unknown[]): Promise<string | null> {
+    // Supports: SET key value [PX ms] [NX]
+    const nx = args.includes('NX');
+    const pxIndex = args.indexOf('PX');
+    const ttlMs = pxIndex !== -1 ? Number(args[pxIndex + 1]) : 0;
+
+    if (nx && this.store.has(key)) {
+      return null;
+    }
+
+    this.clearTimer(key);
+    this.store.set(key, value);
+
+    if (ttlMs > 0) {
+      const timeout = setTimeout(() => {
+        this.store.delete(key);
+        this.timers.delete(key);
+      }, ttlMs);
+      this.timers.set(key, timeout);
+    }
+
+    return 'OK';
+  }
+
   async setex(key: string, seconds: number, value: string): Promise<'OK'> {
     this.clearTimer(key);
     this.store.set(key, value);
@@ -28,6 +52,29 @@ class InMemoryRedisShim {
     }, seconds * 1000);
     this.timers.set(key, timeout);
     return 'OK';
+  }
+
+  async incr(key: string): Promise<number> {
+    const current = parseInt(this.store.get(key) ?? '0', 10);
+    const next = current + 1;
+    this.store.set(key, String(next));
+    return next;
+  }
+
+  async pexpire(key: string, ms: number): Promise<number> {
+    if (!this.store.has(key)) return 0;
+    this.clearTimer(key);
+    const timeout = setTimeout(() => {
+      this.store.delete(key);
+      this.timers.delete(key);
+    }, ms);
+    this.timers.set(key, timeout);
+    return 1;
+  }
+
+  async eval(..._args: unknown[]): Promise<unknown> {
+    // Lua scripts can't run in-memory; return 0 (no-op) for lock release scripts
+    return 0;
   }
 
   async del(...keys: string[]): Promise<number> {

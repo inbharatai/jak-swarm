@@ -21,6 +21,7 @@ export interface SchedulerExecuteParams {
 
 export class SchedulerService {
   private interval: ReturnType<typeof setInterval> | null = null;
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
   private db: PrismaClient;
   private executeWorkflow: (params: SchedulerExecuteParams) => Promise<string>;
   private isLeader: () => Promise<boolean>;
@@ -40,6 +41,10 @@ export class SchedulerService {
     this.interval = setInterval(() => {
       void this.tick();
     }, 60_000);
+    // Poll for completed scheduled workflows every 30s
+    this.pollInterval = setInterval(() => {
+      void this.syncRunStatuses();
+    }, 30_000);
     // Initial tick after 5 seconds (let everything boot first)
     setTimeout(() => {
       void this.tick();
@@ -52,6 +57,10 @@ export class SchedulerService {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
+    }
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
     logger.info('Stopped');
   }
@@ -143,6 +152,74 @@ export class SchedulerService {
       }
     } catch (err) {
       logger.error({ err }, 'Tick error');
+    }
+  }
+
+  /**
+   * Sync lastRunStatus for schedules that are still showing RUNNING.
+   * Looks up the actual workflow status and updates the schedule record.
+   */
+  private async syncRunStatuses(): Promise<void> {
+    try {
+      const leader = await this.isLeader();
+      if (!leader) return;
+
+      const running = await this.db.workflowSchedule.findMany({
+        where: { lastRunStatus: 'RUNNING', lastRunId: { not: null } },
+        select: { id: true, lastRunId: true, name: true, lastRunAt: true },
+      });
+
+      if (running.length === 0) return;
+
+      const STUCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+      for (const schedule of running) {
+        try {
+          const workflow = await this.db.workflow.findUnique({
+            where: { id: schedule.lastRunId! },
+            select: { status: true },
+          });
+
+          // Workflow record missing — mark as FAILED
+          if (!workflow) {
+            await this.db.workflowSchedule.update({
+              where: { id: schedule.id },
+              data: { lastRunStatus: 'FAILED' },
+            });
+            logger.warn({ schedule: schedule.name }, 'Workflow record missing — marked schedule run as FAILED');
+            continue;
+          }
+
+          const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'];
+          if (terminal.includes(workflow.status)) {
+            await this.db.workflowSchedule.update({
+              where: { id: schedule.id },
+              data: { lastRunStatus: workflow.status },
+            });
+            logger.info(
+              { schedule: schedule.name, status: workflow.status },
+              'Synced schedule run status',
+            );
+          } else if (
+            schedule.lastRunAt &&
+            Date.now() - new Date(schedule.lastRunAt).getTime() > STUCK_TIMEOUT_MS
+          ) {
+            // Workflow stuck in non-terminal state for over 2 hours — mark as FAILED
+            await this.db.workflowSchedule.update({
+              where: { id: schedule.id },
+              data: { lastRunStatus: 'FAILED' },
+            });
+            logger.warn(
+              { schedule: schedule.name, workflowStatus: workflow.status },
+              'Workflow stuck for >2h — marked schedule run as FAILED',
+            );
+          }
+        } catch {
+          // Non-critical — will retry next cycle
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, 'syncRunStatuses error');
     }
   }
 }

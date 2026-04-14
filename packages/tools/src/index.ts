@@ -4,6 +4,7 @@ export type { RegisteredTool, ToolExecutor } from './registry/tool-registry.js';
 
 // Tenant-scoped registry
 export { TenantToolRegistry, getTenantToolRegistry, clearTenantToolRegistries } from './registry/tenant-tool-registry.js';
+export type { TenantToolRegistryOptions } from './registry/tenant-tool-registry.js';
 
 // Email adapter
 export type {

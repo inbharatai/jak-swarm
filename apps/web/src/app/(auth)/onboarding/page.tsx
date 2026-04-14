@@ -52,7 +52,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     onboardingApi.getState().then((state) => {
       if (state.dismissed) {
-        router.replace('/home');
+        router.replace('/workspace');
         return;
       }
       setCompletedSteps(state.completedSteps);
@@ -90,7 +90,7 @@ export default function OnboardingPage() {
 
   const handleFinish = async () => {
     await onboardingApi.updateState({ dismissed: true });
-    router.push('/home');
+    router.push('/workspace');
   };
 
   const handleConnect = (provider: IntegrationProvider) => {

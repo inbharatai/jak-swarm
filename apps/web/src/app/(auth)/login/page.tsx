@@ -23,7 +23,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const redirectTo = searchParams.get('redirectTo') ?? '/workspace';
+  const rawRedirect = searchParams.get('redirectTo') ?? '/workspace';
+  // Prevent open redirect — only allow relative paths starting with /
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/workspace';
   const authError = searchParams.get('error');
 
   const {

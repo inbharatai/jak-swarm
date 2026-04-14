@@ -4,15 +4,15 @@
 
 ### Autonomous Multi-Agent AI Platform
 
-[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
-[![Tools](https://img.shields.io/badge/Production_Tools-56-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
+[![Agents](https://img.shields.io/badge/AI_Agents-39-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
+[![Tools](https://img.shields.io/badge/Production_Tools-119-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
-[![LLM Providers](https://img.shields.io/badge/AI_Providers-3_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
+[![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-85_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**38 AI agents, 56 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Production-grade SaaS with managed AI — no API keys required.**
+**39 AI agents, 119 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Production-grade SaaS with managed AI — no API keys required.**
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -69,7 +69,7 @@ flowchart TD
         F["🔀 Router Agent\nAssign agents • Select LLM tier • Enable parallelism"]
     end
 
-    subgraph WORKERS["⚡ Worker Layer — 32 Specialists + 5 Vibe Coding"]
+    subgraph WORKERS["⚡ Worker Layer — 33 Specialists + 5 Vibe Coding"]
         direction LR
         G["📧 Email\n📅 Calendar\n👤 CRM"]
         H["📄 Document\n📊 Spreadsheet\n🌐 Browser"]
@@ -149,16 +149,16 @@ flowchart LR
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
-| 🔧 | **56 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), 20 browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
-| 🔍 | **26 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
+| 🤖 | **39 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 33 specialist workers |
+| 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), 27 browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
+| 🔍 | **30 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
-| 🧠 | **3 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini). Dynamic routing per task type. No API keys needed for users |
+| 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing per task type. No API keys needed for users |
 | 💰 | **Credit-Based Billing** | 4 plans (Free/Pro/Team/Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard, Paddle payments |
 | 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
 | 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
 | 🔌 | **21 MCP Integrations** | Slack, GitHub, Notion, HubSpot, Salesforce, Stripe, Linear, Jira, Supabase, Discord, and 11 more via Model Context Protocol |
-| 🌐 | **20 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
+| 🌐 | **27 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, /healthz + /ready probes, structured Pino logging |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
@@ -229,7 +229,7 @@ Most AI agent platforms have **zero resilience**. If an LLM call fails, the whol
 
 ---
 
-## 🎭 Agent Roster — 38 Agents
+## 🎭 Agent Roster — 39 Agents
 
 ```mermaid
 graph LR
@@ -393,7 +393,7 @@ graph LR
 ### Landing Page — Hero
 ![JAK Swarm Hero](docs/screenshots/01-hero.png)
 
-### Agent Network — 38 Agents in 5 Layers
+### Agent Network — 39 Agents in 5 Layers
 ![Agent Network](docs/screenshots/02-agents.png)
 
 ### Workflow — From Command to Result in Seconds
@@ -426,7 +426,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 56 production tools + 26 research tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 119 production tools + 30 research tools.*
 
 </div>
 
@@ -538,7 +538,7 @@ flowchart TD
 | **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **56 production tools** | ✅ | ❌ | ❌ | ❌ |
+| **119 production tools** | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
 | **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
@@ -658,27 +658,22 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (119 Registered — 56 Production, 26 Research, 18 Utilities)
+## 🔧 Tool Inventory (119 Registered)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
-| **Email** | 5 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email | ✅ Real (Gmail IMAP/SMTP) |
+| **Email** | 10 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email, personalize_email, schedule_email, track_email_engagement, analyze_engagement, create_email_sequence | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
-| **CRM** | 3 | lookup_crm_contact, update_crm_record, search_deals | 🔌 Mock (pluggable adapter — bring your own CRM API) |
-| **Browser** | 20 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs + more | ✅ Real (Playwright) |
-| **Document** | 4 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze | ✅ Real (pdf-parse) |
-| **Research** | 3 | web_search, web_fetch, search_knowledge | ✅ Real (web) |
-| **Spreadsheet** | 3 | parse_spreadsheet, compute_statistics, generate_report | ✅ Built-in |
-| **Knowledge** | 3 | search_knowledge, memory_store, memory_retrieve | ✅ Real (DB-backed) |
+| **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, enrich_company, verify_email, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn, generate_winback + more | 🔌 Pluggable adapter |
+| **Browser** | 27 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs, hover, select, upload, evaluate_js, wait_for, pdf_export + more | ✅ Real (Playwright) |
+| **Document** | 15 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write, list_directory + more | ✅ Real (pdf-parse) |
+| **Research** | 30 | web_search, web_fetch, search_knowledge, classify_text, audit_seo, research_keywords, analyze_serp, monitor_rankings + more | ✅ Real (web) |
+| **Spreadsheet** | 4 | parse_spreadsheet, compute_statistics, generate_report, export_csv | ✅ Built-in |
+| **Knowledge** | 9 | search_knowledge, memory_store, memory_retrieve, ingest_document, compile_executive_summary + more | ✅ Real (DB-backed) |
 | **Ops** | 5 | send_webhook, file_read, file_write, list_directory, code_execute | ✅ Built-in |
-| **Classify** | 1 | classify_text | ✅ Built-in |
-| **Lead/Sales** | 8 | enrich_contact, enrich_company, verify_email, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn | ✅ Built-in |
-| **SEO** | 4 | audit_seo, research_keywords, analyze_serp, monitor_rankings | ✅ Built-in |
-| **Email Sequences** | 5 | create_email_sequence, personalize_email, schedule_email, track_email_engagement, analyze_engagement | ✅ Built-in |
-| **Growth** | 2 | generate_winback, predict_churn | ✅ Built-in |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion + 17 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 119 registered tools — 56 production (real API/browser/DB calls), 26 research (web search + analysis), 18 utilities (local compute + memory), 8 verification, 11 other**
+**Total: 119 registered tools — Email (10), Calendar (3), Browser (27), Document (15), Spreadsheet (4), CRM (14), Research (30), Knowledge (9), Webhook (2), Ops + Voice (5). Plus 21 MCP integrations loaded at runtime.**
 
 ---
 
@@ -755,12 +750,12 @@ Create recurring workflows from the dashboard at `/schedules`:
 
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
-| Pre-built agents | **38** | 0 | 0 | 1 |
-| Tools | **119 (56 production)** | 50+ | Custom | ~10 |
+| Pre-built agents | **39** | 0 | 0 | 1 |
+| Tools | **119** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
-| Browser control | **20 tools** | Via plugin | Via plugin | — |
+| Browser control | **27 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
 | Self-correction | **4 layers** (heuristic) | Limited | Manual | Limited |
 | Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
@@ -883,12 +878,12 @@ jak-swarm/
 │           ├── settings/       # LLM & approval config
 │           └── admin/          # Tenant management
 ├── packages/
-│   ├── agents/                 # 38 agent implementations
+│   ├── agents/                 # 39 agent implementations
 │   │   └── src/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
 │   │       ├── roles/          # 6 orchestrator agents
-│   │       └── workers/        # 32 worker agents
-│   ├── tools/                  # 119 tool implementations (56 production + 26 research + utilities)
+│   │       └── workers/        # 33 worker agents
+│   ├── tools/                  # 119 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools

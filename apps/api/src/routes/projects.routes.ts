@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import path from 'path';
 import { ProjectService } from '../services/project.service.js';
 import { VibeCodingExecutionService } from '../services/vibe-coding-execution.service.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
@@ -307,8 +308,14 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
       const filePath = (request.params as Record<string, string>)['*'];
       if (!filePath) return reply.status(400).send(err('VALIDATION_ERROR', 'File path required'));
 
-      // FIX: Prevent path traversal
-      if (filePath.includes('..') || filePath.startsWith('/')) {
+      // FIX: Prevent path traversal — normalize and reject any escape
+      const normalized = path.posix.normalize(filePath);
+      if (
+        normalized.startsWith('/') ||
+        normalized.startsWith('..') ||
+        normalized.includes('\\') ||
+        normalized !== filePath
+      ) {
         return reply.status(400).send(err('VALIDATION_ERROR', 'Invalid file path'));
       }
 

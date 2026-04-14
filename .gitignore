@@ -12,3 +12,6 @@ prisma/migrations/
 
 .vercel
 scripts/create-render-service.ps1
+
+.vercel
+.env*.local

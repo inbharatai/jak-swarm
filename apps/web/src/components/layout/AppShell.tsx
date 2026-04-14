@@ -2,60 +2,33 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import { Sidebar } from './Sidebar';
-import { Header } from './Header';
-import { PlatformShell } from '@/components/shell/PlatformShell';
+import { AppLayout } from './AppLayout';
 import { useAuth } from '@/lib/auth';
-import { Spinner } from '@/components/ui/spinner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const AUTH_PATHS = ['/login', '/register', '/'];
-
-// Dashboard routes that should render inside the PlatformShell
-const DASHBOARD_PREFIX = ['/home', '/workspace', '/builder', '/swarm', '/traces', '/analytics', '/skills', '/knowledge', '/integrations', '/schedules', '/settings', '/admin'];
+const AUTH_PATHS = ['/login', '/register', '/', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms'];
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
   const pathname = usePathname();
 
   const isAuthPage = AUTH_PATHS.some(
-    p => pathname === p || pathname.startsWith('/(auth)'),
-  ) || pathname === '/login' || pathname === '/register';
+    p => pathname === p,
+  ) || pathname.startsWith('/auth/');
 
-  // Landing / auth pages render without shell
+  // Auth/landing pages and unauthenticated users render without shell
   if (isAuthPage || !user) {
-    if (isLoading) {
-      return (
-        <div className="flex min-h-screen items-center justify-center">
-          <Spinner size="lg" />
-        </div>
-      );
-    }
     return <>{children}</>;
   }
 
-  // Dashboard routes → PlatformShell (module-based desktop OS)
-  const isDashboard = DASHBOARD_PREFIX.some(p => pathname.startsWith(p));
-  if (isDashboard) {
-    return <ErrorBoundary><PlatformShell /></ErrorBoundary>;
-  }
-
-  // Fallback: legacy layout for any remaining routes
+  // All authenticated routes use the chat-first AppLayout
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <Header />
-          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-            {children}
-          </main>
-        </div>
-      </div>
+      <AppLayout>{children}</AppLayout>
     </ErrorBoundary>
   );
 }

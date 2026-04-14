@@ -100,7 +100,9 @@ async function buildApp() {
         description: 'Production-grade autonomous swarm agent platform API',
         version: '0.1.0',
       },
-      servers: [{ url: `http://localhost:${config.port}` }],
+      servers: config.nodeEnv === 'production'
+        ? [{ url: config.corsOrigins[0]?.replace(/^https:\/\/(?:www\.)?/, 'https://api.') || `http://localhost:${config.port}` }]
+        : [{ url: `http://localhost:${config.port}` }],
       components: {
         securitySchemes: {
           bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -110,10 +112,13 @@ async function buildApp() {
     },
   });
 
-  await fastify.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list', deepLinking: true },
-  });
+  // Only expose Swagger UI in non-production environments
+  if (config.nodeEnv !== 'production') {
+    await fastify.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: { docExpansion: 'list', deepLinking: true },
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Application plugins

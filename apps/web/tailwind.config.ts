@@ -35,6 +35,15 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        role: {
+          cto: 'hsl(220, 75%, 55%)',
+          cmo: 'hsl(340, 70%, 60%)',
+          ceo: 'hsl(42, 85%, 55%)',
+          coding: 'hsl(150, 70%, 45%)',
+          research: 'hsl(270, 60%, 55%)',
+          design: 'hsl(175, 65%, 50%)',
+          automation: 'hsl(25, 80%, 55%)',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -42,7 +51,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Space Grotesk', 'system-ui', 'sans-serif'],
+        sans: ['Satoshi', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'Syne', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },

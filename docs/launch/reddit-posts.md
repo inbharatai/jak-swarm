@@ -4,7 +4,7 @@
 
 ## Post 1: r/artificial
 
-**Title:** I open-sourced a multi-agent AI platform after 14 months of development -- 38 agents, 112 tools, 6 LLM providers
+**Title:** I open-sourced a multi-agent AI platform after 14 months of development -- 39 agents, 119 tools, 6 LLM providers
 
 **Body:**
 
@@ -15,7 +15,7 @@ The core idea is simple: instead of one all-purpose AI call, you create speciali
 What's included:
 
 - 33 pre-built specialized agents covering research, code, data, content, and utility tasks
-- 112 tools for web scraping, file operations, API calls, code execution, and more
+- 119 tools for web scraping, file operations, API calls, code execution, and more
 - Support for OpenAI, Anthropic, Google, Mistral, Ollama (local), and Groq
 - Shared context system for agent communication
 - Dynamic delegation (agents can hand off work to other agents mid-task)
@@ -40,7 +40,7 @@ MIT licensed: https://github.com/inbharatai/jak-swarm
 
 I wanted to share something I think this community will appreciate: JAK Swarm supports Ollama as a first-class LLM provider, meaning you can run the entire multi-agent platform locally without any API keys or cloud dependencies.
 
-JAK Swarm is an open-source multi-agent AI platform with 38 specialized agents and 112 tools. The agents collaborate on tasks -- research, code analysis, data processing, content generation, and more.
+JAK Swarm is an open-source multi-agent AI platform with 39 specialized agents and 119 tools. The agents collaborate on tasks -- research, code analysis, data processing, content generation, and more.
 
 Why local LLM users should care:
 
@@ -67,7 +67,7 @@ What local models are you running? I want to add specific optimization notes for
 
 ## Post 3: r/SideProject
 
-**Title:** 14 months of evenings and weekends: I built an open-source AI agent platform with 38 agents and 112 tools
+**Title:** 14 months of evenings and weekends: I built an open-source AI agent platform with 39 agents and 119 tools
 
 **Body:**
 
@@ -150,7 +150,7 @@ The full codebase is MIT licensed and under 15K lines of Python: https://github.
 
 **Body:**
 
-I spent 14 months building JAK Swarm, a multi-agent AI platform with 38 agents, 112 tools, and support for 6 LLM providers. And I'm giving it away for free under the MIT license.
+I spent 14 months building JAK Swarm, a multi-agent AI platform with 39 agents, 119 tools, and support for 6 LLM providers. And I'm giving it away for free under the MIT license.
 
 People keep asking me if I'm going to monetize this. The answer is: not directly.
 

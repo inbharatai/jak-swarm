@@ -164,10 +164,11 @@ pnpm dev
 
 This runs via Turbo in parallel:
 - `apps/web` — Next.js app at `http://localhost:3000`
-- `apps/api` — Hono API server at `http://localhost:4000`
-- `apps/worker` — Temporal worker (connects to `localhost:7233`)
+- `apps/api` — Fastify API server at `http://localhost:4000`
 - `packages/shared` — TypeScript watch mode
 - `packages/db` — TypeScript watch mode
+
+Temporal infrastructure can be started locally for experimentation, but the default API execution path currently runs workflows in-process via the swarm execution service.
 
 To run a specific app only:
 
@@ -281,7 +282,7 @@ pnpm build --filter @jak-swarm/db
 pnpm dev
 ```
 
-### Temporal worker fails to connect — "Connection refused at localhost:7233"
+### Temporal services fail to connect — "Connection refused at localhost:7233"
 
 Ensure Docker Compose services are running:
 ```bash
@@ -333,14 +334,14 @@ pnpm build
 ```
 jak-swarm/
 ├── apps/
-│   ├── api/          — Hono REST API server
+│   ├── api/          — Fastify REST API server
 │   ├── web/          — Next.js frontend
-│   └── worker/       — Temporal workflow worker
 ├── packages/
 │   ├── shared/       — Types, schemas, constants, utils
 │   ├── db/           — Prisma client + schema
 │   ├── agents/       — Agent implementations (Phase 1b)
-│   └── tools/        — Tool registry + adapters (Phase 1b)
+│   ├── tools/        — Tool registry + adapters (Phase 1b)
+│   └── workflows/    — Temporal-ready workflow package
 ├── docker/
 │   └── docker-compose.yml
 ├── docs/             — Architecture, security, setup docs

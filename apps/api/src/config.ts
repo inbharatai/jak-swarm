@@ -32,9 +32,14 @@ export const config = {
 
   redisUrl: process.env['REDIS_URL']?.trim() || null,
 
-  // OPENAI_API_KEY is required for LLM calls. Agents log a warning if missing.
+  // LLM provider API keys. At least one is required. Agents log a warning if all are missing.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',
   openaiRealtimeModel: process.env['OPENAI_REALTIME_MODEL'] ?? 'gpt-4o-realtime-preview',
+  anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? '',
+  geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
+  deepseekApiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
+  ollamaBaseUrl: process.env['OLLAMA_BASE_URL'] ?? '',
+  openrouterApiKey: process.env['OPENROUTER_API_KEY'] ?? '',
 
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),

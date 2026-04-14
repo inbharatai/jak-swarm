@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Space_Grotesk, Syne, JetBrains_Mono } from 'next/font/google';
+import { Syne, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AppShell } from '@/components/layout/AppShell';
 import { ToastProvider } from '@/components/ui/toast';
@@ -13,12 +13,6 @@ const syne = Syne({
   weight: ['400', '500', '600', '700', '800'],
 });
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-});
-
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
@@ -28,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'JAK Swarm — Autonomous Multi-Agent AI Platform',
   description:
-    'Autonomous multi-agent AI platform — 38 agents, 56 production tools, 3 managed AI providers. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. No API keys needed.',
+    'Autonomous multi-agent AI platform — 39 agents, 119 production tools, 6 managed AI providers. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. No API keys needed.',
   keywords: ['AI agents', 'multi-agent platform', 'automation', 'workflow', 'enterprise AI', 'vibe coding', 'managed AI'],
   authors: [{ name: 'JAK Swarm' }],
   manifest: '/manifest.json',
@@ -52,7 +46,7 @@ export const metadata: Metadata = {
   },
   other: {
     'theme-color': '#09090b',
-    'color-scheme': 'dark',
+    'color-scheme': 'dark light',
     'mobile-web-app-capable': 'yes',
   },
 };
@@ -63,10 +57,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${syne.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`} style={{ colorScheme: 'dark' }}>
+    <html lang="en" suppressHydrationWarning className={`${syne.variable} ${jetbrainsMono.variable}`}>
       <head>
         <meta name="theme-color" content="#09090b" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap" rel="stylesheet" />
         <script
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js')})}`,

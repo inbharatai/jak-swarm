@@ -272,6 +272,9 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
       });
       await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'PAUSED' } });
 
+      // Notify SSE listeners that workflow is paused
+      fastify.swarm.emit(`workflow:${workflowId}`, { type: 'paused', workflowId, timestamp: new Date().toISOString() });
+
       return reply.send(ok({ success: true, message: 'Workflow will pause after current node completes' }));
     },
   );
@@ -316,7 +319,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
       const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
       if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-        await fastify.authenticate(request, reply);
+
       // Broadcast stop signal to ALL instances
       fastify.swarm.stopWorkflow(workflowId); // Local instance
       await fastify.coordination.signals.publish({

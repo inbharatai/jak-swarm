@@ -11,8 +11,8 @@ export default function BillingPage() {
 
       {/* Plan comparison */}
       <div>
-        <h2 className="text-lg font-display font-semibold text-white mb-2">Plans</h2>
-        <p className="text-sm text-slate-400 mb-6">Choose the right plan for your usage. Upgrade or downgrade anytime.</p>
+        <h2 className="text-lg font-display font-semibold text-foreground mb-2">Plans</h2>
+        <p className="text-sm text-muted-foreground mb-6">Choose the right plan for your usage. Upgrade or downgrade anytime.</p>
         <PricingTable />
       </div>
     </div>

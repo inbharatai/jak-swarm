@@ -18,7 +18,7 @@ interface CommandItem {
 }
 
 const NAV_COMMANDS: CommandItem[] = [
-  { id: 'home', label: 'Home', description: 'Dashboard overview', icon: <Home className="h-4 w-4" />, href: '/home', group: 'Navigation' },
+  { id: 'home', label: 'Home', description: 'Dashboard overview', icon: <Home className="h-4 w-4" />, href: '/workspace', group: 'Navigation' },
   { id: 'workspace', label: 'Workspace', description: 'Command center', icon: <LayoutDashboard className="h-4 w-4" />, href: '/workspace', group: 'Navigation' },
   { id: 'builder', label: 'Builder', description: 'Vibe Coding IDE', icon: <Code2 className="h-4 w-4" />, href: '/builder', group: 'Navigation' },
   { id: 'swarm', label: 'Swarm Inspector', description: 'Workflow runs', icon: <Network className="h-4 w-4" />, href: '/swarm', group: 'Navigation' },

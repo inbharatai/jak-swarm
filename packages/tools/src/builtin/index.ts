@@ -1476,10 +1476,10 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'browser_evaluate_js',
-      description: 'Execute JavaScript code in the browser page context. Returns the result. Use to read DOM values, modify page state, or extract data.',
+      description: 'Execute JavaScript code in the browser page context. Returns the result. Use to read DOM values, modify page state, or extract data. REQUIRES approval due to arbitrary code execution.',
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
-      requiresApproval: false,
+      requiresApproval: true,
       inputSchema: {
         type: 'object',
         properties: {

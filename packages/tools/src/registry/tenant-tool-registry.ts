@@ -1,4 +1,5 @@
-import type { ToolMetadata, ToolExecutionContext, ToolResult, ToolCategory, ToolRiskClass } from '@jak-swarm/shared';
+import type { ToolMetadata, ToolExecutionContext, ToolResult, ToolRiskClass } from '@jak-swarm/shared';
+import { ToolCategory } from '@jak-swarm/shared';
 import { toolRegistry, type RegisteredTool } from '../registry/tool-registry.js';
 
 /**
@@ -14,13 +15,22 @@ import { toolRegistry, type RegisteredTool } from '../registry/tool-registry.js'
  *   const tenantTools = new TenantToolRegistry('tenant_123', ['GMAIL', 'SLACK']);
  *   const tools = tenantTools.list(); // built-ins + gmail_* + slack_*
  */
+export interface TenantToolRegistryOptions {
+  browserAutomationEnabled?: boolean;
+  restrictedCategories?: ToolCategory[];
+}
+
 export class TenantToolRegistry {
   private readonly tenantId: string;
   private readonly allowedProviders: Set<string>;
+  private browserAutomationEnabled: boolean;
+  private restrictedCategories: Set<ToolCategory>;
 
-  constructor(tenantId: string, connectedProviders: string[]) {
+  constructor(tenantId: string, connectedProviders: string[], options?: TenantToolRegistryOptions) {
     this.tenantId = tenantId;
     this.allowedProviders = new Set(connectedProviders.map(p => p.toLowerCase()));
+    this.browserAutomationEnabled = options?.browserAutomationEnabled ?? false;
+    this.restrictedCategories = new Set(options?.restrictedCategories ?? []);
   }
 
   /** Check if a tool is available to this tenant. */
@@ -56,6 +66,17 @@ export class TenantToolRegistry {
         durationMs: 0,
       };
     }
+
+    // Enforce tool-level approval gate: if tool requires approval,
+    // the execution context must carry an approvalId proving it was approved.
+    if (tool.metadata.requiresApproval && !context.approvalId) {
+      return {
+        success: false,
+        error: `Tool '${name}' requires approval before execution. No approvalId provided.`,
+        durationMs: 0,
+      };
+    }
+
     return toolRegistry.execute<TOutput>(name, input, context);
   }
 
@@ -65,7 +86,25 @@ export class TenantToolRegistry {
     for (const p of connectedProviders) this.allowedProviders.add(p.toLowerCase());
   }
 
+  /** Update tenant options (browser automation flag, restricted categories). */
+  updateOptions(options: TenantToolRegistryOptions): void {
+    if (options.browserAutomationEnabled !== undefined) {
+      this.browserAutomationEnabled = options.browserAutomationEnabled;
+    }
+    if (options.restrictedCategories) {
+      this.restrictedCategories = new Set(options.restrictedCategories);
+    }
+  }
+
   private isAllowed(metadata: ToolMetadata): boolean {
+    // Block browser tools if tenant hasn't enabled browser automation
+    if (metadata.category === ToolCategory.BROWSER && !this.browserAutomationEnabled) {
+      return false;
+    }
+    // Block tools in categories restricted by the tenant's industry pack
+    if (this.restrictedCategories.has(metadata.category)) {
+      return false;
+    }
     // Built-in tools (no provider) are always available
     if (!metadata.provider) return true;
     // Provider-specific tools require the tenant to have that provider connected
@@ -79,13 +118,18 @@ export class TenantToolRegistry {
  */
 const tenantRegistries = new Map<string, TenantToolRegistry>();
 
-export function getTenantToolRegistry(tenantId: string, connectedProviders: string[]): TenantToolRegistry {
+export function getTenantToolRegistry(
+  tenantId: string,
+  connectedProviders: string[],
+  options?: TenantToolRegistryOptions,
+): TenantToolRegistry {
   let registry = tenantRegistries.get(tenantId);
   if (!registry) {
-    registry = new TenantToolRegistry(tenantId, connectedProviders);
+    registry = new TenantToolRegistry(tenantId, connectedProviders, options);
     tenantRegistries.set(tenantId, registry);
   } else {
     registry.updateProviders(connectedProviders);
+    if (options) registry.updateOptions(options);
   }
   return registry;
 }

@@ -46,6 +46,10 @@ const paddleRoutes: FastifyPluginAsync = async (fastify) => {
   const creditService = new CreditService(fastify.db);
   const webhookSecret = process.env['PADDLE_WEBHOOK_SECRET'] ?? '';
 
+  if (!webhookSecret && process.env['NODE_ENV'] === 'production') {
+    fastify.log.error('[paddle] PADDLE_WEBHOOK_SECRET is required in production');
+  }
+
   /**
    * POST /paddle/webhook — Paddle event handler
    * No auth required (verified via signature)
@@ -57,8 +61,12 @@ const paddleRoutes: FastifyPluginAsync = async (fastify) => {
       const rawBody = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
       const signature = request.headers['paddle-signature'] as string | undefined;
 
-      // Verify webhook signature in production
-      if (webhookSecret && !verifyPaddleSignature(rawBody, signature, webhookSecret)) {
+      // Verify webhook signature — always require in production
+      if (!webhookSecret) {
+        fastify.log.error('[paddle] Webhook secret not configured — rejecting request');
+        return reply.status(500).send({ error: 'Webhook not configured' });
+      }
+      if (!verifyPaddleSignature(rawBody, signature, webhookSecret)) {
         fastify.log.warn('[paddle] Invalid webhook signature');
         return reply.status(401).send({ error: 'Invalid signature' });
       }

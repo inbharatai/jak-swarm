@@ -20,6 +20,7 @@ export interface RunParams {
   onAgentActivity?: (data: unknown) => void;
   maxCostUsd?: number;
   approvalThreshold?: string;
+  allowedDomains?: string[];
   loadState?: (id: string) => Promise<unknown | undefined>;
   /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
   circuitBreakerFactory?: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
@@ -136,6 +137,7 @@ export class SwarmRunner {
         industry: params.industry,
         maxCostUsd: params.maxCostUsd,
         approvalThreshold: params.approvalThreshold,
+        allowedDomains: params.allowedDomains,
       }),
       // Inject distributed circuit breaker factory if provided
       ...(params.circuitBreakerFactory ? { circuitBreakerFactory: params.circuitBreakerFactory } : {}),
