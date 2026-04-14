@@ -31,7 +31,7 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, resolve, basename, dirname } from 'node:path';
+import { join } from 'node:path';
 
 export interface SkillManifest {
   name: string;
