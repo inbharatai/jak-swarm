@@ -48,6 +48,7 @@ export function ChatSidebar() {
   const activeConversationId = useConversationStore((s) => s.activeConversationId);
   const switchConversation = useConversationStore((s) => s.switchConversation);
   const createConversation = useConversationStore((s) => s.createConversation);
+  const deleteConversation = useConversationStore((s) => s.deleteConversation);
   const activeRoles = useConversationStore((s) => s.activeRoles);
   const toggleRole = useConversationStore((s) => s.toggleRole);
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -110,20 +111,24 @@ export function ChatSidebar() {
           </div>
           <div className="space-y-0.5">
             {conversations.slice(0, 20).map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => { switchConversation(conv.id); if (isMobile) setSidebarCollapsed(true); }}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+                  'group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
                   conv.id === activeConversationId
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
-                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{conv.title}</span>
+                <button
+                  onClick={() => { switchConversation(conv.id); if (isMobile) setSidebarCollapsed(true); }}
+                  className="flex flex-1 items-center gap-2 min-w-0"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{conv.title}</span>
+                </button>
                 {/* Role color dots */}
-                <div className="ml-auto flex shrink-0 gap-0.5">
+                <div className="flex shrink-0 gap-0.5">
                   {conv.roles.slice(0, 3).map((r) => (
                     <span
                       key={r}
@@ -132,7 +137,15 @@ export function ChatSidebar() {
                     />
                   ))}
                 </div>
-              </button>
+                {/* Delete button — visible on hover */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
+                  className="ml-0.5 hidden shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors group-hover:block"
+                  aria-label={`Delete conversation: ${conv.title}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             ))}
             {conversations.length === 0 && (
               <p className="px-2.5 py-3 text-xs text-muted-foreground/60">

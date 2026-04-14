@@ -286,9 +286,6 @@ export class WorkflowService {
    * List agent traces for a workflow, with optional tenant check.
    */
   async getWorkflowTraces(tenantId: string, workflowId: string): Promise<AgentTrace[]> {
-    // Verify ownership first
-    await this.getWorkflow(tenantId, workflowId);
-
     const traces = await this.db.agentTrace.findMany({
       where: { workflowId, tenantId },
       orderBy: { startedAt: 'desc' },
@@ -301,8 +298,6 @@ export class WorkflowService {
    * List approval requests for a workflow.
    */
   async getWorkflowApprovals(tenantId: string, workflowId: string): Promise<ApprovalRequest[]> {
-    await this.getWorkflow(tenantId, workflowId);
-
     const approvals = await this.db.approvalRequest.findMany({
       where: { workflowId, tenantId },
       orderBy: { createdAt: 'desc' },

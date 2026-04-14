@@ -141,7 +141,13 @@ export function ChatWorkspace() {
           }
         },
         onError: () => {
-          // SSE disconnected — user can check Swarm page for status
+          // SSE disconnected — notify the user
+          addMessage(convId, {
+            role: 'assistant',
+            agentRole: null,
+            content: 'Live stream disconnected. Check the Runs page for the latest status.',
+          });
+          setIsSending(false);
         },
       });
     } catch (err) {
@@ -189,7 +195,9 @@ export function ChatWorkspace() {
           {hasMessages ? (
             <MessageThread messages={messages} />
           ) : (
-            <EmptyState onStartChat={handleStartChat} />
+            <div className="flex-1 overflow-y-auto">
+              <EmptyState onStartChat={handleStartChat} />
+            </div>
           )}
 
           {/* Thinking indicator */}

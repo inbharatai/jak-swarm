@@ -3,19 +3,31 @@ import { createClient } from './supabase';
 
 const BASE_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').trim();
 
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0;
+const TOKEN_CACHE_TTL_MS = 30_000; // 30 seconds
+
 async function getToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiresAt) return cachedToken;
   try {
     const supabase = createClient();
     const { data } = await supabase.auth.getSession();
-    return data?.session?.access_token ?? null;
+    cachedToken = data?.session?.access_token ?? null;
+    tokenExpiresAt = now + TOKEN_CACHE_TTL_MS;
+    return cachedToken;
   } catch {
+    cachedToken = null;
+    tokenExpiresAt = 0;
     return null;
   }
 }
 
 function clearSession(): void {
   if (typeof window === 'undefined') return;
+  cachedToken = null;
+  tokenExpiresAt = 0;
   const supabase = createClient();
   supabase.auth.signOut();
   window.location.href = '/login';

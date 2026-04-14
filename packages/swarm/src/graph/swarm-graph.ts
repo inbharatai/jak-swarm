@@ -108,6 +108,8 @@ export class SwarmGraph extends EventEmitter {
 
   constructor() {
     super();
+    // Each concurrent workflow registers ~3 listeners; 20 workflows = 60
+    this.setMaxListeners(100);
     this.nodes.set('commander', commanderNode);
     this.nodes.set('planner', plannerNode);
     this.nodes.set('router', routerNode);

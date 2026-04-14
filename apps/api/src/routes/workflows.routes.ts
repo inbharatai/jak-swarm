@@ -5,6 +5,8 @@ import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
 import type { WorkflowStatus } from '../types.js';
+import { CreditService } from '../billing/credit-service.js';
+import { detectTaskType, estimateCredits } from '../billing/model-router.js';
 
 const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
@@ -42,8 +44,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         // ── Credit check: estimate cost and verify user has budget ───────
-        const { CreditService } = await import('../billing/credit-service.js');
-        const { detectTaskType, estimateCredits } = await import('../billing/model-router.js');
         const creditService = new CreditService(fastify.db);
 
         const taskType = detectTaskType(goal);
