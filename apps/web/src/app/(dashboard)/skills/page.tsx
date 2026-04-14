@@ -81,11 +81,11 @@ export default function SkillsPage() {
     implementation: '',
   });
 
-  const { data: skillsData, isLoading, mutate } = useSWR<{ success: boolean; data: Skill[] }>(
+  const { data: skillsData, isLoading, mutate } = useSWR<{ success: boolean; data: { items: Skill[]; total: number } }>(
     '/skills',
-    (url: string) => apiFetch<{ success: boolean; data: Skill[] }>(url),
+    (url: string) => apiFetch<{ success: boolean; data: { items: Skill[]; total: number } }>(url),
   );
-  const skills = skillsData?.data ?? [];
+  const skills = skillsData?.data?.items ?? [];
 
   const filteredSkills = skills.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
