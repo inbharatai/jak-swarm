@@ -61,3 +61,27 @@ export {
   purgeIdleCircuitBreakers,
 } from './supervisor/circuit-breaker.js';
 export type { CircuitBreakerOptions, CircuitState } from './supervisor/circuit-breaker.js';
+
+// Memory
+export {
+  extractMemories,
+  deduplicateFacts,
+  filterByConfidence,
+  formatMemoryBlock,
+  buildMemoryQuery,
+  rankMemories,
+} from './memory/index.js';
+export type {
+  ExtractedFact,
+  MemoryExtractionResult,
+  MemoryEntry,
+  MemoryQueryOptions,
+} from './memory/index.js';
+
+// Context
+export {
+  needsSummarization,
+  summarizeTaskResults,
+  applySummarizationIfNeeded,
+} from './context/index.js';
+export type { SummarizationConfig } from './context/index.js';

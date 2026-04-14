@@ -264,6 +264,117 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+
+  /**
+   * POST /voice/sessions/:sessionId/trigger-workflow
+   * Take a completed voice session's transcript and trigger a new
+   * JAK Swarm workflow with it. The transcript is joined into a single
+   * goal string or a structured prompt, then passed to executeAsync.
+   *
+   * Body (optional):
+   *   - goal: Custom goal to use instead of raw transcript
+   *   - industry: Industry pack to apply
+   *   - maxCostUsd: Max cost budget for the workflow
+   */
+  fastify.post(
+    '/sessions/:sessionId/trigger-workflow',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { sessionId } = request.params as { sessionId: string };
+      const body = (request.body ?? {}) as {
+        goal?: string;
+        industry?: string;
+        maxCostUsd?: number;
+      };
+      const { userId, tenantId } = request.user;
+
+      try {
+        // 1. Retrieve session data (allows ended sessions — transcript may still exist)
+        const sessionRaw = await fastify.redis.get(`voice:session:${sessionId}`);
+        const transcriptRaw = await fastify.redis.get(`voice:transcript:${sessionId}`);
+
+        if (!sessionRaw && !transcriptRaw) {
+          throw new NotFoundError('VoiceSession', sessionId);
+        }
+
+        // 2. Ownership check
+        if (sessionRaw) {
+          let session: { tenantId: string };
+          try {
+            const parsed = JSON.parse(sessionRaw);
+            if (typeof parsed?.tenantId !== 'string') throw new Error('Missing tenantId');
+            session = parsed;
+          } catch {
+            throw new AppError(500, 'CORRUPTED_SESSION', 'Voice session data is corrupted');
+          }
+          if (session.tenantId !== tenantId && request.user.role !== 'SYSTEM_ADMIN') {
+            throw new ForbiddenError('Cannot trigger workflow from another tenant\'s voice session');
+          }
+        }
+
+        // 3. Build goal from transcript if none provided
+        let goal = body.goal?.trim() ?? '';
+        if (!goal && transcriptRaw) {
+          const segments = JSON.parse(transcriptRaw) as Array<{ role: string; content: string }>;
+          const userSegments = segments
+            .filter((s) => s.role === 'user')
+            .map((s) => s.content)
+            .join(' ')
+            .trim();
+          goal = userSegments || segments.map((s) => s.content).join(' ').trim();
+        }
+
+        if (!goal) {
+          return reply.status(400).send(err('EMPTY_TRANSCRIPT', 'No goal provided and voice transcript is empty'));
+        }
+
+        // Prefix for clarity in the DAG
+        const prefixedGoal = `[Voice Session ${sessionId}] ${goal}`;
+
+        // 4. Create workflow record
+        const workflow = await fastify.db.workflow.create({
+          data: {
+            tenantId,
+            userId,
+            goal: prefixedGoal,
+            status: 'PENDING',
+            source: 'VOICE',
+            metadata: {
+              voiceSessionId: sessionId,
+              originalGoal: goal,
+            },
+            ...(body.maxCostUsd != null ? { maxCostUsd: body.maxCostUsd } : {}),
+          },
+        });
+
+        // 5. Fire-and-forget execution
+        setImmediate(() => {
+          void fastify.swarm.executeAsync({
+            workflowId: workflow.id,
+            tenantId,
+            userId,
+            goal: prefixedGoal,
+            industry: body.industry,
+            maxCostUsd: body.maxCostUsd,
+          });
+        });
+
+        await fastify.auditLog(request, 'VOICE_TRIGGER_WORKFLOW', 'Workflow', workflow.id, {
+          voiceSessionId: sessionId,
+        });
+
+        return reply.status(202).send(ok({
+          workflowId: workflow.id,
+          voiceSessionId: sessionId,
+          status: 'PENDING',
+          goal: prefixedGoal,
+        }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
 };
 
 export default voiceRoutes;

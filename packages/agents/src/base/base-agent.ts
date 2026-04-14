@@ -6,6 +6,20 @@ import type { AgentContext } from './agent-context.js';
 import type { LLMProvider } from './llm-provider.js';
 import { getModelOverride } from './provider-router.js';
 
+/** Memory provider interface — injected by the API layer at boot */
+export interface MemoryProvider {
+  getMemories(tenantId: string, limit?: number): Promise<Array<{
+    key: string;
+    value: unknown;
+    memoryType: string;
+    updatedAt: Date;
+  }>>;
+}
+
+/** Loop detection: fingerprint → count */
+type ToolCallFingerprints = Map<string, number>;
+const LOOP_DETECTION_THRESHOLD = 3;
+
 /** Result of a multi-turn tool execution loop */
 export interface ToolLoopResult {
   /** Final text content from the LLM after all tool calls complete */
@@ -75,7 +89,65 @@ export abstract class BaseAgent {
     workflowId?: string;
   }) => void) | null = null;
 
+  /**
+   * Memory provider — injected at application boot.
+   * When set, all agents automatically receive relevant tenant memories
+   * in their system prompt via <memory> tags.
+   */
+  static memoryProvider: MemoryProvider | null = null;
+
   abstract execute(input: unknown, context: AgentContext): Promise<unknown>;
+
+  /**
+   * Inject tenant memories into the message array.
+   * Inserts a <memory> block after the system message with ranked, token-budgeted facts.
+   * Non-blocking — memory fetch failures never break the LLM call.
+   */
+  protected async injectMemories(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    context: AgentContext,
+  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
+    if (!BaseAgent.memoryProvider || !context.tenantId) return messages;
+
+    try {
+      const memories = await BaseAgent.memoryProvider.getMemories(context.tenantId, 15);
+      if (memories.length === 0) return messages;
+
+      // Build token-budgeted memory block (max ~2000 tokens / ~8000 chars)
+      const lines: string[] = [];
+      let charCount = 0;
+      const MAX_CHARS = 8000;
+
+      for (const mem of memories) {
+        const valStr = typeof mem.value === 'string' ? mem.value : JSON.stringify(mem.value);
+        const line = `- [${mem.memoryType}] ${mem.key}: ${valStr}`;
+        if (charCount + line.length > MAX_CHARS) break;
+        lines.push(line);
+        charCount += line.length;
+      }
+
+      if (lines.length === 0) return messages;
+
+      const memoryBlock: OpenAI.ChatCompletionMessageParam = {
+        role: 'system',
+        content: `<memory>
+The following facts were learned from previous workflows for this organization.
+Use them to inform your decisions but do not reference them explicitly.
+
+${lines.join('\n')}
+</memory>`,
+      };
+
+      // Insert after the first system message
+      const result = [...messages];
+      const sysIdx = result.findIndex(m => m.role === 'system');
+      result.splice(sysIdx + 1, 0, memoryBlock);
+      return result;
+    } catch {
+      // Memory is non-critical — never block agent execution
+      return messages;
+    }
+  }
 
   protected async callLLM(
     messages: OpenAI.ChatCompletionMessageParam[],
@@ -325,6 +397,7 @@ export abstract class BaseAgent {
     const totalTokens = { prompt: 0, completion: 0, total: 0 };
     let totalCostUsd = 0;
     const conversation = [...messages];
+    const toolCallFingerprints: ToolCallFingerprints = new Map();
 
     // Lazy-import ToolRegistry to avoid circular dep at module load time
     const { toolRegistry } = await import('@jak-swarm/tools');
@@ -373,7 +446,48 @@ export abstract class BaseAgent {
       // LLM wants to call tools — add assistant message to conversation
       conversation.push(assistantMsg);
 
-      // Execute each tool call
+      // ── Loop Detection (DeerFlow LoopDetectionMiddleware pattern) ──────
+      // Track tool-call fingerprints to detect infinite loops.
+      // If the same tool+args is called 3+ times, inject a hard-stop message.
+      let loopDetected = false;
+      for (const tc of assistantMsg.tool_calls) {
+        const fp = `${tc.function.name}:${tc.function.arguments}`;
+        const count = (toolCallFingerprints.get(fp) ?? 0) + 1;
+        toolCallFingerprints.set(fp, count);
+        if (count >= LOOP_DETECTION_THRESHOLD) {
+          loopDetected = true;
+        }
+      }
+
+      if (loopDetected) {
+        this.logger.warn(
+          { iteration, fingerprints: toolCallFingerprints.size },
+          'Loop detected — same tool call repeated 3+ times, forcing stop',
+        );
+        // Clear tool_calls and force a text response
+        conversation.push({
+          role: 'system' as const,
+          content: 'STOP: You are repeating the same tool call in a loop. This wastes resources. Summarize what you have so far and provide your best answer with the information available. Do NOT call any more tools.',
+        });
+        // Still need to provide tool results for the pending calls
+        for (const tc of assistantMsg.tool_calls) {
+          conversation.push({
+            role: 'tool' as const,
+            tool_call_id: tc.id,
+            content: JSON.stringify({ _loopDetected: true, message: 'Tool call skipped — loop detected. Provide your best answer now.' }),
+          });
+        }
+        // Do one more LLM call to get the summary, then exit
+        try {
+          const finalCompletion = await this.callLLM(conversation, undefined, { maxTokens: options?.maxTokens, temperature: options?.temperature });
+          const finalContent = finalCompletion.choices[0]?.message?.content ?? 'Agent stopped due to tool call loop.';
+          return { content: finalContent, toolCalls: allToolCalls, totalTokens, totalCostUsd };
+        } catch {
+          return { content: 'Agent stopped due to tool call loop.', toolCalls: allToolCalls, totalTokens, totalCostUsd };
+        }
+      }
+
+      // Execute each tool call with error normalization
       for (const tc of assistantMsg.tool_calls) {
         const toolStartedAt = new Date();
         let parsedArgs: Record<string, unknown> = {};
@@ -387,31 +501,45 @@ export abstract class BaseAgent {
         let resultStr: string;
         let toolError: string | undefined;
 
-        if (toolRegistry.has(toolName)) {
-          // Execute through the real registry
-          const result = await toolRegistry.execute(toolName, parsedArgs, toolExecContext);
-          if (result.success) {
-            const data = result.data as Record<string, unknown> | string | undefined;
-            // Detect mock/demo data — inform the agent honestly
-            if (data && typeof data === 'object' && (data as Record<string, unknown>)._mock) {
-              const notice = (data as Record<string, unknown>)._notice ?? 'This is demo data — real integration not connected.';
-              resultStr = JSON.stringify({ ...data as Record<string, unknown>, _warning: notice });
+        try {
+          if (toolRegistry.has(toolName)) {
+            // Execute through the real registry
+            const result = await toolRegistry.execute(toolName, parsedArgs, toolExecContext);
+            if (result.success) {
+              const data = result.data as Record<string, unknown> | string | undefined;
+              // Detect mock/demo data — inform the agent honestly
+              if (data && typeof data === 'object' && (data as Record<string, unknown>)._mock) {
+                const notice = (data as Record<string, unknown>)._notice ?? 'This is demo data — real integration not connected.';
+                resultStr = JSON.stringify({ ...data as Record<string, unknown>, _warning: notice });
+              } else {
+                resultStr = typeof data === 'string'
+                  ? data
+                  : JSON.stringify(data ?? { success: true });
+              }
             } else {
-              resultStr = typeof data === 'string'
-                ? data
-                : JSON.stringify(data ?? { success: true });
+              resultStr = JSON.stringify({ error: result.error, _toolFailed: true, message: `Tool '${toolName}' failed: ${result.error}. Try a different approach or use an alternative tool.` });
+              toolError = result.error;
             }
           } else {
-            resultStr = JSON.stringify({ error: result.error, _toolFailed: true, message: `Tool '${toolName}' failed: ${result.error}. Try a different approach or use an alternative tool.` });
-            toolError = result.error;
+            // Tool not registered — return a helpful error so LLM can adapt
+            resultStr = JSON.stringify({
+              error: `Tool '${toolName}' is not available. Available tools: ${tools.map(t => t.function.name).join(', ')}. Please choose from the available tools.`,
+              _toolNotFound: true,
+            });
+            toolError = `Tool '${toolName}' not found in registry`;
           }
-        } else {
-          // Tool not registered — return a helpful error so LLM can adapt
+        } catch (toolExecErr) {
+          // ── Tool Error Normalization (DeerFlow ToolErrorHandlingMiddleware) ──
+          // Convert exceptions to recoverable error messages instead of crashing.
+          // The agent can decide to retry, use an alternative tool, or give up.
+          const errMsg = toolExecErr instanceof Error ? toolExecErr.message : String(toolExecErr);
           resultStr = JSON.stringify({
-            error: `Tool '${toolName}' is not available. Available tools: ${tools.map(t => t.function.name).join(', ')}. Please choose from the available tools.`,
-            _toolNotFound: true,
+            error: errMsg,
+            _toolCrashed: true,
+            message: `Tool '${toolName}' threw an exception: ${errMsg}. Try a different approach or use an alternative tool.`,
           });
-          toolError = `Tool '${toolName}' not found in registry`;
+          toolError = errMsg;
+          this.logger.warn({ toolName, error: errMsg }, 'Tool execution crashed — normalized to error message');
         }
 
         const toolCompletedAt = new Date();

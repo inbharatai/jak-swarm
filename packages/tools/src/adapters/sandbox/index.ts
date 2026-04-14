@@ -8,6 +8,15 @@ export type {
 export { E2BSandboxAdapter, e2bSandbox } from './e2b.adapter.js';
 export { DockerSandboxAdapter, dockerSandbox } from './docker.adapter.js';
 export {
+  VirtualFilesystem,
+  createVirtualFs,
+  normaliseVirtualPath,
+  toPhysicalPath,
+  toVirtualPath,
+  PathTraversalError,
+  VIRTUAL_PREFIX,
+} from './virtual-fs.js';
+export {
   PROJECT_TEMPLATES,
   getTemplate,
   listTemplates,

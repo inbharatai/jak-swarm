@@ -26,3 +26,6 @@ export * from './constants/risk-levels.js';
 export * from './utils/errors.js';
 export * from './utils/id.js';
 export * from './utils/logger.js';
+
+// ─── Skills ──────────────────────────────────────────────────────────────────
+export * from './skills/index.js';

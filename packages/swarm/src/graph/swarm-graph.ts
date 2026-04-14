@@ -7,6 +7,7 @@ import {
   hasMoreTasks,
   getCurrentVerificationResult,
 } from '../state/swarm-state.js';
+import { applySummarizationIfNeeded } from '../context/context-summarizer.js';
 import { commanderNode } from './nodes/commander-node.js';
 import { plannerNode } from './nodes/planner-node.js';
 import { routerNode } from './nodes/router-node.js';
@@ -153,6 +154,10 @@ export class SwarmGraph extends EventEmitter {
       }
 
       try {
+        // Apply context summarization before node execution
+        // to prevent context window overflow on long workflows
+        state = applySummarizationIfNeeded(state);
+
         const taskId = getCurrentTask(state)?.id;
         const updates = await this.executeNode(currentNode, handler, state, taskId);
         state = this.mergeState(state, updates);

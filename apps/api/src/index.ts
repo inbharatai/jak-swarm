@@ -39,7 +39,9 @@ import projectsRoutes from './routes/projects.routes.js';
 import layoutRoutes from './routes/layouts.routes.js';
 import usageRoutes from './routes/usage.routes.js';
 import paddleRoutes from './routes/paddle.routes.js';
+import slackRoutes from './routes/slack.routes.js';
 import { registerObservability } from './observability/index.js';
+import { validateConfigOnBoot } from './boot/validate-config.js';
 
 async function buildApp() {
   const fastify = Fastify({
@@ -129,6 +131,11 @@ async function buildApp() {
   await fastify.register(swarmPlugin);
 
   // -------------------------------------------------------------------------
+  // Boot-time config validation (before routes)
+  // -------------------------------------------------------------------------
+  await validateConfigOnBoot(fastify);
+
+  // -------------------------------------------------------------------------
   // Observability (metrics, health probes, request instrumentation)
   // -------------------------------------------------------------------------
   await fastify.register(registerObservability);
@@ -154,6 +161,7 @@ async function buildApp() {
   await fastify.register(layoutRoutes, { prefix: '/layouts' });
   await fastify.register(usageRoutes, { prefix: '/usage' });
   await fastify.register(paddleRoutes, { prefix: '/paddle' });
+  await fastify.register(slackRoutes, { prefix: '/slack' });
 
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity

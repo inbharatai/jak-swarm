@@ -41,6 +41,11 @@ export const config = {
   ollamaBaseUrl: process.env['OLLAMA_BASE_URL'] ?? '',
   openrouterApiKey: process.env['OPENROUTER_API_KEY'] ?? '',
 
+  // Slack channel bridge
+  slackSigningSecret: process.env['SLACK_SIGNING_SECRET'] ?? '',
+  slackClientId: process.env['SLACK_CLIENT_ID'] ?? '',
+  slackClientSecret: process.env['SLACK_CLIENT_SECRET'] ?? '',
+
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
 

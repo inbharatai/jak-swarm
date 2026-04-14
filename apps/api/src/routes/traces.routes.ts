@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError, ForbiddenError } from '../errors.js';
+import { buildWorkflowTimeline } from '../services/workflow-timeline.service.js';
 
 const tracesRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -128,6 +129,29 @@ const tracesRoutes: FastifyPluginAsync = async (fastify) => {
             error: trace.error,
           }),
         );
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * GET /traces/workflow/:workflowId/timeline
+   * Per-node cost breakdown, execution timeline, and DAG critical path
+   * for a completed workflow.
+   */
+  fastify.get(
+    '/workflow/:workflowId/timeline',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { workflowId } = request.params as { workflowId: string };
+      const tenantId = request.user.tenantId;
+
+      try {
+        const timeline = await buildWorkflowTimeline(fastify.db, workflowId, tenantId);
+        if (!timeline) throw new NotFoundError('Workflow', workflowId);
+        return reply.status(200).send(ok(timeline));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;

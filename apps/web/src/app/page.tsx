@@ -930,7 +930,35 @@ export default function HomePage() {
         {/* ── 5d. Supervisor — System Intelligence ────────────────────────── */}
         <SupervisorSection />
 
-        {/* ── 5e. Live Execution Demo ─────────────────────────────────────── */}
+        {/* ── 5e. Enterprise Intelligence ──────────────────────────────────── */}
+        <section className="px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(56,189,248,0.02), transparent)' }}>
+          <div className="mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-3 font-sans">Enterprise Intelligence</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Agents That Learn, Connect &amp; Recover</h2>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Memory-aware agents, automatic context engineering, Slack channel bridge, voice-to-workflow trigger, and a typed SDK. Extracted from DeerFlow 2.0 research.</p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { icon: '🧠', title: 'Memory System', desc: 'LLM-powered fact extraction from completed workflows. Token-budgeted retrieval injected into agent prompts via <memory> tags. Every execution makes agents smarter.', color: '#8b5cf6' },
+                { icon: '🎯', title: 'Context Engineering', desc: 'Automatic context summarization prevents token overflow on long DAGs. Protects current task + dependencies, compresses older results. Never lose context.', color: '#06b6d4' },
+                { icon: '💬', title: 'Slack Channel Bridge', desc: 'Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling, team-scoped tenancy.', color: '#4A154B' },
+                { icon: '🎤', title: 'Voice → Workflow', desc: 'Convert voice session transcripts into full workflow executions. Speak your intent, agents execute. 4 voice providers supported.', color: '#f472b6' },
+                { icon: '📦', title: '@jak-swarm/client SDK', desc: 'Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, and health checks. npm install @jak-swarm/client.', color: '#34d399' },
+                { icon: '🔄', title: 'Error Recovery & Loop Detection', desc: 'Tool crashes produce recoverable error messages. Fingerprint-based loop detection (3x threshold) prevents infinite retries. Workflows self-heal.', color: '#fbbf24' },
+              ].map((feature) => (
+                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
+                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 5f. Live Execution Demo ─────────────────────────────────────── */}
         <LiveDemo />
 
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
@@ -1043,7 +1071,7 @@ export default function HomePage() {
 
             {/* Tech stack badges */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor'].map(tech => (
+              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor', 'OpenAI Realtime', 'SSE Streaming'].map(tech => (
                 <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 font-sans">{tech}</span>
               ))}
             </div>
@@ -1065,7 +1093,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, vibe coding.
+                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack bridge, voice-to-workflow, vibe coding, and a typed SDK.
                 </p>
               </div>
 

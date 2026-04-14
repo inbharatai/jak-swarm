@@ -2,7 +2,7 @@
 export { AgentContext } from './base/agent-context.js';
 export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent } from './base/base-agent.js';
-export type { ToolLoopResult } from './base/base-agent.js';
+export type { ToolLoopResult, MemoryProvider } from './base/base-agent.js';
 
 // LLM Providers
 export type { LLMProvider, LLMResponse, TextContent, ImageContent, MessageContent } from './base/llm-provider.js';

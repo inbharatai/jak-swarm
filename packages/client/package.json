@@ -1,0 +1,25 @@
+{
+  "name": "@jak-swarm/client",
+  "version": "0.1.0",
+  "description": "JAK Swarm TypeScript SDK — programmatic access to workflows, agents, and memory",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {},
+  "files": ["dist"],
+  "license": "MIT"
+}

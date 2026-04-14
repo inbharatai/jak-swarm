@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-85_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**39 AI agents, 119 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Production-grade SaaS with managed AI — no API keys required.**
+**39 AI agents, 119 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Memory-aware agents with context engineering, Slack channel bridge, voice-to-workflow trigger, and an embedded TypeScript SDK. Production-grade SaaS with managed AI — no API keys required.**
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -154,12 +154,20 @@ flowchart LR
 | 🔍 | **30 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
 | 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing per task type. No API keys needed for users |
+| 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
+| 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
+| 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
+| 💬 | **Slack Channel Bridge** | Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling |
+| 🎤 | **Voice → Workflow** | Convert voice session transcripts into workflow executions. 4 voice providers (OpenAI Realtime, Deepgram, ElevenLabs, Mock) |
+| 📦 | **@jak-swarm/client SDK** | Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, health checks |
+| 🛠️ | **SKILL.md Format** | DeerFlow-compatible skill definitions with YAML frontmatter, recursive discovery, risk levels, tool allowlists |
 | 💰 | **Credit-Based Billing** | 4 plans (Free/Pro/Team/Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard, Paddle payments |
 | 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
 | 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
 | 🔌 | **21 MCP Integrations** | Slack, GitHub, Notion, HubSpot, Salesforce, Stripe, Linear, Jira, Supabase, Discord, and 11 more via Model Context Protocol |
 | 🌐 | **27 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
-| 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, /healthz + /ready probes, structured Pino logging |
+| 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
+| 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
 | 📧 | **Real Email/Calendar** | Gmail via IMAP/SMTP, Google Calendar via CalDAV. Real send, real events — not mocks |
@@ -167,6 +175,7 @@ flowchart LR
 | ⏰ | **Workflow Scheduling** | Cron-based recurring workflows with leader-elected scheduler (no duplicate execution) |
 | 📸 | **Screenshot-to-Code** | Upload a UI design → AI generates matching React + Tailwind components |
 | 🛡️ | **Supervisor Module** | Event bus, circuit breakers (exponential backoff), workflow telemetry, budget enforcement |
+| 🏖️ | **Virtual Sandbox FS** | Tenant-scoped `/workspace/` virtual paths translated to E2B or Docker sandbox physical paths. Path traversal protection |
 
 ---
 
@@ -861,9 +870,10 @@ jak-swarm/
 ├── apps/
 │   ├── api/                    # Fastify REST API (port 4000)
 │   │   └── src/
-│   │       ├── routes/         # 14 route modules
+│   │       ├── routes/         # 14 route modules (+ slack, voice trigger)
 │   │       ├── services/       # Business logic
 │   │       ├── middleware/      # Auth, RBAC, rate limiting
+│   │       ├── boot/           # Config validation + environment diagnostics
 │   │       └── plugins/        # Fastify plugins
 │   └── web/                    # Next.js 15 dashboard (port 3000)
 │       └── src/app/(dashboard)/
@@ -880,32 +890,40 @@ jak-swarm/
 ├── packages/
 │   ├── agents/                 # 39 agent implementations
 │   │   └── src/
-│   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination
+│   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination, memory injection
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 33 worker agents
 │   ├── tools/                  # 119 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools
-│   │       ├── adapters/       # Email, Calendar, CRM, Browser, Memory
+│   │       ├── adapters/       # Email, Calendar, CRM, Browser, Memory, Sandbox
 │   │       └── mcp/            # MCP client, bridge, provider configs
 │   ├── swarm/                  # Orchestration engine
 │   │   └── src/
 │   │       ├── graph/          # DAG builder, node handlers, task scheduler
 │   │       ├── runner/         # SwarmRunner execution loop
-│   │       └── state/          # Immutable state machine
+│   │       ├── state/          # Immutable state machine
+│   │       ├── memory/         # Memory extractor + query services
+│   │       └── context/        # Context summarization engine
+│   ├── client/                 # @jak-swarm/client TypeScript SDK
+│   │   └── src/
+│   │       └── index.ts        # HttpClient, SSE streaming, typed API methods
 │   ├── shared/                 # Shared types & enums
+│   │   └── src/
+│   │       └── skills/         # SKILL.md parser + loader
 │   ├── db/                     # Prisma schema, migrations, seed
 │   ├── workflows/              # Temporal workflow definitions
 │   ├── security/               # Audit logging, RBAC, guardrails, tool risk
 │   ├── voice/                  # Voice pipeline (WebRTC, STT, TTS)
+│   ├── verification/           # Email, document, transaction, identity verification
 │   └── industry-packs/         # 13 industry-specific agent configurations
 ├── tests/
 │   ├── unit/                   # Unit tests
 │   ├── integration/            # Integration tests
 │   └── e2e/                    # End-to-end tests
 ├── docker/                     # Docker Compose for Postgres, Redis, Temporal
-├── scripts/                    # Dev scripts
+├── scripts/                    # Dev scripts + doctor.ps1, setup.ps1
 └── docs/                       # Documentation
 ```
 
@@ -1023,6 +1041,7 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | GET | `/traces` | JWT | List agent traces (filterable by workflowId, agentRole) |
 | GET | `/traces/:traceId` | JWT | Get full trace by ID |
 | GET | `/traces/:traceId/replay` | JWT | Get replay-friendly trace data with timing |
+| GET | `/traces/workflow/:workflowId/timeline` | JWT | Workflow timeline with per-node start/end/cost breakdown |
 
 </details>
 
@@ -1058,6 +1077,19 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | GET | `/voice/sessions/:sessionId/token` | JWT | Get ephemeral WebRTC token from OpenAI Realtime API |
 | DELETE | `/voice/sessions/:sessionId` | JWT | End a voice session |
 | GET | `/voice/sessions/:sessionId/transcript` | JWT | Retrieve transcript for a voice session |
+| POST | `/voice/sessions/:sessionId/trigger-workflow` | JWT | Convert voice transcript into a workflow execution |
+
+</details>
+
+<details>
+<summary><b>💬 Slack</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| POST | `/slack/events` | HMAC-SHA256 | Slack Events API webhook (url_verification + event_callback) |
+| POST | `/slack/interactivity` | HMAC-SHA256 | Slack interactive component payloads |
+
+Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. Events trigger authenticated workflows with thread-reply results. Idempotent event handling prevents duplicate workflow creation on Slack retries.
 
 </details>
 
@@ -1130,6 +1162,9 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | `DEEPGRAM_API_KEY` | No | -- | Deepgram STT adapter |
 | `ELEVENLABS_API_KEY` | No | -- | ElevenLabs TTS adapter |
 | `ELEVENLABS_VOICE_ID` | No | -- | ElevenLabs voice ID |
+| `SLACK_SIGNING_SECRET` | No | -- | Slack app signing secret for webhook verification |
+| `SLACK_CLIENT_ID` | No | -- | Slack OAuth client ID |
+| `SLACK_CLIENT_SECRET` | No | -- | Slack OAuth client secret |
 | `TEMPORAL_ADDRESS` | No | `localhost:7233` | Temporal server (infrastructure-ready, API execution path not yet wired) |
 | `TEMPORAL_NAMESPACE` | No | `jak-swarm` | Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | No | `jak-main` | Temporal task queue |
