@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "pretypecheck": "pnpm -w --filter @jak-swarm/verification build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

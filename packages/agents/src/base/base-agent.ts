@@ -399,14 +399,25 @@ ${lines.join('\n')}
     const conversation = [...messages];
     const toolCallFingerprints: ToolCallFingerprints = new Map();
 
-    // Lazy-import ToolRegistry to avoid circular dep at module load time
-    const { toolRegistry } = await import('@jak-swarm/tools');
+    // Lazy-import tool registries to avoid circular dep at module load time
+    const { getTenantToolRegistry } = await import('@jak-swarm/tools');
+
+    const declaredToolNames = new Set(tools.map((t) => t.function.name));
+    const tenantToolRegistry = getTenantToolRegistry(
+      context.tenantId ?? '',
+      context.connectedProviders,
+      {
+        browserAutomationEnabled: context.browserAutomationEnabled,
+        restrictedCategories: context.restrictedCategories,
+      },
+    );
 
     const toolExecContext: ToolExecutionContext = {
       tenantId: context.tenantId ?? '',
       userId: context.userId ?? '',
       workflowId: context.workflowId ?? '',
       runId: context.runId,
+      approvalId: context.approvalId,
     };
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -502,9 +513,15 @@ ${lines.join('\n')}
         let toolError: string | undefined;
 
         try {
-          if (toolRegistry.has(toolName)) {
-            // Execute through the real registry
-            const result = await toolRegistry.execute(toolName, parsedArgs, toolExecContext);
+          if (!declaredToolNames.has(toolName)) {
+            resultStr = JSON.stringify({
+              error: `Tool '${toolName}' is not allowed for this agent run. Allowed tools: ${[...declaredToolNames].join(', ')}`,
+              _toolNotAllowed: true,
+            });
+            toolError = `Tool '${toolName}' is outside agent allowlist`;
+          } else if (tenantToolRegistry.has(toolName)) {
+            // Execute through tenant-scoped registry with provider/category/browser gates
+            const result = await tenantToolRegistry.execute(toolName, parsedArgs, toolExecContext);
             if (result.success) {
               const data = result.data as Record<string, unknown> | string | undefined;
               // Detect mock/demo data — inform the agent honestly
@@ -521,12 +538,12 @@ ${lines.join('\n')}
               toolError = result.error;
             }
           } else {
-            // Tool not registered — return a helpful error so LLM can adapt
+            // Tool not available for tenant policy/integrations — return helpful error
             resultStr = JSON.stringify({
-              error: `Tool '${toolName}' is not available. Available tools: ${tools.map(t => t.function.name).join(', ')}. Please choose from the available tools.`,
+              error: `Tool '${toolName}' is not available for this tenant or current policy constraints. Allowed tools: ${[...declaredToolNames].join(', ')}.`,
               _toolNotFound: true,
             });
-            toolError = `Tool '${toolName}' not found in registry`;
+            toolError = `Tool '${toolName}' not available for tenant`;
           }
         } catch (toolExecErr) {
           // ── Tool Error Normalization (DeerFlow ToolErrorHandlingMiddleware) ──

@@ -21,6 +21,9 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    browserAutomationEnabled: state.browserAutomationEnabled,
+    restrictedCategories: state.restrictedCategories,
+    connectedProviders: state.connectedProviders,
   });
 
   const result = await agent.execute(
@@ -32,6 +35,7 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
 
   return {
     routeMap: result.routeMap,
+    restrictedCategories: industryPack.restrictedTools,
     status: WorkflowStatus.EXECUTING,
     traces,
   };

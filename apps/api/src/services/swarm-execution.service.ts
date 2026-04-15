@@ -11,7 +11,9 @@ import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
 import type { SwarmResult } from '@jak-swarm/swarm';
+import { Industry } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
+import { getIndustryPack } from '@jak-swarm/industry-packs';
 import { detectPII, detectInjection, AuditLogger, AuditAction } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
 import { WorkflowService } from './workflow.service.js';
@@ -230,13 +232,20 @@ export class SwarmExecutionService extends EventEmitter {
       });
 
       const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
+      const effectiveIndustry = (industry ?? tenant?.industry ?? Industry.GENERAL) as Industry;
+      const industryPack = getIndustryPack(effectiveIndustry);
+      const connectedIntegrations = await this.db.integration.findMany({
+        where: { tenantId, status: 'CONNECTED' },
+        select: { provider: true },
+      });
+      const connectedProviders = connectedIntegrations.map((i) => i.provider).filter((p): p is string => Boolean(p));
 
       const result = await this.runner.run({
         workflowId,
         tenantId,
         userId,
         goal,
-        industry,
+        industry: effectiveIndustry,
         maxCostUsd: params.maxCostUsd,
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
@@ -256,6 +265,10 @@ export class SwarmExecutionService extends EventEmitter {
           }
         },
         approvalThreshold: (tenant as any)?.approvalThreshold ?? undefined,
+        allowedDomains: (tenant as any)?.allowedDomains ?? [],
+        browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),
+        restrictedCategories: industryPack.restrictedTools,
+        connectedProviders,
         onAgentActivity: (data: unknown) => {
           this.emit(`workflow:${workflowId}`, data);
         },

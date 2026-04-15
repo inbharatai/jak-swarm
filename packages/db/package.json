@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@jak-swarm/shared": "workspace:*",
-    "@prisma/client": "^6.2.1",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ import type {
   WorkflowStatus,
 } from '@jak-swarm/shared';
 import { WorkflowStatus as WS } from '@jak-swarm/shared';
+import type { ToolCategory } from '@jak-swarm/shared';
 import type { MissionBrief } from '@jak-swarm/agents';
 import type { WorkflowPlan } from '@jak-swarm/shared';
 import type { RouteMap } from '@jak-swarm/agents';
@@ -57,6 +58,9 @@ export interface SwarmState {
 
   // Tenant browser config
   allowedDomains: string[];
+  browserAutomationEnabled: boolean;
+  restrictedCategories: ToolCategory[];
+  connectedProviders: string[];
 
   // Final state
   status: WorkflowStatus;
@@ -74,6 +78,9 @@ export function createInitialSwarmState(params: {
   maxCostUsd?: number;
   approvalThreshold?: string;
   allowedDomains?: string[];
+  browserAutomationEnabled?: boolean;
+  restrictedCategories?: ToolCategory[];
+  connectedProviders?: string[];
 }): SwarmState {
   return {
     goal: params.goal,
@@ -99,6 +106,9 @@ export function createInitialSwarmState(params: {
     maxCostUsd: params.maxCostUsd,
     approvalThreshold: params.approvalThreshold,
     allowedDomains: params.allowedDomains ?? [],
+    browserAutomationEnabled: params.browserAutomationEnabled ?? false,
+    restrictedCategories: params.restrictedCategories ?? [],
+    connectedProviders: params.connectedProviders ?? [],
     status: WS.PENDING,
     error: undefined,
     outputs: [],

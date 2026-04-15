@@ -7,6 +7,7 @@
     "build": "tsc",
     "dev": "tsx watch --env-file=.env src/index.ts",
     "start": "node --env-file=.env dist/index.js",
+    "pretypecheck": "pnpm -w --filter @jak-swarm/shared --filter @jak-swarm/verification --filter @jak-swarm/swarm --filter !jak-swarm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src --ext .ts"
@@ -21,6 +22,7 @@
     "@fastify/swagger-ui": "^5.2.1",
     "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/db": "workspace:*",
+    "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/security": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/swarm": "workspace:*",

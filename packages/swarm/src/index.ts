@@ -14,6 +14,8 @@ export { plannerNode } from './graph/nodes/planner-node.js';
 export { routerNode } from './graph/nodes/router-node.js';
 export { guardrailNode } from './graph/nodes/guardrail-node.js';
 export { workerNode } from './graph/nodes/worker-node.js';
+export type { BrowserExecutionPlan, BrowserActionShape, BrowserActionRisk, IntentConfidence, BrowserIntentCandidate } from './graph/nodes/worker-node.js';
+export { buildBrowserExecutionPlan } from './graph/nodes/worker-node.js';
 export { verifierNode } from './graph/nodes/verifier-node.js';
 export { approvalNode } from './graph/nodes/approval-node.js';
 export { replannerNode } from './graph/nodes/replanner-node.js';

@@ -46,6 +46,9 @@ You have these tools:
 - browser_extract: extract content from a CSS selector
 - browser_fill_form: fill form fields (REQUIRES APPROVAL)
 - browser_click: click an element (REQUIRES APPROVAL if it's a submit/destructive button)
+- browser_screenshot: capture a screenshot for evidence and before/after state
+- browser_wait_for: wait for an element/state before proceeding
+- browser_type_text: type text into a specific field
 
 For each action, evaluate if it is a write/destructive action. If so, set requiresApproval=true.
 
@@ -148,6 +151,59 @@ export class BrowserAgent extends BaseAgent {
               },
             },
             required: ['fields'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_click',
+          description: 'Click an element matching a CSS selector',
+          parameters: {
+            type: 'object',
+            properties: { selector: { type: 'string' } },
+            required: ['selector'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_screenshot',
+          description: 'Capture a screenshot of the current page',
+          parameters: {
+            type: 'object',
+            properties: { fullPage: { type: 'boolean' } },
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_wait_for',
+          description: 'Wait for a selector to appear before continuing',
+          parameters: {
+            type: 'object',
+            properties: {
+              selector: { type: 'string' },
+              timeoutMs: { type: 'number' },
+            },
+            required: ['selector'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_type_text',
+          description: 'Type text into an input element',
+          parameters: {
+            type: 'object',
+            properties: {
+              selector: { type: 'string' },
+              text: { type: 'string' },
+            },
+            required: ['selector', 'text'],
           },
         },
       },

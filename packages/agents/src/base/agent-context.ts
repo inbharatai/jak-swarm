@@ -1,5 +1,6 @@
 import type { AgentTrace } from '@jak-swarm/shared';
 import { generateId, generateTraceId } from '@jak-swarm/shared';
+import type { ToolCategory } from '@jak-swarm/shared';
 
 export interface AgentContextParams {
   traceId?: string;
@@ -8,6 +9,10 @@ export interface AgentContextParams {
   userId: string;
   workflowId: string;
   industry?: string;
+  approvalId?: string;
+  connectedProviders?: string[];
+  browserAutomationEnabled?: boolean;
+  restrictedCategories?: ToolCategory[];
 }
 
 export class AgentContext {
@@ -17,6 +22,10 @@ export class AgentContext {
   readonly userId: string;
   readonly workflowId: string;
   readonly industry: string | undefined;
+  readonly approvalId: string | undefined;
+  readonly connectedProviders: string[];
+  readonly browserAutomationEnabled: boolean;
+  readonly restrictedCategories: ToolCategory[];
   private steps: AgentTrace[] = [];
 
   constructor(params: AgentContextParams) {
@@ -26,6 +35,10 @@ export class AgentContext {
     this.userId = params.userId;
     this.workflowId = params.workflowId;
     this.industry = params.industry;
+    this.approvalId = params.approvalId;
+    this.connectedProviders = params.connectedProviders ?? [];
+    this.browserAutomationEnabled = params.browserAutomationEnabled ?? false;
+    this.restrictedCategories = params.restrictedCategories ?? [];
   }
 
   addTrace(trace: AgentTrace): void {
@@ -44,6 +57,10 @@ export class AgentContext {
       userId: this.userId,
       workflowId: this.workflowId,
       industry: this.industry,
+      approvalId: this.approvalId,
+      connectedProviders: this.connectedProviders,
+      browserAutomationEnabled: this.browserAutomationEnabled,
+      restrictedCategories: this.restrictedCategories,
       ...overrides,
     });
   }

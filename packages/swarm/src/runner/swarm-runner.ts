@@ -1,5 +1,6 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace, ApprovalRequest } from '@jak-swarm/shared';
+import type { ToolCategory } from '@jak-swarm/shared';
 import { createLogger } from '@jak-swarm/shared';
 import { generateId } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
@@ -21,6 +22,9 @@ export interface RunParams {
   maxCostUsd?: number;
   approvalThreshold?: string;
   allowedDomains?: string[];
+  browserAutomationEnabled?: boolean;
+  restrictedCategories?: ToolCategory[];
+  connectedProviders?: string[];
   loadState?: (id: string) => Promise<unknown | undefined>;
   /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
   circuitBreakerFactory?: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
@@ -138,6 +142,9 @@ export class SwarmRunner {
         maxCostUsd: params.maxCostUsd,
         approvalThreshold: params.approvalThreshold,
         allowedDomains: params.allowedDomains,
+        browserAutomationEnabled: params.browserAutomationEnabled,
+        restrictedCategories: params.restrictedCategories,
+        connectedProviders: params.connectedProviders,
       }),
       // Inject distributed circuit breaker factory if provided
       ...(params.circuitBreakerFactory ? { circuitBreakerFactory: params.circuitBreakerFactory } : {}),
