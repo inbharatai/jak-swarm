@@ -130,9 +130,17 @@ function convertMessages(messages: Array<{ role: string; content: string | Messa
 function convertTools(
   tools?: unknown[],
 ): Anthropic.Tool[] | undefined {
-  if (!tools || tools.length === 0) return undefined;
+  if (!tools) return undefined;
 
-  return tools.map((tool) => {
+  const normalizedTools = Array.isArray(tools) ? tools : [tools];
+  if (normalizedTools.length === 0) return undefined;
+
+  return normalizedTools
+    .filter((tool) => {
+      const t = tool as { function?: { name?: string } };
+      return Boolean(t?.function?.name);
+    })
+    .map((tool) => {
     const t = tool as {
       type: string;
       function: {

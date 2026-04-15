@@ -2,6 +2,11 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
 import { calculateCost } from '@jak-swarm/shared';
+import {
+  canRevealProviderIdentity,
+  redactModelCosts,
+  redactProviderCosts,
+} from '../security/provider-privacy.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +41,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const query = request.query as { from?: string; to?: string };
       const tenantId = request.user.tenantId;
+      const allowIdentity = canRevealProviderIdentity(request.user.email);
 
       const now = new Date();
       const fromDate = query.from ? new Date(query.from) : new Date(now.getTime() - 30 * 86_400_000);
@@ -142,7 +148,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           },
           timeSeries,
           topWorkflows,
-          costByProvider,
+          costByProvider: redactProviderCosts(costByProvider, allowIdentity),
           costByAgent,
         };
 
@@ -164,6 +170,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { workflowId } = request.params as { workflowId: string };
       const tenantId = request.user.tenantId;
+      const allowIdentity = canRevealProviderIdentity(request.user.email);
 
       try {
         const traces = await fastify.db.agentTrace.findMany({
@@ -226,9 +233,9 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           },
           cost: {
             totalUsd: Math.round(totalCostUsd * 1_000_000) / 1_000_000,
-            byProvider: costByProvider,
+            byProvider: redactProviderCosts(costByProvider, allowIdentity),
             byAgentRole: costByAgent,
-            byModel,
+            byModel: redactModelCosts(byModel, allowIdentity),
           },
           duration: {
             totalMs: totalDurationMs,
@@ -254,6 +261,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const tenantId = request.user.tenantId;
+      const allowIdentity = canRevealProviderIdentity(request.user.email);
       const now = new Date();
       const fromDate = new Date(now.getTime() - 30 * 86_400_000);
 
@@ -295,9 +303,9 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
 
         const breakdown = {
           totalUsd: Math.round(totalUsd * 1_000_000) / 1_000_000,
-          byProvider,
+          byProvider: redactProviderCosts(byProvider, allowIdentity),
           byAgentRole,
-          byModel,
+          byModel: redactModelCosts(byModel, allowIdentity),
         };
 
         return reply.status(200).send(ok(breakdown));

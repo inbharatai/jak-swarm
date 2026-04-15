@@ -504,14 +504,22 @@ export function registerBuiltinTools(): void {
     source: string;
   }> {
     const encodedQuery = encodeURIComponent(query);
-    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodedQuery}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-      body: `q=${encodedQuery}`,
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    let response: Response;
+    try {
+      response = await fetch(`https://html.duckduckgo.com/html/?q=${encodedQuery}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        body: `q=${encodedQuery}`,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       throw new Error(`DuckDuckGo returned ${response.status}`);
@@ -4719,7 +4727,13 @@ Date: _______________`;
         const threads: Array<{ subreddit: string; title: string; url: string; suggestedReply: string }> = [];
         for (const keyword of keywords) {
           if (threads.length >= maxThreads) break;
-          const { results } = await searchDuckDuckGo(`site:reddit.com ${keyword}`, 3);
+          let results: Array<{ title: string; url: string; snippet: string }> = [];
+          try {
+            const search = await searchDuckDuckGo(`site:reddit.com ${keyword}`, 3);
+            results = search.results;
+          } catch {
+            continue;
+          }
           for (const r of results) {
             if (threads.length >= maxThreads) break;
             const subredditMatch = r.url.match(/reddit\.com\/r\/([^/]+)/);
@@ -5189,6 +5203,7 @@ Date: _______________`;
       inputSchema: {
         type: 'object',
         properties: {
+          email: { type: 'string', description: 'Email address to validate (format + MX)' },
           content: { type: 'string', description: 'Email body text' },
           metadata: {
             type: 'object',
@@ -5200,14 +5215,48 @@ Date: _______________`;
             },
           },
         },
-        required: ['content'],
+        required: [],
       },
       outputSchema: { type: 'object', description: 'VerificationResult with risk score, findings, actions, audit' },
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { verify } = await import('@jak-swarm/verification');
-      const { content, metadata } = input as { content: string; metadata?: Record<string, unknown> };
+      const { email, content, metadata } = input as { email?: string; content?: string; metadata?: Record<string, unknown> };
+
+      // Backward compatibility: support both email deliverability checks and email threat analysis.
+      if (email && !content) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const formatValid = emailRegex.test(email);
+        if (!formatValid) {
+          return { email, valid: false, hasMxRecord: false, domain: null, reason: 'Invalid email format' };
+        }
+
+        const domain = email.split('@')[1] ?? null;
+        let hasMxRecord = false;
+        try {
+          if (domain) {
+            const dns = require('dns') as typeof import('dns');
+            const mxRecords = await dns.promises.resolveMx(domain);
+            hasMxRecord = mxRecords.length > 0;
+          }
+        } catch {
+          hasMxRecord = false;
+        }
+
+        return {
+          email,
+          valid: formatValid && hasMxRecord,
+          hasMxRecord,
+          domain,
+          reason: hasMxRecord ? 'Email appears deliverable' : 'Domain has no MX records',
+        };
+      }
+
+      if (!content) {
+        return { error: 'Either email or content is required' };
+      }
+
       return verify({ type: 'EMAIL', content, contentType: 'message/rfc822', metadata, tenantId: context.tenantId, userId: context.userId, workflowId: context.workflowId });
     },
   );

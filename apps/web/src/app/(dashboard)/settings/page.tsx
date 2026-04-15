@@ -1,100 +1,32 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
 import { apiFetch } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Spinner } from '@/components/ui';
-import { Key, Check, AlertCircle, Eye, EyeOff, Zap, Brain, Cpu, Server, Globe, Box } from 'lucide-react';
+import { Key, Check, Eye, EyeOff, Server, AlertTriangle, Shield } from 'lucide-react';
 
 interface LLMProvider {
+  id: string;
   name: string;
+  providerKey?: string;
   configured: boolean;
   keyPreview?: string;
   model?: string;
-  source?: 'database' | 'env';
+  source?: 'database' | 'env' | 'local' | 'managed' | null;
   url?: string;
+  editable?: boolean;
 }
-
-const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; description: string; models: string[]; color: string; tier: string }> = {
-  openai: {
-    icon: <Brain className="h-5 w-5" />,
-    label: 'OpenAI',
-    description: 'GPT-4.1, GPT-4o, o3, o4-mini and more',
-    models: [
-      'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-      'gpt-4o', 'gpt-4o-mini',
-      'o3', 'o3-mini', 'o4-mini',
-      'o1', 'o1-mini', 'o1-pro',
-      'gpt-4-turbo', 'gpt-4',
-      'gpt-3.5-turbo',
-    ],
-    color: '#10a37f',
-    tier: 'Tier 2-3',
-  },
-  anthropic: {
-    icon: <Zap className="h-5 w-5" />,
-    label: 'Anthropic',
-    description: 'Claude Opus 4, Sonnet 4, Haiku 3.5 and more',
-    models: [
-      'claude-opus-4-20250514',
-      'claude-sonnet-4-20250514',
-      'claude-haiku-4-20250414',
-      'claude-3.5-sonnet-20241022',
-      'claude-3.5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307',
-    ],
-    color: '#d97706',
-    tier: 'Tier 3',
-  },
-  gemini: {
-    icon: <Globe className="h-5 w-5" />,
-    label: 'Google Gemini',
-    description: 'Gemini 2.5 Pro, Flash, 2.0, 1.5 and more',
-    models: [
-      'gemini-2.5-pro', 'gemini-2.5-flash',
-      'gemini-2.0-flash', 'gemini-2.0-flash-lite',
-      'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b',
-      'gemini-1.0-pro',
-    ],
-    color: '#4285f4',
-    tier: 'Tier 2',
-  },
-  deepseek: {
-    icon: <Cpu className="h-5 w-5" />,
-    label: 'DeepSeek',
-    description: 'DeepSeek V3, R1 — cost-optimized',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
-    color: '#00a67e',
-    tier: 'Tier 1',
-  },
-  ollama: {
-    icon: <Server className="h-5 w-5" />,
-    label: 'Ollama (Local)',
-    description: 'Run models locally — zero API cost',
-    models: ['llama3.1', 'llama3.2', 'mistral', 'codellama', 'phi3', 'qwen2.5'],
-    color: '#000000',
-    tier: 'Tier 1',
-  },
-  openrouter: {
-    icon: <Box className="h-5 w-5" />,
-    label: 'OpenRouter',
-    description: '100+ models via single API key',
-    models: ['meta-llama/llama-3.1-70b-instruct', 'anthropic/claude-3.5-sonnet', 'google/gemini-pro'],
-    color: '#6366f1',
-    tier: 'Tier 1-2',
-  },
-};
 
 export default function SettingsPage() {
   const toast = useToast();
-  const { data, isLoading, mutate } = useSWR<{ success: boolean; data: { providers: LLMProvider[] } }>(
+  const { data, isLoading, mutate } = useSWR<{ success: boolean; data: { providers: LLMProvider[]; canViewProviderIdentity: boolean } }>(
     '/settings/llm',
-    (url: string) => apiFetch<{ success: boolean; data: { providers: LLMProvider[] } }>(url),
+    (url: string) => apiFetch<{ success: boolean; data: { providers: LLMProvider[]; canViewProviderIdentity: boolean } }>(url),
   );
   const providers = data?.data?.providers ?? [];
+  const canViewProviderIdentity = data?.data?.canViewProviderIdentity ?? false;
 
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
@@ -102,17 +34,22 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async (providerName: string) => {
+  const handleSave = async (provider: LLMProvider) => {
+    if (!provider.providerKey) {
+      toast.error('Provider details are restricted');
+      return;
+    }
+
     setSaving(true);
     try {
-      await apiFetch(`/settings/llm/${providerName}`, {
+      await apiFetch(`/settings/llm/${provider.providerKey}`, {
         method: 'PUT',
         body: {
           apiKey: apiKey || undefined,
           model: selectedModel || undefined,
         },
       });
-      toast.success(`${PROVIDER_META[providerName]?.label ?? providerName} saved`);
+      toast.success('Provider settings saved');
       setEditingProvider(null);
       setApiKey('');
       setSelectedModel('');
@@ -131,21 +68,37 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-display font-bold">LLM Providers</h1>
+        <h1 className="text-2xl font-display font-bold">AI Backends</h1>
         <p className="text-muted-foreground text-sm mt-1 font-sans">
-          Configure your AI model providers. JAK Swarm uses 3-tier routing to optimize cost — set up multiple providers and the system automatically selects the best model for each task.
+          Backend provider identity is restricted. Access to provider-level configuration is owner-only.
         </p>
       </div>
+
+      {!canViewProviderIdentity && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3 text-sm">
+              <Shield className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Provider identity hidden</p>
+                <p className="text-muted-foreground mt-1">
+                  Provider names and model details are intentionally hidden for account security.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Routing explanation */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-3 text-sm">
-            <Zap className="h-4 w-4 text-primary shrink-0" />
+            <Server className="h-4 w-4 text-primary shrink-0" />
             <div>
-              <span className="font-medium">3-Tier Cost Optimization:</span>
+              <span className="font-medium">Managed model routing:</span>
               <span className="text-muted-foreground ml-1">
-                Tier 1 (cheap workers) &rarr; Tier 2 (balanced) &rarr; Tier 3 (premium reasoning). Each agent automatically uses the right tier.
+                Task routing automatically chooses available backends while respecting tenant budget and reliability constraints.
               </span>
             </div>
           </div>
@@ -154,23 +107,23 @@ export default function SettingsPage() {
 
       {/* Provider Cards */}
       <div className="space-y-4">
-        {Object.entries(PROVIDER_META).map(([name, meta]) => {
-          const provider = providers.find(p => p.name === name);
+        {providers.map((provider) => {
           const isConfigured = provider?.configured ?? false;
-          const isEditing = editingProvider === name;
+          const isEditing = editingProvider === provider.id;
+          const canEdit = canViewProviderIdentity && !!provider.editable;
 
           return (
-            <Card key={name} className={isConfigured ? 'border-primary/20' : ''}>
+            <Card key={provider.id} className={isConfigured ? 'border-primary/20' : ''}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: `${meta.color}15`, color: meta.color }}>
-                      {meta.icon}
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
+                      <Server className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-display font-semibold">{meta.label}</h3>
-                        <Badge variant="secondary" className="text-[10px]">{meta.tier}</Badge>
+                        <h3 className="font-display font-semibold">{provider.name}</h3>
+                        <Badge variant="secondary" className="text-[10px]">Managed</Badge>
                         {isConfigured && (
                           <Badge variant="success" className="text-[10px] gap-1">
                             <Check className="h-2.5 w-2.5" />
@@ -178,7 +131,7 @@ export default function SettingsPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{meta.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Secure backend slot</p>
                       {isConfigured && provider?.model && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Model: <span className="font-mono text-foreground">{provider.model}</span>
@@ -191,72 +144,55 @@ export default function SettingsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={!canEdit}
                     onClick={() => {
                       if (isEditing) {
                         setEditingProvider(null);
                       } else {
-                        setEditingProvider(name);
-                        setSelectedModel(provider?.model ?? meta.models[0] ?? '');
+                        setEditingProvider(provider.id);
+                        setSelectedModel(provider?.model ?? '');
                         setApiKey('');
                       }
                     }}
                   >
-                    {isEditing ? 'Cancel' : isConfigured ? 'Update' : 'Configure'}
+                    {!canEdit ? 'Restricted' : isEditing ? 'Cancel' : isConfigured ? 'Update' : 'Configure'}
                   </Button>
                 </div>
 
                 {/* Edit form */}
                 {isEditing && (
                   <div className="mt-4 pt-4 border-t space-y-3">
-                    {name !== 'ollama' && (
-                      <div>
-                        <label className="text-sm font-medium mb-1.5 block">API Key</label>
-                        <div className="relative">
-                          <Input
-                            type={showKey ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={isConfigured ? 'Leave empty to keep current key' : `Enter your ${meta.label} API key`}
-                            className="pr-10 font-mono text-xs"
-                          />
-                          <button
-                            onClick={() => setShowKey(!showKey)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          >
-                            {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {name === 'ollama' && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-                        <Server className="h-4 w-4 shrink-0" />
-                        <span>Ollama runs locally. Make sure Ollama is running at <code className="font-mono">localhost:11434</code></span>
-                      </div>
-                    )}
-
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Model</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {meta.models.map(model => (
-                          <button
-                            key={model}
-                            onClick={() => setSelectedModel(model)}
-                            className={`rounded-lg border px-3 py-2 text-xs font-mono text-left transition-colors ${
-                              selectedModel === model
-                                ? 'border-primary bg-primary/5 text-primary'
-                                : 'border-border hover:border-primary/30'
-                            }`}
-                          >
-                            {model}
-                          </button>
-                        ))}
+                      <label className="text-sm font-medium mb-1.5 block">API Key</label>
+                      <div className="relative">
+                        <Input
+                          type={showKey ? 'text' : 'password'}
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={isConfigured ? 'Leave empty to keep current key' : 'Enter API key'}
+                          className="pr-10 font-mono text-xs"
+                        />
+                        <button
+                          onClick={() => setShowKey(!showKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Model</label>
+                      <Input
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        placeholder="Optional model override"
+                        className="font-mono text-xs"
+                      />
+                    </div>
+
                     <div className="flex justify-end">
-                      <Button onClick={() => handleSave(name)} disabled={saving} className="gap-1.5">
+                      <Button onClick={() => handleSave(provider)} disabled={saving} className="gap-1.5">
                         {saving ? <Spinner size="sm" /> : <Key className="h-3.5 w-3.5" />}
                         {saving ? 'Saving...' : 'Save'}
                       </Button>
@@ -267,6 +203,15 @@ export default function SettingsPage() {
             </Card>
           );
         })}
+
+        {providers.length === 0 && (
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              No backend slots available.
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

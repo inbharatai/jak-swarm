@@ -717,7 +717,7 @@ export default function HomePage() {
                 { icon: '🔍', category: 'Research', count: 30, tools: 'Web search, fetch, SEO audit, keywords, SERP analysis', color: '#06B6D4' },
                 { icon: '🧠', category: 'Knowledge', count: 9, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
                 { icon: '⚙️', category: 'Ops', count: 3, tools: 'Webhooks, file I/O, code execution', color: '#fb923c' },
-                { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC sessions via OpenAI Realtime API', color: '#f472b6' },
+                { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC voice sessions via managed backend', color: '#f472b6' },
                 { icon: '🔌', category: 'MCP', count: 0, tools: 'Slack, GitHub, Notion, HubSpot, Jira, Linear, Stripe — loaded at runtime', color: '#38bdf8' },
               ].map((cat) => (
                 <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
@@ -1071,7 +1071,7 @@ export default function HomePage() {
 
             {/* Tech stack badges */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor', 'OpenAI Realtime', 'SSE Streaming'].map(tech => (
+              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor', 'Realtime Voice', 'SSE Streaming'].map(tech => (
                 <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 font-sans">{tech}</span>
               ))}
             </div>

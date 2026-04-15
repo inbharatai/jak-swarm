@@ -390,11 +390,14 @@ export class ProviderRouter implements LLMProvider {
     if (message.includes('500') || message.includes('502') || message.includes('503') || message.includes('504')) return true;
     if (message.includes('internal server error') || message.includes('service unavailable')) return true;
     if (message.includes('overloaded') || message.includes('capacity')) return true;
+    // Provider/model-specific client errors can be transient or provider-scoped.
+    if (message.includes('401') || message.includes('403')) return true;
+    if (message.includes('404') || message.includes('model') && (message.includes('not found') || message.includes('does not exist'))) return true;
 
     // Check status property if available
     const errWithStatus = err as { status?: number };
     if (errWithStatus.status) {
-      return errWithStatus.status === 429 || errWithStatus.status >= 500;
+      return errWithStatus.status === 401 || errWithStatus.status === 403 || errWithStatus.status === 404 || errWithStatus.status === 429 || errWithStatus.status >= 500;
     }
 
     return false;

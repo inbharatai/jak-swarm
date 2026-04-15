@@ -4,6 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
 import { config } from '../config.js';
+import { anonymizeProviderName, canRevealProviderIdentity } from '../security/provider-privacy.js';
 
 // ─── Encryption helpers ──────────────────────────────────────────────────────
 // AES-256-GCM using AUTH_SECRET as key material
@@ -82,6 +83,7 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const tenantId = request.user.tenantId;
+      const allowIdentity = canRevealProviderIdentity(request.user.email);
 
       try {
         // Fetch all stored keys from DB
@@ -98,9 +100,10 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
           storedMap.set(entry.key, { value: entry.value as Record<string, unknown> });
         }
 
-        const providers = PROVIDER_NAMES.map((name) => {
+        const providers = PROVIDER_NAMES.map((name, index) => {
           const cfg = PROVIDER_ENV_KEYS[name];
           const dbEntry = storedMap.get(memoryKey(name));
+          const maskedName = allowIdentity ? name : anonymizeProviderName(index);
 
           // Check DB first, then env
           if (dbEntry) {
@@ -112,7 +115,16 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
               keyPreview = '***';
             }
             const model = (dbEntry.value['model'] as string) ?? cfg.defaultModel;
-            return { name, configured: true, keyPreview, model, source: 'database' as const };
+            return {
+              id: `provider_${index + 1}`,
+              name: maskedName,
+              providerKey: allowIdentity ? name : undefined,
+              configured: true,
+              keyPreview: allowIdentity ? keyPreview : '***',
+              model: allowIdentity ? model : 'managed',
+              source: allowIdentity ? ('database' as const) : ('managed' as const),
+              editable: allowIdentity,
+            };
           }
 
           // Check env vars
@@ -120,31 +132,52 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
             const hasOllama = !!process.env['OLLAMA_URL'] || !!process.env['OLLAMA_MODEL'];
             if (hasOllama) {
               return {
-                name,
+                id: `provider_${index + 1}`,
+                name: maskedName,
+                providerKey: allowIdentity ? name : undefined,
                 configured: true,
-                model: process.env['OLLAMA_MODEL'] ?? cfg.defaultModel,
-                source: 'local' as const,
-                url: process.env['OLLAMA_URL'] ?? 'http://localhost:11434',
+                model: allowIdentity ? (process.env['OLLAMA_MODEL'] ?? cfg.defaultModel) : 'managed',
+                source: allowIdentity ? ('local' as const) : ('managed' as const),
+                url: allowIdentity ? (process.env['OLLAMA_URL'] ?? 'http://localhost:11434') : undefined,
+                editable: allowIdentity,
               };
             }
-            return { name, configured: false };
+            return {
+              id: `provider_${index + 1}`,
+              name: maskedName,
+              providerKey: allowIdentity ? name : undefined,
+              configured: false,
+              editable: allowIdentity,
+            };
           }
 
           const envKey = process.env[cfg.apiKeyEnv];
           if (envKey) {
             return {
-              name,
+              id: `provider_${index + 1}`,
+              name: maskedName,
+              providerKey: allowIdentity ? name : undefined,
               configured: true,
-              keyPreview: maskKey(envKey),
-              model: process.env[cfg.modelEnv] ?? cfg.defaultModel,
-              source: 'env' as const,
+              keyPreview: allowIdentity ? maskKey(envKey) : '***',
+              model: allowIdentity ? (process.env[cfg.modelEnv] ?? cfg.defaultModel) : 'managed',
+              source: allowIdentity ? ('env' as const) : ('managed' as const),
+              editable: allowIdentity,
             };
           }
 
-          return { name, configured: false };
+          return {
+            id: `provider_${index + 1}`,
+            name: maskedName,
+            providerKey: allowIdentity ? name : undefined,
+            configured: false,
+            editable: allowIdentity,
+          };
         });
 
-        return reply.status(200).send(ok({ providers }));
+        return reply.status(200).send(ok({
+          providers,
+          canViewProviderIdentity: allowIdentity,
+        }));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;
@@ -159,20 +192,34 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/status',
     { preHandler: [fastify.authenticate] },
-    async (_request: FastifyRequest, reply: FastifyReply) => {
-      const results = PROVIDER_NAMES.map((name) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const allowIdentity = canRevealProviderIdentity(request.user.email);
+      const results = PROVIDER_NAMES.map((name, index) => {
         const cfg = PROVIDER_ENV_KEYS[name];
+        const maskedName = allowIdentity ? name : anonymizeProviderName(index);
 
         if (name === 'ollama') {
           const hasOllama = !!process.env['OLLAMA_URL'] || !!process.env['OLLAMA_MODEL'];
-          return { name, available: hasOllama, source: 'local' as const };
+          return {
+            id: `provider_${index + 1}`,
+            name: maskedName,
+            providerKey: allowIdentity ? name : undefined,
+            available: hasOllama,
+            source: allowIdentity ? ('local' as const) : ('managed' as const),
+          };
         }
 
         const hasEnv = !!process.env[cfg.apiKeyEnv];
-        return { name, available: hasEnv, source: hasEnv ? ('env' as const) : (null as null) };
+        return {
+          id: `provider_${index + 1}`,
+          name: maskedName,
+          providerKey: allowIdentity ? name : undefined,
+          available: hasEnv,
+          source: allowIdentity ? (hasEnv ? ('env' as const) : (null as null)) : ('managed' as const),
+        };
       });
 
-      return reply.status(200).send(ok({ providers: results }));
+      return reply.status(200).send(ok({ providers: results, canViewProviderIdentity: allowIdentity }));
     },
   );
 
@@ -189,6 +236,10 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!canRevealProviderIdentity(request.user.email)) {
+        return reply.status(403).send(err('FORBIDDEN', 'Provider settings are restricted'));
+      }
+
       const { provider } = request.params as { provider: string };
 
       if (!PROVIDER_NAMES.includes(provider as ProviderName)) {
@@ -260,6 +311,10 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!canRevealProviderIdentity(request.user.email)) {
+        return reply.status(403).send(err('FORBIDDEN', 'Provider settings are restricted'));
+      }
+
       const { provider } = request.params as { provider: string };
 
       if (!PROVIDER_NAMES.includes(provider as ProviderName)) {

@@ -27,7 +27,7 @@ export default function TermsPage() {
           <p>We process data as described in our <Link href="/privacy" className="text-emerald-400 hover:underline">Privacy Policy</Link>. Your workflow data, agent outputs, and generated code remain yours.</p>
 
           <h2 className="text-xl font-display font-semibold text-foreground">5. API Usage & Costs</h2>
-          <p>LLM API costs are billed to your own API keys (OpenAI, Anthropic, etc.). JAK Swarm does not mark up API costs. Platform subscription fees are separate from API usage costs.</p>
+          <p>LLM API costs are billed to your own managed AI backend keys. JAK Swarm does not mark up API costs. Platform subscription fees are separate from API usage costs.</p>
 
           <h2 className="text-xl font-display font-semibold text-foreground">6. Open Source License</h2>
           <p>The JAK Swarm codebase is licensed under the MIT License. You may self-host, modify, and distribute the software according to the license terms.</p>

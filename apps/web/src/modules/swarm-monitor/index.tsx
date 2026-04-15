@@ -102,15 +102,17 @@ export default function SwarmMonitorModule({ moduleId, isActive }: ModuleProps) 
                 <Badge variant={STATUS_VARIANT[wf.status]} className="text-xs">{STATUS_LABEL[wf.status]}</Badge>
                 {expandedId === wf.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
-              {expandedId === wf.id && wf.traces && (
+              {expandedId === wf.id && (
                 <CardContent className="pt-0 pb-4 space-y-2">
-                  {wf.traces.map(trace => (
+                  {Array.isArray(wf.traces) ? wf.traces.map(trace => (
                     <div key={trace.id} className="flex items-center gap-2 text-xs">
                       <span className="w-28 truncate text-muted-foreground">{trace.agentRole}</span>
                       <span className={cn('flex-1 truncate', trace.error ? 'text-destructive' : 'text-foreground')}>{trace.error || trace.output?.slice(0, 80) || '—'}</span>
                       {trace.durationMs && <span className="text-muted-foreground">{(trace.durationMs / 1000).toFixed(1)}s</span>}
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-xs text-muted-foreground">No trace data available yet.</div>
+                  )}
                 </CardContent>
               )}
             </Card>

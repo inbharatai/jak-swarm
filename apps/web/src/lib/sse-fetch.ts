@@ -18,13 +18,19 @@ export interface SSEOptions {
 export async function connectSSE(options: SSEOptions): Promise<void> {
   const { url, token, onMessage, onOpen, onError, signal } = options;
 
+  if (!token || token.trim().length === 0) {
+    throw new Error('SSE connection failed: missing auth token');
+  }
+
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     signal,
   });
 
   if (!response.ok) {
-    throw new Error(`SSE connection failed: ${response.status}`);
+    const body = await response.text().catch(() => '');
+    const suffix = body.trim().length > 0 ? ` - ${body.slice(0, 300)}` : '';
+    throw new Error(`SSE connection failed: ${response.status}${suffix}`);
   }
 
   if (!response.body) {

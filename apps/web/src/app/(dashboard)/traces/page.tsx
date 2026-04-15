@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileText,
   ChevronDown,
@@ -13,13 +13,18 @@ import {
   Image,
   Filter,
   X,
+  GitCompare,
+  Radio,
+  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Input, Spinner, EmptyState } from '@/components/ui';
 import useSWR from 'swr';
-import { apiClient, fetcher } from '@/lib/api-client';
+import { dataFetcher } from '@/lib/api-client';
 import type { Trace, TraceStep, AgentRole } from '@/types';
 import { format, formatDistanceToNow } from 'date-fns';
+import type { PaginatedResult } from '@/types';
+import { useWorkflowStream } from '@/hooks/useWorkflowStream';
 
 const AGENT_ROLE_OPTIONS: AgentRole[] = [
   'COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'GUARDRAIL', 'APPROVAL',
@@ -31,8 +36,18 @@ const AGENT_ROLE_OPTIONS: AgentRole[] = [
   'WORKER_GROWTH',
 ];
 
+type TraceListItem = {
+  id: string;
+  workflowId: string;
+  agentRole?: string;
+  startedAt?: string;
+  createdAt?: string;
+  durationMs?: number;
+  error?: string | null;
+};
+
 async function fetchTraces(url: string) {
-  return apiClient.get<{ data: Trace[]; total: number }>(url);
+  return dataFetcher<PaginatedResult<TraceListItem>>(url);
 }
 
 function CostBadge({ cost }: { cost?: number }) {
@@ -53,20 +68,79 @@ function DurationBadge({ durationMs }: { durationMs?: number }) {
   );
 }
 
-interface TraceStepRowProps {
-  step: TraceStep;
+function formatJson(value: unknown): string {
+  if (value === undefined) return '(none)';
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
-function TraceStepRow({ step }: TraceStepRowProps) {
+function arraysEqual(a: unknown[] | undefined, b: unknown[] | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (JSON.stringify(a[i]) !== JSON.stringify(b[i])) return false;
+  }
+  return true;
+}
+
+function SectionDiff({
+  title,
+  previous,
+  current,
+}: {
+  title: string;
+  previous: unknown;
+  current: unknown;
+}) {
+  const prevText = formatJson(previous);
+  const currText = formatJson(current);
+  const changed = prevText !== currText;
+
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b">
+        <p className="text-xs font-semibold">{title}</p>
+        <Badge variant={changed ? 'secondary' : 'outline'} className="text-[10px]">
+          {changed ? 'changed' : 'no change'}
+        </Badge>
+      </div>
+      <div className="grid gap-0 sm:grid-cols-2">
+        <div className="p-3 border-b sm:border-b-0 sm:border-r">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Previous</p>
+          <pre className="text-xs bg-muted/20 rounded p-2 overflow-x-auto max-h-40">{prevText}</pre>
+        </div>
+        <div className="p-3">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Current</p>
+          <pre className="text-xs bg-muted/20 rounded p-2 overflow-x-auto max-h-40">{currText}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface TraceStepRowProps {
+  step: TraceStep;
+  selected?: boolean;
+  onSelect?: (step: TraceStep) => void;
+}
+
+function TraceStepRow({ step, selected = false, onSelect }: TraceStepRowProps) {
   const [expanded, setExpanded] = useState(false);
   const hasError = !!step.error;
   const hasScreenshot = !!step.screenshotUrl;
   const hasTools = step.toolCalls && step.toolCalls.length > 0;
 
   return (
-    <div className={cn('border rounded-lg overflow-hidden', hasError && 'border-destructive/50')}>
+    <div className={cn('border rounded-lg overflow-hidden', hasError && 'border-destructive/50', selected && 'ring-2 ring-primary/60')}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          setExpanded(!expanded);
+          onSelect?.(step);
+        }}
         className={cn(
           'flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors',
           hasError && 'bg-destructive/5',
@@ -202,10 +276,88 @@ function TraceStepRow({ step }: TraceStepRowProps) {
   );
 }
 
+function StepDiffPanel({
+  selectedStep,
+  previousStep,
+}: {
+  selectedStep: TraceStep | null;
+  previousStep: TraceStep | null;
+}) {
+  if (!selectedStep) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground">
+          Select a step to inspect input/output/tools/errors diff.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const prevTools = previousStep?.toolCalls?.map((t) => ({ toolName: t.toolName, error: t.error ?? null })) ?? [];
+  const currTools = selectedStep.toolCalls?.map((t) => ({ toolName: t.toolName, error: t.error ?? null })) ?? [];
+  const toolChanged = !arraysEqual(prevTools, currTools);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <GitCompare className="h-4 w-4 text-primary" />
+          Step Diff Panel
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Comparing step {selectedStep.stepNumber} with previous step.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <SectionDiff title="Input" previous={previousStep?.input} current={selectedStep.input} />
+        <SectionDiff title="Output" previous={previousStep?.output} current={selectedStep.output} />
+        <div className="rounded-lg border overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b">
+            <p className="text-xs font-semibold">Tools</p>
+            <Badge variant={toolChanged ? 'secondary' : 'outline'} className="text-[10px]">
+              {toolChanged ? 'changed' : 'no change'}
+            </Badge>
+          </div>
+          <div className="grid gap-0 sm:grid-cols-2">
+            <div className="p-3 border-b sm:border-b-0 sm:border-r">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Previous</p>
+              <pre className="text-xs bg-muted/20 rounded p-2 overflow-x-auto max-h-40">{formatJson(prevTools)}</pre>
+            </div>
+            <div className="p-3">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Current</p>
+              <pre className="text-xs bg-muted/20 rounded p-2 overflow-x-auto max-h-40">{formatJson(currTools)}</pre>
+            </div>
+          </div>
+        </div>
+        <SectionDiff title="Error" previous={previousStep?.error ?? null} current={selectedStep.error ?? null} />
+      </CardContent>
+    </Card>
+  );
+}
+
 function TraceDetailPanel({ trace }: { trace: Trace }) {
-  const totalSteps = trace.steps.length;
-  const errorSteps = trace.steps.filter(s => !!s.error).length;
-  const browserSteps = trace.steps.filter(s => s.agentRole === 'WORKER_BROWSER').length;
+  const steps = useMemo(
+    () => (Array.isArray(trace.steps) ? [...trace.steps].sort((a, b) => a.stepNumber - b.stepNumber) : []),
+    [trace.steps],
+  );
+  const totalSteps = steps.length;
+  const errorSteps = steps.filter(s => !!s.error).length;
+  const [selectedStepIndex, setSelectedStepIndex] = useState(steps.length > 0 ? steps.length - 1 : 0);
+  const [followLive, setFollowLive] = useState(true);
+  const selectedStep = steps[selectedStepIndex] ?? null;
+  const previousStep = selectedStepIndex > 0 ? (steps[selectedStepIndex - 1] ?? null) : null;
+  const visibleSteps = selectedStep ? steps.filter((s) => s.stepNumber <= selectedStep.stepNumber) : steps;
+  const { events, isConnected } = useWorkflowStream(trace.workflowId);
+
+  useEffect(() => {
+    setSelectedStepIndex(steps.length > 0 ? steps.length - 1 : 0);
+    setFollowLive(true);
+  }, [trace.id, steps.length]);
+
+  useEffect(() => {
+    if (!followLive || steps.length === 0) return;
+    setSelectedStepIndex(steps.length - 1);
+  }, [steps.length, followLive]);
 
   return (
     <div className="space-y-4">
@@ -231,10 +383,71 @@ function TraceDetailPanel({ trace }: { trace: Trace }) {
         </div>
       )}
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            Timeline Scrubber
+          </CardTitle>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {isConnected ? <Radio className="h-3.5 w-3.5 text-green-500" /> : <Pause className="h-3.5 w-3.5" />}
+            {isConnected ? 'Live stream connected' : 'Not streaming'}
+            <span>•</span>
+            <span>{events.length} stream event{events.length === 1 ? '' : 's'}</span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Step {selectedStep?.stepNumber ?? 0} / {steps.length}</span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={followLive}
+                onChange={(e) => setFollowLive(e.target.checked)}
+                className="rounded border-input"
+              />
+              Follow latest
+            </label>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(steps.length - 1, 0)}
+            value={Math.min(selectedStepIndex, Math.max(steps.length - 1, 0))}
+            onChange={(e) => {
+              setSelectedStepIndex(Number(e.target.value));
+              setFollowLive(false);
+            }}
+            className="w-full"
+            disabled={steps.length === 0}
+          />
+          {selectedStep && (
+            <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs flex items-center gap-2">
+              <Badge variant="secondary" className="text-[10px]">{selectedStep.agentRole}</Badge>
+              <span className="truncate">{selectedStep.action}</span>
+              <span className="ml-auto text-muted-foreground">{format(new Date(selectedStep.startedAt), 'HH:mm:ss')}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <StepDiffPanel selectedStep={selectedStep} previousStep={previousStep} />
+
       {/* Steps */}
       <div className="space-y-2">
-        {trace.steps.map(step => (
-          <TraceStepRow key={step.id} step={step} />
+        {visibleSteps.map((step, index) => (
+          <TraceStepRow
+            key={step.id}
+            step={step}
+            selected={selectedStep?.id === step.id}
+            onSelect={() => {
+              const idx = steps.findIndex((s) => s.id === step.id);
+              if (idx >= 0) {
+                setSelectedStepIndex(idx);
+                setFollowLive(false);
+              }
+            }}
+          />
         ))}
       </div>
     </div>
@@ -264,16 +477,16 @@ export default function TracesPage() {
   // BASE_URL already includes the API host; no /api/ prefix needed
   const key = `/traces${qs ? `?${qs}` : ''}`;
 
-  const { data, isLoading } = useSWR<{ data: Trace[]; total: number }>(key, fetchTraces, {
+  const { data, isLoading } = useSWR<PaginatedResult<TraceListItem>>(key, fetchTraces, {
     refreshInterval: 30_000,
   });
 
   const { data: selectedTraceData, isLoading: traceLoading } = useSWR<Trace>(
     selectedTraceId ? `/traces/${selectedTraceId}` : null,
-    (url: string) => apiClient.get<Trace>(url),
+    (url: string) => dataFetcher<Trace>(url),
   );
 
-  const traces = data?.data ?? [];
+  const traces = Array.isArray(data?.items) ? data.items : [];
   const hasActiveFilters = filters.workflowId || filters.agentRole || filters.dateFrom || filters.dateTo || filters.hasErrors;
 
   return (
@@ -401,7 +614,7 @@ export default function TracesPage() {
                         <span className="text-xs font-mono text-muted-foreground">{trace.id.slice(0, 12)}…</span>
                         <span className="text-xs text-muted-foreground">·</span>
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(trace.createdAt), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(trace.startedAt ?? trace.createdAt ?? Date.now()), { addSuffix: true })}
                         </span>
                       </div>
                       <p className="text-xs font-medium text-muted-foreground">
@@ -410,24 +623,20 @@ export default function TracesPage() {
                     </div>
 
                     <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground shrink-0">
-                      <span>{trace.steps.length} steps</span>
-                      {trace.totalDurationMs && (
-                        <span>{(trace.totalDurationMs / 1000).toFixed(1)}s</span>
-                      )}
-                      {trace.totalCostUsd && (
-                        <span>${trace.totalCostUsd.toFixed(4)}</span>
+                      {trace.durationMs && (
+                        <span>{(trace.durationMs / 1000).toFixed(1)}s</span>
                       )}
                     </div>
                   </div>
 
                   {/* Agent role pills */}
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {Array.from(new Set(trace.steps.map(s => s.agentRole))).map(role => (
-                      <Badge key={role} variant="secondary" className="text-[10px]">{role}</Badge>
-                    ))}
-                    {trace.steps.some(s => s.error) && (
+                    {trace.agentRole && (
+                      <Badge variant="secondary" className="text-[10px]">{trace.agentRole}</Badge>
+                    )}
+                    {trace.error && (
                       <Badge variant="destructive" className="text-[10px]">
-                        {trace.steps.filter(s => s.error).length} errors
+                        Error
                       </Badge>
                     )}
                   </div>
@@ -450,8 +659,17 @@ export default function TracesPage() {
               <div className="flex justify-center py-8">
                 <Spinner />
               </div>
-            ) : selectedTraceData ? (
+            ) : selectedTraceData && Array.isArray(selectedTraceData.steps) ? (
               <TraceDetailPanel trace={selectedTraceData} />
+            ) : selectedTraceData ? (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Raw Trace Payload</p>
+                  <pre className="text-xs bg-muted/30 rounded p-2 overflow-x-auto max-h-[480px]">
+                    {JSON.stringify(selectedTraceData, null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
             ) : null}
           </div>
         )}

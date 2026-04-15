@@ -412,20 +412,20 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /workflows/:workflowId/stream
    * SSE stream for real-time workflow updates.
-   * Accepts token as query param since EventSource can't send headers.
+   * Accepts Bearer auth headers and supports token query fallback for legacy EventSource clients.
    */
   fastify.get(
     '/:workflowId/stream',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // Authenticate via query param (EventSource can't set headers)
+      // Support legacy EventSource token query param if no Authorization header is present.
       const query = request.query as { token?: string };
-      if (query.token) {
+      if (!request.headers.authorization && query.token) {
         request.headers.authorization = `Bearer ${query.token}`;
       }
       try {
         await fastify.authenticate(request, reply);
       } catch {
-        return reply.code(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send(err('UNAUTHORIZED', 'Unauthorized'));
       }
 
       const { workflowId } = request.params as { workflowId: string };
@@ -436,7 +436,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: workflowId, tenantId },
       });
       if (!workflow) {
-        return reply.code(404).send({ error: 'Workflow not found' });
+        return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
       }
 
       // SSE stream — hijack the response so Fastify doesn't try to auto-close it

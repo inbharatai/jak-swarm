@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <p>Data is stored in PostgreSQL (Supabase) with row-level tenant isolation. Integration credentials are encrypted using AES-256-GCM. API keys are stored as one-way hashes. All data in transit uses TLS 1.3.</p>
 
           <h2 className="text-xl font-display font-semibold text-foreground">4. Third-Party Services</h2>
-          <p>JAK Swarm connects to LLM providers (OpenAI, Anthropic, Google) using your own API keys. We do not store or access your LLM API keys beyond the encrypted credential store. Integration data (Gmail, Slack, GitHub) passes through our servers to execute agent tasks.</p>
+          <p>JAK Swarm connects to managed LLM backends using your own API keys. We do not store or access your LLM API keys beyond the encrypted credential store. Integration data (Gmail, Slack, GitHub) passes through our servers to execute agent tasks.</p>
 
           <h2 className="text-xl font-display font-semibold text-foreground">5. Your Rights</h2>
           <p>You may request export or deletion of your data at any time by contacting <a href="mailto:contact@inbharat.ai" className="text-emerald-400 hover:underline">contact@inbharat.ai</a>. Self-hosted deployments retain full control of all data.</p>

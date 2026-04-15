@@ -47,17 +47,29 @@ export abstract class BaseAgent {
     this.role = role;
     this.logger = createLogger(`agent:${role.toLowerCase()}`, { role });
 
-    // Auto-initialize provider with failover when both API keys are available
+    // Auto-initialize provider routing/failover whenever any supported provider is configured.
     if (provider) {
       this.provider = provider;
-    } else if (process.env['ANTHROPIC_API_KEY'] && process.env['OPENAI_API_KEY']) {
-      // Both keys available — use ProviderRouter for automatic failover
+    } else {
+      const hasProviderCredentials = Boolean(
+        process.env['OPENAI_API_KEY'] ||
+        process.env['ANTHROPIC_API_KEY'] ||
+        process.env['GEMINI_API_KEY'] ||
+        process.env['DEEPSEEK_API_KEY'] ||
+        process.env['OPENROUTER_API_KEY'] ||
+        process.env['OLLAMA_URL'] ||
+        process.env['OLLAMA_MODEL'],
+      );
+
+      // Any provider available — use ProviderRouter for automatic routing/failover
+      if (hasProviderCredentials) {
       try {
         // Lazy require to avoid circular deps at module load
         const { ProviderRouter } = require('./provider-router.js') as { ProviderRouter: new () => LLMProvider };
         this.provider = new ProviderRouter();
       } catch {
         // ProviderRouter not available — fall through to direct OpenAI
+      }
       }
     }
 

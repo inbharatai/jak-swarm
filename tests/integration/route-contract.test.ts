@@ -65,4 +65,20 @@ describe('JAK Swarm route contract checks', () => {
     expect(projectHook).toContain('/projects/${projectId}/stream');
     expect(projectRoutes).toContain("'/:id/stream'");
   });
+
+  it('guards stream auth and UI trace rendering contracts against runtime crashes', () => {
+    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const swarmMonitor = readRepoFile('apps/web/src/modules/swarm-monitor/index.tsx');
+    const tracesPage = readRepoFile('apps/web/src/app/(dashboard)/traces/page.tsx');
+
+    // Stream route should support header auth with query fallback and structured errors.
+    expect(workflowRoutes).toContain('!request.headers.authorization && query.token');
+    expect(workflowRoutes).toContain("err('UNAUTHORIZED', 'Unauthorized')");
+    expect(workflowRoutes).toContain("err('NOT_FOUND', 'Workflow not found')");
+
+    // UI must guard against non-array traces to prevent .map runtime crash.
+    expect(swarmMonitor).toContain('Array.isArray(wf.traces)');
+    expect(tracesPage).toContain('Array.isArray(data?.items)');
+    expect(tracesPage).toContain('Array.isArray(selectedTraceData.steps)');
+  });
 });
