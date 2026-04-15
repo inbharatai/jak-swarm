@@ -33,6 +33,19 @@ function clearSession(): void {
   window.location.href = '/login';
 }
 
+function normalizeErrorDetails(value: unknown): Record<string, string[]> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const normalized: Record<string, string[]> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(raw)) {
+      normalized[key] = raw.map((item) => String(item));
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -72,11 +85,15 @@ async function request<T>(
   const json = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const envelope = (json && typeof json === 'object' ? json : null) as
+      | { error?: { code?: string; message?: string; details?: unknown }; code?: string; message?: string; details?: unknown }
+      | null;
+
     const error: ApiError = {
-      message: json?.message ?? response.statusText ?? 'Request failed',
-      code: json?.code ?? 'UNKNOWN_ERROR',
+      message: envelope?.error?.message ?? envelope?.message ?? response.statusText ?? 'Request failed',
+      code: envelope?.error?.code ?? envelope?.code ?? 'UNKNOWN_ERROR',
       status: response.status,
-      details: json?.details,
+      details: normalizeErrorDetails(envelope?.error?.details ?? envelope?.details),
     };
     throw error;
   }
@@ -189,10 +206,10 @@ export const workflowApi = {
    * POST /workflows — returns 202 Accepted immediately.
    * Use workflowApi.get() to poll for status changes.
    */
-  create: (goal: string, industry?: string) =>
+  create: (goal: string, industry?: string, roleModes?: string[]) =>
     apiDataFetch<Workflow & { estimatedCredits?: number; creditsReserved?: number; taskType?: string; model?: string }>(
       '/workflows',
-      { method: 'POST', body: { goal, industry } },
+      { method: 'POST', body: { goal, industry, roleModes } },
     ),
 
   /**

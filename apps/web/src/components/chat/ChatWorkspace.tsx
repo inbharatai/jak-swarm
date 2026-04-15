@@ -65,7 +65,7 @@ export function ChatWorkspace() {
 
     try {
       // Create a real workflow via the API
-      const workflow = await workflowApi.create(text);
+      const workflow = await workflowApi.create(text, undefined, activeRoles);
 
       // Add initial acknowledgement
       addMessage(convId, {

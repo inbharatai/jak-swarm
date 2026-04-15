@@ -52,6 +52,7 @@ export interface ExecuteAsyncParams {
   userId: string;
   goal: string;
   industry?: string;
+  roleModes?: string[];
   maxCostUsd?: number;
 }
 
@@ -246,6 +247,7 @@ export class SwarmExecutionService extends EventEmitter {
         userId,
         goal,
         industry: effectiveIndustry,
+        roleModes: params.roleModes,
         maxCostUsd: params.maxCostUsd,
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {

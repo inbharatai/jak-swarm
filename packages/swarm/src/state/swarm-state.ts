@@ -18,6 +18,7 @@ export interface SwarmState {
   userId: string;
   workflowId: string;
   industry: string | undefined;
+  roleModes: string[];
 
   // Commander output
   missionBrief: MissionBrief | undefined;
@@ -75,6 +76,7 @@ export function createInitialSwarmState(params: {
   userId: string;
   workflowId: string;
   industry?: string;
+  roleModes?: string[];
   maxCostUsd?: number;
   approvalThreshold?: string;
   allowedDomains?: string[];
@@ -88,6 +90,7 @@ export function createInitialSwarmState(params: {
     userId: params.userId,
     workflowId: params.workflowId,
     industry: params.industry,
+    roleModes: params.roleModes ?? [],
     missionBrief: undefined,
     clarificationNeeded: false,
     clarificationQuestion: undefined,

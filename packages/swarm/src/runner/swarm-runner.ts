@@ -15,6 +15,7 @@ export interface RunParams {
   tenantId: string;
   userId: string;
   industry?: string;
+  roleModes?: string[];
   workflowId?: string;
   timeoutMs?: number;
   onStateChange?: (workflowId: string, state: unknown) => Promise<void>;
@@ -139,6 +140,7 @@ export class SwarmRunner {
         userId: params.userId,
         workflowId,
         industry: params.industry,
+        roleModes: params.roleModes,
         maxCostUsd: params.maxCostUsd,
         approvalThreshold: params.approvalThreshold,
         allowedDomains: params.allowedDomains,

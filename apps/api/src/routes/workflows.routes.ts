@@ -11,6 +11,7 @@ import { detectTaskType, estimateCredits } from '../billing/model-router.js';
 const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
   industry: z.string().max(120).optional(),
+  roleModes: z.array(z.string().min(1).max(64)).max(10).optional(),
   maxCostUsd: z.number().positive().max(1000).optional(),
 });
 
@@ -39,7 +40,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
       }
 
-      const { goal, industry, maxCostUsd } = parseResult.data;
+      const { goal, industry, roleModes, maxCostUsd } = parseResult.data;
       const { tenantId, userId } = request.user;
 
       try {
@@ -80,6 +81,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             userId,
             goal,
             industry,
+            roleModes,
             maxCostUsd,
           });
         });
