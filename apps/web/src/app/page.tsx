@@ -434,7 +434,7 @@ export default function HomePage() {
                 <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">39 Agents Live</span>
               </div>
 
-              <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[0.95]">
+              <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.02] sm:leading-[1]">
                 <span className="block text-white/90">Your Entire Company,</span>
                 <span className="block mt-2 gradient-text">Automated.</span>
               </h1>

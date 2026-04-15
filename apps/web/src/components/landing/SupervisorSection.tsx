@@ -159,7 +159,7 @@ export default function SupervisorSection() {
             </div>
 
             {/* Event log */}
-            <div className="p-3 sm:p-4 space-y-1.5 min-h-[320px] sm:min-h-[380px] max-h-[420px] overflow-y-auto">
+            <div className="p-3 sm:p-4 space-y-1.5 min-h-[320px] sm:min-h-[380px] lg:max-h-none overflow-y-auto lg:overflow-visible">
               {EVENT_TYPES.map((event, i) => (
                 <motion.div
                   key={`${event.type}-${i}`}
@@ -186,7 +186,7 @@ export default function SupervisorSection() {
                   </span>
 
                   {/* Agent */}
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-sans truncate">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-sans break-words min-w-0">
                     {event.agent}
                   </span>
                 </motion.div>
