@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// ─── Supabase Auth Middleware ─────────────────────────────────────────────────
+// ─── Supabase Auth Proxy ───────────────────────────────────────────────────
 // Refreshes the user's session on every request so it doesn't expire.
 // Also protects dashboard routes — unauthenticated users get redirected to /login.
 
@@ -28,7 +28,7 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
