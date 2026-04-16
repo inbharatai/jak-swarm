@@ -23,6 +23,7 @@ type WhatsAppCommandResult = {
 const bridgeToken = 'test-bridge-token';
 
 let app: FastifyInstance;
+const hasDatabaseUrl = Boolean(process.env['DATABASE_URL'] || process.env['DIRECT_URL']);
 
 async function injectJson<T>(
   method: string,
@@ -66,7 +67,7 @@ afterAll(async () => {
   }
 });
 
-describe('WhatsApp verification flow', () => {
+describe.skipIf(!hasDatabaseUrl)('WhatsApp verification flow', () => {
   it('issues a challenge, verifies it, and allows commands', async () => {
     const suffix = Date.now();
     const uniqueDigits = String(suffix).slice(-7);
