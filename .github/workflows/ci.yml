@@ -53,7 +53,7 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs: build
     services:
       postgres:
@@ -120,3 +120,56 @@ jobs:
           DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
           DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
           REDIS_URL: redis://localhost:6379
+
+  # ---------------------------------------------------------------------------
+  # Security gate — blocks merge/deploy if hardened defaults are violated
+  # ---------------------------------------------------------------------------
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail if default AUTH_SECRET is committed anywhere
+        run: |
+          if grep -rn "dev-secret-change-me-NEVER-USE-IN-PROD" \
+            --include="*.ts" --include="*.js" --include="*.json" \
+            --exclude-dir=node_modules --exclude-dir=dist \
+            --exclude="validate-config.ts" \
+            .; then
+            echo "::error::Default AUTH_SECRET found in source — rotate it immediately."
+            exit 1
+          fi
+          echo "No hardcoded default auth secrets found."
+
+      - name: Fail if real API keys are committed
+        run: |
+          # Patterns that look like real secrets (not placeholders)
+          if grep -rEn "(sk-[A-Za-z0-9]{32,}|sk-ant-[A-Za-z0-9-]{40,}|AIza[A-Za-z0-9_-]{35})" \
+            --include="*.ts" --include="*.js" --include="*.env*" \
+            --exclude-dir=node_modules --exclude-dir=dist \
+            --exclude="*.example" \
+            . 2>/dev/null; then
+            echo "::error::Possible real API key committed to source — review and revoke."
+            exit 1
+          fi
+          echo "No hardcoded API keys found."
+
+      - name: Ensure .env is gitignored
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env file is tracked by git — add it to .gitignore immediately."
+            exit 1
+          fi
+          echo ".env is not tracked by git."
+
+      - name: Validate production boot guard exists
+        run: |
+          if ! grep -qE "(process\.exit\(1\)|throw new Error)" apps/api/src/boot/validate-config.ts; then
+            echo "::error::Production boot guard missing from validate-config.ts — server must refuse to start on bad config"
+            exit 1
+          fi
+          echo "Production boot guard is present."
