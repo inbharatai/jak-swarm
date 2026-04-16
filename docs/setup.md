@@ -49,6 +49,26 @@ NODE_ENV="development"
 
 All other values default to local addresses. Voice features require the additional voice API keys.
 
+### Optional: WhatsApp Control (QR-based)
+
+1. Set a shared bridge token:
+
+```env
+WHATSAPP_BRIDGE_TOKEN="change-me-to-a-random-secret"
+```
+
+2. Start the WhatsApp client manually (recommended for local dev):
+
+```bash
+pnpm --filter @jak-swarm/whatsapp-client dev
+```
+
+3. In the dashboard, go to Integrations → WhatsApp, register your number, and send the verification code from WhatsApp to activate command access.
+
+Notes:
+- `WHATSAPP_AUTO_START=1` will auto-spawn the client on API boot if the API and client run on the same host.
+- Redis coordination prevents multiple API instances from spawning duplicate WhatsApp clients.
+
 ---
 
 ## 3. Start Infrastructure Services
@@ -141,6 +161,12 @@ pnpm db:migrate
 ```
 
 This runs `prisma migrate dev` which creates migration files and applies them. You will be prompted to name the migration.
+
+If you use Supabase connection pooling, set `DIRECT_URL` to a non-pooler connection string for migrations. For production deploys, use:
+
+```bash
+pnpm db:migrate:deploy
+```
 
 ### Verify Schema
 

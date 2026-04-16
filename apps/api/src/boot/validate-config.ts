@@ -136,6 +136,27 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   }
 
   // -----------------------------------------------------------------------
+  // 7. WhatsApp control bridge (optional)
+  // -----------------------------------------------------------------------
+  const whatsappConfigured = config.whatsappNumberMap.length > 0 || config.whatsappAllowedNumbers.length > 0;
+
+  if (config.whatsappAutoStart && !config.whatsappBridgeToken) {
+    results.push({
+      name: 'WHATSAPP_BRIDGE_TOKEN',
+      status: 'warn',
+      message: 'WHATSAPP_AUTO_START is enabled but WHATSAPP_BRIDGE_TOKEN is missing',
+    });
+  }
+
+  if (config.whatsappAutoStart && !whatsappConfigured) {
+    results.push({
+      name: 'WHATSAPP_NUMBER_MAP',
+      status: 'warn',
+      message: 'WHATSAPP_AUTO_START is enabled but no allowlist is configured (users must register numbers in the dashboard)',
+    });
+  }
+
+  // -----------------------------------------------------------------------
   // Report
   // -----------------------------------------------------------------------
   const errors = results.filter((r) => r.status === 'error');

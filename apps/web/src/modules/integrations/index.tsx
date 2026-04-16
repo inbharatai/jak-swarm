@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { dataFetcher, integrationApi } from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
+import { WhatsAppControl } from '@/components/integrations/WhatsAppControl';
 import type { Integration, IntegrationProvider } from '@/types';
 import type { ModuleProps } from '@/modules/registry';
 
@@ -55,6 +56,8 @@ export default function IntegrationsModule({ moduleId, isActive }: ModuleProps) 
         </h2>
         <p className="text-xs text-muted-foreground">Connect tools to enable agents to work across your stack</p>
       </div>
+
+      <WhatsAppControl />
 
       {connectedProviders.length > 0 && (
         <section>

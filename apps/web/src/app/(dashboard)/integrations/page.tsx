@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { dataFetcher, integrationApi } from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
+import { WhatsAppControl } from '@/components/integrations/WhatsAppControl';
 import type { Integration, IntegrationProvider } from '@/types';
 
 const ALL_PROVIDERS: IntegrationProvider[] = [
@@ -71,6 +72,8 @@ export default function IntegrationsPage() {
           Connect your tools to enable agents to work across your stack.
         </p>
       </div>
+
+      <WhatsAppControl />
 
       {/* Connected */}
       {connectedProviders.length > 0 && (

@@ -10,7 +10,7 @@
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-85_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-127_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
 **39 AI agents, 119 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Memory-aware agents with context engineering, Slack channel bridge, voice-to-workflow trigger, and an embedded TypeScript SDK. Production-grade SaaS with managed AI — no API keys required.**
 
@@ -158,6 +158,7 @@ flowchart LR
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
 | 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
 | 💬 | **Slack Channel Bridge** | Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling |
+| 💬 | **WhatsApp Control (QR)** | Register a number in the dashboard, verify via challenge code, then send workflow commands over WhatsApp |
 | 🎤 | **Voice → Workflow** | Convert voice session transcripts into workflow executions. 4 voice providers (OpenAI Realtime, Deepgram, ElevenLabs, Mock) |
 | 📦 | **@jak-swarm/client SDK** | Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, health checks |
 | 🛠️ | **SKILL.md Format** | DeerFlow-compatible skill definitions with YAML frontmatter, recursive discovery, risk levels, tool allowlists |
@@ -168,7 +169,7 @@ flowchart LR
 | 🌐 | **27 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
 | 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
-| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers |
+| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers (including WhatsApp auto-start lock) |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
 | 📧 | **Real Email/Calendar** | Gmail via IMAP/SMTP, Google Calendar via CalDAV. Real send, real events — not mocks |
 | 🧩 | **Skills Marketplace** | Create, sandbox-test, and deploy custom agent skills with approval workflow |

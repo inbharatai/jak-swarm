@@ -40,8 +40,10 @@ import layoutRoutes from './routes/layouts.routes.js';
 import usageRoutes from './routes/usage.routes.js';
 import paddleRoutes from './routes/paddle.routes.js';
 import slackRoutes from './routes/slack.routes.js';
+import whatsappRoutes from './routes/whatsapp.routes.js';
 import { registerObservability } from './observability/index.js';
 import { validateConfigOnBoot } from './boot/validate-config.js';
+import { spawnWhatsAppClient, stopWhatsAppClient, releaseWhatsAppAutoStartLock } from './whatsapp/whatsapp-spawner.js';
 
 async function buildApp() {
   const fastify = Fastify({
@@ -162,6 +164,7 @@ async function buildApp() {
   await fastify.register(usageRoutes, { prefix: '/usage' });
   await fastify.register(paddleRoutes, { prefix: '/paddle' });
   await fastify.register(slackRoutes, { prefix: '/slack' });
+  await fastify.register(whatsappRoutes, { prefix: '/whatsapp' });
 
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity
@@ -278,6 +281,8 @@ async function main() {
   const gracefulShutdown = async (signal: string) => {
     fastify.log.info({ signal }, 'Received shutdown signal, closing server...');
     try {
+      await stopWhatsAppClient(fastify.log);
+      await releaseWhatsAppAutoStartLock(fastify.log, config.redisUrl ? fastify.redis : null);
       await fastify.close();
       fastify.log.info('Server closed gracefully');
       process.exit(0);
@@ -296,12 +301,15 @@ async function main() {
       { port: config.port, env: config.nodeEnv },
       `JAK Swarm API listening on port ${config.port}`,
     );
+    void spawnWhatsAppClient(fastify.log, config.redisUrl ? fastify.redis : null);
   } catch (err) {
     fastify.log.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 }
 
-void main();
+if (process.env['NODE_ENV'] !== 'test') {
+  void main();
+}
 
 export { buildApp };

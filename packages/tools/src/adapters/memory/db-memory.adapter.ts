@@ -238,6 +238,9 @@ export class DbMemoryAdapter implements MemoryAdapter {
 // ─── Prisma-like interface (avoids hard dependency on @prisma/client types) ──
 
 interface PrismaLike {
+  tenant?: {
+    findUnique(args: { where: { id: string }; select?: Record<string, boolean> }): Promise<{ id: string } | null>;
+  };
   memoryItem: {
     findFirst(args: { where: Record<string, unknown>; select?: Record<string, boolean> }): Promise<PrismaMemoryItemRow | null>;
     update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<PrismaMemoryItemRow>;
@@ -293,10 +296,27 @@ export function getMemoryAdapter(): MemoryAdapter {
       const dbAdapter = new DbMemoryAdapter(prisma as PrismaLike);
       const inMemoryFallback = new InMemoryAdapter();
       let useDb = true;
+      const tenantCache = new Map<string, boolean>();
+
+      const hasTenant = async (tenantId: string): Promise<boolean> => {
+        const tenantModel = (prisma as PrismaLike).tenant;
+        if (!tenantModel?.findUnique) return true;
+        if (tenantCache.has(tenantId)) return tenantCache.get(tenantId) ?? false;
+        try {
+          const tenant = await tenantModel.findUnique({ where: { id: tenantId }, select: { id: true } });
+          const exists = Boolean(tenant);
+          tenantCache.set(tenantId, exists);
+          return exists;
+        } catch {
+          return true;
+        }
+      };
 
       const fallbackAdapter: MemoryAdapter = {
         async get(key: string, tenantId?: string, opts?: MemoryGetOptions): Promise<unknown> {
           if (!useDb) return inMemoryFallback.get(key, tenantId, opts);
+          const tid = tenantId ?? 'default';
+          if (!(await hasTenant(tid))) return inMemoryFallback.get(key, tenantId, opts);
           try {
             return await dbAdapter.get(key, tenantId, opts);
           } catch {
@@ -306,6 +326,8 @@ export function getMemoryAdapter(): MemoryAdapter {
         },
         async set(key: string, value: unknown, tenantId?: string, opts?: MemorySetOptions): Promise<void> {
           if (!useDb) return inMemoryFallback.set(key, value, tenantId, opts);
+          const tid = tenantId ?? 'default';
+          if (!(await hasTenant(tid))) return inMemoryFallback.set(key, value, tenantId, opts);
           try {
             return await dbAdapter.set(key, value, tenantId, opts);
           } catch {
@@ -315,6 +337,8 @@ export function getMemoryAdapter(): MemoryAdapter {
         },
         async delete(key: string, tenantId?: string, opts?: MemoryDeleteOptions): Promise<void> {
           if (!useDb) return inMemoryFallback.delete(key, tenantId, opts);
+          const tid = tenantId ?? 'default';
+          if (!(await hasTenant(tid))) return inMemoryFallback.delete(key, tenantId, opts);
           try {
             return await dbAdapter.delete(key, tenantId, opts);
           } catch {

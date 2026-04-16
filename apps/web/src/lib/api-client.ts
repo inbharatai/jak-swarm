@@ -403,6 +403,15 @@ export const integrationApi = {
     ),
 };
 
+export const whatsappApi = {
+  getNumber: () => apiDataFetch<{ number: string | null; status: string; verificationCode?: string | null; expiresAt?: string | null; verifiedAt?: string | null }>('/whatsapp/number'),
+  setNumber: (number: string) => apiDataFetch<{ number: string; status: string; verificationCode?: string | null; expiresAt?: string | null; verifiedAt?: string | null }>(
+    '/whatsapp/number',
+    { method: 'POST', body: { number } },
+  ),
+  clearNumber: () => apiDataFetch<void>('/whatsapp/number', { method: 'DELETE' }),
+};
+
 export const onboardingApi = {
   getState: () =>
     apiDataFetch<{ completedSteps: string[]; dismissed: boolean }>('/onboarding/state'),

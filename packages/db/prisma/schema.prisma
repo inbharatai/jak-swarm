@@ -34,6 +34,7 @@ model Tenant {
   memoryEvents     MemoryEvent[]
   apiKeys          ApiKey[]
   integrations    Integration[]
+  whatsappLinks  WhatsappLink[]
   onboardingState OnboardingState?
   schedules       WorkflowSchedule[]
   projects        Project[]
@@ -62,6 +63,7 @@ model User {
   workflows Workflow[]
   approvals ApprovalRequest[] @relation("reviewer")
   projects  Project[]
+  whatsappLinks WhatsappLink[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -348,6 +350,27 @@ model IntegrationCredential {
   integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   @@map("integration_credentials")
+}
+
+model WhatsappLink {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  phoneNumber String
+  status      String   @default("PENDING")
+  challengeCode String?
+  challengeExpiresAt DateTime?
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([phoneNumber])
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@map("whatsapp_links")
 }
 
 model OnboardingState {

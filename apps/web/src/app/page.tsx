@@ -167,6 +167,7 @@ const WORKFLOW_STEPS = [
 const INTEGRATIONS = [
   { name: 'Gmail', color: '#EA4335', bg: 'rgba(234,67,53,0.1)' },
   { name: 'Slack', color: '#4A154B', bg: 'rgba(74,21,75,0.1)' },
+  { name: 'WhatsApp', color: '#25D366', bg: 'rgba(37,211,102,0.12)' },
   { name: 'GitHub', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
   { name: 'Notion', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
   { name: 'Google Calendar', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
@@ -702,7 +703,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Production Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, WhatsApp control with verified numbers, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
             </div>
 
             {/* Tool Categories Grid */}
@@ -755,7 +756,6 @@ export default function HomePage() {
                   { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
                   { name: 'Asana', color: '#F06A6A', bg: 'rgba(240,106,106,0.1)' },
                   { name: 'Airtable', color: '#18BFFF', bg: 'rgba(24,191,255,0.1)' },
-                  { name: 'Twilio', color: '#F22F46', bg: 'rgba(242,47,70,0.1)' },
                   { name: 'Google Drive', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
                   { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
                 ].map((svc) => (
@@ -1093,7 +1093,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack bridge, voice-to-workflow, vibe coding, and a typed SDK.
+                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack + WhatsApp bridges, voice-to-workflow, vibe coding, and a typed SDK.
                 </p>
               </div>
 
