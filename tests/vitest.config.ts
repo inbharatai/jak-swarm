@@ -10,6 +10,7 @@ export default defineConfig({
       '@jak-swarm/shared': path.resolve(__dirname, '../packages/shared/src/index.ts'),
       '@jak-swarm/security': path.resolve(__dirname, '../packages/security/src/index.ts'),
       '@jak-swarm/industry-packs': path.resolve(__dirname, '../packages/industry-packs/src/index.ts'),
+      '@jak-swarm/db': path.resolve(__dirname, '../packages/db/src/index.ts'),
       '@jak-swarm/agents': path.resolve(__dirname, '../packages/agents/src/index.ts'),
       '@jak-swarm/tools': path.resolve(__dirname, '../packages/tools/src/index.ts'),
       '@jak-swarm/swarm': path.resolve(__dirname, '../packages/swarm/src/index.ts'),

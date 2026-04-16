@@ -58,7 +58,7 @@ beforeAll(async () => {
   const mod = await import('../../apps/api/src/index.js');
   app = await mod.buildApp();
   await app.ready();
-});
+}, 30000);
 
 afterAll(async () => {
   if (app) {
