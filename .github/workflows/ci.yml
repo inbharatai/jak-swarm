@@ -55,6 +55,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: build
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jakswarm
+          POSTGRES_PASSWORD: jakswarm
+          POSTGRES_DB: jakswarm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jakswarm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -75,6 +98,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @jak-swarm/db exec prisma generate
 
+      - name: Apply database migrations
+        run: pnpm --filter @jak-swarm/db db:migrate:deploy
+        env:
+          DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+
       - name: Build packages (dependency order)
         run: |
           pnpm --filter @jak-swarm/shared build
@@ -84,6 +113,10 @@ jobs:
           pnpm --filter @jak-swarm/agents build
 
       - name: Run tests
-        run: pnpm --filter tests test
+        run: pnpm test
         env:
           NODE_ENV: test
+          AUTH_SECRET: ci-test-secret-change-me
+          DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          REDIS_URL: redis://localhost:6379
