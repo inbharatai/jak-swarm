@@ -101,6 +101,8 @@ export async function integrationRoutes(app: FastifyInstance) {
         create: { integrationId: integration.id, accessTokenEnc: encryptCredentials(JSON.stringify(credentials)) },
       });
 
+      await app.auditLog(request, 'CONNECT_INTEGRATION', 'Integration', integration.id, { provider: providerUpper });
+
       return reply.send({
         data: {
           id: integration.id,
@@ -154,6 +156,9 @@ export async function integrationRoutes(app: FastifyInstance) {
     await app.db.integration.deleteMany({
       where: { id, tenantId },
     });
+    if (integration) {
+      await app.auditLog(request, 'DISCONNECT_INTEGRATION', 'Integration', id, { provider: integration.provider });
+    }
     return reply.code(204).send();
   });
 }

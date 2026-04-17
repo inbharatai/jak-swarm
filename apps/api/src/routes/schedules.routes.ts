@@ -105,6 +105,7 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
+      await fastify.auditLog(request, 'CREATE_SCHEDULE', 'Schedule', schedule.id, { name: schedule.name });
       return reply.code(201).send(ok(schedule));
     },
   );
@@ -150,6 +151,7 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
         data: updates as any,
       });
 
+      await fastify.auditLog(request, 'UPDATE_SCHEDULE', 'Schedule', schedule.id);
       return reply.send(ok(schedule));
     },
   );
@@ -166,6 +168,7 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId } = request.user;
 
       await fastify.db.workflowSchedule.deleteMany({ where: { id, tenantId } });
+      await fastify.auditLog(request, 'DELETE_SCHEDULE', 'Schedule', id);
       return reply.code(204).send();
     },
   );

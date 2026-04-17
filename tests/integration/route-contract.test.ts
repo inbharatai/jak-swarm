@@ -81,4 +81,17 @@ describe('JAK Swarm route contract checks', () => {
     expect(tracesPage).toContain('Array.isArray(data?.items)');
     expect(tracesPage).toContain('Array.isArray(selectedTraceData.steps)');
   });
+
+  it('keeps tool frontend paths aligned with backend tool routes', () => {
+    const apiClient = readRepoFile('apps/web/src/lib/api-client.ts');
+    const toolRoutes = readRepoFile('apps/api/src/routes/tools.routes.ts');
+
+    // Frontend calls POST /tools/:toolName/execute
+    expect(apiClient).toContain('`/tools/${toolName}/execute`');
+
+    // Backend exposes GET /tools, GET /tools/:toolName, POST /tools/:toolName/execute
+    expect(toolRoutes).toContain("fastify.get(\n    '/'");
+    expect(toolRoutes).toContain("fastify.get(\n    '/:toolName'");
+    expect(toolRoutes).toContain("fastify.post(\n    '/:toolName/execute'");
+  });
 });
