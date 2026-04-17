@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "vitest run integration/postgres-integration.test.ts",
+    "test:errors": "vitest run integration/workflow-errors-behavioral.test.ts",
+    "test:e2e": "playwright test",
+    "test:temporal": "tsx temporal/temporal-workflows.ts",
+    "test:load:k6": "k6 run tests/load/api-load.k6.js"
   },
   "dependencies": {
     "@jak-swarm/shared": "workspace:*",
@@ -12,9 +17,20 @@
     "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/tools": "workspace:*",
-    "@jak-swarm/swarm": "workspace:*"
+    "@jak-swarm/swarm": "workspace:*",
+    "@jak-swarm/voice": "workspace:*",
+    "@jak-swarm/verification": "workspace:*",
+    "@jak-swarm/client": "workspace:*",
+    "@jak-swarm/workflows": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.1",
+    "@temporalio/testing": "^1.11.6",
+    "@temporalio/worker": "^1.11.6",
+    "@temporalio/workflow": "^1.11.6",
+    "@temporalio/client": "^1.11.6",
+    "tsx": "^4.19.2",
+    "testcontainers": "^10.13.0",
     "vitest": "^2.1.8",
     "typescript": "^5.7.3",
     "@types/node": "^22.10.7"

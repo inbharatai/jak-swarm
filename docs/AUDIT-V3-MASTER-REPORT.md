@@ -342,7 +342,7 @@ All modules have matching frontend pages and backend API routes. No orphaned mod
 
 | Claim | Reality | Fix |
 |-------|---------|-----|
-| "56 Production Tools" (landing page, 4 locations) | 123 registered tools | Changed to "112+" everywhere |
+| "56 Production Tools" (landing page, 4 locations) | 119 registered built-in tools (+ dynamic MCP tools) | Changed to "112+" everywhere |
 | "56 production tools" (metadata description) | Same | Fixed to "112+" |
 | Dead `jak_token` auth check on landing page | Supabase uses `sb-*` cookies | Fixed to correct cookie prefix |
 | Redirect to `/home` (dead route) | `/workspace` is the real dashboard | Fixed redirect target |
@@ -452,7 +452,7 @@ All modules have matching frontend pages and backend API routes. No orphaned mod
 
 - **Architecture**: Well-structured monorepo with proper separation of concerns across 11 packages
 - **Agent system**: 38 agents with DAG-based orchestration, human-in-the-loop approvals, safety guardrails
-- **Tool coverage**: 123 production tools across email, calendar, CRM, browser automation, document processing, web search, and more
+- **Tool coverage**: 119 production built-in tools across email, calendar, CRM, browser automation, document processing, web search, and more (plus dynamic MCP tools)
 - **Multi-tenancy**: Consistent tenant isolation across database queries, API routes, and coordination layer
 - **Observability**: Prometheus metrics, OpenTelemetry tracing, structured logging, audit trails
 - **Graceful degradation**: Redis-optional architecture with in-memory fallbacks

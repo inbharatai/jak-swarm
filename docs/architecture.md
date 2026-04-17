@@ -18,7 +18,364 @@
 
 ## System Overview
 
-JAK Swarm is a production-grade autonomous multi-agent platform designed to automate complex, multi-step business workflows across industries. The platform is built as a TypeScript monorepo with the following core principles:
+JAK Swarm is an autonomous multi-agent platform designed to automate complex, multi-step business workflows across industries. The platform is built as a TypeScript monorepo.
+
+**Current maturity: v0.1.0 — staging-ready.** The core orchestration engine, agent pipeline, tool registry, and queue system are implemented and tested. The system has not yet carried production traffic at scale.
+
+Core principles:
+
+- **Multi-tenant by default** — every resource is scoped to a tenant; cross-tenant access is impossible by design.
+- **Human-in-the-loop** — high-risk actions are gated by configurable approval workflows before execution.
+- **Full observability** — every agent step, tool call, and handoff is traced and stored for audit and debugging.
+- **Industry-aware** — industry packs customise agent prompts, tool allowlists, compliance notes, and approval thresholds per vertical.
+- **Extensible skill system** — operators can propose new Tier 3 skills that go through a sandbox-and-review pipeline before activation.
+
+---
+
+## Component Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          CLIENT LAYER                                │
+│                                                                     │
+│   ┌──────────────────┐    ┌────────────────────────────────────┐   │
+│   │  Next.js Web App │    │  Voice Session Client (browser)    │   │
+│   │  (apps/web)      │    │  Token exchange + client-side      │   │
+│   │                  │    │  WebRTC via OpenAI Realtime API    │   │
+│   └────────┬─────────┘    └─────────────────┬──────────────────┘   │
+└────────────│──────────────────────────────── │────────────────────--┘
+             │ HTTPS / REST + SSE              │ HTTPS (session + token)
+             ▼                                 ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          API LAYER                                   │
+│                                                                     │
+│   ┌──────────────────────────────────────────────────────────────┐  │
+│   │  Fastify API Server (apps/api)  — port 4000                 │  │
+│   │  • JWT + API Key authentication                             │  │
+│   │  • Tenant isolation middleware                               │  │
+│   │  • Rate limiting (@fastify/rate-limit)                      │  │
+│   │  • Helmet CSP + CORS                                        │  │
+│   │  • Routes: /workflows, /approvals, /tools, /voice,          │  │
+│   │    /skills, /memory, /schedules, /integrations, /auth       │  │
+│   └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ In-process function calls
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      ORCHESTRATION LAYER                             │
+│                                                                     │
+│   ┌──────────────────────────────────────────────────────────────┐  │
+│   │  SwarmExecutionService + QueueWorker                        │  │
+│   │  • DB-backed job queue (PostgreSQL WorkflowJob table)       │  │
+│   │  • Atomic claiming (FOR UPDATE SKIP LOCKED)                 │  │
+│   │  • Retry with exponential backoff → dead-letter             │  │
+│   │  • Configurable concurrency (default 2 workers)             │  │
+│   └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│   ┌──────────────────────────────────────────────────────────────┐  │
+│   │  SwarmGraph + SwarmRunner (packages/swarm)                   │  │
+│   │  • DAG state machine: commander → planner → router →        │  │
+│   │    guardrail → worker → verifier → replanner                │  │
+│   │  • Parallel task execution (Promise.allSettled, max 5)      │  │
+│   │  • Dependency-aware scheduling via getReadyTasks()          │  │
+│   │  • State persisted to PostgreSQL after every node           │  │
+│   └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│   ┌──────────────────────────────────────────────────────────────┐  │
+│   │  Agent Engine (packages/agents)                              │  │
+│   │  • BaseAgent with multi-provider LLM routing + failover     │  │
+│   │  • 6 providers: OpenAI, Anthropic, Gemini, DeepSeek,        │  │
+│   │    Ollama, OpenRouter                                       │  │
+│   │  • Role-aware tier selection (Tier 1–3)                     │  │
+│   │  • ToolRegistry — resolves tool names to implementations    │  │
+│   │  • Memory injection via <memory> tags                       │  │
+│   └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │
+        ┌────────────────────┼───────────────────┐
+        ▼                    ▼                   ▼
+┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│  PostgreSQL  │   │      Redis       │   │   External APIs  │
+│  (Prisma)    │   │  (coordination,  │   │  (OpenAI, Gmail, │
+│  • tenants   │   │   sessions,      │   │   MCP servers,   │
+│  • workflows │   │   rate limits,   │   │   etc.)          │
+│  • job queue │   │   locks, leader  │   │                  │
+│  • traces    │   │   election)      │   │                  │
+│  • approvals │   │                  │   │                  │
+│  • memory    │   │  Falls back to   │   │                  │
+│  • audit logs│   │  in-memory shim  │   │                  │
+└──────────────┘   └──────────────────┘   └──────────────────┘
+```
+
+**Note:** The QueueWorker can run embedded (default) or as a standalone process. Set `WORKFLOW_WORKER_MODE=standalone` to disable the embedded worker and run `pnpm --filter @jak-swarm/api worker` as a separate process for stronger isolation.
+
+---
+
+## Data Flow
+
+### Workflow Creation Flow
+
+```
+1. User submits goal via POST /workflows
+2. Fastify validates JWT/API Key and extracts TenantContext
+3. API creates Workflow record in DB (status=PENDING)
+4. API creates WorkflowJob record (status=QUEUED)
+5. QueueWorker claims the job (atomic SKIP LOCKED)
+6. SwarmExecutionService.executeAsync() is called
+7. SwarmRunner executes the DAG:
+   a. Commander agent parses intent, extracts entities
+   b. Planner decomposes goal into dependency-aware task graph
+   c. Guardrail validates plan (injection/PII checks)
+   d. Router dispatches tasks (parallel where deps allow, max 5 concurrent)
+   e. Each task: guardrail → worker agent + tool calls → verifier
+   f. High-risk tasks pause for ApprovalRequest creation
+8. Workflow state persisted to DB after every node
+9. Workflow record updated to COMPLETED/FAILED
+10. SSE event pushed to client
+```
+
+### Approval Flow
+
+```
+Router detects task.requiresApproval = true
+    │
+    ▼
+Approval Manager creates ApprovalRequest record (status=PENDING)
+    │
+    ▼
+Workflow pauses (status=AWAITING_APPROVAL)
+    │
+    ▼
+Reviewer opens approval UI, sees proposed action + rationale
+    │
+    ├── APPROVED → POST /workflows/:id/resume → Router resumes task
+    ├── REJECTED → Task cancelled, downstream tasks skipped
+    └── DEFERRED → Request re-queued with new expiry
+```
+
+---
+
+## Agent Communication Pattern
+
+Agents communicate via structured handoffs, not direct function calls. Each handoff is:
+
+1. Logged as an `AgentHandoff` in the current trace
+2. Carried as context into the next agent's run
+3. Observable in the trace viewer UI
+
+The pattern enforces:
+- **Loose coupling** — agents do not import each other
+- **Full auditability** — the complete chain of reasoning is preserved
+- **Durability** — Workflow state is persisted to PostgreSQL after every node. If the process crashes, the workflow can be resumed from the last persisted state via the recovery system.
+
+---
+
+## Swarm Execution Model
+
+The swarm uses a hierarchical execution model:
+
+```
+Level 0: Commander    — one per workflow, always present
+Level 1: Planner      — one per workflow, runs once (re-runs on auto-repair)
+Level 1: Guardrail    — invoked before plan execution and per-task
+Level 1: Verifier     — one per task, validates worker output
+Level 2: Router       — one per workflow, manages task lifecycle
+Level 2: Approval     — zero or more per workflow, one per approval gate
+Level 3: Workers      — one instance per task (up to 5 tasks run in parallel)
+```
+
+**Parallelism:**
+The SwarmGraph analyzes the dependency graph via `getReadyTasks()` and dispatches all tasks with no unresolved dependencies simultaneously. Execution uses `Promise.allSettled()` with batching (max 5 concurrent tasks per batch). Each agent in a batch runs independently with its own LLM calls and tool execution.
+
+**Durability:**
+Workflow state (the full `SwarmState` object) is persisted to PostgreSQL via `DbWorkflowStateStore` after every node completes. The QueueWorker provides job-level durability: if the process crashes, ACTIVE jobs are recovered on restart — classified as replay-safe, replay-unsafe, or requiring manual intervention.
+
+**Replay Safety:**
+Each workflow's checkpoint is classified into one of four tiers:
+- **REPLAY_SAFE** — read-only tasks, safe to auto-resume
+- **REQUIRES_IDEMPOTENCY_KEY** — may produce side effects, needs caller-provided key
+- **MANUAL_INTERVENTION_REQUIRED** — approval-gated or high-side-effect tasks
+- **REPLAY_UNSAFE** — cannot be safely replayed
+
+---
+
+## Voice Pipeline
+
+**Current status: Session management + token exchange implemented. Full voice-to-workflow pipeline requires client-side WebRTC integration.**
+
+The voice subsystem provides:
+1. **Session creation** — `POST /voice/sessions` creates a session record in Redis with TTL
+2. **Token exchange** — `GET /voice/sessions/:id/token` fetches an ephemeral OpenAI Realtime API token
+3. **Provider abstraction** — `VoicePipeline` class with providers for OpenAI Realtime, Deepgram (STT), ElevenLabs (TTS), and a mock provider for testing
+
+```
+Browser Microphone
+        │
+        │ Client-side WebRTC (OpenAI Realtime API)
+        │ (browser connects directly to OpenAI using ephemeral token)
+        ▼
+OpenAI Realtime Model (gpt-4o-realtime-preview)
+        │
+        │ Transcription + VAD + response audio
+        ▼
+Browser Speaker
+```
+
+**What's implemented:**
+- `VoicePipeline` with provider fallback (OpenAI → Deepgram → Mock)
+- Session lifecycle in Redis (create, expire, status tracking)
+- Ephemeral token generation for secure client-side WebRTC
+
+**What's not yet wired:**
+- Server-side audio stream processing
+- Voice-to-workflow trigger (voice → Commander agent)
+- Transcript persistence to database
+
+---
+
+## Tool Registry
+
+The Tool Registry is the central catalogue of all capabilities available to worker agents.
+
+**Implementation:** 123 tools registered in `packages/tools/src/builtin/index.ts`.
+
+**Tool resolution:**
+1. Worker agent requests tool by name from ToolRegistry
+2. Registry looks up ToolMetadata (category, riskClass, requiresApproval)
+3. Registry checks tenant's enabled tools and skill permissions
+4. Tool executes with ToolExecutionContext (tenantId, workflowId, runId)
+5. Result returned as `ToolResult<T>`
+
+**Risk classification:**
+Every tool is classified as READ_ONLY, WRITE, EXTERNAL_SIDE_EFFECT, or DESTRUCTIVE. High-risk tools trigger approval gates.
+
+---
+
+## Industry Pack System
+
+Industry packs customise the swarm's behaviour for specific verticals. A pack is loaded at workflow start based on the tenant's `industry` setting.
+
+11 industry packs: healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, general.
+
+**Pack application:**
+1. IndustryPack selected based on `Tenant.industry` enum value
+2. `agentPromptSupplement` appended to Commander and Planner system prompts
+3. `policyOverlays` loaded into Guardrail's rule set
+4. `recommendedApprovalThreshold` used as default if tenant hasn't overridden
+5. `restrictedTools` merged with Guardrail block list
+
+---
+
+## Security Model
+
+### Authentication
+- **Web app users:** JWT issued by Fastify auth plugin, HS256 signed
+- **API consumers:** HMAC-SHA256 API keys scoped to tenant + permission set
+
+### Authorisation
+- Every API request passes through `tenantIsolationMiddleware`
+- All DB queries include `WHERE tenantId = :tenantId` enforced at service layer
+- Role-based access: SYSTEM_ADMIN > TENANT_ADMIN > REVIEWER > END_USER
+- Approval actions require REVIEWER role minimum
+
+### Data Isolation
+- PostgreSQL row-level isolation per tenant (tenantId column on every table)
+- Redis keys namespaced: `jak:{tenantId}:{resource}`
+- No cross-tenant joins permitted in any query
+
+### Guardrails
+- **Injection detection** — 15+ patterns (prompt overrides, jailbreaks, system tag injection). HIGH risk blocks workflow.
+- **PII detection** — 10 PII types (SSN, credit card, phone, IP, etc.) with redaction.
+- **Tool risk classification** — 4 classes with 40+ tool-specific overrides.
+- **Encrypted credentials** — AES-256-GCM for stored integration secrets.
+
+For the full threat model, see `docs/security-threat-model.md`.
+
+---
+
+## Observability
+
+### Structured Logging
+- All services use `pino` (via Fastify) with JSON output in production
+- Log levels: debug, info, warn, error
+- Every log line includes: `tenantId`, `workflowId`, `traceId`, `agentRole`
+
+### Distributed Tracing
+- `AgentTrace` records stored in `agent_traces` table
+- Linked by `traceId` (correlation ID across the full workflow)
+- Trace viewer in the web app shows the full execution DAG
+
+### Metrics
+- Prometheus metrics exposed at `/metrics` (17 counters/histograms)
+- Key metrics: LLM token counts, LLM cost by model, workflow durations
+- Health check at `/health` with DB and Redis status
+
+### Audit Logs
+- `AuditLog` table records every user action and agent side effect
+- Append-only pattern — immutable once written
+- Tenant-scoped with user-agent and IP tracking
+
+---
+
+## Deployment Topology
+
+### Local Development
+```
+pnpm dev             — runs Next.js (3000) + Fastify API (4000)
+docker compose up    — runs Postgres (5432) + Redis (6379)
+```
+
+### Current Production (Render)
+```
+┌─────────────────────────────────────────┐
+│  Render (render.yaml)                   │
+│  • jak-swarm-api: Docker service        │
+│  • Starter plan ($7/mo)                 │
+│  • Oregon region                        │
+└────────────┬──────────────┬─────────────┘
+             │              │
+     ┌───────▼──────┐  ┌────▼──────┐
+     │  web         │  │  api      │
+     │  (Next.js)   │  │  (Fastify)│
+     │  Static/SSR  │  │  + Worker │
+     └──────────────┘  └────┬──────┘
+                            │
+              ┌─────────────┼───────────┐
+              ▼             ▼           ▼
+         ┌─────────┐  ┌─────────┐  ┌──────────┐
+         │Postgres │  │  Redis  │  │  MCP      │
+         │(Supabase│  │(Upstash │  │  servers  │
+         │ or RDS) │  │ or self)│  │  (npm)    │
+         └─────────┘  └─────────┘  └──────────┘
+```
+
+The API process runs the QueueWorker embedded — no separate worker process required for single-instance deployments. For horizontal scaling, QueueWorker can be extracted to a standalone process reading from the same database.
+
+### Environment Tiers
+- **development** — local Docker Compose, hot-reload, verbose logging
+- **staging** — Render deployment with test credentials
+- **production** — Render or container platform, managed Postgres, Redis coordination
+# JAK Swarm — System Architecture
+
+## Table of Contents
+
+1. [System Overview](#system-overview)
+2. [Component Diagram](#component-diagram)
+3. [Data Flow](#data-flow)
+4. [Agent Communication Pattern](#agent-communication-pattern)
+5. [Swarm Execution Model](#swarm-execution-model)
+6. [Voice Pipeline](#voice-pipeline)
+7. [Tool Registry](#tool-registry)
+8. [Industry Pack System](#industry-pack-system)
+9. [Security Model](#security-model)
+10. [Observability](#observability)
+11. [Deployment Topology](#deployment-topology)
+
+---
+
+## System Overview
+
+JAK Swarm is a staging-ready, production-capable autonomous multi-agent platform designed to automate complex, multi-step business workflows across industries. The platform is built as a TypeScript monorepo with the following core principles:
 
 - **Multi-tenant by default** — every resource is scoped to a tenant; cross-tenant access is impossible by design.
 - **Human-in-the-loop** — high-risk actions are gated by configurable approval workflows before execution.

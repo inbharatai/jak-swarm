@@ -28,6 +28,7 @@ model Tenant {
 
   users            User[]
   workflows        Workflow[]
+  workflowJobs     WorkflowJob[]
   skills           Skill[]
   auditLogs        AuditLog[]
   memory           TenantMemory[]
@@ -62,6 +63,7 @@ model User {
   tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  Session[]
   workflows Workflow[]
+  workflowJobs WorkflowJob[]
   approvals ApprovalRequest[] @relation("reviewer")
   projects  Project[]
   whatsappLinks WhatsappLink[]
@@ -122,10 +124,37 @@ model Workflow {
   user             User              @relation(fields: [userId], references: [id])
   traces           AgentTrace[]
   approvalRequests ApprovalRequest[]
+  jobs             WorkflowJob[]
 
   @@index([tenantId, status])
   @@index([updatedAt])
   @@map("workflows")
+}
+
+model WorkflowJob {
+  id          String   @id @default(cuid())
+  workflowId  String   @unique
+  tenantId    String
+  userId      String
+  status      String   @default("QUEUED") // QUEUED | ACTIVE | COMPLETED | FAILED | DEAD
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  payloadJson Json
+  availableAt DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([tenantId, status])
+  @@index([updatedAt])
+  @@map("workflow_jobs")
 }
 
 model AgentTrace {

@@ -24,6 +24,8 @@ export async function replannerNode(state: SwarmState): Promise<Partial<SwarmSta
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    idempotencyKey: state.idempotencyKey,
+    allowedDomains: state.allowedDomains,
   });
 
   // Gather failed task info

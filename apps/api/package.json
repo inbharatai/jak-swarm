@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch --env-file=.env src/index.ts",
+    "worker": "tsx --env-file=.env src/worker-entry.ts",
     "start": "node --env-file=.env dist/index.js",
     "pretypecheck": "pnpm -w --filter @jak-swarm/shared --filter @jak-swarm/verification --filter @jak-swarm/swarm --filter !jak-swarm build",
     "typecheck": "tsc --noEmit",

@@ -137,7 +137,8 @@ export default function SkillsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -316,6 +317,8 @@ export default function SkillsPage() {
           </CardContent>
         </Card>
       )}
+
+      </div>
 
       {/* Create Skill Dialog (from Marketplace install) */}
       <Dialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)}>

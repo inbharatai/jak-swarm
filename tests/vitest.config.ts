@@ -14,6 +14,10 @@ export default defineConfig({
       '@jak-swarm/agents': path.resolve(__dirname, '../packages/agents/src/index.ts'),
       '@jak-swarm/tools': path.resolve(__dirname, '../packages/tools/src/index.ts'),
       '@jak-swarm/swarm': path.resolve(__dirname, '../packages/swarm/src/index.ts'),
+      '@jak-swarm/voice': path.resolve(__dirname, '../packages/voice/src/index.ts'),
+      '@jak-swarm/verification': path.resolve(__dirname, '../packages/verification/src/index.ts'),
+      '@jak-swarm/client': path.resolve(__dirname, '../packages/client/src/index.ts'),
+      '@jak-swarm/workflows': path.resolve(__dirname, '../packages/workflows/src/index.ts'),
     },
   },
   test: {

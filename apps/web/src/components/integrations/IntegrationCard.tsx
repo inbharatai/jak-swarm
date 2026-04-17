@@ -76,6 +76,15 @@ export function IntegrationCard({
   const isConnected = integration?.status === 'CONNECTED';
   const needsReauth = integration?.status === 'NEEDS_REAUTH';
   const hasError = integration?.status === 'ERROR';
+  const maturity = integration?.maturity;
+  const maturityTone =
+    maturity === 'production-ready'
+      ? 'text-green-700 bg-green-50'
+      : maturity === 'beta'
+        ? 'text-blue-700 bg-blue-50'
+        : maturity === 'partial'
+          ? 'text-amber-700 bg-amber-50'
+          : 'text-slate-700 bg-slate-100';
 
   return (
     <Card className="relative overflow-hidden">
@@ -90,6 +99,16 @@ export function IntegrationCard({
               {hasError && <StatusDot variant="error" />}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">{meta.description}</p>
+            {maturity && (
+              <div className="mt-1 flex items-center gap-2">
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${maturityTone}`}>
+                  {maturity}
+                </span>
+              </div>
+            )}
+            {integration?.note && (
+              <p className="mt-1 text-[10px] text-muted-foreground">{integration.note}</p>
+            )}
             {isConnected && integration?.metadata && typeof (integration.metadata as Record<string, unknown>).toolCount === 'number' && (integration.metadata as Record<string, unknown>).toolCount as number > 0 && (
               <p className="text-[10px] text-green-600 mt-1">
                 {(integration.metadata as Record<string, unknown>).toolCount as number} tools active

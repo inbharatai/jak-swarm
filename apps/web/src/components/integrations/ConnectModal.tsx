@@ -5,7 +5,7 @@ import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from 'lucide-reac
 import { Button } from '@/components/ui';
 import { integrationApi } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
-import type { IntegrationProvider } from '@/types';
+import type { IntegrationMaturity, IntegrationProvider } from '@/types';
 
 interface CredentialField {
   key: string;
@@ -26,6 +26,8 @@ interface ConnectModalProps {
 export function ConnectModal({ provider, providerName, providerEmoji, onClose, onConnected }: ConnectModalProps) {
   const [fields, setFields] = useState<CredentialField[]>([]);
   const [instructions, setInstructions] = useState('');
+  const [maturity, setMaturity] = useState<IntegrationMaturity | null>(null);
+  const [maturityNote, setMaturityNote] = useState('');
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<'idle' | 'loading' | 'testing' | 'connected' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -44,6 +46,9 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
         const d = data as Record<string, unknown>;
         setFields((d.credentialFields as CredentialField[]) ?? []);
         setInstructions((d.setupInstructions as string) ?? '');
+        const nextMaturity = d.maturity;
+        setMaturity(typeof nextMaturity === 'string' ? nextMaturity as IntegrationMaturity : null);
+        setMaturityNote(typeof d.note === 'string' ? d.note : '');
         setStatus('idle');
       } catch {
         if (cancelled) return;
@@ -76,6 +81,8 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
           ],
         };
         setFields(fallbacks[provider] ?? []);
+        setMaturity('partial');
+        setMaturityNote('Provider supports credential setup. Validate adapter depth before production reliance.');
         setStatus('idle');
       }
     })();
@@ -83,6 +90,12 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
   }, [provider]);
 
   const allFieldsFilled = fields.length > 0 && fields.every(f => credentials[f.key]?.trim());
+
+  const maturityTone =
+    maturity === 'production-ready' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+    maturity === 'beta' ? 'bg-sky-100 text-sky-700 border-sky-200' :
+    maturity === 'placeholder' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' :
+    'bg-amber-100 text-amber-700 border-amber-200';
 
   const handleConnect = async () => {
     if (!allFieldsFilled) return;
@@ -127,6 +140,14 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             <div>
               <h2 className="font-semibold text-lg">Connect {providerName}</h2>
               <p className="text-xs text-muted-foreground">Set up integration credentials</p>
+              {maturity && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className={cn('inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide', maturityTone)}>
+                    {maturity.replace('-', ' ')}
+                  </span>
+                  {maturityNote && <span className="text-[11px] text-muted-foreground">{maturityNote}</span>}
+                </div>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">

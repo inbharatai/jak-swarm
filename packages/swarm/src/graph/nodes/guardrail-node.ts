@@ -54,6 +54,8 @@ export async function guardrailNode(state: SwarmState): Promise<Partial<SwarmSta
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    idempotencyKey: state.idempotencyKey,
+    allowedDomains: state.allowedDomains,
   });
 
   const guardrailInput: GuardrailInput = {

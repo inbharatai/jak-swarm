@@ -18,7 +18,7 @@ import type { FastifyInstance } from 'fastify';
 type ApiOk<T> = { success: true; data: T };
 type ApiErr = { success: false; error: string; code?: string; statusCode?: number };
 
-type AuthData = { token: string; user: { id: string; email: string; name: string } };
+type AuthData = { token: string; user: { id: string; email: string; name: string; tenantId?: string; role?: string } };
 type WorkflowData = { id: string; status: string; goal?: string };
 type SkillData = { id: string; name: string; status: string };
 type ToolData = { name: string; description: string };
@@ -104,6 +104,20 @@ beforeAll(async () => {
     tenantSlug: `user-tenant-${suffix}`,
   });
   userToken = userReg.body?.data.token ?? '';
+
+  if (userReg.body?.data.user?.id) {
+    await app.db.user.update({
+      where: { id: userReg.body.data.user.id },
+      data: { role: 'VIEWER' },
+    });
+
+    const relogin = await inject<ApiOk<AuthData>>('POST', '/auth/login', {
+      email: userEmail,
+      password: 'UserPass123!',
+      tenantSlug: `user-tenant-${suffix}`,
+    });
+    userToken = relogin.body?.data.token ?? userToken;
+  }
 }, 40000);
 
 afterAll(async () => {
@@ -225,6 +239,22 @@ describe.skipIf(!hasDatabaseUrl)('GET /auth/me', () => {
   it('returns 401 with malformed token', async () => {
     const { status } = await inject('GET', '/auth/me', undefined, auth('not.a.valid.jwt'));
     expect(status).toBe(401);
+  });
+});
+
+// ===========================================================================
+// QUEUE ADMIN ROUTES (RBAC NEGATIVE)
+// ===========================================================================
+
+describe.skipIf(!hasDatabaseUrl)('Queue admin RBAC', () => {
+  it('GET /workflows/queue/stats returns 403 for non-admin', async () => {
+    const { status } = await inject('GET', '/workflows/queue/stats', undefined, auth(userToken));
+    expect(status).toBe(403);
+  });
+
+  it('GET /workflows/queue/health returns 403 for non-admin', async () => {
+    const { status } = await inject('GET', '/workflows/queue/health', undefined, auth(userToken));
+    expect(status).toBe(403);
   });
 });
 

@@ -111,6 +111,13 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
 
   const swarmService = new SwarmExecutionService(fastify.db, fastify.log);
   swarmService.setLockProvider(locks); // Distributed lock for workflow execution
+  const workerMode = config.workflowWorkerMode;
+  if (workerMode === 'embedded') {
+    swarmService.startQueueWorker();
+    fastify.log.info('[Swarm] Queue worker started in embedded mode');
+  } else {
+    fastify.log.warn({ workerMode }, '[Swarm] Queue worker disabled in API process (standalone mode expected)');
+  }
 
   // Start LLM provider health monitoring
   try {
@@ -160,6 +167,14 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate('swarm', swarmService);
   fastify.log.info('[Swarm] SwarmExecutionService registered (with distributed lock + SSE relay)');
 
+  // Graceful shutdown: drain in-flight jobs before closing
+  fastify.addHook('onClose', async () => {
+    if (workerMode !== 'embedded') return;
+    fastify.log.info('[Swarm] Graceful shutdown — draining queue worker');
+    await swarmService.drainQueueWorker();
+    swarmService.stopQueueWorker();
+  });
+
   // Wire workflow signals: when another instance sends pause/stop, apply locally
   signals.subscribe((signal) => {
     if (signal.type === 'pause') {
@@ -171,15 +186,19 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // Recover stale workflows (use lock to prevent duplicate recovery across instances)
-  setImmediate(async () => {
-    const recovered = await withLock(locks, 'stale-workflow-recovery', 60_000, async () => {
-      await swarmService.recoverStaleWorkflows();
-      return true;
+  if (workerMode === 'embedded') {
+    setImmediate(async () => {
+      const recovered = await withLock(locks, 'stale-workflow-recovery', 60_000, async () => {
+        await swarmService.recoverStaleWorkflows();
+        return true;
+      });
+      if (recovered === null) {
+        fastify.log.info('[Swarm] Stale workflow recovery skipped (another instance is handling it)');
+      }
     });
-    if (recovered === null) {
-      fastify.log.info('[Swarm] Stale workflow recovery skipped (another instance is handling it)');
-    }
-  });
+  } else {
+    fastify.log.info('[Swarm] Stale workflow recovery handled by standalone worker');
+  }
 
   // Start the workflow scheduler with leader election
   const workflowService = new WorkflowService(fastify.db, fastify.log);
@@ -192,14 +211,12 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
         params.goal,
         params.industry,
       );
-      setImmediate(() => {
-        void swarmService.executeAsync({
-          workflowId: workflow.id,
-          tenantId: params.tenantId,
-          userId: params.userId,
-          goal: params.goal,
-          industry: params.industry,
-        });
+      swarmService.enqueueExecution({
+        workflowId: workflow.id,
+        tenantId: params.tenantId,
+        userId: params.userId,
+        goal: params.goal,
+        industry: params.industry,
       });
       return workflow.id;
     },
@@ -268,6 +285,7 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   // Clean up scheduler, purge interval, and coordination resources on server close
   fastify.addHook('onClose', async () => {
     scheduler.stop();
+    swarmService.stopQueueWorker();
     clearInterval(purgeInterval);
     await leader.stop();
     await signals.close();

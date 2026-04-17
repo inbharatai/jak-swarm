@@ -121,9 +121,9 @@ TypeScript enums and interfaces used across all packages:
 
 Prisma ORM with PostgreSQL. Schema covers tenants, users, workflows, tasks, traces, integrations, credentials, schedules, memory, and skills.
 
-### `packages/workflows` -- Temporal Integration
+### `packages/workflows` -- Temporal Integration (Optional)
 
-Temporal workflow and activity definitions for durable, long-running workflows that survive process restarts.
+Optional Temporal workflow and activity definitions for durable, long-running workflows (batch processing, scheduled reports, multi-day approval escalations). The primary workflow engine is the in-process SwarmGraph + QueueWorker in `packages/swarm` and `apps/api`. Temporal is only needed for jobs that must survive full process restarts.
 
 ### `packages/security` -- Security Layer
 

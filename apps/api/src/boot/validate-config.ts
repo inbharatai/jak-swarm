@@ -100,8 +100,16 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   } else {
     results.push({
       name: 'REDIS',
-      status: 'warn',
+      status: isProd && config.requireRedisInProd ? 'error' : 'warn',
       message: 'REDIS_URL not set — using in-memory coordination (not suitable for multi-instance)',
+    });
+  }
+
+  if (config.workflowWorkerMode === 'standalone' && !config.redisUrl) {
+    results.push({
+      name: 'WORKFLOW_WORKER_MODE',
+      status: isProd ? 'warn' : 'warn',
+      message: 'Standalone worker mode without Redis reduces coordination safety. Set REDIS_URL for cross-process locks, signals, and SSE relay.',
     });
   }
 

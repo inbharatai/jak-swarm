@@ -71,6 +71,7 @@ export interface AuthUser {
 
 export type IntegrationProvider = 'GMAIL' | 'GCAL' | 'SLACK' | 'GITHUB' | 'NOTION' | 'HUBSPOT' | 'DRIVE';
 export type IntegrationStatus = 'CONNECTED' | 'DISCONNECTED' | 'NEEDS_REAUTH' | 'ERROR';
+export type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
 
 export interface Integration {
   id: string;
@@ -80,6 +81,8 @@ export interface Integration {
   displayName?: string;
   scopes: string[];
   metadata?: Record<string, unknown>;
+  maturity?: IntegrationMaturity;
+  note?: string;
   lastUsedAt?: string;
   connectedBy: string;
   createdAt: string;

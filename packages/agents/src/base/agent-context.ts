@@ -10,8 +10,10 @@ export interface AgentContextParams {
   workflowId: string;
   industry?: string;
   approvalId?: string;
+  idempotencyKey?: string;
   connectedProviders?: string[];
   browserAutomationEnabled?: boolean;
+  allowedDomains?: string[];
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
 }
@@ -24,8 +26,10 @@ export class AgentContext {
   readonly workflowId: string;
   readonly industry: string | undefined;
   readonly approvalId: string | undefined;
+  readonly idempotencyKey: string | undefined;
   readonly connectedProviders: string[];
   readonly browserAutomationEnabled: boolean;
+  readonly allowedDomains: string[];
   readonly restrictedCategories: ToolCategory[];
   readonly disabledToolNames: string[];
   private steps: AgentTrace[] = [];
@@ -38,8 +42,10 @@ export class AgentContext {
     this.workflowId = params.workflowId;
     this.industry = params.industry;
     this.approvalId = params.approvalId;
+    this.idempotencyKey = params.idempotencyKey;
     this.connectedProviders = params.connectedProviders ?? [];
     this.browserAutomationEnabled = params.browserAutomationEnabled ?? false;
+    this.allowedDomains = params.allowedDomains ?? [];
     this.restrictedCategories = params.restrictedCategories ?? [];
     this.disabledToolNames = params.disabledToolNames ?? [];
   }
@@ -61,8 +67,10 @@ export class AgentContext {
       workflowId: this.workflowId,
       industry: this.industry,
       approvalId: this.approvalId,
+      idempotencyKey: this.idempotencyKey,
       connectedProviders: this.connectedProviders,
       browserAutomationEnabled: this.browserAutomationEnabled,
+      allowedDomains: this.allowedDomains,
       restrictedCategories: this.restrictedCategories,
       disabledToolNames: this.disabledToolNames,
       ...overrides,

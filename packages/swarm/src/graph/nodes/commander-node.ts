@@ -37,6 +37,8 @@ export async function commanderNode(
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    idempotencyKey: state.idempotencyKey,
+    allowedDomains: state.allowedDomains,
   });
 
   const commanderInput = buildCommanderInput(state.goal, state.roleModes);

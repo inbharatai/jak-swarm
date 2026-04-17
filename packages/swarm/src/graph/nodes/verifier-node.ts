@@ -21,6 +21,8 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    idempotencyKey: state.idempotencyKey,
+    allowedDomains: state.allowedDomains,
   });
 
   const verifierInput: VerifierInput = {

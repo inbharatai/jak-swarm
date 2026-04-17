@@ -117,6 +117,9 @@ declare module 'fastify' {
 
 const redisPlugin: FastifyPluginAsync = async (fastify) => {
   if (!config.redisUrl) {
+    if (config.nodeEnv === 'production' && config.requireRedisInProd) {
+      throw new Error('REDIS_URL is required in production when REQUIRE_REDIS_IN_PROD=true');
+    }
     fastify.decorate('redis', new InMemoryRedisShim() as unknown as Redis);
     fastify.log.warn('REDIS_URL not set; using in-memory Redis shim (single-instance mode)');
     return;

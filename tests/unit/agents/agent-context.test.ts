@@ -68,6 +68,11 @@ describe('AgentContext', () => {
     expect(ctx.browserAutomationEnabled).toBe(false);
   });
 
+  it('defaults allowedDomains to empty array', () => {
+    const ctx = new AgentContext({ tenantId: 't', userId: 'u', workflowId: 'w' });
+    expect(ctx.allowedDomains).toEqual([]);
+  });
+
   it('defaults restrictedCategories to empty array', () => {
     const ctx = new AgentContext({ tenantId: 't', userId: 'u', workflowId: 'w' });
     expect(ctx.restrictedCategories).toEqual([]);
@@ -89,12 +94,14 @@ describe('AgentContext', () => {
       userId: 'u',
       workflowId: 'w',
       browserAutomationEnabled: true,
+      allowedDomains: ['example.com'],
       connectedProviders: ['gmail', 'slack'],
       restrictedCategories: ['BROWSER' as import('@jak-swarm/shared').ToolCategory],
       approvalId: 'apr_123',
       industry: 'healthcare',
     });
     expect(ctx.browserAutomationEnabled).toBe(true);
+    expect(ctx.allowedDomains).toEqual(['example.com']);
     expect(ctx.connectedProviders).toEqual(['gmail', 'slack']);
     expect(ctx.restrictedCategories).toEqual(['BROWSER']);
     expect(ctx.approvalId).toBe('apr_123');
@@ -142,6 +149,7 @@ describe('AgentContext', () => {
       approvalId: 'apr_orig',
       connectedProviders: ['email'],
       browserAutomationEnabled: true,
+      allowedDomains: ['fintech.example'],
     });
 
     const cloned = original.clone();
@@ -154,6 +162,7 @@ describe('AgentContext', () => {
     expect(cloned.approvalId).toBe(original.approvalId);
     expect(cloned.connectedProviders).toEqual(original.connectedProviders);
     expect(cloned.browserAutomationEnabled).toBe(original.browserAutomationEnabled);
+    expect(cloned.allowedDomains).toEqual(original.allowedDomains);
   });
 
   it('clone applies overrides correctly', () => {
@@ -164,10 +173,11 @@ describe('AgentContext', () => {
       browserAutomationEnabled: false,
     });
 
-    const cloned = original.clone({ browserAutomationEnabled: true, approvalId: 'apr_new' });
+    const cloned = original.clone({ browserAutomationEnabled: true, approvalId: 'apr_new', allowedDomains: ['foo.test'] });
     expect(cloned.tenantId).toBe('tnt_a');   // unchanged
     expect(cloned.browserAutomationEnabled).toBe(true);
     expect(cloned.approvalId).toBe('apr_new');
+    expect(cloned.allowedDomains).toEqual(['foo.test']);
   });
 
   it('cloned context has an independent trace list', () => {

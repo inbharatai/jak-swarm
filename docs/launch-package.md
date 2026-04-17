@@ -8,7 +8,7 @@
 
 ### Tagline (58 chars)
 ```
-39 AI agents that run your company autonomously
+38 AI agents that run your company autonomously
 ```
 
 ### Description (258 chars)
@@ -71,7 +71,7 @@ The human-in-the-loop approval UI. A pending approval card shows: the workflow t
 
 **Tweet 1 — The Hook**
 ```
-I built an open-source platform with 39 AI agents that runs your company autonomously.
+I built an open-source platform with 38 AI agents that runs your company autonomously.
 
 Not a demo. Not a framework. A production-grade system with:
 • 119 tools
@@ -285,7 +285,7 @@ What approaches have others taken for the "safety vs capability" tradeoff in aut
 
 Hey r/SideProject — launching something today that I've been heads-down building for months.
 
-**What it is:** JAK Swarm — an open-source platform with 39 AI agents that can autonomously handle business workflows: emails, calendar scheduling, CRM updates, document creation, web research, customer support triage, and more.
+**What it is:** JAK Swarm — an open-source platform with 38 AI agents that can autonomously handle business workflows: emails, calendar scheduling, CRM updates, document creation, web research, customer support triage, and more.
 
 **Why I built it:** I kept hitting the same wall. I'd try to use AI to automate something at work, and it would either be a toy (great demo, breaks on anything real) or a black box I didn't trust. I wanted a system I could point at a goal like "follow up with all leads who haven't responded in 7 days, personalise each email with their last interaction, log the activity in the CRM" and have it just... work. Reliably. Without me babysitting it.
 
@@ -345,7 +345,7 @@ Excited to share something I've been building for a while: **JAK Swarm** — an 
 
 The agents cover the full operational stack — email management, calendar scheduling, CRM updates, document creation, spreadsheet operations, web research, customer support triage, internal knowledge retrieval, and browser automation. These aren't demos. They connect to Gmail, Google Calendar, Salesforce, HubSpot, Google Docs, Slack, and more.
 
-**The business value proposition is simple:** a swarm of 39 AI agents that handles the coordination, execution, and verification work that currently requires dozens of separate hires — or fragile one-off automation scripts that break when something changes.
+**The business value proposition is simple:** a swarm of 38 AI agents that handles the coordination, execution, and verification work that currently requires dozens of separate hires — or fragile one-off automation scripts that break when something changes.
 
 **Why this is different from other AI tools:**
 

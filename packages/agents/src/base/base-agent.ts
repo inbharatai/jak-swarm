@@ -4,7 +4,12 @@ import { generateId, createLogger, calculateCost } from '@jak-swarm/shared';
 import type { Logger } from '@jak-swarm/shared';
 import type { AgentContext } from './agent-context.js';
 import type { LLMProvider } from './llm-provider.js';
-import { getModelOverride } from './provider-router.js';
+import {
+  ProviderRouter,
+  getModelOverride,
+  getProviderForTier,
+  getTierForAgent,
+} from './provider-router.js';
 
 /** Memory provider interface — injected by the API layer at boot */
 export interface MemoryProvider {
@@ -64,9 +69,11 @@ export abstract class BaseAgent {
       // Any provider available — use ProviderRouter for automatic routing/failover
       if (hasProviderCredentials) {
       try {
-        // Lazy require to avoid circular deps at module load
-        const { ProviderRouter } = require('./provider-router.js') as { ProviderRouter: new () => LLMProvider };
-        this.provider = new ProviderRouter();
+        // Role-aware routing: pick a tier-aligned primary provider first,
+        // then let ProviderRouter append environment-driven fallbacks.
+        const tier = getTierForAgent(this.role);
+        const primary = getProviderForTier(tier);
+        this.provider = new ProviderRouter(primary);
       } catch {
         // ProviderRouter not available — fall through to direct OpenAI
       }
@@ -431,6 +438,8 @@ ${lines.join('\n')}
       workflowId: context.workflowId ?? '',
       runId: context.runId,
       approvalId: context.approvalId,
+      idempotencyKey: context.idempotencyKey,
+      allowedDomains: context.allowedDomains,
     };
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {

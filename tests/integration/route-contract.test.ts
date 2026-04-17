@@ -35,6 +35,8 @@ describe('JAK Swarm route contract checks', () => {
     expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/traces'");
     expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/approvals'");
     expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/stream'");
+    expect(workflowRoutes).toContain("fastify.get(\n    '/queue/stats'");
+    expect(workflowRoutes).toContain('fastify.swarm.enqueueExecution(');
   });
 
   it('ensures role modes are propagated from API request into swarm execution', () => {
@@ -93,5 +95,24 @@ describe('JAK Swarm route contract checks', () => {
     expect(toolRoutes).toContain("fastify.get(\n    '/'");
     expect(toolRoutes).toContain("fastify.get(\n    '/:toolName'");
     expect(toolRoutes).toContain("fastify.post(\n    '/:toolName/execute'");
+    expect(toolRoutes).toContain("fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')");
+    expect(toolRoutes).toContain("Direct execution is disabled for");
+  });
+
+  it('keeps integration routes on canonical success/error envelopes for apiDataFetch callers', () => {
+    const integrationRoutes = readRepoFile('apps/api/src/routes/integrations.routes.ts');
+
+    expect(integrationRoutes).toContain("import { ok, err } from '../types.js'");
+    expect(integrationRoutes).toContain('reply.send(ok(');
+    expect(integrationRoutes).toContain("err('VALIDATION_ERROR'");
+    expect(integrationRoutes).toContain("err('NOT_FOUND'");
+  });
+
+  it('aligns workflow list pagination query naming between hook and backend', () => {
+    const workflowHook = readRepoFile('apps/web/src/hooks/useWorkflow.ts');
+    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+
+    expect(workflowHook).toContain("params.set('limit', String(filters.pageSize))");
+    expect(workflowRoutes).toContain("parseInt(query.limit ?? '20', 10)");
   });
 });

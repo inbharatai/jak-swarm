@@ -407,7 +407,15 @@ export const integrationApi = {
       { method: 'POST', body: { provider, credentials } },
     ),
   getProviderInfo: (provider: string) =>
-    apiDataFetch<{ name: string; description: string; credentialFields: Array<{ key: string; label: string; placeholder: string; type: string; helpUrl?: string }>; setupInstructions: string }>(
+    apiDataFetch<{
+      name: string;
+      description: string;
+      credentialFields: Array<{ key: string; label: string; placeholder: string; type: string; helpUrl?: string }>;
+      setupInstructions: string;
+      isMcp?: boolean;
+      maturity?: 'production-ready' | 'beta' | 'partial' | 'placeholder';
+      note?: string;
+    }>(
       `/integrations/providers/${provider}`,
     ),
   test: (id: string) =>

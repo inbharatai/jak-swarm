@@ -11,13 +11,16 @@ import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
 import type { SwarmResult } from '@jak-swarm/swarm';
-import { Industry } from '@jak-swarm/shared';
+import { Industry, ToolRiskClass } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
-import { detectPII, detectInjection, AuditLogger, AuditAction } from '@jak-swarm/security';
+import { detectPII, detectInjection, AuditLogger, AuditAction, classifyToolRisk } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
+import { toolRegistry } from '@jak-swarm/tools';
 import { WorkflowService } from './workflow.service.js';
 import { DbWorkflowStateStore } from './db-state-store.js';
+import { QueueWorker } from './queue-worker.js';
+import type { WorkflowJobRow, WorkerHealth } from './queue-worker.js';
 
 /**
  * Map the rich internal WorkflowStatus enum to the DB-persisted string literal.
@@ -54,6 +57,8 @@ export interface ExecuteAsyncParams {
   industry?: string;
   roleModes?: string[];
   maxCostUsd?: number;
+  /** Caller-provided idempotency key to prevent duplicate execution on replays. */
+  idempotencyKey?: string;
 }
 
 export interface ResumeParams {
@@ -68,10 +73,94 @@ export interface CancelParams {
   workflowId: string;
 }
 
+type ReplaySafetyClass =
+  | 'REPLAY_SAFE'
+  | 'REPLAY_UNSAFE'
+  | 'REQUIRES_IDEMPOTENCY_KEY'
+  | 'MANUAL_INTERVENTION_REQUIRED';
+
+function classifyReplaySafety(state: Record<string, unknown>): {
+  safety: ReplaySafetyClass;
+  reason: string;
+  taskId?: string;
+} {
+  const plan = state['plan'] as { tasks?: Array<Record<string, unknown>> } | undefined;
+  const currentTaskIndex = typeof state['currentTaskIndex'] === 'number'
+    ? state['currentTaskIndex']
+    : 0;
+  const task = plan?.tasks?.[currentTaskIndex];
+
+  if (!task) {
+    return { safety: 'REPLAY_SAFE', reason: 'No active task at checkpoint boundary' };
+  }
+
+  const taskId = typeof task['id'] === 'string' ? task['id'] : undefined;
+  const requiresApproval = Boolean(task['requiresApproval']);
+  const tools = Array.isArray(task['toolsRequired'])
+    ? task['toolsRequired'].filter((v): v is string => typeof v === 'string')
+    : [];
+
+  const toolRisks = tools.map((name) => {
+    const metadata = toolRegistry.get(name)?.metadata;
+    return {
+      name,
+      riskClass: classifyToolRisk(name, metadata),
+      requiresApproval: metadata?.requiresApproval ?? false,
+    };
+  });
+
+  const hasExternalOrDestructive = toolRisks.some((tool) =>
+    tool.riskClass === ToolRiskClass.EXTERNAL_SIDE_EFFECT || tool.riskClass === ToolRiskClass.DESTRUCTIVE,
+  );
+  const hasWrite = toolRisks.some((tool) => tool.riskClass === ToolRiskClass.WRITE);
+  const toolRequiresApproval = toolRisks.some((tool) => tool.requiresApproval);
+
+  if (requiresApproval || toolRequiresApproval || hasExternalOrDestructive) {
+    return {
+      safety: 'MANUAL_INTERVENTION_REQUIRED',
+      reason: 'Task includes approval-gated or high side-effect tools that are not replay-safe',
+      taskId,
+    };
+  }
+
+  const readOnlyOnly = tools.length === 0 || toolRisks.every((tool) => tool.riskClass === ToolRiskClass.READ_ONLY);
+
+  if (readOnlyOnly) {
+    return {
+      safety: 'REPLAY_SAFE',
+      reason: 'Task appears read-only or analysis-only',
+      taskId,
+    };
+  }
+
+  if (hasWrite) {
+    return {
+      safety: 'REQUIRES_IDEMPOTENCY_KEY',
+      reason: 'Task includes write tools; replay should use idempotency keys before auto-resume',
+      taskId,
+    };
+  }
+
+  return {
+    safety: 'REPLAY_UNSAFE',
+    reason: 'Task includes unclassified tools; replay safety cannot be guaranteed',
+    taskId,
+  };
+}
+
 export class SwarmExecutionService extends EventEmitter {
   private readonly runner: SwarmRunner;
   private readonly workflowService: WorkflowService;
   private readonly audit: AuditLogger;
+  private readonly queueWorker: QueueWorker;
+  private readonly maxConcurrentExecutions = Math.max(
+    1,
+    Number.parseInt(process.env['WORKFLOW_QUEUE_CONCURRENCY'] ?? '2', 10) || 2,
+  );
+  private readonly queuePollIntervalMs = Math.max(
+    250,
+    Number.parseInt(process.env['WORKFLOW_QUEUE_POLL_INTERVAL_MS'] ?? '1000', 10) || 1000,
+  );
   private lockProvider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> } | null = null;
   private redisPublisher: { publish: (ch: string, msg: string) => Promise<unknown> } | null = null;
   private instanceId = `jak-${process.pid}-${Date.now().toString(36)}`;
@@ -85,11 +174,92 @@ export class SwarmExecutionService extends EventEmitter {
     this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
+
+    // Instantiate the dedicated queue worker — delegates job claiming/retry/DLQ
+    this.queueWorker = new QueueWorker(db, log, async (job: WorkflowJobRow) => {
+      const payload = (job.payloadJson ?? {}) as ExecuteAsyncParams;
+      try {
+        await this.executeAsync(payload);
+        const workflow = await this.db.workflow.findUnique({
+          where: { id: job.workflowId },
+          select: { status: true, error: true },
+        });
+        return String(workflow?.status ?? 'FAILED') === 'FAILED' ? 'FAILED' : 'COMPLETED';
+      } catch {
+        return 'FAILED';
+      }
+    }, {
+      maxConcurrent: this.maxConcurrentExecutions,
+      pollIntervalMs: this.queuePollIntervalMs,
+    });
+
+    // Forward worker lifecycle events for observability
+    this.queueWorker.on('job:claimed', (e) => this.emit('worker:job:claimed', e));
+    this.queueWorker.on('job:completed', (e) => this.emit('worker:job:completed', e));
+    this.queueWorker.on('job:retried', (e) => this.emit('worker:job:retried', e));
+    this.queueWorker.on('job:dead', (e) => this.emit('worker:job:dead', e));
   }
 
   /** Inject distributed lock provider for multi-instance safety. */
   setLockProvider(provider: { acquire: (key: string, ttlMs: number) => Promise<string | null>; release: (key: string, token: string) => Promise<boolean> }): void {
     this.lockProvider = provider;
+  }
+
+  /**
+   * Enqueue a workflow execution request.
+   *
+   * This provides backpressure and durable intent semantics:
+   * the workflow row remains in PENDING until a queue worker claims it.
+   */
+  enqueueExecution(params: ExecuteAsyncParams): boolean {
+    void this.upsertWorkflowJob(params).catch((err) => {
+      this.log.error(
+        { workflowId: params.workflowId, err: err instanceof Error ? err.message : String(err) },
+        '[SwarmQueue] Failed to enqueue workflow job',
+      );
+    });
+    return true;
+  }
+
+  async getQueueStats(): Promise<{
+    queued: number;
+    active: number;
+    completed: number;
+    failed: number;
+    dead: number;
+    running: number;
+    maxConcurrent: number;
+  }> {
+    const jobModel = (this.db as any).workflowJob;
+    if (!jobModel) {
+      return {
+        queued: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        dead: 0,
+        running: this.queueWorker.runningWorkflowIds.size,
+        maxConcurrent: this.maxConcurrentExecutions,
+      };
+    }
+
+    const [queued, active, completed, failed, dead] = await Promise.all([
+      jobModel.count({ where: { status: 'QUEUED' } }),
+      jobModel.count({ where: { status: 'ACTIVE' } }),
+      jobModel.count({ where: { status: 'COMPLETED' } }),
+      jobModel.count({ where: { status: 'FAILED' } }),
+      jobModel.count({ where: { status: 'DEAD' } }),
+    ]);
+
+    return {
+      queued,
+      active,
+      completed,
+      failed,
+      dead,
+      running: this.queueWorker.runningWorkflowIds.size,
+      maxConcurrent: this.maxConcurrentExecutions,
+    };
   }
 
   private circuitBreakerFactory: ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }) | undefined;
@@ -98,6 +268,67 @@ export class SwarmExecutionService extends EventEmitter {
   /** Inject distributed circuit breaker factory for multi-instance safety. */
   setCircuitBreakerFactory(factory: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }): void {
     this.circuitBreakerFactory = factory;
+  }
+
+  startQueueWorker(): void {
+    this.queueWorker.start();
+  }
+
+  stopQueueWorker(): void {
+    this.queueWorker.stop();
+  }
+
+  /** Graceful shutdown: stop polling and wait for in-flight jobs. */
+  async drainQueueWorker(): Promise<void> {
+    await this.queueWorker.drain();
+  }
+
+  /** Expose worker health for operator diagnostics. */
+  getWorkerHealth(): WorkerHealth {
+    return this.queueWorker.health();
+  }
+
+  private async upsertWorkflowJob(params: ExecuteAsyncParams): Promise<void> {
+    const jobModel = (this.db as any).workflowJob;
+    if (!jobModel) {
+      this.log.warn({ workflowId: params.workflowId }, '[SwarmQueue] workflow_jobs model unavailable; executing immediately');
+      void this.executeAsync(params);
+      return;
+    }
+
+    const payload = params as unknown as Record<string, unknown>;
+    const existing = await jobModel.findUnique({ where: { workflowId: params.workflowId } });
+    if (existing) {
+      if (existing.status === 'COMPLETED') {
+        this.log.warn({ workflowId: params.workflowId }, '[SwarmQueue] Workflow already completed; enqueue ignored');
+        return;
+      }
+
+      await jobModel.update({
+        where: { workflowId: params.workflowId },
+        data: {
+          status: 'QUEUED',
+          payloadJson: payload,
+          availableAt: new Date(),
+          lastError: null,
+          completedAt: null,
+        },
+      });
+      return;
+    }
+
+    await jobModel.create({
+      data: {
+        workflowId: params.workflowId,
+        tenantId: params.tenantId,
+        userId: params.userId,
+        status: 'QUEUED',
+        attempts: 0,
+        maxAttempts: 5,
+        payloadJson: payload,
+        availableAt: new Date(),
+      },
+    });
   }
 
   /** Inject credit service for post-execution reconciliation. */
@@ -163,6 +394,21 @@ export class SwarmExecutionService extends EventEmitter {
    */
   async executeAsync(params: ExecuteAsyncParams): Promise<void> {
     const { workflowId, tenantId, userId, goal, industry } = params;
+
+    // ── Idempotency guard: prevent duplicate execution for the same request ──
+    if (params.idempotencyKey) {
+      const existing = await this.db.workflow.findUnique({
+        where: { id: workflowId },
+        select: { status: true, stateJson: true },
+      });
+      const existingState = (existing?.stateJson ?? {}) as Record<string, unknown>;
+      const existingIdemKey = (existingState['__checkpoint'] as Record<string, unknown> | undefined)?.['idempotencyKey'];
+      if (existingIdemKey === params.idempotencyKey && existing?.status === 'COMPLETED') {
+        this.log.info({ workflowId, idempotencyKey: params.idempotencyKey },
+          '[Swarm] Duplicate execution blocked by idempotency key — workflow already completed');
+        return;
+      }
+    }
 
     // ── Distributed lock: prevent duplicate execution across instances ───
     let lockToken: string | null = null;
@@ -249,15 +495,30 @@ export class SwarmExecutionService extends EventEmitter {
         industry: effectiveIndustry,
         roleModes: params.roleModes,
         maxCostUsd: params.maxCostUsd,
+        idempotencyKey: params.idempotencyKey,
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;
+            const normalizedStatus = mapSwarmStatusToDb(String(s.status ?? 'RUNNING'));
+            const replaySafety = classifyReplaySafety(s);
+            const checkpoint = {
+              ...s,
+              __checkpoint: {
+                version: 2,
+                checkpointAt: new Date().toISOString(),
+                replaySafety: replaySafety.safety,
+                replayReason: replaySafety.reason,
+                replayTaskId: replaySafety.taskId,
+                idempotencyKey: params.idempotencyKey ?? null,
+                instanceId: this.instanceId,
+              },
+            };
             await (this.db.workflow.update as any)({
               where: { id: wfId },
               data: {
-                stateJson: stateData,
-                status: (s.status as string) ?? 'RUNNING',
+                stateJson: checkpoint,
+                status: normalizedStatus,
                 totalCostUsd: (s.accumulatedCostUsd as number) ?? 0,
               },
             });
@@ -298,7 +559,13 @@ export class SwarmExecutionService extends EventEmitter {
       }
 
       const dbStatus = mapSwarmStatusToDb(result.status);
-      await this.workflowService.updateWorkflowStatus(workflowId, dbStatus, result.error);
+      const traceError = result.traces.find((t: { error?: string }) => t.error)?.error;
+      const errorMessage = result.error
+        ?? traceError
+        ?? (dbStatus === 'FAILED'
+          ? 'Workflow failed without error details. Check traces for the failing node.'
+          : undefined);
+      await this.workflowService.updateWorkflowStatus(workflowId, dbStatus, errorMessage);
 
       if (dbStatus === 'COMPLETED') {
         this.emit(`workflow:${workflowId}`, { type: 'completed', workflowId, status: dbStatus, timestamp: new Date().toISOString() });
@@ -311,14 +578,14 @@ export class SwarmExecutionService extends EventEmitter {
           details: { durationMs: result.durationMs, traceCount: result.traces.length },
         });
       } else if (dbStatus === 'FAILED') {
-        this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: result.error, timestamp: new Date().toISOString() });
+        this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: errorMessage, timestamp: new Date().toISOString() });
         void this.audit.log({
           action: AuditAction.WORKFLOW_FAILED,
           tenantId,
           userId,
           resource: 'workflow',
           resourceId: workflowId,
-          details: { error: result.error, durationMs: result.durationMs },
+          details: { error: errorMessage, durationMs: result.durationMs },
         });
       }
 
@@ -499,34 +766,165 @@ export class SwarmExecutionService extends EventEmitter {
   }
 
   /**
-   * Mark any workflows that were mid-execution when the server restarted as FAILED.
-   * Call this once on startup so stale in-progress workflows don't hang forever.
+   * Recover queue intent after restart.
+   *
+   * - PENDING workflows are re-enqueued.
+   * - RUNNING/EXECUTING/VERIFYING workflows are moved back to PENDING and re-enqueued.
+   *
+   * This preserves durable execution intent rather than failing all in-flight work.
    */
   async recoverStaleWorkflows(): Promise<void> {
     try {
-      const stale = await this.db.workflow.findMany({
-        where: { status: { in: ['RUNNING', 'EXECUTING', 'VERIFYING'] } },
-        select: { id: true, tenantId: true, goal: true, status: true, updatedAt: true },
-      });
-      for (const wf of stale) {
-        const staleDurationMs = Date.now() - new Date(wf.updatedAt).getTime();
-        await this.db.workflow.update({
-          where: { id: wf.id },
-          data: {
-            status: 'FAILED',
-            error: `Server restarted during execution (was ${wf.status} for ${Math.round(staleDurationMs / 1000)}s). Workflow state preserved in stateJson — resubmit to retry.`,
-            completedAt: new Date(),
-          },
+      const jobModel = (this.db as any).workflowJob;
+      if (jobModel) {
+        const activeJobs = await jobModel.findMany({
+          where: { status: 'ACTIVE' },
+          select: { id: true, workflowId: true, attempts: true, maxAttempts: true, updatedAt: true },
         });
-        this.log.warn({
+
+        for (const job of activeJobs) {
+          const staleDurationMs = Date.now() - new Date(job.updatedAt).getTime();
+          const shouldRetry = (job.attempts ?? 0) < (job.maxAttempts ?? 5);
+          await jobModel.update({
+            where: { id: job.id },
+            data: shouldRetry
+              ? {
+                  status: 'QUEUED',
+                  availableAt: new Date(),
+                  lastError: `Recovered ACTIVE job after restart (${Math.round(staleDurationMs / 1000)}s stale).`,
+                }
+              : {
+                  status: 'DEAD',
+                  completedAt: new Date(),
+                  lastError: `Active job exceeded retry budget after restart (${Math.round(staleDurationMs / 1000)}s stale).`,
+                },
+          });
+        }
+      }
+
+      const recoverable = await this.db.workflow.findMany({
+        where: { status: { in: ['PENDING', 'RUNNING', 'EXECUTING', 'VERIFYING'] } },
+        select: {
+          id: true,
+          tenantId: true,
+          userId: true,
+          goal: true,
+          industry: true,
+          status: true,
+          updatedAt: true,
+          stateJson: true,
+          maxCostUsd: true,
+        },
+      });
+
+      for (const wf of recoverable) {
+        const staleDurationMs = Date.now() - new Date(wf.updatedAt).getTime();
+        const stateData = (wf.stateJson ?? {}) as Record<string, unknown>;
+        const checkpoint = (stateData['__checkpoint'] ?? {}) as Record<string, unknown>;
+        const replaySafety = String(checkpoint['replaySafety'] ?? 'REPLAY_SAFE');
+
+        if (replaySafety === 'MANUAL_INTERVENTION_REQUIRED') {
+          await this.db.workflow.update({
+            where: { id: wf.id },
+            data: {
+              status: 'PAUSED',
+              error: `Recovery paused for manual intervention: ${String(checkpoint['replayReason'] ?? 'Replay safety unknown')}`,
+              completedAt: null,
+            },
+          });
+
+          this.log.warn(
+            {
+              workflowId: wf.id,
+              replaySafety,
+            },
+            '[recovery] Workflow requires manual intervention before replay',
+          );
+          continue;
+        }
+
+        if (replaySafety === 'REPLAY_UNSAFE') {
+          await this.db.workflow.update({
+            where: { id: wf.id },
+            data: {
+              status: 'PAUSED',
+              error: `Recovery blocked: replay-unsafe workflow. ${String(checkpoint['replayReason'] ?? '')}`.trim(),
+              completedAt: null,
+            },
+          });
+
+          this.log.warn(
+            { workflowId: wf.id, replaySafety },
+            '[recovery] Workflow replay is unsafe — paused for operator review',
+          );
+          continue;
+        }
+
+        // Side-effecting tasks without idempotency keys are NOT safe to auto-replay.
+        // Gate them to PAUSED so an operator can decide whether to resume or discard.
+        if (replaySafety === 'REQUIRES_IDEMPOTENCY_KEY') {
+          const hasIdemKey = Boolean(checkpoint['idempotencyKey']);
+          if (!hasIdemKey) {
+            await this.db.workflow.update({
+              where: { id: wf.id },
+              data: {
+                status: 'PAUSED',
+                error: `Recovery paused: task has potential side effects and no idempotency key. ${String(checkpoint['replayReason'] ?? '')}`.trim(),
+                completedAt: null,
+              },
+            });
+
+            this.log.warn(
+              { workflowId: wf.id, replaySafety },
+              '[recovery] Side-effecting workflow without idempotency key paused for operator review',
+            );
+            continue;
+          }
+          // Has idempotency key — safe to auto-replay because the key prevents duplicate side effects
+          this.log.info(
+            { workflowId: wf.id, idempotencyKey: checkpoint['idempotencyKey'] },
+            '[recovery] Side-effecting workflow has idempotency key — proceeding with auto-replay',
+          );
+        }
+
+        if (wf.status !== 'PENDING') {
+          await this.db.workflow.update({
+            where: { id: wf.id },
+            data: {
+              status: 'PENDING',
+              error: `Recovered after restart: previous status ${wf.status} (${Math.round(staleDurationMs / 1000)}s since last update).`,
+              completedAt: null,
+            },
+          });
+        }
+
+        const roleModes = Array.isArray(stateData['roleModes'])
+          ? (stateData['roleModes'].filter((v): v is string => typeof v === 'string'))
+          : undefined;
+
+        this.enqueueExecution({
           workflowId: wf.id,
           tenantId: wf.tenantId,
-          previousStatus: wf.status,
-          staleDurationMs,
-        }, '[recovery] Marked stale workflow as FAILED');
+          userId: wf.userId,
+          goal: wf.goal,
+          industry: wf.industry ?? undefined,
+          roleModes,
+          maxCostUsd: wf.maxCostUsd ?? undefined,
+        });
+
+        this.log.warn(
+          {
+            workflowId: wf.id,
+            tenantId: wf.tenantId,
+            previousStatus: wf.status,
+            staleDurationMs,
+          },
+          '[recovery] Re-enqueued workflow after restart',
+        );
       }
-      if (stale.length > 0) {
-        this.log.info({ count: stale.length }, '[recovery] Stale workflow recovery complete');
+
+      if (recoverable.length > 0) {
+        this.log.info({ count: recoverable.length }, '[recovery] Queue recovery complete');
       }
     } catch (err) {
       this.log.error({ err }, '[recovery] Failed to recover stale workflows');

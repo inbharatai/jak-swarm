@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { WorkflowService } from '../services/workflow.service.js';
+import { config } from '../config.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
@@ -69,21 +70,39 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
         // 1. Persist the workflow record (PENDING)
         const workflow = await workflowService.createWorkflow(tenantId, userId, goal, industry);
+
+        // Persist queue execution intent so restart recovery can re-enqueue with
+        // the same user-selected parameters even before the first state update.
+        await (fastify.db.workflow.update as any)({
+          where: { id: workflow.id },
+          data: {
+            maxCostUsd: maxCostUsd ?? null,
+            stateJson: {
+              roleModes: roleModes ?? [],
+              requestedAt: new Date().toISOString(),
+              requestedBy: userId,
+            },
+          },
+        });
+
         await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, {
           goal, maxCostUsd, estimatedCredits: estimate.estimatedCredits, taskType,
         });
 
-        // 2. Fire-and-forget: run the swarm in the background
-        setImmediate(() => {
-          void fastify.swarm.executeAsync({
-            workflowId: workflow.id,
-            tenantId,
-            userId,
-            goal,
-            industry,
-            roleModes,
-            maxCostUsd,
-          });
+        // 2. Enqueue execution for queue-backed background processing
+        const idempotencyKey = typeof request.headers['idempotency-key'] === 'string'
+          ? request.headers['idempotency-key']
+          : undefined;
+
+        fastify.swarm.enqueueExecution({
+          workflowId: workflow.id,
+          tenantId,
+          userId,
+          goal,
+          industry,
+          roleModes,
+          maxCostUsd,
+          idempotencyKey,
         });
 
         // 3. Return 202 with the created workflow + cost estimate
@@ -145,6 +164,47 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * GET /workflows/queue/stats
+   * Operational queue depth and running worker count.
+   */
+  fastify.get(
+    '/queue/stats',
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
+        enforceTenantIsolation,
+      ],
+    },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const stats = await fastify.swarm.getQueueStats();
+      return reply.status(200).send(ok(stats));
+    },
+  );
+
+  /**
+   * GET /workflows/queue/health
+   * Dedicated worker health diagnostics (counters, uptime, running jobs).
+   */
+  fastify.get(
+    '/queue/health',
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
+        enforceTenantIsolation,
+      ],
+    },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const health = fastify.swarm.getWorkerHealth();
+      return reply.status(200).send(ok({
+        ...health,
+        mode: config.workflowWorkerMode,
+      }));
+    },
+  );
+
+  /**
    * GET /workflows/:workflowId
    * Full workflow record including traces and approvals.
    */
@@ -177,6 +237,16 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/:workflowId/resume',
     {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '1 minute',
+          keyGenerator: (req: FastifyRequest) => {
+            const { workflowId } = req.params as { workflowId: string };
+            return `resume:${req.user?.userId ?? req.ip}:${workflowId}`;
+          },
+        },
+      },
       preHandler: [
         fastify.authenticate,
         fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN'),

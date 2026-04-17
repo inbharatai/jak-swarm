@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
 import { toolRegistry } from '@jak-swarm/tools';
-import type { ToolCategory, ToolRiskClass } from '@jak-swarm/shared';
+import { ToolRiskClass, type ToolCategory } from '@jak-swarm/shared';
 import { randomUUID } from 'node:crypto';
 
 const toolsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -55,13 +55,28 @@ const toolsRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     '/:toolName/execute',
-    { preHandler: [fastify.authenticate] },
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
+      ],
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { toolName } = request.params as { toolName: string };
       const user = (request as unknown as { user: { tenantId: string; userId: string } }).user;
 
-      if (!toolRegistry.has(toolName)) {
+      const registered = toolRegistry.get(toolName);
+      if (!registered) {
         return reply.status(404).send(err('NOT_FOUND', `Tool '${toolName}' not found`));
+      }
+
+      // Direct execution bypasses workflow-level guardrails and approval nodes,
+      // so restrict this endpoint to lower-risk tools.
+      if (registered.metadata.riskClass !== ToolRiskClass.READ_ONLY) {
+        return reply.status(403).send(err(
+          'FORBIDDEN',
+          `Direct execution is disabled for ${registered.metadata.riskClass} tools. Run via workflow for guarded execution.`,
+        ));
       }
 
       const context = {

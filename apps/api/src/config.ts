@@ -69,6 +69,10 @@ export const config = {
   databaseUrl: required('DATABASE_URL', 'postgresql://jakswarm:jakswarm@localhost:5432/jakswarm'),
 
   redisUrl: process.env['REDIS_URL']?.trim() || null,
+  requireRedisInProd: (process.env['REQUIRE_REDIS_IN_PROD'] ?? 'false') === 'true',
+  workflowWorkerMode: (process.env['WORKFLOW_WORKER_MODE'] ?? 'embedded') as
+    | 'embedded'
+    | 'standalone',
 
   // LLM provider API keys. At least one is required. Agents log a warning if all are missing.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',

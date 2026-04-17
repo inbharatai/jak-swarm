@@ -127,7 +127,7 @@ InBharat AI
 
 Hi Superhuman AI team,
 
-I just launched JAK Swarm, an open-source multi-agent AI platform that runs entirely locally. 39 specialized agents, 119 tools, 6 LLM providers -- including Ollama for complete on-device execution with no API keys required.
+I just launched JAK Swarm, an open-source multi-agent AI platform that runs entirely locally. 38 specialized agents, 119 tools, 6 LLM providers -- including Ollama for complete on-device execution with no API keys required.
 
 What your productivity-focused audience should know: JAK Swarm handles multi-step tasks by breaking them into subtasks and assigning each to a specialized agent. A research workflow that would take a human hours -- searching multiple sources, extracting key information, analyzing patterns, and writing a structured report -- runs in minutes. The agents handle the orchestration; users just define the task and the output format.
 

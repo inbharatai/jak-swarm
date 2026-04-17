@@ -17,6 +17,8 @@ export async function plannerNode(state: SwarmState): Promise<Partial<SwarmState
     userId: state.userId,
     workflowId: state.workflowId,
     industry: state.industry,
+    idempotencyKey: state.idempotencyKey,
+    allowedDomains: state.allowedDomains,
   });
 
   const result = await agent.execute(state.missionBrief, context);

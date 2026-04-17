@@ -16,6 +16,66 @@ if (hasRealAdapters()) {
   console.warn('[tools] Email + Calendar adapters NOT configured (set GMAIL_EMAIL + GMAIL_APP_PASSWORD). Tools will fail on use.');
 }
 
+function normalizeAllowedDomain(domain: string): string | null {
+  const trimmed = domain.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  const withoutScheme = trimmed.replace(/^[a-z]+:\/\//, '');
+  const withoutPath = withoutScheme.split('/')[0] ?? '';
+  const withoutPort = withoutPath.split(':')[0] ?? '';
+  const withoutWildcard = withoutPort.startsWith('*.')
+    ? withoutPort.slice(2)
+    : withoutPort;
+
+  return withoutWildcard || null;
+}
+
+function isHostAllowed(host: string, allowedDomains: string[]): boolean {
+  const normalizedHost = host.toLowerCase();
+  for (const domain of allowedDomains) {
+    const normalized = normalizeAllowedDomain(domain);
+    if (!normalized) continue;
+    if (normalizedHost === normalized || normalizedHost.endsWith(`.${normalized}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function checkBrowserAllowlist(
+  url: string,
+  context: ToolExecutionContext,
+): { error: string; code: string } | null {
+  const allowedDomains = context.allowedDomains ?? [];
+  if (allowedDomains.length === 0) {
+    return {
+      error: 'Browser domain allowlist is empty for this tenant. Configure allowedDomains to enable browser navigation.',
+      code: 'DOMAIN_BLOCKED',
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: `Invalid URL: ${url}`, code: 'INVALID_URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { error: `Unsupported URL scheme: ${parsed.protocol}`, code: 'INVALID_URL' };
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!isHostAllowed(host, allowedDomains)) {
+    return {
+      error: `Domain '${host}' is not in the allowedDomains list for this tenant.`,
+      code: 'DOMAIN_BLOCKED',
+    };
+  }
+
+  return null;
+}
+
 /**
  * Register all built-in tools in the global ToolRegistry.
  * Call this once at application startup.
@@ -981,8 +1041,10 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '2.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url } = input as { url: string };
+      const allowlistError = checkBrowserAllowlist(url, context);
+      if (allowlistError) return allowlistError;
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const result = await playwrightEngine.navigate(url);
@@ -1011,12 +1073,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '2.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url, selector } = input as { url?: string; selector: string };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const page = await playwrightEngine.getActivePage();
         if (url) {
+          const allowlistError = checkBrowserAllowlist(url, context);
+          if (allowlistError) return allowlistError;
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         }
         const text = await playwrightEngine.extractText(page, selector);
@@ -1046,12 +1110,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '2.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url, fields } = input as { url?: string; fields: Record<string, string> };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const page = await playwrightEngine.getActivePage();
         if (url) {
+          const allowlistError = checkBrowserAllowlist(url, context);
+          if (allowlistError) return allowlistError;
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         }
         const result = await playwrightEngine.fillForm(page, fields);
@@ -1080,12 +1146,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url, selector } = input as { url?: string; selector: string };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const page = await playwrightEngine.getActivePage();
         if (url) {
+          const allowlistError = checkBrowserAllowlist(url, context);
+          if (allowlistError) return allowlistError;
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         }
         const result = await playwrightEngine.clickElement(page, selector);
@@ -1113,12 +1181,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url } = input as { url?: string };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const page = await playwrightEngine.getActivePage();
         if (url) {
+          const allowlistError = checkBrowserAllowlist(url, context);
+          if (allowlistError) return allowlistError;
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         }
         const buffer = await playwrightEngine.screenshot(page);
@@ -1146,12 +1216,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { url } = input as { url?: string };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
         const page = await playwrightEngine.getActivePage();
         if (url) {
+          const allowlistError = checkBrowserAllowlist(url, context);
+          if (allowlistError) return allowlistError;
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         }
         const text = await playwrightEngine.getPageContent(page);
@@ -1673,7 +1745,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { action = 'list', tabIndex, url } = input as { action?: string; tabIndex?: number; url?: string };
       try {
         const { playwrightEngine } = await import('../adapters/browser/playwright-engine.js');
@@ -1698,6 +1770,10 @@ export function registerBuiltinTools(): void {
           return { success: true, data: { closed: tabIndex } };
         }
         if (action === 'new') {
+          if (url) {
+            const allowlistError = checkBrowserAllowlist(url, context);
+            if (allowlistError) return allowlistError;
+          }
           const newPage = await ctx.newPage();
           if (url) await newPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
           return { success: true, data: { newTabIndex: ctx.pages().length - 1, url: url ?? 'about:blank' } };

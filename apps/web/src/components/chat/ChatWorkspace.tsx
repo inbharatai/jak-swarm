@@ -125,10 +125,11 @@ export function ChatWorkspace() {
             });
           // Workflow failed
           } else if (evType === 'failed') {
+            const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
             addMessage(convId, {
               role: 'assistant',
               agentRole: null,
-              content: `Workflow failed: ${(ev.error as string) ?? 'Unknown error'}`,
+              content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
             });
           // Workflow paused for approval
           } else if (evType === 'paused') {

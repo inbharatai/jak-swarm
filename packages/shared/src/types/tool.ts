@@ -37,6 +37,8 @@ export interface ToolExecutionContext {
   workflowId: string;
   runId: string;
   approvalId?: string;
+  idempotencyKey?: string;
+  allowedDomains?: string[];
   db?: Record<string, unknown>;
 }
 

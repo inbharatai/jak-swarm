@@ -4,15 +4,15 @@
 
 ### Autonomous Multi-Agent AI Platform
 
-[![Agents](https://img.shields.io/badge/AI_Agents-39-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
 [![Tools](https://img.shields.io/badge/Production_Tools-119-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-127_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-277_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**39 AI agents, 119 production tools, 21 integrations. Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision and vibe coding. Memory-aware agents with context engineering, Slack channel bridge, voice-to-workflow trigger, and an embedded TypeScript SDK. Production-grade SaaS with managed AI — no API keys required.**
+**38 AI agents, 119 production tools, and a mixed integration layer (fully implemented + in-progress providers). Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, and vibe coding. Memory-aware agents with context engineering, Slack bridge, voice sessions, and internal TypeScript packages. API keys are required for external LLM/integration providers unless using local models.**
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -149,23 +149,23 @@ flowchart LR
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **39 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 33 specialist workers |
-| 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), 27 browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
+| 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
+| 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
 | 🔍 | **30 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
-| 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing per task type. No API keys needed for users |
+| 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing with failover and role-aware primary selection. Provider API keys are required unless using local models |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
 | 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
 | 💬 | **Slack Channel Bridge** | Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling |
 | 💬 | **WhatsApp Control (QR)** | Register a number in the dashboard, verify via challenge code, then send workflow commands over WhatsApp |
-| 🎤 | **Voice → Workflow** | Convert voice session transcripts into workflow executions. 4 voice providers (OpenAI Realtime, Deepgram, ElevenLabs, Mock) |
-| 📦 | **@jak-swarm/client SDK** | Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, health checks |
+| 🎤 | **Voice Sessions + Realtime Tokens** | Voice session lifecycle and realtime token exchange are implemented; workflow trigger behavior depends on client-side orchestration |
+| 📦 | **Internal TypeScript Client Package** | Typed API client in-monorepo with SSE streaming, workflow management, memory CRUD, health checks |
 | 🛠️ | **SKILL.md Format** | DeerFlow-compatible skill definitions with YAML frontmatter, recursive discovery, risk levels, tool allowlists |
 | 💰 | **Credit-Based Billing** | 4 plans (Free/Pro/Team/Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard, Paddle payments |
 | 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
 | 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
-| 🔌 | **21 MCP Integrations** | Slack, GitHub, Notion, HubSpot, Salesforce, Stripe, Linear, Jira, Supabase, Discord, and 11 more via Model Context Protocol |
+| 🔌 | **MCP Integrations (Implemented + Extendable)** | Slack, GitHub, Notion are wired with provider management; additional providers are extendable via MCP and adapter work |
 | 🌐 | **27 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
 | 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
@@ -239,7 +239,7 @@ Most AI agent platforms have **zero resilience**. If an LLM call fails, the whol
 
 ---
 
-## 🎭 Agent Roster — 39 Agents
+## 🎭 Agent Roster — 38 Agents
 
 ```mermaid
 graph LR
@@ -683,7 +683,7 @@ http://localhost:3000
 | **Ops** | 5 | send_webhook, file_read, file_write, list_directory, code_execute | ✅ Built-in |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion + 17 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 119 registered tools — Email (10), Calendar (3), Browser (27), Document (15), Spreadsheet (4), CRM (14), Research (30), Knowledge (9), Webhook (2), Ops + Voice (5). Plus 21 MCP integrations loaded at runtime.**
+**Total: 119 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, Webhook, Ops, and Voice categories. Additional provider tools can be loaded dynamically via MCP integrations.**
 
 ---
 
@@ -1253,7 +1253,7 @@ OPENAI_API_KEY=sk-... node tests/human-simulator/run-all.js      # Human simulat
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-The architecture is production-grade (multi-tenant, RBAC, cost controls, state persistence, error recovery). It's v0.1.0 -- test thoroughly before production deployment.
+JAK Swarm is staging-ready and production-capable with caveats. The architecture includes multi-tenant isolation, RBAC, credit-based cost controls, PostgreSQL state persistence, queue-backed durable execution with atomic job claiming, replay-safety classification, and idempotency key support. However, it is v0.1.0 — workflow durability relies on DB-backed checkpoints (not a dedicated workflow engine like Temporal), and in-flight workflows survive API restarts via recovery but not mid-node crashes. Test thoroughly before production deployment.
 
 </details>
 
