@@ -1,4 +1,4 @@
-﻿-- Migration: 0_init
+-- Migration: 0_init
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 

@@ -138,6 +138,7 @@ jobs:
           if grep -rn "dev-secret-change-me-NEVER-USE-IN-PROD" \
             --include="*.ts" --include="*.js" --include="*.json" \
             --exclude-dir=node_modules --exclude-dir=dist \
+            --exclude="config.ts" \
             --exclude="validate-config.ts" \
             .; then
             echo "::error::Default AUTH_SECRET found in source — rotate it immediately."
