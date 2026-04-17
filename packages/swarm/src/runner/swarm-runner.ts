@@ -25,6 +25,7 @@ export interface RunParams {
   allowedDomains?: string[];
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
+  disabledToolNames?: string[];
   connectedProviders?: string[];
   loadState?: (id: string) => Promise<unknown | undefined>;
   /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
@@ -146,6 +147,7 @@ export class SwarmRunner {
         allowedDomains: params.allowedDomains,
         browserAutomationEnabled: params.browserAutomationEnabled,
         restrictedCategories: params.restrictedCategories,
+        disabledToolNames: params.disabledToolNames,
         connectedProviders: params.connectedProviders,
       }),
       // Inject distributed circuit breaker factory if provided

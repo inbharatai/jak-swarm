@@ -61,6 +61,7 @@ export interface SwarmState {
   allowedDomains: string[];
   browserAutomationEnabled: boolean;
   restrictedCategories: ToolCategory[];
+  disabledToolNames: string[];
   connectedProviders: string[];
 
   // Final state
@@ -82,6 +83,7 @@ export function createInitialSwarmState(params: {
   allowedDomains?: string[];
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
+  disabledToolNames?: string[];
   connectedProviders?: string[];
 }): SwarmState {
   return {
@@ -111,6 +113,7 @@ export function createInitialSwarmState(params: {
     allowedDomains: params.allowedDomains ?? [],
     browserAutomationEnabled: params.browserAutomationEnabled ?? false,
     restrictedCategories: params.restrictedCategories ?? [],
+    disabledToolNames: params.disabledToolNames ?? [],
     connectedProviders: params.connectedProviders ?? [],
     status: WS.PENDING,
     error: undefined,

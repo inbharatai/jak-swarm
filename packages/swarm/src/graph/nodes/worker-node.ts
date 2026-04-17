@@ -55,6 +55,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     industry: state.industry,
     browserAutomationEnabled: state.browserAutomationEnabled,
     restrictedCategories: state.restrictedCategories,
+    disabledToolNames: state.disabledToolNames,
     connectedProviders: state.connectedProviders,
   });
 

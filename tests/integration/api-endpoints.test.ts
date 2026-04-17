@@ -69,6 +69,7 @@ function uniqueEmail(prefix: string): string {
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
+  if (!hasDatabaseUrl) return;
   process.env['NODE_ENV'] = 'test';
   if (process.env['DIRECT_URL']) {
     process.env['DATABASE_URL'] = process.env['DIRECT_URL'];
@@ -793,7 +794,7 @@ describe.skipIf(!hasDatabaseUrl)('Auth boundary hardening', () => {
 // 404 HANDLER
 // ===========================================================================
 
-describe('404 handler', () => {
+describe.skipIf(!hasDatabaseUrl)('404 handler', () => {
   it('returns 404 for unknown routes in JSON format', async () => {
     const { status, body } = await inject<{ success: false; error: string }>(
       'GET',

@@ -23,6 +23,7 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
     industry: state.industry,
     browserAutomationEnabled: state.browserAutomationEnabled,
     restrictedCategories: state.restrictedCategories,
+    disabledToolNames: state.disabledToolNames,
     connectedProviders: state.connectedProviders,
   });
 
