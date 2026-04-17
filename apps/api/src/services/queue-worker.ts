@@ -232,6 +232,11 @@ export class QueueWorker extends EventEmitter {
             this.runningJobs.delete(job.id);
           });
       }
+    } catch (err) {
+      this.log.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        '[QueueWorker] Poll failed',
+      );
     } finally {
       this.pollInProgress = false;
     }

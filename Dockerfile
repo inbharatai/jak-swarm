@@ -61,6 +61,8 @@ COPY --from=builder /app/apps/api ./apps/api
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
+RUN chmod +x /app/apps/api/scripts/start-with-migrations.sh
+
 # Security: non-root user
 RUN addgroup -g 1001 -S jak && \
     adduser -S jak -u 1001 -G jak
@@ -75,4 +77,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/healthz || exit 1
 
-CMD ["node", "apps/api/dist/index.js"]
+CMD ["/app/apps/api/scripts/start-with-migrations.sh"]
