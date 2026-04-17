@@ -18,6 +18,7 @@ import { toolRegistry, type RegisteredTool } from '../registry/tool-registry.js'
 export interface TenantToolRegistryOptions {
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
+  disabledToolNames?: string[];
 }
 
 export class TenantToolRegistry {
@@ -25,12 +26,14 @@ export class TenantToolRegistry {
   private readonly allowedProviders: Set<string>;
   private browserAutomationEnabled: boolean;
   private restrictedCategories: Set<ToolCategory>;
+  private disabledToolNames: Set<string>;
 
   constructor(tenantId: string, connectedProviders: string[], options?: TenantToolRegistryOptions) {
     this.tenantId = tenantId;
     this.allowedProviders = new Set(connectedProviders.map(p => p.toLowerCase()));
     this.browserAutomationEnabled = options?.browserAutomationEnabled ?? false;
     this.restrictedCategories = new Set(options?.restrictedCategories ?? []);
+    this.disabledToolNames = new Set(options?.disabledToolNames ?? []);
   }
 
   /** Check if a tool is available to this tenant. */
@@ -94,6 +97,9 @@ export class TenantToolRegistry {
     if (options.restrictedCategories) {
       this.restrictedCategories = new Set(options.restrictedCategories);
     }
+    if (options.disabledToolNames) {
+      this.disabledToolNames = new Set(options.disabledToolNames);
+    }
   }
 
   private isAllowed(metadata: ToolMetadata): boolean {
@@ -103,6 +109,10 @@ export class TenantToolRegistry {
     }
     // Block tools in categories restricted by the tenant's industry pack
     if (this.restrictedCategories.has(metadata.category)) {
+      return false;
+    }
+    // Block tools explicitly disabled by the tenant admin
+    if (this.disabledToolNames.has(metadata.name)) {
       return false;
     }
     // Built-in tools (no provider) are always available

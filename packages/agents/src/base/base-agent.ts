@@ -421,6 +421,7 @@ ${lines.join('\n')}
       {
         browserAutomationEnabled: context.browserAutomationEnabled,
         restrictedCategories: context.restrictedCategories,
+        disabledToolNames: context.disabledToolNames,
       },
     );
 

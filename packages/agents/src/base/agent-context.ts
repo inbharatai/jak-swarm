@@ -13,6 +13,7 @@ export interface AgentContextParams {
   connectedProviders?: string[];
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
+  disabledToolNames?: string[];
 }
 
 export class AgentContext {
@@ -26,6 +27,7 @@ export class AgentContext {
   readonly connectedProviders: string[];
   readonly browserAutomationEnabled: boolean;
   readonly restrictedCategories: ToolCategory[];
+  readonly disabledToolNames: string[];
   private steps: AgentTrace[] = [];
 
   constructor(params: AgentContextParams) {
@@ -39,6 +41,7 @@ export class AgentContext {
     this.connectedProviders = params.connectedProviders ?? [];
     this.browserAutomationEnabled = params.browserAutomationEnabled ?? false;
     this.restrictedCategories = params.restrictedCategories ?? [];
+    this.disabledToolNames = params.disabledToolNames ?? [];
   }
 
   addTrace(trace: AgentTrace): void {
@@ -61,6 +64,7 @@ export class AgentContext {
       connectedProviders: this.connectedProviders,
       browserAutomationEnabled: this.browserAutomationEnabled,
       restrictedCategories: this.restrictedCategories,
+      disabledToolNames: this.disabledToolNames,
       ...overrides,
     });
   }

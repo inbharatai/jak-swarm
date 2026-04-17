@@ -21,6 +21,7 @@ model Tenant {
   maxConcurrentWorkflows  Int      @default(5)
   enableVoice             Boolean  @default(true)
   enableBrowserAutomation Boolean  @default(false)
+  disabledToolNames       String[] @default([])
   logRetentionDays        Int      @default(90)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

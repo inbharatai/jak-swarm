@@ -270,6 +270,7 @@ export class SwarmExecutionService extends EventEmitter {
         allowedDomains: (tenant as any)?.allowedDomains ?? [],
         browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),
         restrictedCategories: industryPack.restrictedTools,
+        disabledToolNames: (tenant as any)?.disabledToolNames ?? [],
         connectedProviders,
         onAgentActivity: (data: unknown) => {
           this.emit(`workflow:${workflowId}`, data);

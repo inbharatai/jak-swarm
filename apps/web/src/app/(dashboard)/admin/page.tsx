@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { BookOpen, CheckCircle2, Shield, Users, XCircle } from 'lucide-react';
+import { BookOpen, CheckCircle2, Key, Shield, Trash2, Users, Wrench, XCircle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast';
-import { adminApi, dataFetcher } from '@/lib/api-client';
+import { adminApi, apiKeyApi, dataFetcher, toolToggleApi } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import {
   Badge,
@@ -61,6 +61,16 @@ interface PendingSkill {
   riskLevel: string;
   implementation?: string | null;
   sandboxResult?: { success?: boolean; output?: string; error?: string; durationMs?: number } | null;
+}
+
+interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scopes: string[];
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
 }
 
 interface PaginatedSkills {
@@ -154,6 +164,177 @@ function SettingsTab({ settings, onSave }: { settings?: TenantSettings; onSave: 
       <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button>
     </div>
   );
+}
+
+function ApiKeysTab() {
+    const { data: keys, isLoading, mutate } = useSWR<ApiKey[]>('/tenants/current/api-keys', dataFetcher);
+    const toast = useToast();
+    const [creating, setCreating] = useState(false);
+    const [newKeyName, setNewKeyName] = useState('');
+    const [newKeyScopes, setNewKeyScopes] = useState('read');
+    const [revealedKey, setRevealedKey] = useState<string | null>(null);
+    const [revoking, setRevoking] = useState<string | null>(null);
+
+    const handleCreate = async () => {
+      if (!newKeyName.trim()) return;
+      setCreating(true);
+      try {
+        const res = await apiKeyApi.create({ name: newKeyName.trim(), scopes: newKeyScopes.split(',').map((s) => s.trim()).filter(Boolean) });
+        setRevealedKey(res.key);
+        setNewKeyName('');
+        setNewKeyScopes('read');
+        mutate();
+        toast.success('API key created', 'Copy it now — it will not be shown again.');
+      } catch (err) {
+        toast.error('Failed to create API key', err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setCreating(false);
+      }
+    };
+
+    const handleRevoke = async (id: string) => {
+      setRevoking(id);
+      try {
+        await apiKeyApi.revoke(id);
+        mutate();
+        toast.success('API key revoked');
+      } catch (err) {
+        toast.error('Failed to revoke key', err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setRevoking(null);
+      }
+    };
+
+    if (isLoading) return <div className="flex justify-center py-8"><Spinner /></div>;
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Create API Key</CardTitle>
+            <CardDescription>Keys are shown once at creation time. Treat them like passwords.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input label="Key Name" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="ci-deploy-token" />
+              <Input label="Scopes (comma-separated)" value={newKeyScopes} onChange={(e) => setNewKeyScopes(e.target.value)} placeholder="read, write" />
+            </div>
+            <Button onClick={handleCreate} disabled={creating || !newKeyName.trim()}>{creating ? 'Creating...' : 'Create Key'}</Button>
+            {revealedKey ? (
+              <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 dark:bg-yellow-900/10">
+                <p className="mb-2 text-xs font-semibold text-yellow-800 dark:text-yellow-300">Copy this key now — it will not be shown again.</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 overflow-x-auto rounded bg-muted/30 px-3 py-1.5 text-xs font-mono">{revealedKey}</code>
+                  <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(revealedKey); toast.success('Copied'); }}>Copy</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setRevealedKey(null)}>Dismiss</Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {!keys?.length ? (
+          <EmptyState icon={<Key className="h-6 w-6" />} title="No API keys" description="Create an API key above to authenticate external integrations." />
+        ) : (
+          <Card>
+            <div className="divide-y">
+              {keys.map((k) => (
+                <div key={k.id} className="flex items-center gap-4 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{k.name}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{k.keyPrefix}…</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {k.scopes.map((s) => <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>)}
+                    {k.expiresAt ? <span className="text-xs text-muted-foreground">exp {new Date(k.expiresAt).toLocaleDateString()}</span> : null}
+                    {k.lastUsedAt ? <span className="text-xs text-muted-foreground">last used {new Date(k.lastUsedAt).toLocaleDateString()}</span> : null}
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={revoking === k.id} onClick={() => handleRevoke(k.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+}
+
+interface ToolEntry {
+  name: string;
+  description: string;
+  category: string;
+  enabled: boolean;
+}
+
+function ToolTogglesTab({ disabledToolNames }: { disabledToolNames: string[] }) {
+    const toast = useToast();
+    const [tools, setTools] = useState<ToolEntry[]>([]);
+    const [toggling, setToggling] = useState<string | null>(null);
+
+    const buildMockTools = useCallback((disabled: string[]): ToolEntry[] => {
+      const knownTools: Omit<ToolEntry, 'enabled'>[] = [
+        { name: 'web_search', description: 'Search the web via configured search provider', category: 'Research' },
+        { name: 'url_fetch', description: 'Fetch and parse content from a URL', category: 'Research' },
+        { name: 'code_execute', description: 'Run sandboxed code snippets', category: 'Engineering' },
+        { name: 'file_read', description: 'Read files from the workspace', category: 'Files' },
+        { name: 'file_write', description: 'Write files to the workspace', category: 'Files' },
+        { name: 'browser_navigate', description: 'Navigate a headless browser', category: 'Browser' },
+        { name: 'browser_screenshot', description: 'Take screenshot of current browser page', category: 'Browser' },
+        { name: 'email_send', description: 'Send outbound email via configured provider', category: 'Communication' },
+        { name: 'slack_message', description: 'Post a message to a Slack channel', category: 'Communication' },
+      ];
+      return knownTools.map((t) => ({ ...t, enabled: !disabled.includes(t.name) }));
+    }, []);
+
+    useEffect(() => {
+      setTools(buildMockTools(disabledToolNames));
+    }, [disabledToolNames, buildMockTools]);
+
+    const handleToggle = async (name: string, currentEnabled: boolean) => {
+      setToggling(name);
+      try {
+        await toolToggleApi.toggle(name, !currentEnabled);
+        setTools((prev) => prev.map((t) => t.name === name ? { ...t, enabled: !currentEnabled } : t));
+        toast.success(`Tool ${!currentEnabled ? 'enabled' : 'disabled'}`);
+      } catch (err) {
+        toast.error('Failed to update tool', err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setToggling(null);
+      }
+    };
+
+    const categories = [...new Set(tools.map((t) => t.category))];
+
+    return (
+      <div className="space-y-6">
+        {categories.map((cat) => (
+          <Card key={cat}>
+            <CardHeader>
+              <CardTitle className="text-sm">{cat}</CardTitle>
+            </CardHeader>
+            <div className="divide-y">
+              {tools.filter((t) => t.category === cat).map((tool) => (
+                <div key={tool.name} className="flex items-center gap-4 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className={cn('truncate text-sm font-mono font-medium', !tool.enabled && 'text-muted-foreground line-through')}>{tool.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{tool.description}</p>
+                  </div>
+                  <button
+                    disabled={toggling === tool.name}
+                    onClick={() => handleToggle(tool.name, tool.enabled)}
+                    className={cn('relative h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring', tool.enabled ? 'bg-primary' : 'bg-input')}
+                    role="switch"
+                    aria-checked={tool.enabled}
+                  >
+                    <span className={cn('block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform', tool.enabled ? 'translate-x-4' : 'translate-x-0.5')} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
 }
 
 function UsersTab() {
@@ -292,22 +473,20 @@ export default function AdminPage() {
         <p className="mt-0.5 text-sm text-muted-foreground">Manage the admin flows that are wired to the live backend.</p>
       </div>
 
-      <Card>
-        <CardContent className="py-4 text-sm text-muted-foreground">
-          API keys and per-tool toggles are intentionally hidden until backend authentication and enforcement are fully implemented. This console only exposes settings, users, and skill review paths that work end to end today.
-        </CardContent>
-      </Card>
-
       <Tabs defaultValue="settings">
-        <TabsList className="flex h-auto flex-wrap gap-1">
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="users"><Users className="mr-1.5 h-3.5 w-3.5" />Users</TabsTrigger>
-          <TabsTrigger value="skills"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Skills</TabsTrigger>
-        </TabsList>
+          <TabsList className="flex h-auto flex-wrap gap-1">
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="users"><Users className="mr-1.5 h-3.5 w-3.5" />Users</TabsTrigger>
+            <TabsTrigger value="skills"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Skills</TabsTrigger>
+            <TabsTrigger value="api-keys"><Key className="mr-1.5 h-3.5 w-3.5" />API Keys</TabsTrigger>
+            <TabsTrigger value="tools"><Wrench className="mr-1.5 h-3.5 w-3.5" />Tools</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="settings"><SettingsTab settings={settings} onSave={handleSaveSettings} /></TabsContent>
-        <TabsContent value="users"><UsersTab /></TabsContent>
-        <TabsContent value="skills"><SkillsTab /></TabsContent>
+          <TabsContent value="settings"><SettingsTab settings={settings} onSave={handleSaveSettings} /></TabsContent>
+          <TabsContent value="users"><UsersTab /></TabsContent>
+          <TabsContent value="skills"><SkillsTab /></TabsContent>
+          <TabsContent value="api-keys"><ApiKeysTab /></TabsContent>
+          <TabsContent value="tools"><ToolTogglesTab disabledToolNames={(settings as any)?.disabledToolNames ?? []} /></TabsContent>
       </Tabs>
     </div>
   );

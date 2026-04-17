@@ -463,6 +463,37 @@ export const adminApi = {
   listTools: () => apiDataFetch<unknown>('/tools'),
 };
 
+export const apiKeyApi = {
+  /** GET /tenants/current/api-keys */
+  list: () => apiDataFetch<unknown[]>('/tenants/current/api-keys'),
+
+  /**
+   * POST /tenants/current/api-keys
+   * Returns { ...key, key: '<rawKey>' } — the raw key is returned only once.
+   */
+  create: (body: { name: string; scopes?: string[]; expiresAt?: string }) =>
+    apiDataFetch<{ id: string; name: string; scopes: string[]; expiresAt: string | null; createdAt: string; key: string }>(
+      '/tenants/current/api-keys',
+      { method: 'POST', body },
+    ),
+
+  /** DELETE /tenants/current/api-keys/:keyId */
+  revoke: (keyId: string) =>
+    apiDataFetch<void>(`/tenants/current/api-keys/${keyId}`, { method: 'DELETE' }),
+};
+
+export const toolToggleApi = {
+  /**
+   * PATCH /tenants/current/tools/:toolName
+   * Enable or disable a specific tool for this tenant.
+   */
+  toggle: (toolName: string, enabled: boolean) =>
+    apiDataFetch<{ toolName: string; enabled: boolean; disabledToolNames: string[] }>(
+      `/tenants/current/tools/${encodeURIComponent(toolName)}`,
+      { method: 'PATCH', body: { enabled } },
+    ),
+};
+
 // ─── Schedule API ────────────────────────────────────────────────────────────
 
 export const scheduleApi = {
