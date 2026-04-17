@@ -26,6 +26,18 @@ const updateUserProfileBodySchema = z.object({
   avatarUrl: z.string().url().optional().nullable(),
 });
 
+const currentTenantSettingsBodySchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  industry: z.string().max(100).nullable().optional(),
+  requireApprovals: z.boolean().optional(),
+  approvalThreshold: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  maxConcurrentWorkflows: z.number().int().min(1).max(50).optional(),
+  enableVoice: z.boolean().optional(),
+  enableBrowserAutomation: z.boolean().optional(),
+  allowedDomains: z.array(z.string().min(1).max(255)).max(100).optional(),
+  logRetentionDays: z.number().int().min(1).max(3650).optional(),
+});
+
 const tenantsRoutes: FastifyPluginAsync = async (fastify) => {
   const preHandlerBase = [fastify.authenticate, enforceTenantIsolation];
 
@@ -310,6 +322,137 @@ const tenantsRoutes: FastifyPluginAsync = async (fastify) => {
 
         await fastify.auditLog(request, 'UPDATE_USER_PROFILE', 'User', userId, { fields: Object.keys(parseResult.data) });
         return reply.status(200).send(ok(updated));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * GET /tenants/current/settings
+   * Returns the authenticated tenant's real persisted settings.
+   */
+  fastify.get(
+    '/current/settings',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId } = request.user;
+
+      try {
+        const tenant = await fastify.db.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            industry: true,
+            requireApprovals: true,
+            approvalThreshold: true,
+            maxConcurrentWorkflows: true,
+            enableVoice: true,
+            enableBrowserAutomation: true,
+            allowedDomains: true,
+            logRetentionDays: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (!tenant) throw new NotFoundError('Tenant', tenantId);
+
+        return reply.status(200).send(ok(tenant));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * PATCH /tenants/current/settings
+   * Update the authenticated tenant's real persisted settings.
+   */
+  fastify.patch(
+    '/current/settings',
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId } = request.user;
+      const parseResult = currentTenantSettingsBodySchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply
+          .status(422)
+          .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
+      }
+
+      try {
+        const tenant = await fastify.db.tenant.update({
+          where: { id: tenantId },
+          data: parseResult.data,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            industry: true,
+            requireApprovals: true,
+            approvalThreshold: true,
+            maxConcurrentWorkflows: true,
+            enableVoice: true,
+            enableBrowserAutomation: true,
+            allowedDomains: true,
+            logRetentionDays: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        await fastify.auditLog(request, 'UPDATE_TENANT_SETTINGS', 'Tenant', tenantId, parseResult.data);
+        return reply.status(200).send(ok(tenant));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * GET /tenants/current/users
+   * List users for the authenticated tenant without requiring the caller to know the tenant id.
+   */
+  fastify.get(
+    '/current/users',
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId } = request.user;
+
+      try {
+        const users = await fastify.db.user.findMany({
+          where: { tenantId },
+          select: {
+            id: true,
+            tenantId: true,
+            email: true,
+            name: true,
+            role: true,
+            active: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        return reply.status(200).send(ok(users));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;

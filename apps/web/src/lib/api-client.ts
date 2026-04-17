@@ -288,19 +288,33 @@ export const memoryApi = {
     const qs = params
       ? '?' + new URLSearchParams(params as Record<string, string>).toString()
       : '';
-    return apiClient.get<unknown>(`/memory${qs}`);
+    return apiDataFetch<unknown>(`/memory${qs}`);
   },
 
-  /** POST /memory */
-  create: (entry: { type: string; key: string; value: unknown; ttl?: number; expiresAt?: string }) =>
-    apiClient.post<unknown>('/memory', entry),
+  /** PUT /memory/:key */
+  create: (entry: { type: string; key: string; value: unknown; expiresAt?: string }) =>
+    apiDataFetch<unknown>(`/memory/${encodeURIComponent(entry.key)}`, {
+      method: 'PUT',
+      body: {
+        value: entry.value,
+        type: entry.type,
+        ttl: entry.expiresAt,
+      },
+    }),
 
-  /** PATCH /memory/:id */
-  update: (id: string, value: unknown) =>
-    apiClient.patch<unknown>(`/memory/${id}`, { value }),
+  /** PUT /memory/:key */
+  update: (key: string, value: unknown, type?: string, expiresAt?: string) =>
+    apiDataFetch<unknown>(`/memory/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: {
+        value,
+        ...(type ? { type } : {}),
+        ...(expiresAt ? { ttl: expiresAt } : {}),
+      },
+    }),
 
-  /** DELETE /memory/:id */
-  delete: (id: string) => apiClient.delete<unknown>(`/memory/${id}`),
+  /** DELETE /memory/:key */
+  delete: (key: string) => apiDataFetch<unknown>(`/memory/${encodeURIComponent(key)}`, { method: 'DELETE' }),
 };
 
 export const skillApi = {
@@ -315,8 +329,8 @@ export const skillApi = {
   /** GET /skills/:id */
   get: (id: string) => apiClient.get<unknown>(`/skills/${id}`),
 
-  /** POST /skills — propose a new skill */
-  propose: (skill: Record<string, unknown>) => apiClient.post<unknown>('/skills', skill),
+  /** POST /skills/propose — propose a new skill */
+  propose: (skill: Record<string, unknown>) => apiDataFetch<unknown>('/skills/propose', { method: 'POST', body: skill }),
 
   /** POST /skills/:id/approve */
   approve: (id: string) => apiClient.post<unknown>(`/skills/${id}/approve`, {}),
@@ -430,15 +444,13 @@ export const approvalsApi = {
 };
 
 export const adminApi = {
-  /** GET /tenants/:tenantId/settings (use current tenant from token) */
-  getSettings: () => apiClient.get<unknown>('/tenants/current/settings'),
+  /** GET /tenants/current/settings */
+  getSettings: () => apiDataFetch<unknown>('/tenants/current/settings'),
   updateSettings: (settings: unknown) =>
-    apiClient.patch<unknown>('/tenants/current/settings', settings),
+    apiDataFetch<unknown>('/tenants/current/settings', { method: 'PATCH', body: settings }),
 
-  /** GET /tenants/:tenantId/users */
-  listUsers: () => apiClient.get<unknown>('/tenants/current/users'),
-  updateUserRole: (userId: string, role: string) =>
-    apiClient.patch<unknown>(`/tenants/current/users/${userId}`, { role }),
+  /** GET /tenants/current/users */
+  listUsers: () => apiDataFetch<unknown>('/tenants/current/users'),
 
   /** Skills (via /skills routes) */
   listSkills: (status?: string) =>
@@ -447,17 +459,8 @@ export const adminApi = {
   rejectSkill: (id: string, reason: string) =>
     apiClient.post<unknown>(`/skills/${id}/reject`, { reason }),
 
-  /** API Keys — managed via tenants plugin */
-  listApiKeys: () => apiClient.get<unknown>('/tenants/current/api-keys'),
-  createApiKey: (name: string, permissions: string[]) =>
-    apiClient.post<unknown>('/tenants/current/api-keys', { name, permissions }),
-  deleteApiKey: (id: string) =>
-    apiClient.delete<unknown>(`/tenants/current/api-keys/${id}`),
-
   /** Tools */
-  listTools: () => apiClient.get<unknown>('/tools'),
-  toggleTool: (toolId: string, enabled: boolean) =>
-    apiClient.patch<unknown>(`/tools/${toolId}`, { enabled }),
+  listTools: () => apiDataFetch<unknown>('/tools'),
 };
 
 // ─── Schedule API ────────────────────────────────────────────────────────────

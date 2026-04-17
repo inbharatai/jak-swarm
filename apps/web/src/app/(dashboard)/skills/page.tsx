@@ -11,7 +11,9 @@ import { useToast } from '@/components/ui/toast';
 const SKILL_STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
   ACTIVE: { label: 'Active', variant: 'success' },
   PROPOSED: { label: 'Proposed', variant: 'warning' },
-  SANDBOX_TESTING: { label: 'Testing', variant: 'warning' },
+  SANDBOX_RUNNING: { label: 'Testing', variant: 'warning' },
+  SANDBOX_PASSED: { label: 'Sandbox Passed', variant: 'success' },
+  SANDBOX_FAILED: { label: 'Sandbox Failed', variant: 'destructive' },
   APPROVED: { label: 'Approved', variant: 'success' },
   REJECTED: { label: 'Rejected', variant: 'destructive' },
   DEPRECATED: { label: 'Deprecated', variant: 'secondary' },
@@ -68,6 +70,24 @@ interface Skill {
   createdAt: string;
 }
 
+function buildSkillProposal(input: {
+  name: string;
+  description: string;
+  riskLevel: string;
+  implementation?: string;
+}) {
+  return {
+    name: input.name,
+    description: input.description,
+    riskLevel: input.riskLevel,
+    implementation: input.implementation || undefined,
+    inputSchema: {},
+    outputSchema: {},
+    permissions: [],
+    testCases: [{ name: 'Basic validation', input: {}, expected: {} }],
+  };
+}
+
 export default function SkillsPage() {
   const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,13 +124,7 @@ export default function SkillsPage() {
     try {
       await apiFetch('/skills/propose', {
         method: 'POST',
-        body: {
-          name: newSkill.name,
-          description: newSkill.description,
-          riskLevel: newSkill.riskLevel,
-          implementation: newSkill.implementation || undefined,
-          tier: newSkill.implementation ? 3 : 2,
-        },
+        body: buildSkillProposal(newSkill),
       });
       setShowCreateDialog(false);
       setNewSkill({ name: '', description: '', riskLevel: 'MEDIUM', implementation: '' });
