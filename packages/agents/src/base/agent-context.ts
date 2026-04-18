@@ -1,4 +1,4 @@
-import type { AgentTrace } from '@jak-swarm/shared';
+import type { AgentTrace, SubscriptionTier } from '@jak-swarm/shared';
 import { generateId, generateTraceId } from '@jak-swarm/shared';
 import type { ToolCategory } from '@jak-swarm/shared';
 
@@ -16,6 +16,12 @@ export interface AgentContextParams {
   allowedDomains?: string[];
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
+  /**
+   * Coarse plan tier for gating paid external services. Propagated to every
+   * ToolExecutionContext the agent creates so search adapters can pick
+   * between the paid Serper/Tavily chain vs the free DDG fallback.
+   */
+  subscriptionTier?: SubscriptionTier;
 }
 
 export class AgentContext {
@@ -32,6 +38,7 @@ export class AgentContext {
   readonly allowedDomains: string[];
   readonly restrictedCategories: ToolCategory[];
   readonly disabledToolNames: string[];
+  readonly subscriptionTier: SubscriptionTier | undefined;
   private steps: AgentTrace[] = [];
 
   constructor(params: AgentContextParams) {
@@ -48,6 +55,7 @@ export class AgentContext {
     this.allowedDomains = params.allowedDomains ?? [];
     this.restrictedCategories = params.restrictedCategories ?? [];
     this.disabledToolNames = params.disabledToolNames ?? [];
+    this.subscriptionTier = params.subscriptionTier;
   }
 
   addTrace(trace: AgentTrace): void {
@@ -73,6 +81,7 @@ export class AgentContext {
       allowedDomains: this.allowedDomains,
       restrictedCategories: this.restrictedCategories,
       disabledToolNames: this.disabledToolNames,
+      subscriptionTier: this.subscriptionTier,
       ...overrides,
     });
   }

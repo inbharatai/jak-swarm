@@ -59,6 +59,12 @@ export interface ExecuteAsyncParams {
   maxCostUsd?: number;
   /** Caller-provided idempotency key to prevent duplicate execution on replays. */
   idempotencyKey?: string;
+  /**
+   * Coarse tier for gating paid external services (Serper / Tavily). Populated
+   * at workflow creation from `Subscription.maxModelTier`. 'free' forces DDG-only
+   * search chain; 'paid' (or undefined) allows Serper primary.
+   */
+  subscriptionTier?: 'free' | 'paid';
 }
 
 export interface ResumeParams {
@@ -590,6 +596,7 @@ export class SwarmExecutionService extends EventEmitter {
         roleModes: params.roleModes,
         maxCostUsd: params.maxCostUsd,
         idempotencyKey: params.idempotencyKey,
+        subscriptionTier: params.subscriptionTier,
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {

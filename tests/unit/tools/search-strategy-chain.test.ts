@@ -207,4 +207,149 @@ describe('availableSearchProviders', () => {
     process.env['TAVILY_API_KEY'] = 'y';
     expect(availableSearchProviders().tavily).toBe(true);
   });
+
+  it("subscriptionTier='free' forces paid providers off even when keys are set", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    process.env['TAVILY_API_KEY'] = 'tv-test';
+    const { availableSearchProviders } = await import('../../../packages/tools/src/adapters/search/index.js');
+
+    expect(availableSearchProviders('free')).toEqual({
+      serper: false,
+      tavily: false,
+      duckduckgo: true,
+    });
+    // 'paid' (or undefined) preserves normal behavior
+    expect(availableSearchProviders('paid').serper).toBe(true);
+    expect(availableSearchProviders().serper).toBe(true);
+  });
+
+  it('DISABLE_PAID_SEARCH=1 forces paid providers off regardless of tier', async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    process.env['TAVILY_API_KEY'] = 'tv-test';
+    process.env['DISABLE_PAID_SEARCH'] = '1';
+    const { availableSearchProviders } = await import('../../../packages/tools/src/adapters/search/index.js');
+
+    expect(availableSearchProviders('paid')).toEqual({
+      serper: false,
+      tavily: false,
+      duckduckgo: true,
+    });
+
+    delete process.env['DISABLE_PAID_SEARCH'];
+  });
+});
+
+describe('searchStrategyChain — subscription tier gating', () => {
+  it("FREE plan: Serper key is set but chain goes straight to DDG", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        throw new Error(`Serper hit on FREE plan — should have been skipped, url=${url}`);
+      }
+      if (url.includes('duckduckgo.com')) {
+        return new Response(DDG_STUB_HTML, { status: 200 });
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const { searchStrategyChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchStrategyChain({
+      query: 'cheap tenant',
+      maxResults: 3,
+      fetchContent: false,
+      subscriptionTier: 'free',
+    });
+
+    expect(res.source).toBe('duckduckgo');
+  });
+
+  it("PAID plan: Serper is called even with tier='paid'", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        return jsonResponse({ organic: [{ title: 'Paid result', link: 'https://x.example', snippet: 'y' }] });
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const { searchStrategyChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchStrategyChain({
+      query: 'paid tenant',
+      maxResults: 3,
+      subscriptionTier: 'paid',
+    });
+
+    expect(res.source).toBe('serper');
+  });
+
+  it("subscriptionTier omitted: permissive default (admin scripts, bench)", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        return jsonResponse({ organic: [{ title: 'Admin run', link: 'https://x.example', snippet: 'y' }] });
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const { searchStrategyChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchStrategyChain({ query: 'admin', maxResults: 3 });
+
+    expect(res.source).toBe('serper');
+  });
+});
+
+describe('searchLegacyWithChain — premium-tier helper', () => {
+  it("FREE tier routes to DDG even with SERPER_API_KEY set", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        throw new Error('Serper should not be called on FREE tier via searchLegacyWithChain');
+      }
+      if (url.includes('duckduckgo.com')) {
+        return new Response(DDG_STUB_HTML, { status: 200 });
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const { searchLegacyWithChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchLegacyWithChain('free tenant query', 5, 'free');
+
+    expect(res.source).toBe('duckduckgo');
+    expect(res.results[0]?.snippet).toBe('DDG snippet text');
+  });
+
+  it("PAID tier routes through Serper", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-test';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        return jsonResponse({
+          organic: [{ title: 'Paid result', link: 'https://x.example', snippet: 'serper snippet' }],
+        });
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const { searchLegacyWithChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchLegacyWithChain('paid tenant query', 5, 'paid');
+
+    expect(res.source).toBe('serper');
+    expect(res.results[0]?.snippet).toBe('serper snippet');
+  });
+
+  it("swallows hard errors (legacy contract: empty results, not throw)", async () => {
+    process.env['SERPER_API_KEY'] = 'sk-bad';
+    installFetch(async (url) => {
+      if (url.includes('serper.dev')) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      // DDG must NOT be called after an auth-error fail-fast.
+      throw new Error(`leak to ${url}`);
+    });
+
+    const { searchLegacyWithChain } = await import('../../../packages/tools/src/adapters/search/index.js');
+    const res = await searchLegacyWithChain('oops', 5, 'paid');
+
+    expect(res.source).toBe('search_failed');
+    expect(res.results).toHaveLength(0);
+  });
 });

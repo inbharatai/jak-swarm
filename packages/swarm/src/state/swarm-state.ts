@@ -64,6 +64,12 @@ export interface SwarmState {
   restrictedCategories: ToolCategory[];
   disabledToolNames: string[];
   connectedProviders: string[];
+  /**
+   * Coarse plan tier for gating paid external services (Serper, Tavily).
+   * Populated from Subscription.maxModelTier at workflow creation.
+   * 'free' forces DDG-only search; 'paid' or undefined allows full chain.
+   */
+  subscriptionTier?: 'free' | 'paid';
 
   // Final state
   status: WorkflowStatus;
@@ -87,6 +93,7 @@ export function createInitialSwarmState(params: {
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
   connectedProviders?: string[];
+  subscriptionTier?: 'free' | 'paid';
 }): SwarmState {
   return {
     goal: params.goal,
@@ -118,6 +125,7 @@ export function createInitialSwarmState(params: {
     restrictedCategories: params.restrictedCategories ?? [],
     disabledToolNames: params.disabledToolNames ?? [],
     connectedProviders: params.connectedProviders ?? [],
+    subscriptionTier: params.subscriptionTier,
     status: WS.PENDING,
     error: undefined,
     outputs: [],

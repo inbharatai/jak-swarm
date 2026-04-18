@@ -34,6 +34,15 @@ export interface SearchOptions {
   maxResults?: number;
   /** If true, adapters that only return snippets (DDG) may fetch full page text. */
   fetchContent?: boolean;
+  /**
+   * Subscription tier for gating paid providers (Serper, Tavily). When 'free',
+   * the strategy chain skips paid providers regardless of whether their keys
+   * are configured. When 'paid' or undefined, the full chain runs.
+   *
+   * Populated from `ToolExecutionContext.subscriptionTier` (which is in turn
+   * populated from `Subscription.maxModelTier >= 2` at workflow creation).
+   */
+  subscriptionTier?: 'free' | 'paid';
 }
 
 /**

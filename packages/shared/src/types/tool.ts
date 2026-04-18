@@ -64,6 +64,20 @@ export interface ToolMetadata {
   sideEffectLevel?: ToolSideEffectLevel;
 }
 
+/**
+ * Subscription tier coarse-grained for runtime gating of paid external services
+ * (search APIs, vision APIs, etc.).
+ *
+ * Derived from `Subscription.maxModelTier` at workflow creation time:
+ *   maxModelTier >= 2  -> 'paid'
+ *   otherwise          -> 'free'
+ *
+ * When undefined (admin scripts, bench harness, dev without a tenant), the
+ * gate is OPEN — callers behave as if on 'paid'. This preserves backwards
+ * compatibility for non-workflow call sites.
+ */
+export type SubscriptionTier = 'free' | 'paid';
+
 export interface ToolExecutionContext {
   tenantId: string;
   userId: string;
@@ -73,6 +87,11 @@ export interface ToolExecutionContext {
   idempotencyKey?: string;
   allowedDomains?: string[];
   db?: Record<string, unknown>;
+  /**
+   * Coarse plan tier for gating paid external services. Populated from the
+   * tenant's Subscription at workflow creation. Undefined = no gate (permissive).
+   */
+  subscriptionTier?: SubscriptionTier;
 }
 
 export interface ToolResult<T = unknown> {

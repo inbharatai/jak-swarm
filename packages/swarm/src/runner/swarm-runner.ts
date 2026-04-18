@@ -28,6 +28,11 @@ export interface RunParams {
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
   connectedProviders?: string[];
+  /**
+   * Coarse plan tier for gating paid external services (Serper, Tavily).
+   * 'free' forces DDG-only search; 'paid' or undefined allows the full chain.
+   */
+  subscriptionTier?: 'free' | 'paid';
   loadState?: (id: string) => Promise<unknown | undefined>;
   /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
   circuitBreakerFactory?: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
@@ -151,6 +156,7 @@ export class SwarmRunner {
         restrictedCategories: params.restrictedCategories,
         disabledToolNames: params.disabledToolNames,
         connectedProviders: params.connectedProviders,
+        subscriptionTier: params.subscriptionTier,
       }),
       // Inject distributed circuit breaker factory if provided
       ...(params.circuitBreakerFactory ? { circuitBreakerFactory: params.circuitBreakerFactory } : {}),

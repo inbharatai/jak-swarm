@@ -51,6 +51,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     restrictedCategories: state.restrictedCategories,
     disabledToolNames: state.disabledToolNames,
     connectedProviders: state.connectedProviders,
+    subscriptionTier: state.subscriptionTier,
   });
 
   let output: unknown;

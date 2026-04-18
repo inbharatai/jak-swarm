@@ -440,6 +440,7 @@ ${lines.join('\n')}
       approvalId: context.approvalId,
       idempotencyKey: context.idempotencyKey,
       allowedDomains: context.allowedDomains,
+      subscriptionTier: context.subscriptionTier,
     };
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {

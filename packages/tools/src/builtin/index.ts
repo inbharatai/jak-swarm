@@ -8,6 +8,7 @@ import { getEmailAdapter, getCalendarAdapter, getCRMAdapterFromEnv, hasRealAdapt
 import {
   searchStrategyChain,
   searchDuckDuckGoLegacy as searchDuckDuckGo,
+  searchLegacyWithChain,
   fetchPageContent,
 } from '../adapters/search/index.js';
 
@@ -632,16 +633,18 @@ export function registerBuiltinTools(): void {
       },
       version: '2.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { query, maxResults = 5, fetchContent = true } = input as {
         query: string; maxResults?: number; fetchContent?: boolean;
       };
       try {
-        return await searchStrategyChain({ query, maxResults, fetchContent });
+        return await searchStrategyChain({
+          query,
+          maxResults,
+          fetchContent,
+          subscriptionTier: context.subscriptionTier,
+        });
       } catch (err) {
-        // Hard errors from the chain (misconfigured keys, bad query) — return
-        // the same JSON-error shape the previous implementation used so callers
-        // don't need to branch.
         const errorMessage = err instanceof Error ? err.message : String(err);
         return {
           results: [],
@@ -2604,11 +2607,13 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       try {
         const { name, company, role } = input as { name: string; company: string; role?: string };
         const query = `${name} ${company} LinkedIn${role ? ' ' + role : ''}`;
-        const { results } = await searchDuckDuckGo(query, 5);
+        // Premium tier: routes through Serper → Tavily → DDG when tenant is on a
+        // paid plan, DDG only when on FREE plan (protects margin).
+        const { results } = await searchLegacyWithChain(query, 5, context.subscriptionTier);
         const linkedinResult = results.find(r => r.url.includes('linkedin.com'));
         return {
           name,
@@ -2648,10 +2653,11 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       try {
         const { company } = input as { company: string };
-        const { results } = await searchDuckDuckGo(`${company} about funding employees`, 5);
+        // Premium tier: chain for paid plans, DDG only for FREE (margin protection).
+        const { results } = await searchLegacyWithChain(`${company} about funding employees`, 5, context.subscriptionTier);
         const contentSnippets = results.map(r => r.snippet).join(' ');
         return {
           name: company,
@@ -3025,10 +3031,11 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       try {
         const { keyword } = input as { keyword: string };
-        const { results: searchResults } = await searchDuckDuckGo(keyword, 5);
+        // Premium tier: chain for paid plans, DDG only for FREE.
+        const { results: searchResults } = await searchLegacyWithChain(keyword, 5, context.subscriptionTier);
         const analyzed = [];
         let totalWords = 0;
         for (const result of searchResults.slice(0, 5)) {
@@ -3503,13 +3510,14 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       try {
         const { company, roles } = input as { company: string; roles: string[] };
         const decisionMakers: Array<{ name: string; title: string; source: string }> = [];
         for (const role of roles.slice(0, 5)) {
           try {
-            const { results } = await searchDuckDuckGo(`${company} ${role} LinkedIn`, 3);
+            // Premium tier: chain for paid plans, DDG only for FREE.
+            const { results } = await searchLegacyWithChain(`${company} ${role} LinkedIn`, 3, context.subscriptionTier);
             for (const r of results) {
               if (r.url.includes('linkedin.com') || r.title.toLowerCase().includes(role.toLowerCase())) {
                 decisionMakers.push({

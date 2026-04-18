@@ -1,8 +1,10 @@
 # Search Stack
 
 JAK's web-search layer uses a **three-provider strategy chain** behind a single
-tool (`web_search`). Callers don't need to know which provider answered; each
-provider adapter normalises its response to the same shape.
+tool (`web_search`), plus a per-tenant **subscription-tier gate** that forces
+paid providers off for FREE-plan tenants to protect margin. Callers don't need
+to know which provider answered; each provider adapter normalises its response
+to the same shape.
 
 ## Provider chain (priority order)
 
@@ -13,6 +15,54 @@ provider adapter normalises its response to the same shape.
 | 3 | **DuckDuckGo HTML scrape** | none (free) | Always last in chain | Heuristic — brittle to markup changes, no answer box | $0 |
 
 The chain lives at [`packages/tools/src/adapters/search/index.ts`](../packages/tools/src/adapters/search/index.ts).
+
+## Subscription-tier gating
+
+Derived from `Subscription.maxModelTier` at workflow creation time
+(`apps/api/src/routes/workflows.routes.ts`):
+
+| Plan | `maxModelTier` | Tier | Paid providers allowed? |
+|---|---|---|---|
+| FREE ($0) | 1 | `'free'` | ❌ DDG only |
+| STARTER / PRO ($29) | 3 | `'paid'` | ✅ Serper → Tavily → DDG |
+| TEAM ($99) | 3 | `'paid'` | ✅ |
+| ENTERPRISE ($249) | 3 | `'paid'` | ✅ |
+
+The tier propagates through `ExecuteAsyncParams` → `SwarmState` → `AgentContext`
+→ `ToolExecutionContext.subscriptionTier` → `SearchOptions.subscriptionTier` →
+`availableSearchProviders(tier)`. Admin scripts and the benchmark harness
+omit the tier (undefined = permissive, all configured providers allowed).
+
+### Internal tool cost tiers
+
+The 15 internal tools that make web-search calls are split by expected
+call volume and the marginal quality benefit of Serper over DDG:
+
+**Premium (4 tools, chain-backed — `searchLegacyWithChain`):**
+- `enrich_contact`, `enrich_company`, `analyze_serp`, `find_decision_makers`
+- Per-workflow, bounded volume; Serper's Google-grade results materially
+  better for "who is this person/company at this URL right now?"
+
+**Free-tier only (11 tools, DDG direct — `searchDuckDuckGoLegacy`):**
+- Monitoring crons: `monitor_rankings`, `monitor_brand_mentions`,
+  `monitor_company_signals`, `monitor_competitors`, `monitor_regulations`
+- Social auto-engagement: `auto_reply_reddit/twitter`,
+  `auto_engage_reddit/twitter/linkedin`
+- `check_dependencies`
+- High volume + marginal quality delta means Serper spend here kills margin
+  without meaningfully improving results.
+
+FREE-plan tenants fall back to DDG even in the "premium" 4 tools — the tier
+gate short-circuits the chain regardless of which tool is calling it.
+
+## Kill switch + cost logging
+
+- `DISABLE_PAID_SEARCH=1` — global kill switch. Forces every search (including
+  the benchmark harness and admin scripts) to DDG only until unset. Use when a
+  Serper bill spike needs instant containment.
+- `SEARCH_PROVIDER_LOG=1` — emits a JSON line to stderr on every paid search
+  call (`provider`, `query` truncated to 200 chars, `latencyMs`, `ok`, `ts`).
+  Pipe to a log aggregator for offline cost modeling.
 
 ## Failure policy
 

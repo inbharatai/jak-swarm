@@ -94,6 +94,10 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           ? request.headers['idempotency-key']
           : undefined;
 
+        // Coarse subscription tier for gating paid external services (Serper / Tavily).
+        // maxModelTier 1 = FREE plan → 'free' (DDG only); >= 2 = paid plan → 'paid'.
+        const subscriptionTier: 'free' | 'paid' = maxTier >= 2 ? 'paid' : 'free';
+
         fastify.swarm.enqueueExecution({
           workflowId: workflow.id,
           tenantId,
@@ -103,6 +107,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           roleModes,
           maxCostUsd,
           idempotencyKey,
+          subscriptionTier,
         });
 
         // 3. Return 202 with the created workflow + cost estimate

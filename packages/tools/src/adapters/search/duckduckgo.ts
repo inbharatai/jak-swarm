@@ -12,27 +12,20 @@ import type { SearchAdapter, SearchResponse } from './types.js';
  * helpers) to sit behind the search strategy chain alongside Serper + Tavily.
  */
 
-interface DdgRawResult {
+export interface DdgRawResult {
   title: string;
   url: string;
   snippet: string;
 }
 
 /**
- * Legacy-shape helper preserved so internal tools in builtin/index.ts (19 call
- * sites for CRM enrichment, deal search, SERP analysis, social scraping, etc.)
- * can keep their `{title, url, snippet}` contract. Prefer the `searchDuckDuckGo`
- * adapter below for new code.
+ * Internal-only. Hits DuckDuckGo HTML directly and returns the legacy
+ * `{title, url, snippet}` shape. Used by:
+ *   - the `searchDuckDuckGo` adapter below (content enrichment path)
+ *   - the strategy-chain-aware `searchDuckDuckGoLegacy` in ./index.ts
+ *     (which prefers Serper/Tavily and only lands here as fallback)
  */
-export async function searchDuckDuckGoLegacy(
-  query: string,
-  maxResults: number,
-): Promise<{ results: DdgRawResult[]; source: string }> {
-  const results = await searchDuckDuckGoRaw(query, maxResults);
-  return { results, source: 'duckduckgo' };
-}
-
-async function searchDuckDuckGoRaw(
+export async function searchDuckDuckGoRaw(
   query: string,
   maxResults: number,
 ): Promise<DdgRawResult[]> {
