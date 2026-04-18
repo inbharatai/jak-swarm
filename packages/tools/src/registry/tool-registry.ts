@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   ToolMetadata,
   ToolExecutionContext,
@@ -14,6 +15,110 @@ export type ToolExecutor<TInput = unknown, TOutput = unknown> = (
 export interface RegisteredTool {
   metadata: ToolMetadata;
   executor: ToolExecutor;
+  /** Compiled Zod schema for input. Cached at registration. */
+  inputZod?: z.ZodTypeAny;
+  /** Compiled Zod schema for output. Cached at registration. */
+  outputZod?: z.ZodTypeAny;
+}
+
+/**
+ * Convert a JSON-schema-lite descriptor to a Zod schema.
+ *
+ * Supports the shape used throughout packages/tools/src/builtin/index.ts:
+ *   { type: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'null',
+ *     properties?, required?, items?, enum?, format?, minLength?, maxLength?,
+ *     minimum?, maximum?, minItems?, maxItems?, additionalProperties? }
+ *
+ * Already-Zod schemas (anything with a `_def` property) are returned as-is, so
+ * future tools can register a Zod schema directly without wrapping.
+ *
+ * Unrecognised shapes degrade to `z.any()` rather than throwing — this keeps
+ * 119 historical tool registrations working without per-tool migration.
+ */
+function jsonSchemaToZod(schema: unknown): z.ZodTypeAny {
+  if (schema && typeof schema === 'object' && '_def' in (schema as Record<string, unknown>)) {
+    return schema as unknown as z.ZodTypeAny;
+  }
+  if (!schema || typeof schema !== 'object') return z.any();
+
+  const s = schema as Record<string, unknown>;
+  const type = s['type'] as string | undefined;
+
+  // Enum at any level
+  const enumVals = s['enum'];
+  if (Array.isArray(enumVals) && enumVals.length > 0 && enumVals.every((v) => typeof v === 'string')) {
+    return z.enum(enumVals as [string, ...string[]]);
+  }
+
+  switch (type) {
+    case 'string': {
+      let str: z.ZodString = z.string();
+      const format = s['format'];
+      if (format === 'email') str = str.email();
+      if (format === 'url' || format === 'uri') str = str.url();
+      if (format === 'uuid') str = str.uuid();
+      if (typeof s['minLength'] === 'number') str = str.min(s['minLength'] as number);
+      if (typeof s['maxLength'] === 'number') str = str.max(s['maxLength'] as number);
+      return str;
+    }
+    case 'number':
+    case 'integer': {
+      let num: z.ZodNumber = z.number();
+      if (type === 'integer') num = num.int();
+      if (typeof s['minimum'] === 'number') num = num.min(s['minimum'] as number);
+      if (typeof s['maximum'] === 'number') num = num.max(s['maximum'] as number);
+      return num;
+    }
+    case 'boolean':
+      return z.boolean();
+    case 'null':
+      return z.null();
+    case 'array': {
+      const items = s['items'];
+      const itemSchema = items ? jsonSchemaToZod(items) : z.any();
+      let arr: z.ZodArray<z.ZodTypeAny> = z.array(itemSchema);
+      if (typeof s['minItems'] === 'number') arr = arr.min(s['minItems'] as number);
+      if (typeof s['maxItems'] === 'number') arr = arr.max(s['maxItems'] as number);
+      return arr;
+    }
+    case 'object':
+    default: {
+      const properties = s['properties'] as Record<string, unknown> | undefined;
+      const required = (s['required'] as string[] | undefined) ?? [];
+      if (!properties) {
+        // Bare `{ type: 'object' }` — accept any record.
+        return z.record(z.any());
+      }
+      const shape: Record<string, z.ZodTypeAny> = {};
+      for (const [k, v] of Object.entries(properties)) {
+        const fieldSchema = jsonSchemaToZod(v);
+        shape[k] = required.includes(k) ? fieldSchema : fieldSchema.optional();
+      }
+      let obj: z.ZodObject<z.ZodRawShape> = z.object(shape);
+      if (s['additionalProperties'] === false) {
+        obj = obj.strict();
+      } else {
+        obj = obj.passthrough();
+      }
+      return obj;
+    }
+  }
+}
+
+function formatZodError(err: z.ZodError): string {
+  return err.errors
+    .map((e) => `${e.path.join('.') || '<root>'}: ${e.message}`)
+    .join('; ');
+}
+
+function compileSchema(schema: Record<string, unknown> | undefined): z.ZodTypeAny | undefined {
+  if (!schema || Object.keys(schema).length === 0) return undefined;
+  try {
+    return jsonSchemaToZod(schema);
+  } catch {
+    // Defensive: a malformed schema must not crash registration.
+    return undefined;
+  }
 }
 
 export class ToolRegistry {
@@ -35,6 +140,10 @@ export class ToolRegistry {
    * Throws on duplicate name unless `options.allowOverride` is true. Silent shadowing was
    * the historical behavior and hid a real semantic collision (`verify_email` registered
    * twice). Tests that need to swap an executor must pass `allowOverride: true` explicitly.
+   *
+   * Input/output schemas are compiled to Zod once at registration. Compilation failures
+   * are silent (no schema is cached) — execution then runs without validation rather than
+   * blocking the tool.
    */
   register<TInput = unknown, TOutput = unknown>(
     metadata: ToolMetadata,
@@ -53,6 +162,8 @@ export class ToolRegistry {
     this.tools.set(metadata.name, {
       metadata,
       executor: executor as ToolExecutor,
+      inputZod: compileSchema(metadata.inputSchema as Record<string, unknown> | undefined),
+      outputZod: compileSchema(metadata.outputSchema as Record<string, unknown> | undefined),
     });
   }
 
@@ -87,6 +198,11 @@ export class ToolRegistry {
 
   /**
    * Execute a tool by name with validated input.
+   *
+   * Input validation is hard-failure (returns a structured error) for any tool that has
+   * a non-empty inputSchema. Output validation is advisory by default — a mismatch attaches
+   * an `outputSchemaWarning` to the successful result. Set `JAK_TOOL_OUTPUT_STRICT=1` to
+   * make output mismatches a hard failure (for staging / contract-test environments).
    */
   async execute<TOutput = unknown>(
     name: string,
@@ -104,13 +220,12 @@ export class ToolRegistry {
       };
     }
 
-    // Validate input schema if provided
-    if (registered.metadata.inputSchema && Object.keys(registered.metadata.inputSchema).length > 0) {
-      const validationError = this.validateInput(input, registered.metadata.inputSchema);
-      if (validationError) {
+    if (registered.inputZod) {
+      const parsed = registered.inputZod.safeParse(input);
+      if (!parsed.success) {
         return {
           success: false,
-          error: `Input validation failed for tool '${name}': ${validationError}`,
+          error: `Input validation failed for tool '${name}': ${formatZodError(parsed.error)}`,
           durationMs: Date.now() - startedAt,
         };
       }
@@ -120,19 +235,27 @@ export class ToolRegistry {
       const output = await registered.executor(input, context);
       const durationMs = Date.now() - startedAt;
 
-      // Validate output against declared schema (advisory — logs warning, does not fail)
-      if (registered.metadata.outputSchema && Object.keys(registered.metadata.outputSchema).length > 0) {
-        const outputValidationError = this.validateOutput(output, registered.metadata.outputSchema);
-        if (outputValidationError) {
-          // Log but don't fail — output schema violations are advisory
+      if (registered.outputZod) {
+        const parsed = registered.outputZod.safeParse(output);
+        if (!parsed.success) {
+          const warning = `Output schema mismatch for tool '${name}': ${formatZodError(parsed.error)}`;
+          const strict =
+            process.env['JAK_TOOL_OUTPUT_STRICT'] === '1' ||
+            process.env['JAK_TOOL_OUTPUT_STRICT'] === 'true';
+          if (strict) {
+            return {
+              success: false,
+              error: warning,
+              durationMs,
+            };
+          }
           const result: ToolResult<TOutput> = {
             success: true,
             data: output as TOutput,
             durationMs,
           };
-          // Attach warning to result for downstream consumers
           (result as ToolResult<TOutput> & { outputSchemaWarning?: string }).outputSchemaWarning =
-            `Output schema mismatch for tool '${name}': ${outputValidationError}`;
+            warning;
           return result;
         }
       }
@@ -167,78 +290,10 @@ export class ToolRegistry {
   clear(): void {
     this.tools.clear();
   }
-
-  private validateInput(
-    input: unknown,
-    schema: Record<string, unknown>,
-  ): string | null {
-    return this.validateAgainstSchema(input, schema, 'input');
-  }
-
-  private validateOutput(
-    output: unknown,
-    schema: Record<string, unknown>,
-  ): string | null {
-    return this.validateAgainstSchema(output, schema, 'output');
-  }
-
-  private validateAgainstSchema(
-    data: unknown,
-    schema: Record<string, unknown>,
-    label: string,
-  ): string | null {
-    const properties = schema['properties'] as Record<string, { type: string }> | undefined;
-    const required = schema['required'] as string[] | undefined;
-
-    if (!properties) return null;
-
-    if (typeof data !== 'object' || data === null) {
-      return `${label} must be an object`;
-    }
-
-    const dataObj = data as Record<string, unknown>;
-
-    // Check required fields
-    if (required) {
-      for (const field of required) {
-        if (!(field in dataObj) || dataObj[field] === undefined || dataObj[field] === null) {
-          return `Required ${label} field '${field}' is missing`;
-        }
-      }
-    }
-
-    // Check types for provided fields
-    for (const [field, spec] of Object.entries(properties)) {
-      if (field in dataObj) {
-        const value = dataObj[field];
-        const expectedType = spec.type;
-
-        if (!this.checkType(value, expectedType)) {
-          return `${label} field '${field}' should be of type '${expectedType}'`;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private checkType(value: unknown, expectedType: string): boolean {
-    switch (expectedType) {
-      case 'string':
-        return typeof value === 'string';
-      case 'number':
-        return typeof value === 'number';
-      case 'boolean':
-        return typeof value === 'boolean';
-      case 'array':
-        return Array.isArray(value);
-      case 'object':
-        return typeof value === 'object' && value !== null && !Array.isArray(value);
-      default:
-        return true;
-    }
-  }
 }
 
 // Export singleton accessor
 export const toolRegistry = ToolRegistry.getInstance();
+
+// Export converter so callers / tests can inspect compiled schemas if needed.
+export { jsonSchemaToZod };
