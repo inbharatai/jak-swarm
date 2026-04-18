@@ -38,6 +38,23 @@ export type { WorkflowStateStore } from './state/workflow-state-store.js';
 
 // Runner
 export { SwarmRunner } from './runner/swarm-runner.js';
+
+// Workflows — higher-level orchestrations that compose agents outside the
+// general SwarmGraph (e.g., the cyclic Vibe Coder debug-retry chain).
+export {
+  runVibeCoderWorkflow,
+  heuristicBuildChecker,
+  passThroughBuildChecker,
+} from './workflows/vibe-coder-workflow.js';
+export type {
+  VibeCoderParams,
+  VibeCoderResult,
+  VibeCoderEvent,
+  VibeCoderEventType,
+  BuildChecker,
+  BuildResult,
+} from './workflows/vibe-coder-workflow.js';
+export { staticBuildChecker } from './workflows/static-build-checker.js';
 export type { RunParams, SwarmResult, ApprovalDecision } from './runner/swarm-runner.js';
 
 // Supervisor

@@ -160,7 +160,7 @@ export { AppArchitectAgent } from './workers/app-architect.agent.js';
 export type { AppArchitectAction, AppArchitectTask, AppArchitectResult } from './workers/app-architect.agent.js';
 
 export { AppGeneratorAgent } from './workers/app-generator.agent.js';
-export type { AppGeneratorAction, AppGeneratorTask, AppGeneratorResult } from './workers/app-generator.agent.js';
+export type { AppGeneratorAction, AppGeneratorTask, AppGeneratorResult, GeneratedFile } from './workers/app-generator.agent.js';
 
 export { AppDebuggerAgent } from './workers/app-debugger.agent.js';
 export type { AppDebuggerAction, AppDebuggerTask, AppDebuggerResult } from './workers/app-debugger.agent.js';
