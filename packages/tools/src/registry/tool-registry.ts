@@ -5,6 +5,7 @@ import type {
   ToolResult,
   ToolCategory,
   ToolRiskClass,
+  ToolMaturity,
 } from '@jak-swarm/shared';
 
 export type ToolExecutor<TInput = unknown, TOutput = unknown> = (
@@ -289,6 +290,58 @@ export class ToolRegistry {
    */
   clear(): void {
     this.tools.clear();
+  }
+
+  /**
+   * Honest summary of registered tools by maturity / category.
+   *
+   * Tools without an explicit `maturity` are bucketed as 'unclassified' so the
+   * truth-check (P0b) can surface coverage gaps. The intent is for this manifest
+   * — not the raw registration count — to drive any "production tools" claim
+   * in marketing copy and trace UI badges.
+   */
+  getManifest(): {
+    total: number;
+    byMaturity: Record<ToolMaturity, number>;
+    byCategory: Record<string, number>;
+    requiresApproval: number;
+    liveTested: number;
+    unclassifiedNames: string[];
+  } {
+    const byMaturity: Record<ToolMaturity, number> = {
+      real: 0,
+      config_dependent: 0,
+      heuristic: 0,
+      llm_passthrough: 0,
+      experimental: 0,
+      test_only: 0,
+      unclassified: 0,
+    };
+    const byCategory: Record<string, number> = {};
+    const unclassifiedNames: string[] = [];
+    let requiresApproval = 0;
+    let liveTested = 0;
+
+    for (const { metadata } of this.tools.values()) {
+      const maturity = metadata.maturity ?? 'unclassified';
+      byMaturity[maturity] += 1;
+      if (maturity === 'unclassified') unclassifiedNames.push(metadata.name);
+
+      const cat = String(metadata.category);
+      byCategory[cat] = (byCategory[cat] ?? 0) + 1;
+
+      if (metadata.requiresApproval) requiresApproval += 1;
+      if (metadata.liveTested) liveTested += 1;
+    }
+
+    return {
+      total: this.tools.size,
+      byMaturity,
+      byCategory,
+      requiresApproval,
+      liveTested,
+      unclassifiedNames,
+    };
   }
 }
 

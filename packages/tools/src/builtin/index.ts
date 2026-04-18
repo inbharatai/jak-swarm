@@ -94,6 +94,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.EMAIL,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -129,6 +133,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.EMAIL,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -155,6 +163,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.EMAIL,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -523,6 +535,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -687,6 +702,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      // 'real' because the DDG fallback is a real HTTP scrape; quality improves with TAVILY_API_KEY.
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1035,6 +1054,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      // 'real' Playwright; depends on tenant allowedDomains policy (enforced via context).
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2407,6 +2430,11 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      // 'real' for JS (vm-sandboxed). Python path is host-only and gated by NODE_ENV;
+      // production Python should route through sandbox_exec (Docker / E2B adapters).
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2526,6 +2554,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CALENDAR,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: { type: 'object', properties: { attendees: { type: 'array' }, dateRange: { type: 'object' } } },
       outputSchema: { type: 'object' },
       version: '1.0.0',
@@ -2542,6 +2573,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: { type: 'object', properties: { query: { type: 'string' }, status: { type: 'string' } }, required: ['query'] },
       outputSchema: { type: 'object' },
       version: '1.0.0',
@@ -2558,6 +2592,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: { type: 'object', properties: { content: { type: 'string' } }, required: ['content'] },
       outputSchema: { type: 'object' },
       version: '1.0.0',
@@ -2575,6 +2612,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: { type: 'object', properties: { email: { type: 'string' }, customerId: { type: 'string' } } },
       outputSchema: { type: 'object' },
       version: '1.0.0',
@@ -2705,6 +2745,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      // Real DNS lookup + regex; no external API key needed.
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2755,6 +2799,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'heuristic',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5299,6 +5346,11 @@ Date: _______________`;
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      // Routes to @jak-swarm/verification; multi-layer (rules + AI). 'config_dependent'
+      // because higher-tier verification layers need provider keys to do real work.
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5567,6 +5619,10 @@ Date: _______________`;
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GITHUB_PAT'],
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
