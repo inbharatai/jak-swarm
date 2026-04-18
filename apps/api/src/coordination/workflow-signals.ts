@@ -13,7 +13,9 @@
  */
 
 export interface WorkflowSignal {
-  type: 'pause' | 'stop' | 'resume';
+  // 'unpause' is broadcast so whichever instance holds the paused workflow can resume it.
+  // 'resume' is reserved for resume-after-approval flows (Phase 1b).
+  type: 'pause' | 'unpause' | 'stop' | 'resume';
   workflowId: string;
   issuedBy: string; // instance ID or user ID
   timestamp: string;

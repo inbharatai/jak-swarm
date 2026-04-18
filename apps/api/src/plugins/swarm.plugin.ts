@@ -175,12 +175,27 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     swarmService.stopQueueWorker();
   });
 
-  // Wire workflow signals: when another instance sends pause/stop, apply locally
+  // Wire workflow signals: when another instance sends pause/unpause/stop, apply locally.
+  // Unpause uses a distributed lock so only one instance actually resumes the workflow.
   signals.subscribe((signal) => {
     if (signal.type === 'pause') {
       swarmService.pauseWorkflow(signal.workflowId);
     } else if (signal.type === 'stop') {
       swarmService.stopWorkflow(signal.workflowId);
+    } else if (signal.type === 'unpause') {
+      swarmService.unpauseWorkflow(signal.workflowId); // idempotent
+      void (async () => {
+        const acquired = await withLock(locks, `resume:${signal.workflowId}`, 60_000, async () => {
+          await swarmService.resumeWorkflow(signal.workflowId);
+          return true;
+        });
+        if (acquired === null) {
+          fastify.log.info(
+            { workflowId: signal.workflowId },
+            '[Coordination] Unpause handled by another instance',
+          );
+        }
+      })();
     }
     fastify.log.info({ signal }, '[Coordination] Received workflow signal');
   });

@@ -368,11 +368,16 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send(err('BAD_REQUEST', `Cannot unpause workflow in ${workflow.status} status`));
       }
 
-      fastify.swarm.unpauseWorkflow(workflowId);
+      // Broadcast unpause signal — whichever instance holds the paused workflow will resume it
+      // under a distributed lock (see subscriber in plugins/swarm.plugin.ts and worker-entry.ts).
+      fastify.swarm.unpauseWorkflow(workflowId); // Local instance (idempotent)
+      await fastify.coordination.signals.publish({
+        type: 'unpause',
+        workflowId,
+        issuedBy: request.user.userId,
+        timestamp: new Date().toISOString(),
+      });
       await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING' } });
-
-      // Resume the workflow from where it paused
-      setImmediate(() => { void fastify.swarm.resumeWorkflow(workflowId); });
 
       return reply.send(ok({ success: true, message: 'Workflow resumed' }));
     },

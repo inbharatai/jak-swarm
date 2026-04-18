@@ -75,12 +75,27 @@ async function main(): Promise<void> {
   swarmService.startQueueWorker();
   log.info({ mode: 'standalone' }, '[Worker] Queue worker started');
 
-  // Apply workflow signals from other instances
+  // Apply workflow signals from other instances.
+  // Unpause uses a distributed lock so only one instance resumes the workflow.
   signals.subscribe((signal) => {
     if (signal.type === 'pause') {
       swarmService.pauseWorkflow(signal.workflowId);
     } else if (signal.type === 'stop') {
       swarmService.stopWorkflow(signal.workflowId);
+    } else if (signal.type === 'unpause') {
+      swarmService.unpauseWorkflow(signal.workflowId); // idempotent
+      void (async () => {
+        const acquired = await withLock(locks, `resume:${signal.workflowId}`, 60_000, async () => {
+          await swarmService.resumeWorkflow(signal.workflowId);
+          return true;
+        });
+        if (acquired === null) {
+          log.info(
+            { workflowId: signal.workflowId },
+            '[Worker] Unpause handled by another instance',
+          );
+        }
+      })();
     }
     log.info({ signal }, '[Worker] Received workflow signal');
   });
