@@ -78,9 +78,13 @@ function checkBrowserAllowlist(
 
 /**
  * Register all built-in tools in the global ToolRegistry.
- * Call this once at application startup.
+ * Call this once at application startup. Safe to call multiple times — bails out if
+ * the registry is already populated, which keeps test `beforeAll` patterns working
+ * even though the registry now throws on individual duplicate registrations.
  */
 export function registerBuiltinTools(): void {
+  if (toolRegistry.list().length > 0) return;
+
   // ─── EMAIL TOOLS ─────────────────────────────────────────────────────────
 
   toolRegistry.register(
@@ -2676,11 +2680,13 @@ export function registerBuiltinTools(): void {
     },
   );
 
-  // 3. verify_email — regex + DNS MX record check, completely FREE
+  // 3. verify_email_deliverability — regex + DNS MX record check, completely FREE.
+  // Renamed from verify_email to remove the silent collision with the threat-analysis
+  // tool below. Deliverability and risk analysis are different concerns.
   toolRegistry.register(
     {
-      name: 'verify_email',
-      description: 'Verify an email address using format validation and DNS MX record lookup. Completely FREE, no API needed.',
+      name: 'verify_email_deliverability',
+      description: 'Verify an email address is deliverable using format validation and DNS MX record lookup. Completely FREE, no API needed.',
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
@@ -5269,9 +5275,11 @@ Date: _______________`;
 
   // ─── VERIFICATION & RISK INTELLIGENCE TOOLS ───────────────────────────────
 
+  // analyze_email_risk — phishing/spoofing/BEC analysis. Renamed from verify_email
+  // to remove the silent collision with the deliverability tool above.
   toolRegistry.register(
     {
-      name: 'verify_email',
+      name: 'analyze_email_risk',
       description: 'Analyze an email for phishing, spoofing, spam, and social engineering threats. Returns risk score, findings, and recommended actions.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,

@@ -124,7 +124,7 @@ For DECISION_MAKER_SEARCH:
 You have access to these tools:
 - enrich_contact: Find professional info about a contact via web search
 - enrich_company: Find company info (funding, size, tech stack) via web search
-- verify_email: Verify email format and DNS MX records
+- verify_email_deliverability: Verify email format and DNS MX records
 - score_lead: Score a lead using heuristic rules
 - audit_seo: Perform on-page SEO audit of a URL
 - research_keywords: Research keywords via Google Autocomplete
@@ -193,7 +193,7 @@ export class GrowthAgent extends BaseAgent {
       {
         type: 'function',
         function: {
-          name: 'verify_email',
+          name: 'verify_email_deliverability',
           description: 'Verify email format and DNS MX records',
           parameters: {
             type: 'object',

@@ -251,8 +251,8 @@ async function runMaya() {
 async function runAlex() {
   console.log('\n\x1b[1m\ud83d\udcca ALEX (Operations Manager)\x1b[0m\n');
 
-  await test('Alex', 'Tool: verify_email', async () => {
-    const r = await toolRegistry.execute('verify_email', { email: 'contact@google.com' }, toolCtx);
+  await test('Alex', 'Tool: verify_email_deliverability', async () => {
+    const r = await toolRegistry.execute('verify_email_deliverability', { email: 'contact@google.com' }, toolCtx);
     if (!r.success) throw new Error(r.error);
   });
 

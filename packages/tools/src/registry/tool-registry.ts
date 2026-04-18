@@ -31,14 +31,24 @@ export class ToolRegistry {
 
   /**
    * Register a tool with its metadata and executor function.
+   *
+   * Throws on duplicate name unless `options.allowOverride` is true. Silent shadowing was
+   * the historical behavior and hid a real semantic collision (`verify_email` registered
+   * twice). Tests that need to swap an executor must pass `allowOverride: true` explicitly.
    */
   register<TInput = unknown, TOutput = unknown>(
     metadata: ToolMetadata,
     executor: ToolExecutor<TInput, TOutput>,
+    options?: { allowOverride?: boolean },
   ): void {
     if (this.tools.has(metadata.name)) {
-      // Allow re-registration (useful for overrides in tests)
-      // console.warn(`[ToolRegistry] Tool '${metadata.name}' is being re-registered`);
+      if (!options?.allowOverride) {
+        throw new Error(
+          `[ToolRegistry] Duplicate tool registration: '${metadata.name}'. ` +
+          `Pass { allowOverride: true } to replace an existing tool intentionally.`,
+        );
+      }
+      console.warn(`[ToolRegistry] Tool '${metadata.name}' is being re-registered (override)`);
     }
     this.tools.set(metadata.name, {
       metadata,

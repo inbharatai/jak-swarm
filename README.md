@@ -674,7 +674,7 @@ http://localhost:3000
 |:---------|:-----:|:------|:------:|
 | **Email** | 10 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email, personalize_email, schedule_email, track_email_engagement, analyze_engagement, create_email_sequence | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
-| **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, enrich_company, verify_email, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn, generate_winback + more | 🔌 Pluggable adapter |
+| **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, enrich_company, verify_email_deliverability, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn, generate_winback + more | 🔌 Pluggable adapter |
 | **Browser** | 30 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs, hover, select, upload, evaluate_js, wait_for, pdf_export, post_to_twitter, post_to_linkedin, post_to_reddit + more | ✅ Real (Playwright) |
 | **Document** | 16 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write, list_directory, generate_image + more | ✅ Real (pdf-parse + DALL-E) |
 | **Research** | 31 | web_search, web_fetch, classify_text, audit_seo, research_keywords, analyze_serp, monitor_rankings, code_execute, discover_posting_platforms + more | ✅ Real (web) |
