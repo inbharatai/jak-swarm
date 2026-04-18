@@ -2,29 +2,54 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
 import { toolRegistry } from '@jak-swarm/tools';
-import { ToolRiskClass, type ToolCategory } from '@jak-swarm/shared';
+import { ToolRiskClass, type ToolCategory, type ToolMaturity } from '@jak-swarm/shared';
 import { randomUUID } from 'node:crypto';
 
 const toolsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /tools
    * List all registered tools with metadata from the real ToolRegistry.
-   * Supports optional ?category= and ?riskClass= query filters.
+   * Supports optional ?category=, ?riskClass=, and ?maturity= query filters.
+   *
+   * Metadata now includes honest maturity classification (maturity,
+   * requiredEnvVars, liveTested, sideEffectLevel) so admin UIs can render
+   * "real / config-dependent / heuristic / llm-passthrough / experimental"
+   * badges instead of treating every tool as equally production-grade.
    */
   fastify.get(
     '/',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { category, riskClass } = request.query as {
+      const { category, riskClass, maturity } = request.query as {
         category?: ToolCategory;
         riskClass?: ToolRiskClass;
+        maturity?: ToolMaturity;
       };
       const filter =
         category || riskClass
           ? { category: category || undefined, riskClass: riskClass || undefined }
           : undefined;
-      const tools = toolRegistry.list(filter);
+      let tools = toolRegistry.list(filter);
+      if (maturity) {
+        tools = tools.filter((t) => (t.maturity ?? 'unclassified') === maturity);
+      }
       return reply.status(200).send(ok(tools));
+    },
+  );
+
+  /**
+   * GET /tools/manifest
+   * Aggregate counts by maturity and category + the names of unclassified tools.
+   *
+   * Consumed by the docs truth-check script (scripts/check-docs-truth.ts) and the
+   * admin observability surfaces. This is the source-of-truth for any "production
+   * tools" claim in README / landing-page copy.
+   */
+  fastify.get(
+    '/manifest',
+    { preHandler: [fastify.authenticate] },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      return reply.status(200).send(ok(toolRegistry.getManifest()));
     },
   );
 
