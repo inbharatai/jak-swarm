@@ -5,6 +5,11 @@ import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
 // Phoring integration removed — disabled
 import { getEmailAdapter, getCalendarAdapter, getCRMAdapterFromEnv, hasRealAdapters } from '../adapters/adapter-factory.js';
+import {
+  searchStrategyChain,
+  searchDuckDuckGoLegacy as searchDuckDuckGo,
+  fetchPageContent,
+} from '../adapters/search/index.js';
 
 const emailAdapter = getEmailAdapter();
 const calendarAdapter = getCalendarAdapter();
@@ -592,134 +597,20 @@ export function registerBuiltinTools(): void {
   // Falls back gracefully if all search methods fail.
 
   /**
-   * Parse DuckDuckGo HTML search results.
-   * DDG's lite HTML endpoint doesn't require authentication or API keys.
+   * Search helpers live under packages/tools/src/adapters/search/ as of Wave 1.
+   * The `web_search` tool below calls `searchStrategyChain()` which picks
+   * Serper → Tavily → DuckDuckGo based on available API keys.
    */
-  async function searchDuckDuckGo(query: string, maxResults: number): Promise<{
-    results: Array<{ title: string; url: string; snippet: string }>;
-    source: string;
-  }> {
-    const encodedQuery = encodeURIComponent(query);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
-    let response: Response;
-    try {
-      response = await fetch(`https://html.duckduckgo.com/html/?q=${encodedQuery}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        body: `q=${encodedQuery}`,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (!response.ok) {
-      throw new Error(`DuckDuckGo returned ${response.status}`);
-    }
-
-    const html = await response.text();
-    const results: Array<{ title: string; url: string; snippet: string }> = [];
-
-    // Parse result blocks from DDG HTML — each result is in a div.result
-    // Extract: title from <a class="result__a">, URL from href, snippet from <a class="result__snippet">
-    const resultBlocks = html.split('class="result__body"');
-
-    for (let i = 1; i < resultBlocks.length && results.length < maxResults; i++) {
-      const block = resultBlocks[i]!;
-
-      // Extract title
-      const titleMatch = block.match(/class="result__a"[^>]*>([^<]*)</);
-      const title = titleMatch?.[1]?.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').trim() ?? '';
-
-      // Extract URL — DDG wraps URLs in a redirect, the actual URL is in the uddg parameter
-      const urlMatch = block.match(/href="([^"]*uddg=([^&"]*))/);
-      let url = '';
-      if (urlMatch?.[2]) {
-        try {
-          url = decodeURIComponent(urlMatch[2]);
-        } catch {
-          url = urlMatch[2];
-        }
-      } else {
-        // Fallback: try to find any https URL in the block
-        const directUrlMatch = block.match(/href="(https?:\/\/[^"]+)"/);
-        url = directUrlMatch?.[1] ?? '';
-      }
-
-      // Extract snippet
-      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-      const snippet = snippetMatch?.[1]
-        ?.replace(/<\/?[^>]+(>|$)/g, '') // strip HTML tags
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x27;/g, "'").replace(/&quot;/g, '"')
-        .trim() ?? '';
-
-      if (title && url) {
-        results.push({ title, url, snippet });
-      }
-    }
-
-    return { results, source: 'duckduckgo' };
-  }
-
-  /**
-   * Fetch and extract readable text content from a URL.
-   * Used to get full page content for the top search results.
-   */
-  async function fetchPageContent(url: string, maxChars: number = 3000): Promise<string> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-        redirect: 'follow',
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) return '';
-
-      const html = await response.text();
-
-      // Strip scripts, styles, nav, header, footer
-      let text = html
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-        .replace(/<header[\s\S]*?<\/header>/gi, '')
-        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-        .replace(/<[^>]+>/g, ' ')  // strip remaining HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#x27;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/\s+/g, ' ')     // collapse whitespace
-        .trim();
-
-      return text.slice(0, maxChars);
-    } catch {
-      clearTimeout(timeout);
-      return '';
-    }
-  }
 
   toolRegistry.register(
     {
       name: 'web_search',
-      description: 'Search the web for current information. FREE — no API key required. Uses DuckDuckGo for search results and fetches page content from top results.',
+      description:
+        'Search the web for current information. Provider chain: Serper (primary, requires SERPER_API_KEY) → Tavily (secondary, requires TAVILY_API_KEY) → DuckDuckGo HTML scrape (free fallback, always works but lower quality). Configure SERPER_API_KEY for production-grade results.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      // 'real' because the DDG fallback is a real HTTP scrape; quality improves with TAVILY_API_KEY.
+      // 'real' across all chain tiers. Materially better quality with SERPER_API_KEY or TAVILY_API_KEY.
       maturity: 'real',
       liveTested: false,
       sideEffectLevel: 'external',
@@ -745,86 +636,19 @@ export function registerBuiltinTools(): void {
       const { query, maxResults = 5, fetchContent = true } = input as {
         query: string; maxResults?: number; fetchContent?: boolean;
       };
-
-      // Strategy 1: If Tavily key is available, use it (higher quality)
-      const tavilyKey = process.env['TAVILY_API_KEY'];
-      if (tavilyKey) {
-        try {
-          const response = await fetch('https://api.tavily.com/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              api_key: tavilyKey,
-              query,
-              search_depth: 'basic',
-              max_results: maxResults,
-              include_answer: true,
-            }),
-          });
-
-          if (response.ok) {
-            const data = (await response.json()) as {
-              answer?: string;
-              results?: Array<{ title: string; url: string; content: string; score: number }>;
-            };
-            return {
-              results: (data.results ?? []).map(r => ({
-                title: r.title,
-                url: r.url,
-                content: r.content,
-                relevanceScore: r.score,
-              })),
-              answer: data.answer ?? null,
-              query,
-              source: 'tavily',
-              resultCount: (data.results ?? []).length,
-            };
-          }
-          // Tavily failed — fall through to DuckDuckGo
-        } catch {
-          // Tavily unavailable — fall through to DuckDuckGo
-        }
-      }
-
-      // Strategy 2: FREE DuckDuckGo search (always available, no API key)
       try {
-        const { results: ddgResults, source } = await searchDuckDuckGo(query, maxResults);
-
-        // Optionally fetch full content from top results for better context
-        const enrichedResults = [];
-        for (const result of ddgResults) {
-          let content = result.snippet;
-          if (fetchContent && enrichedResults.length < 3) {
-            // Fetch full page content for top 3 results only (performance)
-            const pageContent = await fetchPageContent(result.url);
-            if (pageContent.length > content.length) {
-              content = pageContent;
-            }
-          }
-          enrichedResults.push({
-            title: result.title,
-            url: result.url,
-            content,
-            relevanceScore: 1 - (enrichedResults.length * 0.1), // rank-based score
-          });
-        }
-
-        return {
-          results: enrichedResults,
-          query,
-          source,
-          resultCount: enrichedResults.length,
-          message: enrichedResults.length > 0
-            ? `Found ${enrichedResults.length} results via DuckDuckGo (free, no API key needed)`
-            : 'No results found. Try rephrasing your query.',
-        };
+        return await searchStrategyChain({ query, maxResults, fetchContent });
       } catch (err) {
+        // Hard errors from the chain (misconfigured keys, bad query) — return
+        // the same JSON-error shape the previous implementation used so callers
+        // don't need to branch.
         const errorMessage = err instanceof Error ? err.message : String(err);
         return {
           results: [],
           query,
           source: 'search_failed',
-          message: `Web search failed: ${errorMessage}. The agent should rely on its built-in knowledge.`,
+          resultCount: 0,
+          message: `Web search failed: ${errorMessage}. Configure SERPER_API_KEY or TAVILY_API_KEY for production-grade search, or rely on built-in knowledge.`,
         };
       }
     },
