@@ -152,7 +152,9 @@ const AGENTS = [
 const STATS = [
   { value: 38, label: 'Agents', suffix: '' },
   { value: 119, label: 'Production Tools', suffix: '' },
-  { value: 21, label: 'Integrations', suffix: '' },
+  // 21 = 12 external SaaS connectors + 9 infrastructure/MCP adapters surfaced in the UI.
+  // Only a subset are production-ready runtime paths — see docs/integration-maturity-matrix.md.
+  { value: 21, label: 'Connectors', suffix: '' },
   { value: 6, label: 'AI Providers', suffix: '' },
 ];
 
