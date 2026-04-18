@@ -2472,6 +2472,21 @@ export function registerBuiltinTools(): void {
       }
 
       if (language === 'python' || language === 'py') {
+        // Production guard: host Python execution is disabled because the JS path is
+        // hardened via vm but the Python path shells out to the host interpreter with
+        // no syscall sandbox. Use sandbox_exec for production Python workloads — it
+        // routes through Docker / E2B (see packages/tools/src/adapters/sandbox/).
+        if (process.env.NODE_ENV === 'production') {
+          return {
+            stdout: '',
+            stderr: 'Host Python execution disabled in production. Use sandbox_exec (Docker/E2B-backed) for Python workloads.',
+            result: null,
+            executionTimeMs: Date.now() - startTime,
+            language: 'python',
+            error: true,
+            errorCode: 'HOST_PYTHON_DISABLED_IN_PRODUCTION',
+          };
+        }
         const { execFile } = require('child_process') as typeof import('child_process');
         return new Promise((resolve) => {
           const proc = execFile(
