@@ -40,6 +40,10 @@ export type { SearchAdapter, SearchOptions, SearchResponse, SearchProviderSource
 export { searchSerper } from './serper.js';
 export { searchTavily } from './tavily.js';
 export { searchDuckDuckGo, fetchPageContent } from './duckduckgo.js';
+export { defaultReranker, inferQueryIntent } from './reranker.js';
+export type { RerankerOptions, RerankerFn, QueryIntent } from './reranker.js';
+
+import { defaultReranker } from './reranker.js';
 
 /**
  * Global kill switch. When truthy, the strategy chain skips paid providers
@@ -145,6 +149,23 @@ export async function searchStrategyChain(opts: SearchOptions): Promise<SearchRe
       const result = await adapter(opts);
       if (name === 'serper' || name === 'tavily') {
         logPaidSearch(name, opts.query, Date.now() - startedAt, true);
+      }
+      // Optional LLM re-ranker — pipes raw results through a cheap LLM that
+      // scores relevance, filters below threshold, and re-orders. Fails safe:
+      // any error returns the original results unchanged.
+      if (opts.rerank && result.results.length > 1) {
+        try {
+          const reranked = await defaultReranker({
+            query: opts.query,
+            results: result.results,
+            maxResults: opts.maxResults,
+            intent: opts.rerankIntent,
+          });
+          return { ...result, results: reranked, resultCount: reranked.length };
+        } catch {
+          // Re-ranker must never break search — surface originals.
+          return result;
+        }
       }
       return result;
     } catch (err) {

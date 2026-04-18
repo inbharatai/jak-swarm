@@ -43,6 +43,25 @@ export interface SearchOptions {
    * populated from `Subscription.maxModelTier >= 2` at workflow creation).
    */
   subscriptionTier?: 'free' | 'paid';
+  /**
+   * When true, pipe chain results through an LLM re-ranker (Claude Haiku
+   * preferred, GPT-4o-mini fallback) that scores each result 0-1 on query
+   * relevance, drops low-score results, and re-orders by score. Fails safe:
+   * any error returns original results unchanged.
+   *
+   * Gated by caller (typically paid-tier only — re-ranking free DDG scrapes
+   * is pointless) and by DISABLE_SEARCH_RERANKER env var.
+   *
+   * Can also be a custom function if the caller wants to inject a different
+   * re-ranker implementation.
+   */
+  rerank?: boolean;
+  /**
+   * Optional query-intent hint for the re-ranker. When omitted, the re-ranker
+   * auto-detects via keyword heuristics. Useful when the caller already knows
+   * the intent (e.g., `monitor_brand_mentions` is always time_sensitive).
+   */
+  rerankIntent?: 'informational' | 'navigational' | 'time_sensitive' | 'technical';
 }
 
 /**

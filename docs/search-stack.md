@@ -60,9 +60,38 @@ gate short-circuits the chain regardless of which tool is calling it.
 - `DISABLE_PAID_SEARCH=1` — global kill switch. Forces every search (including
   the benchmark harness and admin scripts) to DDG only until unset. Use when a
   Serper bill spike needs instant containment.
+- `DISABLE_SEARCH_RERANKER=1` — same idea for the LLM re-ranker. Turns it into
+  a no-op globally without a code deploy.
 - `SEARCH_PROVIDER_LOG=1` — emits a JSON line to stderr on every paid search
   call (`provider`, `query` truncated to 200 chars, `latencyMs`, `ok`, `ts`).
+  Emits a separate `event: 'search_rerank'` line per re-ranker invocation.
   Pipe to a log aggregator for offline cost modeling.
+
+## LLM re-ranker
+
+After the strategy chain returns N raw results, `web_search` (on paid tiers
+only) pipes them through a cheap LLM that scores each result 0-1 on relevance
+to the user's query, drops low-score results, and re-sorts by score. This is
+the single biggest accuracy lift on top of any search API — raw Serper/Tavily
+results are ranked by the provider's own signal, which doesn't know the
+user's specific intent.
+
+- **Provider**: Claude Haiku 4.5 primary, GPT-4o-mini fallback, pass-through
+  no-op if neither key is configured.
+- **Cost**: ~$0.0017 per re-rank on Haiku (~$0.85/mo for 500 searches/tenant),
+  ~$0.0003 on GPT-4o-mini. Cheaper than Serper itself.
+- **Latency**: +300-1500ms per search (5s hard timeout).
+- **Gating**: only when `subscriptionTier === 'paid'` AND `rerank: true` AND
+  `DISABLE_SEARCH_RERANKER` is unset. FREE-plan tenants never pay for it.
+- **Fail-safe**: any error (malformed JSON, timeout, 5xx, missing key) returns
+  the un-ranked results unchanged. Re-ranking must never break search.
+- **Intent detection**: the re-ranker infers query intent (`informational`,
+  `navigational`, `time_sensitive`, `technical`) via keyword heuristics unless
+  the caller provides `rerankIntent`. Intent drives the ranking criteria
+  (e.g., `time_sensitive` penalizes old results, `technical` favors official
+  docs + GitHub + Stack Overflow).
+
+Implementation: [`packages/tools/src/adapters/search/reranker.ts`](../packages/tools/src/adapters/search/reranker.ts).
 
 ## Failure policy
 
