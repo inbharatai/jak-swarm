@@ -14,6 +14,114 @@ export type ProviderTier = 1 | 2 | 3;
 /** Controls how the router orders available providers */
 export type RoutingStrategy = 'cost_optimized' | 'quality_first' | 'local_first';
 
+/**
+ * Classified kind of a provider error. Drives the failover policy below.
+ *
+ * `auth_error`, `config_error`, `model_not_found`, and `bad_request` are intentionally
+ * NOT retryable across providers: bad credentials, malformed requests, and provider-specific
+ * model names will not resolve by trying a different provider, and silently failing over
+ * on auth errors hides real misconfiguration from operators.
+ */
+export type ProviderErrorKind =
+  | 'rate_limit'
+  | 'server_error'
+  | 'timeout'
+  | 'auth_error'
+  | 'config_error'
+  | 'model_not_found'
+  | 'bad_request'
+  | 'unknown';
+
+const FAILOVER_POLICY: Record<ProviderErrorKind, boolean> = {
+  rate_limit: true,
+  server_error: true,
+  timeout: true,
+  auth_error: false,
+  config_error: false,
+  model_not_found: false,
+  bad_request: false,
+  unknown: false,
+};
+
+/** Classify a provider error. Inspects `status` property and message patterns. */
+export function classifyProviderError(err: unknown): ProviderErrorKind {
+  if (!(err instanceof Error)) return 'unknown';
+  const message = err.message.toLowerCase();
+  const status = (err as { status?: number }).status;
+
+  if (
+    status === 429 ||
+    message.includes('429') ||
+    message.includes('rate limit') ||
+    message.includes('too many requests')
+  ) {
+    return 'rate_limit';
+  }
+
+  if (
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('etimedout')
+  ) {
+    return 'timeout';
+  }
+
+  if (
+    (typeof status === 'number' && status >= 500) ||
+    /\b(500|502|503|504)\b/.test(message) ||
+    message.includes('internal server error') ||
+    message.includes('service unavailable') ||
+    message.includes('bad gateway') ||
+    message.includes('overloaded') ||
+    message.includes('capacity')
+  ) {
+    return 'server_error';
+  }
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    message.includes('401') ||
+    message.includes('403') ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden') ||
+    message.includes('invalid api key') ||
+    message.includes('invalid_api_key') ||
+    message.includes('authentication')
+  ) {
+    return 'auth_error';
+  }
+
+  // Model-not-found: a 404 that names a model/deployment, or an explicit "model not found" message.
+  if (
+    (status === 404 && (message.includes('model') || message.includes('deployment') || message.includes('engine'))) ||
+    (message.includes('model') && (message.includes('not found') || message.includes('does not exist') || message.includes('not supported')))
+  ) {
+    return 'model_not_found';
+  }
+
+  // Any other 404 → config error (wrong endpoint / wrong path).
+  if (status === 404 || message.includes('404')) {
+    return 'config_error';
+  }
+
+  if (
+    status === 400 ||
+    /\b400\b/.test(message) ||
+    message.includes('bad request') ||
+    message.includes('invalid request')
+  ) {
+    return 'bad_request';
+  }
+
+  return 'unknown';
+}
+
+/** Whether the router should try the next provider after receiving this error kind. */
+export function shouldFailover(kind: ProviderErrorKind): boolean {
+  return FAILOVER_POLICY[kind];
+}
+
 // ─── Per-Agent Model Override ───────────────────────────────────────────────
 
 /**
@@ -368,8 +476,12 @@ export class ProviderRouter implements LLMProvider {
         return await provider.chatCompletion(params);
       } catch (err) {
         lastError = err;
-        // Only failover on retryable errors; throw immediately on auth/client errors
-        if (i < this.chain.length - 1 && this.isRetryableError(err)) {
+        const kind = classifyProviderError(err);
+        // Surface the classified kind on the error for downstream telemetry.
+        if (err instanceof Error) {
+          (err as Error & { providerErrorKind?: ProviderErrorKind }).providerErrorKind = kind;
+        }
+        if (i < this.chain.length - 1 && shouldFailover(kind)) {
           continue;
         }
         throw err;
@@ -378,28 +490,5 @@ export class ProviderRouter implements LLMProvider {
 
     // Should not reach here, but satisfy TypeScript
     throw lastError;
-  }
-
-  private isRetryableError(err: unknown): boolean {
-    if (!(err instanceof Error)) return false;
-
-    const message = err.message.toLowerCase();
-
-    // Check for rate limit (429) or server errors (5xx)
-    if (message.includes('429') || message.includes('rate limit')) return true;
-    if (message.includes('500') || message.includes('502') || message.includes('503') || message.includes('504')) return true;
-    if (message.includes('internal server error') || message.includes('service unavailable')) return true;
-    if (message.includes('overloaded') || message.includes('capacity')) return true;
-    // Provider/model-specific client errors can be transient or provider-scoped.
-    if (message.includes('401') || message.includes('403')) return true;
-    if (message.includes('404') || message.includes('model') && (message.includes('not found') || message.includes('does not exist'))) return true;
-
-    // Check status property if available
-    const errWithStatus = err as { status?: number };
-    if (errWithStatus.status) {
-      return errWithStatus.status === 401 || errWithStatus.status === 403 || errWithStatus.status === 404 || errWithStatus.status === 429 || errWithStatus.status >= 500;
-    }
-
-    return false;
   }
 }
