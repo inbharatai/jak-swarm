@@ -123,27 +123,54 @@ const matrixCounts = {
 
 // ─── No-longer-current claims: flag prohibited strings ─────────────────────
 
-const prohibitedInMarketing: Array<{ pattern: RegExp; source: string; why: string }> = [
+const prohibitedInMarketing: Array<{ pattern: RegExp; sourceFile: 'README.md' | 'landing'; why: string }> = [
   {
     pattern: /\bHono\b/,
-    source: 'README.md',
+    sourceFile: 'README.md',
     why: 'API is Fastify, not Hono — all Hono claims were removed in b6ea08b',
   },
   {
     pattern: /no\s+api\s+keys?\s+required/i,
-    source: 'README.md',
+    sourceFile: 'README.md',
     why: 'External LLM/integration providers require keys — corrected in b6ea08b',
+  },
+  {
+    // Wave 1: no branded crawler product named "Ducky Duck" / "DuckyDuck" exists.
+    // The DDG HTML scrape is the free-tier fallback inside web_search, not a product.
+    pattern: /\b(ducky[\s-]?duck|duckyduck)\b/i,
+    sourceFile: 'README.md',
+    why: 'No branded "Ducky Duck" crawler product exists; the DDG scrape is the free fallback inside web_search. Wave 1 recommends Serper primary.',
+  },
+  {
+    pattern: /\b(ducky[\s-]?duck|duckyduck)\b/i,
+    sourceFile: 'landing',
+    why: 'No branded "Ducky Duck" crawler product exists; the DDG scrape is the free fallback inside web_search. Wave 1 recommends Serper primary.',
+  },
+  {
+    // Wave 4 preview: block "10x cheaper" until there's a linked benchmark file.
+    // When owner-run `pnpm bench:search` produces docs/_generated/search-bench.json
+    // with the required comparison, this check can be relaxed — for now we block
+    // any un-sourced "N-times cheaper" claim in marketing copy.
+    pattern: /\b\d+x\s+cheaper\b/i,
+    sourceFile: 'README.md',
+    why: 'Cost-multiplier claims require a linked benchmark — run `pnpm bench:search` with real keys and link the report, or drop the claim.',
+  },
+  {
+    pattern: /\b\d+x\s+cheaper\b/i,
+    sourceFile: 'landing',
+    why: 'Cost-multiplier claims require a linked benchmark — run `pnpm bench:search` with real keys and link the report, or drop the claim.',
   },
 ];
 
 for (const check of prohibitedInMarketing) {
-  const match = readme.match(check.pattern);
+  const haystack = check.sourceFile === 'README.md' ? readme : landing;
+  const match = haystack.match(check.pattern);
   if (match) {
     mismatches.push({
-      claim: `Prohibited phrase "${match[0]}" in ${check.source}`,
+      claim: `Prohibited phrase "${match[0]}" in ${check.sourceFile}`,
       expected: '(should not be present)',
       actual: match[0],
-      source: `${check.source}: ${check.why}`,
+      source: `${check.sourceFile}: ${check.why}`,
     });
   }
 }

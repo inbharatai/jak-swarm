@@ -38,6 +38,9 @@ tools layer without a dedicated UI tile.
 | Supabase | placeholder | UI tile only | No runtime adapter; platform uses Postgres directly. |
 | Sentry | placeholder | UI tile only | No runtime adapter wired. |
 | Brave Search | beta | Web-search tool fallback | Used when `TAVILY_API_KEY` is absent; quality varies. |
+| Serper (google.serper.dev) | config-dependent | `web_search` adapter (Wave 1 primary) | Google-graded organic + knowledge graph + answer box; requires `SERPER_API_KEY`. See [search-stack.md](./search-stack.md). |
+| Tavily (api.tavily.com) | config-dependent | `web_search` adapter (Wave 1 secondary) | Research-oriented quality with answer synthesis; requires `TAVILY_API_KEY`. |
+| DuckDuckGo HTML scrape | real (heuristic quality) | `web_search` adapter (Wave 1 free fallback) + 17 internal tools | Zero cost, no key, brittle to markup changes. **Not a branded product.** |
 | PostgreSQL | production-ready | Prisma-backed core DB | Runtime dependency of the platform itself. |
 | Puppeteer | production-ready | Browser automation adapter | Runs via Playwright; Puppeteer tile is a visual stand-in. |
 | Filesystem | production-ready | `file_read`/`file_write` tools | Sandboxed to tenant workspaces. |

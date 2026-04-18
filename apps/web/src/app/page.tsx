@@ -826,7 +826,7 @@ export default function HomePage() {
                   <div className="text-xs text-slate-500 mt-1 font-sans">Per iteration<br />Only changed files</div>
                 </div>
               </div>
-              <p className="text-center text-[10px] text-slate-600 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug. 10x cheaper than single-model platforms.</p>
+              <p className="text-center text-[10px] text-slate-600 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug — routes each task to the cheapest model that can handle it.</p>
             </div>
 
             {/* Builder IDE Preview */}
