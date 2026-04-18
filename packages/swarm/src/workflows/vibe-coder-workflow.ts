@@ -70,6 +70,13 @@ export interface BuildResult {
   ok: boolean;
   errorLog?: string;
   affectedFiles?: string[];
+  /** Checker skipped (e.g., Docker unavailable). Callers can treat as "unverified"
+   *  rather than "verified pass" when composing. Defaults to false when omitted. */
+  skipped?: boolean;
+  /** Optional reason for the skip (or short annotation). Surfaced in build logs. */
+  skipReason?: string;
+  /** Wall-clock duration of the check, for benchmark reporting. */
+  durationMs?: number;
 }
 
 export interface BuildChecker {

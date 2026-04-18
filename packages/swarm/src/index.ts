@@ -55,6 +55,19 @@ export type {
   BuildResult,
 } from './workflows/vibe-coder-workflow.js';
 export { staticBuildChecker } from './workflows/static-build-checker.js';
+export {
+  DockerBuildChecker,
+  RealDockerRunner,
+  dockerBuildChecker,
+  extractAffectedFiles,
+  capErrorLog,
+} from './workflows/docker-build-checker.js';
+export type {
+  DockerRunner,
+  DockerBuildCheckerOptions,
+  DockerBuildRunOptions,
+  DockerBuildRunResult,
+} from './workflows/docker-build-checker.js';
 export type { RunParams, SwarmResult, ApprovalDecision } from './runner/swarm-runner.js';
 
 // Supervisor

@@ -32,6 +32,7 @@ import {
   runVibeCoderWorkflow,
   staticBuildChecker,
   heuristicBuildChecker,
+  DockerBuildChecker,
   type BuildChecker,
   type BuildResult,
   type VibeCoderResult,
@@ -79,19 +80,34 @@ function hasLLMKey(): boolean {
 }
 
 /**
- * Compose the heuristic and static build checkers — run heuristic first
- * (catches obvious truncation / empty files fast), then static if that passes
- * (catches real type/syntax errors). Only one error message per layer.
+ * Compose the heuristic, static, and (optionally) docker build checkers.
+ * Layers run in order of cost and stop on the first real failure — the
+ * debugger only sees the shallowest signal it can act on.
+ *
+ *   1. heuristic     — ~1ms, catches truncation / empty files / "Not implemented"
+ *   2. static (tsc)  — sub-second, catches real syntax + type errors in-memory
+ *   3. docker build  — 30-120s, catches Next.js / runtime / missing-dep errors
+ *
+ * The docker layer is enabled only when --docker is passed AND Docker is
+ * running on the host. When Docker is unreachable, it returns `{ok:true, skipped:true}`
+ * and the composition treats that as a pass-through — we never silently fail
+ * a spec because the infra wasn't there.
  */
-const composedBuildChecker: BuildChecker = {
-  async check(files): Promise<BuildResult> {
-    const heur = await heuristicBuildChecker.check(files);
-    if (!heur.ok) return heur;
-    return staticBuildChecker.check(files);
-  },
-};
+function composeBuildChecker(enableDocker: boolean): BuildChecker {
+  const docker = enableDocker ? new DockerBuildChecker({ framework: 'nextjs' }) : null;
+  return {
+    async check(files): Promise<BuildResult> {
+      const heur = await heuristicBuildChecker.check(files);
+      if (!heur.ok) return heur;
+      const stat = await staticBuildChecker.check(files);
+      if (!stat.ok) return stat;
+      if (docker) return docker.check(files);
+      return stat;
+    },
+  };
+}
 
-async function runOne(spec: BenchSpec): Promise<SpecReport> {
+async function runOne(spec: BenchSpec, checker: BuildChecker): Promise<SpecReport> {
   const started = Date.now();
   let result: VibeCoderResult;
   try {
@@ -106,7 +122,7 @@ async function runOne(spec: BenchSpec): Promise<SpecReport> {
       subscriptionTier: 'paid', // run with full chain — this is measurement
       deployAfterBuild: false,
       maxDebugRetries: 3,
-      buildChecker: composedBuildChecker,
+      buildChecker: checker,
     });
   } catch (err) {
     return {
@@ -175,11 +191,20 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  const args = process.argv.slice(2);
+  const enableDocker = args.includes('--docker');
+  const checker = composeBuildChecker(enableDocker);
+  if (enableDocker) {
+    console.log('[bench-vibe-coder] Docker build checker enabled — expect 30-120s per spec when the build runs.');
+  } else {
+    console.log('[bench-vibe-coder] Docker build checker disabled (pass --docker to enable real builds).');
+  }
+
   console.log(`[bench-vibe-coder] Running ${specsFile.specs.length} specs…\n`);
   const reports: SpecReport[] = [];
   for (const spec of specsFile.specs) {
     console.log(`  [${spec.difficulty.padEnd(6)}] ${spec.id} — running…`);
-    const r = await runOne(spec);
+    const r = await runOne(spec, checker);
     reports.push(r);
     const score = summarizeScore(r);
     const emoji = score === 'pass' ? '✓' : score === 'partial' ? '~' : '✗';
@@ -191,6 +216,7 @@ async function main(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   const summary = {
     generatedAt: new Date().toISOString(),
+    dockerBuildCheckerEnabled: enableDocker,
     totalSpecs: reports.length,
     pass: reports.filter((r) => summarizeScore(r) === 'pass').length,
     partial: reports.filter((r) => summarizeScore(r) === 'partial').length,
