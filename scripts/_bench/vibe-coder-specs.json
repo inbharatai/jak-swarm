@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "description": "Benchmark specs for scripts/bench-vibe-coder.ts. Each spec is a real app request with a bar the workflow must clear to count as a pass (minimum files, required paths, expected features). Intentionally hand-curated across difficulty tiers so regressions are visible across specs.",
+  "specs": [
+    {
+      "id": "todo-app-local",
+      "difficulty": "easy",
+      "description": "A simple todo list app with Next.js App Router. In-memory state (no database). User can add, check off, and delete todos. Tailwind CSS styling. No auth.",
+      "framework": "nextjs",
+      "features": ["todo", "local-state"],
+      "requiredFiles": ["src/app/page.tsx"],
+      "minFiles": 2,
+      "mustNotHavePhrases": ["TODO", "Not implemented", "placeholder"]
+    },
+    {
+      "id": "blog-prisma",
+      "difficulty": "medium",
+      "description": "A Next.js blog where posts are stored in Postgres via Prisma. Home page lists latest 10 posts, clicking a post shows its full content. No auth. No create-post UI.",
+      "framework": "nextjs",
+      "features": ["prisma", "postgres", "dynamic-routes"],
+      "requiredFiles": ["src/app/page.tsx", "prisma/schema.prisma"],
+      "minFiles": 4,
+      "mustNotHavePhrases": ["TODO", "Not implemented"]
+    },
+    {
+      "id": "auth-login-supabase",
+      "difficulty": "medium",
+      "description": "A Next.js landing page with a login form using Supabase Auth. After login, redirect to /dashboard which shows the user's email. Tailwind + shadcn-style components.",
+      "framework": "nextjs",
+      "features": ["auth", "supabase", "protected-routes"],
+      "requiredFiles": ["src/app/page.tsx", "src/app/dashboard/page.tsx"],
+      "minFiles": 4,
+      "mustNotHavePhrases": ["TODO", "Not implemented"]
+    },
+    {
+      "id": "crud-rest-api",
+      "difficulty": "medium",
+      "description": "Next.js app with a full CRUD REST API for a 'Contact' resource (name, email, phone). Create/list/get/update/delete endpoints under /api/contacts. Prisma for persistence. No UI.",
+      "framework": "nextjs",
+      "features": ["rest-api", "prisma", "crud"],
+      "requiredFiles": ["prisma/schema.prisma"],
+      "requiredApiPatterns": ["/api/contacts"],
+      "minFiles": 4,
+      "mustNotHavePhrases": ["TODO"]
+    },
+    {
+      "id": "dashboard-with-chart",
+      "difficulty": "hard",
+      "description": "A metrics dashboard that displays a line chart of daily active users. Data from a /api/metrics endpoint that returns last 30 days of mock data. Uses Recharts. Tailwind styling. No auth.",
+      "framework": "nextjs",
+      "features": ["dashboard", "chart", "api-route"],
+      "requiredFiles": ["src/app/page.tsx"],
+      "requiredApiPatterns": ["/api/metrics"],
+      "minFiles": 3,
+      "mustNotHavePhrases": ["TODO", "Not implemented"]
+    }
+  ]
+}
