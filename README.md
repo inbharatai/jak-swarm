@@ -69,7 +69,7 @@ flowchart TD
         F["🔀 Router Agent\nAssign agents • Select LLM tier • Enable parallelism"]
     end
 
-    subgraph WORKERS["⚡ Worker Layer — 33 Specialists + 5 Vibe Coding"]
+    subgraph WORKERS["⚡ Worker Layer — 32 Specialists (incl. 5 Vibe Coding)"]
         direction LR
         G["📧 Email\n📅 Calendar\n👤 CRM"]
         H["📄 Document\n📊 Spreadsheet\n🌐 Browser"]
@@ -151,7 +151,7 @@ flowchart LR
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
 | 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
-| 🔍 | **30 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis |
+| 🔍 | **31 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
 | 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing with failover and role-aware primary selection. Provider API keys are required unless using local models |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
@@ -166,7 +166,7 @@ flowchart LR
 | 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
 | 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
 | 🔌 | **MCP Integrations (Implemented + Extendable)** | Slack, GitHub, Notion are wired with provider management; additional providers are extendable via MCP and adapter work |
-| 🌐 | **27 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation |
+| 🌐 | **30 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation, social posting |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
 | 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers (including WhatsApp auto-start lock) |
@@ -403,7 +403,7 @@ graph LR
 ### Landing Page — Hero
 ![JAK Swarm Hero](docs/screenshots/01-hero.png)
 
-### Agent Network — 39 Agents in 5 Layers
+### Agent Network — 38 Agents in 5 Layers
 ![Agent Network](docs/screenshots/02-agents.png)
 
 ### Workflow — From Command to Result in Seconds
@@ -436,7 +436,7 @@ graph LR
 
 **Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 119 production tools + 30 research tools.*
+*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 119 production tools (including 31 research tools).*
 
 </div>
 
@@ -675,15 +675,15 @@ http://localhost:3000
 | **Email** | 10 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email, personalize_email, schedule_email, track_email_engagement, analyze_engagement, create_email_sequence | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
 | **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, enrich_company, verify_email, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn, generate_winback + more | 🔌 Pluggable adapter |
-| **Browser** | 27 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs, hover, select, upload, evaluate_js, wait_for, pdf_export + more | ✅ Real (Playwright) |
-| **Document** | 15 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write, list_directory + more | ✅ Real (pdf-parse) |
-| **Research** | 30 | web_search, web_fetch, search_knowledge, classify_text, audit_seo, research_keywords, analyze_serp, monitor_rankings + more | ✅ Real (web) |
+| **Browser** | 30 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs, hover, select, upload, evaluate_js, wait_for, pdf_export, post_to_twitter, post_to_linkedin, post_to_reddit + more | ✅ Real (Playwright) |
+| **Document** | 16 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write, list_directory, generate_image + more | ✅ Real (pdf-parse + DALL-E) |
+| **Research** | 31 | web_search, web_fetch, classify_text, audit_seo, research_keywords, analyze_serp, monitor_rankings, code_execute, discover_posting_platforms + more | ✅ Real (web) |
 | **Spreadsheet** | 4 | parse_spreadsheet, compute_statistics, generate_report, export_csv | ✅ Built-in |
 | **Knowledge** | 9 | search_knowledge, memory_store, memory_retrieve, ingest_document, compile_executive_summary + more | ✅ Real (DB-backed) |
-| **Ops** | 5 | send_webhook, file_read, file_write, list_directory, code_execute | ✅ Built-in |
-| **MCP (external)** | Dynamic | Slack, GitHub, Notion + 17 more loaded at runtime | ✅ Real (MCP servers) |
+| **Webhook** | 2 | send_webhook, deploy_to_vercel | ✅ Built-in |
+| **MCP (external)** | Dynamic | Slack, GitHub, Notion + 18 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 119 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, Webhook, Ops, and Voice categories. Additional provider tools can be loaded dynamically via MCP integrations.**
+**Total: 119 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, and Webhook categories. Additional provider tools can be loaded dynamically via MCP integrations.**
 
 ---
 
@@ -760,7 +760,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
-| Pre-built agents | **39** | 0 | 0 | 1 |
+| Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **119** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
@@ -889,7 +889,7 @@ jak-swarm/
 │           ├── settings/       # LLM & approval config
 │           └── admin/          # Tenant management
 ├── packages/
-│   ├── agents/                 # 39 agent implementations
+│   ├── agents/                 # 38 agent implementations
 │   │   └── src/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination, memory injection
 │   │       ├── roles/          # 6 orchestrator agents

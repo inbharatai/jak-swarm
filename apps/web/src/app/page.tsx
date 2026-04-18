@@ -150,7 +150,7 @@ const AGENTS = [
 ];
 
 const STATS = [
-  { value: 39, label: 'Agents', suffix: '' },
+  { value: 38, label: 'Agents', suffix: '' },
   { value: 119, label: 'Production Tools', suffix: '' },
   { value: 21, label: 'Integrations', suffix: '' },
   { value: 6, label: 'AI Providers', suffix: '' },
@@ -164,14 +164,31 @@ const WORKFLOW_STEPS = [
   { label: 'Result', desc: 'Compiled output', icon: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z', color: '#c084fc' },
 ];
 
-const INTEGRATIONS = [
-  { name: 'Gmail', color: '#EA4335', bg: 'rgba(234,67,53,0.1)' },
+const INTEGRATIONS_CORE = [
   { name: 'Slack', color: '#4A154B', bg: 'rgba(74,21,75,0.1)' },
-  { name: 'WhatsApp', color: '#25D366', bg: 'rgba(37,211,102,0.12)' },
   { name: 'GitHub', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
   { name: 'Notion', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
-  { name: 'Google Calendar', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
-  { name: 'Jira', color: '#0052CC', bg: 'rgba(0,82,204,0.1)' },
+  { name: 'Google Drive', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
+  { name: 'Linear', color: '#5E6AD2', bg: 'rgba(94,106,210,0.1)' },
+  { name: 'HubSpot', color: '#FF7A59', bg: 'rgba(255,122,89,0.1)' },
+  { name: 'Stripe', color: '#635BFF', bg: 'rgba(99,91,255,0.1)' },
+  { name: 'Salesforce', color: '#00A1E0', bg: 'rgba(0,161,224,0.1)' },
+  { name: 'Airtable', color: '#18BFFF', bg: 'rgba(24,191,255,0.1)' },
+  { name: 'ClickUp', color: '#7B68EE', bg: 'rgba(123,104,238,0.1)' },
+  { name: 'SendGrid', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
+  { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
+];
+
+const INTEGRATIONS_INFRA = [
+  { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
+  { name: 'Sentry', color: '#A855F7', bg: 'rgba(168,85,247,0.1)' },
+  { name: 'Brave Search', color: '#FB6A25', bg: 'rgba(251,106,37,0.1)' },
+  { name: 'PostgreSQL', color: '#336791', bg: 'rgba(51,103,145,0.1)' },
+  { name: 'Puppeteer', color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
+  { name: 'Filesystem', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
+  { name: 'Fetch', color: '#38bdf8', bg: 'rgba(56,189,248,0.1)' },
+  { name: 'Memory', color: '#c084fc', bg: 'rgba(192,132,252,0.1)' },
+  { name: 'Sequential Thinking', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
 ];
 
 const PRICING = [
@@ -191,7 +208,7 @@ const PRICING = [
     price: '$29',
     period: '/mo',
     description: 'For builders shipping with AI.',
-    features: ['3,000 credits / month', '200 credits / day', 'All 39 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
+    features: ['3,000 credits / month', '200 credits / day', 'All 38 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
     cta: 'Go Pro',
     href: '/register',
     highlighted: true,
@@ -432,7 +449,7 @@ export default function HomePage() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">39 Agents Live</span>
+                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
               </div>
 
               <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.02] sm:leading-[1]">
@@ -703,23 +720,21 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Production Tools</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, WhatsApp control with verified numbers, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; agents do actual work.</p>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, WhatsApp control with verified numbers, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; plus 21 verified MCP providers.</p>
             </div>
 
             {/* Tool Categories Grid */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
               {[
-                { icon: '📧', category: 'Email', count: 10, tools: 'Read, draft, send, search, sequences, personalize, track', color: '#EA4335' },
+                { icon: '📧', category: 'Email', count: 10, tools: 'Read, draft, send, search, labels, filters', color: '#EA4335' },
                 { icon: '📅', category: 'Calendar', count: 3, tools: 'List events, create events, find availability', color: '#4285F4' },
-                { icon: '🌐', category: 'Browser', count: 27, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, tabs', color: '#34d399' },
-                { icon: '📄', category: 'Document', count: 15, tools: 'Read, write, summarize, extract data, PDF analysis, export', color: '#8B5CF6' },
+                { icon: '🌐', category: 'Browser', count: 30, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, social posting', color: '#34d399' },
+                { icon: '📄', category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, image gen', color: '#8B5CF6' },
                 { icon: '📊', category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
                 { icon: '👤', category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
-                { icon: '🔍', category: 'Research', count: 30, tools: 'Web search, fetch, SEO audit, keywords, SERP analysis', color: '#06B6D4' },
+                { icon: '🔍', category: 'Research', count: 31, tools: 'Web search, fetch, SEO audit, keywords, SERP, platform discovery', color: '#06B6D4' },
                 { icon: '🧠', category: 'Knowledge', count: 9, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
-                { icon: '⚙️', category: 'Ops', count: 3, tools: 'Webhooks, file I/O, code execution', color: '#fb923c' },
-                { icon: '🎤', category: 'Voice', count: 1, tools: 'Real-time WebRTC voice sessions via managed backend', color: '#f472b6' },
-                { icon: '🔌', category: 'MCP', count: 0, tools: 'Slack, GitHub, Notion, HubSpot, Jira, Linear, Stripe — loaded at runtime', color: '#38bdf8' },
+                { icon: '🔔', category: 'Webhooks', count: 2, tools: 'External webhook delivery, Vercel deploy', color: '#fb923c' },
               ].map((cat) => (
                 <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
                   <div className="flex items-center gap-2 mb-2">
@@ -734,9 +749,9 @@ export default function HomePage() {
 
             {/* Connected Services */}
             <div className="text-center">
-              <p className="text-xs text-slate-500 mb-4 font-sans uppercase tracking-widest">Connected Services</p>
+              <p className="text-xs text-slate-500 mb-4 font-sans uppercase tracking-widest">Verified Integrations (MCP)</p>
               <div className="flex flex-wrap items-center justify-center gap-3">
-                {INTEGRATIONS.map((int) => (
+                {INTEGRATIONS_CORE.map((int) => (
                   <div
                     key={int.name}
                     className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans"
@@ -746,27 +761,15 @@ export default function HomePage() {
                     {int.name}
                   </div>
                 ))}
-                {[
-                  { name: 'HubSpot', color: '#FF7A59', bg: 'rgba(255,122,89,0.1)' },
-                  { name: 'Salesforce', color: '#00A1E0', bg: 'rgba(0,161,224,0.1)' },
-                  { name: 'Pipedrive', color: '#017737', bg: 'rgba(1,119,55,0.1)' },
-                  { name: 'Jira', color: '#0052CC', bg: 'rgba(0,82,204,0.1)' },
-                  { name: 'Linear', color: '#5E6AD2', bg: 'rgba(94,106,210,0.1)' },
-                  { name: 'Stripe', color: '#635BFF', bg: 'rgba(99,91,255,0.1)' },
-                  { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
-                  { name: 'Asana', color: '#F06A6A', bg: 'rgba(240,106,106,0.1)' },
-                  { name: 'Airtable', color: '#18BFFF', bg: 'rgba(24,191,255,0.1)' },
-                  { name: 'Google Drive', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
-                  { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
-                ].map((svc) => (
+              </div>
+              <p className="text-xs text-slate-500 mt-6 mb-4 font-sans uppercase tracking-widest">Infrastructure + Utilities</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {INTEGRATIONS_INFRA.map((svc) => (
                   <div key={svc.name} className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white border transition-all duration-200 hover:scale-105 font-sans" style={{ backgroundColor: svc.bg, borderColor: svc.color + '40' }}>
                     <span className="w-2 h-2 rounded-full" style={{ background: svc.color, boxShadow: `0 0 6px ${svc.color}40` }} aria-hidden="true" />
                     {svc.name}
                   </div>
                 ))}
-                <div className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-white/10 font-sans">
-                  + MCP providers &amp; growing
-                </div>
               </div>
             </div>
           </div>
@@ -1093,7 +1096,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Autonomous multi-agent AI platform. 39 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack + WhatsApp bridges, voice-to-workflow, vibe coding, and a typed SDK.
+                  Autonomous multi-agent AI platform. 38 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack + WhatsApp bridges, voice-to-workflow, vibe coding, and a typed SDK.
                 </p>
               </div>
 

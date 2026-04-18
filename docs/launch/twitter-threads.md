@@ -5,7 +5,7 @@
 ## Thread 1: Launch Announcement
 
 **Tweet 1:**
-I just open-sourced JAK Swarm -- a multi-agent AI platform with 39 agents, 119 tools, and support for 6 LLM providers.
+I just open-sourced JAK Swarm -- a multi-agent AI platform with 38 agents, 119 tools, and support for 6 LLM providers.
 
 It took 14 months to build.
 
@@ -30,10 +30,10 @@ Instead of one mega-model doing everything, you get specialized agents that coll
 - An Analysis Agent that processes data
 - A Content Agent that writes and edits
 
-39 agents total.
+38 agents total.
 
 **Tweet 4:**
-Each agent has access to specific tools from a library of 79.
+Each agent has access to specific tools from a library of 119.
 
 Web scraping. File operations. API calls. Code execution. Data processing. Database queries.
 
@@ -46,9 +46,9 @@ JAK Swarm works with:
 - OpenAI (GPT-4, GPT-4o)
 - Anthropic (Claude)
 - Google (Gemini)
-- Mistral
+- DeepSeek
+- OpenRouter (100+ models)
 - Ollama (fully local)
-- Groq
 
 Mix and match. Use Claude for writing, GPT-4 for code, Ollama for privacy-sensitive tasks.
 
@@ -104,7 +104,7 @@ Let me know what you think. What agents would you want?
 **Tweet 1:**
 Let me show you how JAK Swarm actually works under the hood.
 
-39 agents. 119 tools. 6 LLM providers.
+38 agents. 119 tools. 6 LLM providers.
 
 But the architecture is surprisingly simple.
 
@@ -169,12 +169,12 @@ Performance numbers on my tests:
 - Full 5-agent analysis swarm: ~45 seconds
 - Complex multi-step workflow (10+ agents): ~2 minutes
 
-All with GPT-4o. Faster with Groq. More private with Ollama.
+All with GPT-4o. More private with Ollama.
 
 **Tweet 10:**
-The entire codebase is under 15,000 lines of Python.
+The codebase is a TypeScript monorepo with a deliberately simple architecture.
 
-No framework dependencies beyond the LLM SDKs. No hidden complexity.
+No hidden complexity. Read it in a day. Extend it in a weekend.
 
 Read it in a day. Extend it in a weekend.
 
@@ -245,7 +245,7 @@ A 5-agent swarm calling GPT-4 can burn through dollars in minutes if you're not 
 JAK Swarm tracks token usage per agent, per task, per provider. You set budgets. Agents respect them. No surprise bills.
 
 **Tweet 9:**
-Lesson 8: Users don't want to configure 39 agents.
+Lesson 8: Users don't want to configure 38 agents.
 
 My first UI required setting up each agent individually. Nobody used it.
 
@@ -260,4 +260,4 @@ The value isn't in the code. It's in the community that forms around it.
 
 github.com/inbharatai/jak-swarm
 
-What would you build with 39 agents?
+What would you build with 38 agents?

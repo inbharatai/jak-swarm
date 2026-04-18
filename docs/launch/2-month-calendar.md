@@ -51,7 +51,7 @@
 | Tuesday | LinkedIn | Long post | Honest comparison with LangChain, CrewAI, AutoGen |
 | Tuesday | Discord/GitHub Discussions | Community setup | Launch community space, post welcome message with getting-started guide |
 | Wednesday | Twitter | Thread (5 tweets) | Highlight a community contribution or interesting use case |
-| Wednesday | Dev.to | Tutorial | "Building a Custom Agent in JAK Swarm in 20 Lines of Python" |
+| Wednesday | Dev.to | Tutorial | "Building a Custom Agent in JAK Swarm in 20 Lines of TypeScript" |
 | Thursday | Twitter | Single tweet | Share a specific agent capability with a short demo GIF |
 | Friday | Reddit (r/artificial) | Follow-up post | "2 weeks since launch -- here's what developers built with JAK Swarm" |
 | Saturday | Twitter | Single tweet | Shout out to early contributors and community members by name |

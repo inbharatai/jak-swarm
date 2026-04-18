@@ -237,7 +237,7 @@ Browser Speaker
 
 The Tool Registry is the central catalogue of all capabilities available to worker agents.
 
-**Implementation:** 123 tools registered in `packages/tools/src/builtin/index.ts`.
+**Implementation:** 119 built-in tools registered in `packages/tools/src/builtin/index.ts`.
 
 **Tool resolution:**
 1. Worker agent requests tool by name from ToolRegistry
@@ -402,7 +402,7 @@ JAK Swarm is a staging-ready, production-capable autonomous multi-agent platform
 │                          API LAYER                                   │
 │                                                                     │
 │   ┌──────────────────────────────────────────────────────────────┐  │
-│   │  Hono API Server (apps/api)  — port 4000                    │  │
+│   │  Fastify API Server (apps/api)  — port 4000                 │  │
 │   │  • Auth middleware (JWT + API Key)                           │  │
 │   │  • Tenant isolation middleware                               │  │
 │   │  • Route: POST /workflows                                    │  │
@@ -414,17 +414,21 @@ JAK Swarm is a staging-ready, production-capable autonomous multi-agent platform
 │   │  • Route: POST /skills                                      │  │
 │   └──────────────────────────────────────────────────────────────┘  │
 └────────────────────────────┬────────────────────────────────────────┘
-                             │ Temporal Activity Calls
+                             │ In-process call → SwarmExecutionService
+                             │ (Temporal is target architecture, not yet wired)
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      ORCHESTRATION LAYER                             │
 │                                                                     │
 │   ┌──────────────────────────────────────────────────────────────┐  │
-│   │  Temporal Workflow Engine (apps/worker)                      │  │
-│   │  • SwarmWorkflow.ts — root durable workflow                 │  │
-│   │  • CommanderActivity, PlannerActivity, RouterActivity       │  │
-│   │  • ApprovalActivity — blocks on human decision              │  │
-│   │  • VerifierActivity, GuardrailActivity                      │  │
+│   │  SwarmExecutionService + QueueWorker (apps/api)              │  │
+│   │  • WorkflowJob table is the durable queue                    │  │
+│   │  • Poll-and-claim worker embedded by default                 │  │
+│   │  • Standalone worker entrypoint supported (worker-entry)     │  │
+│   │  • SwarmGraph runs nodes: Commander → Planner → Router →     │  │
+│   │    Worker → Verifier → Approval (all in-process)             │  │
+│   │  ── Target: externalise to Temporal workflow pods (see       │  │
+│   │     packages/workflows/; scaffolding only, not wired)        │  │
 │   └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │   ┌──────────────────────────────────────────────────────────────┐  │
@@ -673,7 +677,8 @@ For the full threat model, see `docs/security-threat-model.md`.
 
 ### Local Development
 ```
-pnpm dev             — runs Next.js (3000), API (4000), Temporal worker
+pnpm dev             — runs Next.js (3000) and API (4000)
+pnpm --filter @jak-swarm/api worker  — optional standalone queue worker
 docker compose up    — runs Postgres (5432), Redis (6379), Temporal (7233), Temporal UI (8080)
 ```
 
@@ -686,14 +691,14 @@ docker compose up    — runs Postgres (5432), Redis (6379), Temporal (7233), Te
 └────────────┬──────────────┬─────────────┘
              │              │
      ┌───────▼──────┐  ┌────▼──────┐
-     │  web pods    │  │  api pods │
-     │  (Next.js)   │  │  (Hono)   │
-     └──────────────┘  └────┬──────┘
+     │  web pods    │  │  api pods   │
+     │  (Next.js)   │  │  (Fastify)  │
+     └──────────────┘  └────┬────────┘
                             │
-                    ┌───────▼────────┐
-                    │ Temporal Cloud │
-                    │ (managed)      │
-                    └───────┬────────┘
+                    ┌───────▼──────────────┐
+                    │  Temporal (target)   │
+                    │  — not yet wired in  │
+                    └───────┬──────────────┘
                             │
                     ┌───────▼────────┐
                     │  worker pods   │

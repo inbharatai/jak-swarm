@@ -6,7 +6,7 @@
 
 I just open-sourced JAK Swarm after 14 months of building.
 
-It's a multi-agent AI platform with 39 specialized agents, 119 tools, and support for 6 LLM providers.
+It's a multi-agent AI platform with 38 specialized agents, 119 tools, and support for 6 LLM providers.
 
 Here's what that means in plain English:
 
@@ -22,9 +22,9 @@ I was building AI automations for InBharat AI and kept writing the same boilerpl
 
 14 months and roughly 1,400 hours later, JAK Swarm has:
 
-- 39 agents covering research, coding, data, content, and utilities
+- 38 agents covering research, coding, data, content, and utilities
 - 119 tools for web scraping, APIs, file operations, databases, and more
-- Works with OpenAI, Anthropic, Google, Mistral, Ollama, and Groq
+- Works with OpenAI, Anthropic, Google, DeepSeek, OpenRouter, and Ollama
 - Runs fully locally with Ollama if you need data privacy
 - MIT licensed. Free forever. No strings
 
@@ -72,7 +72,7 @@ I've seen AI frameworks with beautiful abstractions that are impossible to debug
 
 JAK Swarm logs every prompt, every response, every tool call, every delegation. The architecture is boring on purpose. Boring means reliable. Boring means maintainable.
 
-The entire codebase is under 15,000 lines of Python. You can read it in a day and contribute by the weekend.
+The codebase is a TypeScript monorepo designed to be readable and easy to extend.
 
 What architectural patterns do you use for AI orchestration?
 
@@ -101,8 +101,8 @@ AutoGen (Microsoft) is excellent for conversational agent patterns. If your use 
 Where JAK Swarm wins:
 
 - Provider flexibility (6 providers, mix and match per agent)
-- Pre-built agents out of the box (39 agents, ready to go)
-- Simplicity (under 15K lines, readable in a day)
+- Pre-built agents out of the box (38 agents, ready to go)
+- Simplicity (readable codebase, easy to extend)
 - Local-first (full Ollama support, zero cloud required)
 - Cost tracking (built-in token management and budgets)
 

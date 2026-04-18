@@ -4,7 +4,7 @@
 
 ## Post 1: r/artificial
 
-**Title:** I open-sourced a multi-agent AI platform after 14 months of development -- 39 agents, 119 tools, 6 LLM providers
+**Title:** I open-sourced a multi-agent AI platform after 14 months of development -- 38 agents, 119 tools, 6 LLM providers
 
 **Body:**
 
@@ -14,9 +14,9 @@ The core idea is simple: instead of one all-purpose AI call, you create speciali
 
 What's included:
 
-- 33 pre-built specialized agents covering research, code, data, content, and utility tasks
+- 38 pre-built specialized agents covering research, code, data, content, and utility tasks
 - 119 tools for web scraping, file operations, API calls, code execution, and more
-- Support for OpenAI, Anthropic, Google, Mistral, Ollama (local), and Groq
+- Support for OpenAI, Anthropic, Google, DeepSeek, OpenRouter, and Ollama (local)
 - Shared context system for agent communication
 - Dynamic delegation (agents can hand off work to other agents mid-task)
 
@@ -24,7 +24,7 @@ A few things that might interest this community:
 
 The agent architecture is intentionally minimal. Each agent is just a system prompt + a tool set + an LLM provider. No complex inheritance hierarchies. You can create a new agent in about 20 lines of code.
 
-The provider abstraction means you can run the same agent pipeline on GPT-4 for quality, Groq for speed, or Ollama for complete local privacy. Swap a config value and everything else stays the same.
+The provider abstraction means you can run the same agent pipeline on GPT-4 for quality, OpenRouter for model choice, or Ollama for complete local privacy. Swap a config value and everything else stays the same.
 
 I'm particularly interested in feedback from people who've worked with multi-agent systems. What patterns have you found that work? What should I avoid?
 
@@ -40,12 +40,12 @@ MIT licensed: https://github.com/inbharatai/jak-swarm
 
 I wanted to share something I think this community will appreciate: JAK Swarm supports Ollama as a first-class LLM provider, meaning you can run the entire multi-agent platform locally without any API keys or cloud dependencies.
 
-JAK Swarm is an open-source multi-agent AI platform with 39 specialized agents and 119 tools. The agents collaborate on tasks -- research, code analysis, data processing, content generation, and more.
+JAK Swarm is an open-source multi-agent AI platform with 38 specialized agents and 119 tools. The agents collaborate on tasks -- research, code analysis, data processing, content generation, and more.
 
 Why local LLM users should care:
 
 - Full Ollama integration. Point it at your local Ollama instance and go
-- Use different local models for different agents. Codestral for your code agent, Llama for your general agent, Mistral for your writing agent
+- Use different local models for different agents (code-focused, general, and writing)
 - Zero data leaves your machine. No API calls. No telemetry. Nothing phones home
 - Token tracking works with local models too, so you can benchmark performance
 
@@ -55,7 +55,7 @@ I'll be honest about the limitations with local models:
 - Some of the larger agent workflows were tuned on GPT-4 class models and may need prompt adjustments for smaller local models
 - Tool-use reliability varies by model. Models with strong instruction following work best
 
-The platform also supports cloud providers (OpenAI, Anthropic, Google, Mistral, Groq), so you can mix and match. Use local models for privacy-sensitive tasks and cloud models when you need the extra capability.
+The platform also supports cloud providers (OpenAI, Anthropic, Google, DeepSeek, OpenRouter), so you can mix and match. Use local models for privacy-sensitive tasks and cloud models when you need the extra capability.
 
 The project is MIT licensed and I'd love feedback from people running local models on how the agent prompts perform with different model families.
 
@@ -67,7 +67,7 @@ What local models are you running? I want to add specific optimization notes for
 
 ## Post 3: r/SideProject
 
-**Title:** 14 months of evenings and weekends: I built an open-source AI agent platform with 39 agents and 119 tools
+**Title:** 14 months of evenings and weekends: I built an open-source AI agent platform with 38 agents and 119 tools
 
 **Body:**
 
@@ -78,9 +78,9 @@ The journey in numbers:
 - Started: Early 2025
 - Time invested: ~1,400 hours of evenings and weekends
 - Agents built: 38
-- Tools integrated: 79
+- Tools integrated: 119
 - LLM providers supported: 6
-- Lines of Python: ~15,000
+- Codebase: TypeScript monorepo
 - License: MIT (completely free)
 
 What I'd do differently:
@@ -93,7 +93,7 @@ What I'd do differently:
 
 What went right:
 
-1. Keeping the architecture simple. Under 15K lines. Anyone can read and understand it. This made iteration fast.
+1. Keeping the architecture simple. Anyone can read and understand it. This made iteration fast.
 
 2. Provider abstraction from day one. Supporting 6 LLM providers is easy when the abstraction layer is solid. Retrofitting it would have been a nightmare.
 
@@ -115,7 +115,7 @@ Happy to answer questions about the build process, architecture decisions, or th
 
 I recently open-sourced JAK Swarm, a multi-agent AI platform, and I wanted to share some of the architecture patterns that webdevs building AI features might find useful.
 
-The challenge: I needed 38 different AI agents to be able to discover and use 79 different tools (web scraping, file I/O, API calls, code execution, etc.) without hardcoding every combination.
+The challenge: I needed 38 different AI agents to be able to discover and use 119 different tools (web scraping, file I/O, API calls, code execution, etc.) without hardcoding every combination.
 
 The solution has three parts:
 
@@ -129,7 +129,7 @@ When an agent needs a tool, it describes what it needs in natural language. The 
 
 **3. Normalized Provider Interface**
 
-Every LLM provider (OpenAI, Anthropic, Google, Mistral, Ollama, Groq) has a different API. I built a single interface that normalizes them all. You write agent logic once and swap providers with a config change. This is useful for any project using LLMs -- not just multi-agent systems.
+Every LLM provider (OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Ollama) has a different API. I built a single interface that normalizes them all. You write agent logic once and swap providers with a config change. This is useful for any project using LLMs -- not just multi-agent systems.
 
 These patterns work well beyond AI agent platforms. If you're building AI features into web apps, the tool registry and provider abstraction patterns translate directly.
 
@@ -140,7 +140,7 @@ A few practical tips for webdevs adding AI to projects:
 - Validate LLM output structurally before using it. If you expect JSON, parse it and handle failures.
 - Log everything. Debugging AI features without logs is practically impossible.
 
-The full codebase is MIT licensed and under 15K lines of Python: https://github.com/inbharatai/jak-swarm
+The full codebase is MIT licensed and open-source: https://github.com/inbharatai/jak-swarm
 
 ---
 
@@ -150,7 +150,7 @@ The full codebase is MIT licensed and under 15K lines of Python: https://github.
 
 **Body:**
 
-I spent 14 months building JAK Swarm, a multi-agent AI platform with 39 agents, 119 tools, and support for 6 LLM providers. And I'm giving it away for free under the MIT license.
+I spent 14 months building JAK Swarm, a multi-agent AI platform with 38 agents, 119 tools, and support for 6 LLM providers. And I'm giving it away for free under the MIT license.
 
 People keep asking me if I'm going to monetize this. The answer is: not directly.
 

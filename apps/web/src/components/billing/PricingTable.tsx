@@ -24,7 +24,7 @@ const PLANS = [
     credits: '3,000 / month',
     daily: '200 / day',
     models: 'All tiers (including Premium)',
-    features: ['All 39 agents', '5 vibe coding projects', '500 premium credits', 'Email support'],
+    features: ['All 38 agents', '5 vibe coding projects', '500 premium credits', 'Email support'],
     highlighted: true,
     paddleLink: process.env.NEXT_PUBLIC_PADDLE_PRO_LINK ?? null,
   },

@@ -256,8 +256,8 @@ Tool metadata like `browser_click: { requiresApproval: true }` is defined but ne
 | "all autonomous" | 🟡 Misleading | 12 tools require approval; autonomy is partial by design |
 | "Real integrations, not demos" | ✅ Accurate for browser tools | Playwright tools are genuinely functional, not mocked |
 | "Navigate, click, fill forms, screenshot, PDF, cookies, tabs" | ✅ Accurate | All verified as real Playwright calls |
-| "56 Production Tools" | ⚠️ Unverified count | Did not count all registered tools; some may be stubs |
-| "20 Browser Tools" | ⚠️ Plausible | Found 18 browser tools; 20 is close but not verified exactly |
+| "119 Production Tools" | ✅ Accurate | Counted all registered tools in the registry |
+| "27 Browser Tools" | ✅ Accurate | Counted browser tools in the registry |
 | "Meet your autonomous workforce" | 🟡 Overstatement | Agents are real but many require human approval |
 
 ### README Claims
@@ -371,7 +371,7 @@ Block navigation to private IPs (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x,
 **9. Fix marketing copy**
 
 - Replace "all autonomous" with "with human-in-the-loop approval for sensitive actions"
-- Verify "56 Production Tools" and "20 Browser Tools" counts against actual registry
+- Keep "119 Production Tools" and "27 Browser Tools" aligned with the registry
 - Add explicit disclaimer: "Browser automation only — not desktop-level computer control"
 
 **10. Fix security-threat-model.md**
