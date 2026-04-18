@@ -42,8 +42,11 @@ export { searchTavily } from './tavily.js';
 export { searchDuckDuckGo, fetchPageContent } from './duckduckgo.js';
 export { defaultReranker, inferQueryIntent } from './reranker.js';
 export type { RerankerOptions, RerankerFn, QueryIntent } from './reranker.js';
+export { defaultRewriter, needsRewrite } from './rewriter.js';
+export type { RewriterOptions, RewriterFn } from './rewriter.js';
 
 import { defaultReranker } from './reranker.js';
+import { defaultRewriter, needsRewrite } from './rewriter.js';
 
 /**
  * Global kill switch. When truthy, the strategy chain skips paid providers
@@ -134,6 +137,27 @@ interface ChainAttempt {
  * by message content so a mis-configured real key still fails fast loudly.
  */
 export async function searchStrategyChain(opts: SearchOptions): Promise<SearchResponse> {
+  // Optional query rewriter — uses the best single rewrite (first returned).
+  // Smart-gated: already-focused keyword queries pass through. Fails safe.
+  let effectiveQuery = opts.query;
+  let rewrittenFrom: string | undefined;
+  if (opts.rewrite && needsRewrite(opts.query)) {
+    try {
+      const rewrites = await defaultRewriter({
+        query: opts.query,
+        intent: opts.rerankIntent,
+      });
+      const best = rewrites[0];
+      if (best && best.trim() && best.trim() !== opts.query.trim()) {
+        effectiveQuery = best;
+        rewrittenFrom = opts.query;
+      }
+    } catch {
+      // Swallow — caller gets original query behavior.
+    }
+  }
+
+  const effectiveOpts: SearchOptions = { ...opts, query: effectiveQuery };
   const available = availableSearchProviders(opts.subscriptionTier);
   const chain: ChainAttempt[] = [];
   if (available.serper) chain.push({ name: 'serper', adapter: searchSerper });
@@ -146,32 +170,32 @@ export async function searchStrategyChain(opts: SearchOptions): Promise<SearchRe
     const { name, adapter } = chain[i]!;
     const startedAt = Date.now();
     try {
-      const result = await adapter(opts);
+      const result = await adapter(effectiveOpts);
       if (name === 'serper' || name === 'tavily') {
-        logPaidSearch(name, opts.query, Date.now() - startedAt, true);
+        logPaidSearch(name, effectiveQuery, Date.now() - startedAt, true);
       }
       // Optional LLM re-ranker — pipes raw results through a cheap LLM that
       // scores relevance, filters below threshold, and re-orders. Fails safe:
       // any error returns the original results unchanged.
+      let finalResult = result;
       if (opts.rerank && result.results.length > 1) {
         try {
           const reranked = await defaultReranker({
-            query: opts.query,
+            query: effectiveQuery,
             results: result.results,
             maxResults: opts.maxResults,
             intent: opts.rerankIntent,
           });
-          return { ...result, results: reranked, resultCount: reranked.length };
+          finalResult = { ...result, results: reranked, resultCount: reranked.length };
         } catch {
           // Re-ranker must never break search — surface originals.
-          return result;
         }
       }
-      return result;
+      return rewrittenFrom ? { ...finalResult, rewrittenFrom } : finalResult;
     } catch (err) {
       const latencyMs = Date.now() - startedAt;
       if (name === 'serper' || name === 'tavily') {
-        logPaidSearch(name, opts.query, latencyMs, false);
+        logPaidSearch(name, effectiveQuery, latencyMs, false);
       }
       const kind = classifySearchError(err);
       const message = err instanceof Error ? err.message : String(err);
@@ -201,7 +225,8 @@ export async function searchStrategyChain(opts: SearchOptions): Promise<SearchRe
   return {
     results: [],
     source: 'search_failed',
-    query: opts.query,
+    query: effectiveQuery,
+    ...(rewrittenFrom ? { rewrittenFrom } : {}),
     resultCount: 0,
     message:
       'All search providers failed or are unavailable. Configure SERPER_API_KEY or TAVILY_API_KEY for production-grade search. Errors: ' +

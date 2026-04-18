@@ -67,6 +67,33 @@ gate short-circuits the chain regardless of which tool is calling it.
   Emits a separate `event: 'search_rerank'` line per re-ranker invocation.
   Pipe to a log aggregator for offline cost modeling.
 
+## Query rewriter
+
+Before the strategy chain hits a provider, `web_search` (on paid tiers only)
+optionally runs the raw query through a cheap LLM that produces a sharper,
+keyword-optimised version. This is the "prompt engineering in reverse" step
+— Claude/ChatGPT-style search doesn't pass your exact words to the search
+engine; it generates better queries first.
+
+**Smart gate (`needsRewrite`)** — skips the LLM call entirely for already-
+focused keyword queries (short, no question words, no conversational
+phrasing). Only vague / conversational / long queries get rewritten.
+Typically cuts rewrite LLM calls by 60-70% vs always-rewrite.
+
+- **Provider**: Claude Haiku 4.5 primary, GPT-4o-mini fallback, pass-through
+  no-op if neither key is configured.
+- **Cost**: ~$0.0015 per rewrite on Haiku, ~$0.0003 on GPT-4o-mini.
+- **Latency**: +300-800ms when rewrite runs; $0 and +0ms when gate skips.
+- **Gating**: only when `subscriptionTier === 'paid'` AND `rewrite: true` AND
+  `DISABLE_SEARCH_REWRITER` is unset AND `needsRewrite(query)` returns true.
+- **Fail-safe**: any error (malformed JSON, timeout, 5xx, missing key,
+  identical rewrite) uses the original query.
+- **Transparency**: when rewriting actually changes the query, the
+  `SearchResponse.rewrittenFrom` field surfaces the original for traces /
+  UI. Downstream agents can show "searched for X (you asked about Y)".
+
+Implementation: [`packages/tools/src/adapters/search/rewriter.ts`](../packages/tools/src/adapters/search/rewriter.ts).
+
 ## LLM re-ranker
 
 After the strategy chain returns N raw results, `web_search` (on paid tiers

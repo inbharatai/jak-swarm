@@ -643,9 +643,11 @@ export function registerBuiltinTools(): void {
           maxResults,
           fetchContent,
           subscriptionTier: context.subscriptionTier,
-          // LLM re-rank only on paid tiers — free-tier DDG results aren't
-          // worth the re-rank cost, and the LLM call itself adds latency.
+          // Paid-tier accuracy stack: rewrite vague queries before searching,
+          // then re-rank raw results. Both gated on paid-tier + their own kill
+          // switches; rewrite is additionally smart-gated on needsRewrite.
           rerank: context.subscriptionTier !== 'free',
+          rewrite: context.subscriptionTier !== 'free',
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);

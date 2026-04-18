@@ -21,7 +21,14 @@ export interface SearchResult {
 export interface SearchResponse {
   results: SearchResult[];
   source: SearchProviderSource;
+  /** The query actually sent to the provider chain (post-rewrite if enabled). */
   query: string;
+  /**
+   * When the query rewriter produced a different query than the caller asked
+   * for, this is the original. Useful for traces + UI surfacing so operators
+   * can see why the search returned these specific results.
+   */
+  rewrittenFrom?: string;
   /** Optional direct-answer string (Serper "answerBox", Tavily "answer"). */
   answer?: string | null;
   resultCount: number;
@@ -62,6 +69,16 @@ export interface SearchOptions {
    * the intent (e.g., `monitor_brand_mentions` is always time_sensitive).
    */
   rerankIntent?: 'informational' | 'navigational' | 'time_sensitive' | 'technical';
+  /**
+   * When true, pre-rewrite the query via a cheap LLM before hitting the
+   * provider chain. Uses the same Haiku-primary / GPT-4o-mini-fallback path
+   * as the re-ranker. Smart-gated by `needsRewrite()` — already-focused
+   * keyword queries pass through untouched to save cost and latency.
+   *
+   * Gated by caller (typically paid-tier only) and by DISABLE_SEARCH_REWRITER
+   * env var. Fails safe: any error uses the original query.
+   */
+  rewrite?: boolean;
 }
 
 /**
