@@ -19,7 +19,8 @@
     "db:seed": "pnpm --filter @jak-swarm/db db:seed",
     "db:studio": "pnpm --filter @jak-swarm/db run db:studio",
     "start:dev": "bash scripts/start-dev.sh",
-    "check:truth": "pnpm --filter @jak-swarm/tests exec tsx ../scripts/check-docs-truth.ts"
+    "check:truth": "pnpm --filter @jak-swarm/tests exec tsx ../scripts/check-docs-truth.ts",
+    "bench:search": "pnpm --filter @jak-swarm/tests exec tsx ../scripts/bench-search.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
