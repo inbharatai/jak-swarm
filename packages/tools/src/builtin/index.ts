@@ -255,6 +255,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -278,6 +281,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1343,6 +1349,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1376,6 +1385,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1413,6 +1425,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1520,6 +1535,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1553,6 +1571,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1588,6 +1609,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1623,6 +1647,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1654,6 +1681,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1685,6 +1715,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1728,6 +1761,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1759,6 +1795,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1793,6 +1832,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2179,6 +2221,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.WEBHOOK,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
+      maturity: 'real',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2720,6 +2765,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2763,6 +2811,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2916,6 +2967,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -3611,6 +3665,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.CRM,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'llm_passthrough',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -3655,6 +3712,10 @@ export function registerBuiltinTools(): void {
       category: 'DOCUMENT' as any,
       riskClass: 'WRITE' as any,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['OPENAI_API_KEY'],
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -3911,6 +3972,9 @@ export function registerBuiltinTools(): void {
       category: 'RESEARCH' as any,
       riskClass: 'READ_ONLY' as any,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -3964,6 +4028,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4012,6 +4079,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4052,6 +4122,9 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4302,6 +4375,10 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GITHUB_PAT'],
+      liveTested: false,
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4923,6 +5000,9 @@ Date: _______________`;
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4972,6 +5052,9 @@ Date: _______________`;
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5013,6 +5096,9 @@ Date: _______________`;
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      maturity: 'config_dependent',
+      liveTested: false,
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {

@@ -161,6 +161,98 @@ function classify(name: string, body: string, riskHint: string): Classification 
     };
   }
 
+  // Browser tools by name prefix — the 13 browser_* tools all go through
+  // the Playwright pool; body may reference it via helper rather than page.goto directly.
+  if (/^browser_/.test(name)) {
+    const writes = /click|fill|upload|evaluate|set|save|kill|press|mouse|hover|select|scroll|manage_tabs/i.test(name);
+    return {
+      maturity: 'real',
+      sideEffectLevel: writes ? 'write' : 'read',
+      reason: 'browser_* prefix (Playwright pool)',
+    };
+  }
+
+  // Gmail tools by name prefix.
+  if (/^gmail_/.test(name)) {
+    return {
+      maturity: 'config_dependent',
+      sideEffectLevel: /send|reply/.test(name) ? 'external' : 'read',
+      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      reason: 'gmail_* prefix',
+    };
+  }
+
+  // Webhook sender — arbitrary HTTP fetch.
+  if (name === 'send_webhook') {
+    return {
+      maturity: 'real',
+      sideEffectLevel: 'external',
+      reason: 'arbitrary HTTP POST',
+    };
+  }
+
+  // Image generation via OpenAI DALL-E.
+  if (name === 'generate_image' && /OPENAI_API_KEY|api\.openai\.com|images\/generations/i.test(b)) {
+    return {
+      maturity: 'config_dependent',
+      sideEffectLevel: 'external',
+      requiredEnvVars: ['OPENAI_API_KEY'],
+      reason: 'DALL-E via OpenAI',
+    };
+  }
+
+  // Social auto-engagement — Playwright with logged-in session required.
+  if (/^auto_(reply|engage)_/.test(name) || /^monitor_brand_mentions$|^discover_posting_platforms$/.test(name)) {
+    return {
+      maturity: 'config_dependent',
+      sideEffectLevel: /reply|engage/.test(name) ? 'external' : 'read',
+      reason: 'social automation requires logged-in browser session',
+    };
+  }
+
+  // analyze_github_repo — fetches via api.github.com.
+  if (name === 'analyze_github_repo' && /api\.github\.com|GITHUB_PAT/.test(b)) {
+    return {
+      maturity: 'config_dependent',
+      sideEffectLevel: 'read',
+      requiredEnvVars: ['GITHUB_PAT'],
+      reason: 'GitHub REST',
+    };
+  }
+
+  // CSV / spreadsheet local parsing libraries.
+  if (/csv-parse|papaparse|xlsx\.|exceljs|parseCsv/i.test(b)) {
+    return {
+      maturity: 'real',
+      sideEffectLevel: 'read',
+      reason: 'local CSV/XLSX library',
+    };
+  }
+
+  // Short LLM-passthrough stubs: tool body is a single return with a message
+  // field and no external I/O. Examples: track_*, compile_*, generate_{board,qbr,offer,...}_report
+  // that just hand the task back to the LLM.
+  const hasExternalIO = /fetch\(|adapter|require\(|import\(|process\.env|\$\.|db\./.test(b);
+  const isShortStub = b.length < 450 && /return\s*\{/.test(b);
+  if (isShortStub && !hasExternalIO) {
+    return {
+      maturity: 'llm_passthrough',
+      sideEffectLevel: 'read',
+      reason: 'short return-object stub with no external I/O',
+    };
+  }
+
+  // CRM stubs (no external adapter, body just returns {} with message).
+  if (/^(lookup_crm_contact|update_crm_record|deduplicate_contacts|find_decision_makers|enrich_contact|enrich_company)$/.test(name)) {
+    if (!hasExternalIO) {
+      return {
+        maturity: 'llm_passthrough',
+        sideEffectLevel: 'read',
+        reason: 'CRM stub (no adapter)',
+      };
+    }
+  }
+
   // web_fetch / generic HTTP.
   if (/^web_fetch$|^web_scrape$/.test(name)) {
     return {
