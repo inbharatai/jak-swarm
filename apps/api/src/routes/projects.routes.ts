@@ -3,6 +3,8 @@ import { z } from 'zod';
 import path from 'path';
 import { ProjectService } from '../services/project.service.js';
 import { VibeCodingExecutionService } from '../services/vibe-coding-execution.service.js';
+import { WorkflowService } from '../services/workflow.service.js';
+import { CreditService } from '../billing/credit-service.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
@@ -26,6 +28,15 @@ const generateProjectSchema = z.object({
   imageBase64: z.string().max(10_000_000).optional(), // FIX: max 10MB base64
 });
 
+const runVibeCoderSchema = z.object({
+  description: z.string().min(1).max(5000),
+  framework: z.string().max(50).optional(),
+  features: z.array(z.string().max(200)).max(50).optional(),
+  envVars: z.record(z.string().max(2000)).optional(),
+  deployAfterBuild: z.boolean().optional(),
+  maxDebugRetries: z.number().int().min(0).max(5).optional(),
+});
+
 const rollbackSchema = z.object({
   version: z.number().int().positive(),
 });
@@ -40,6 +51,8 @@ const BUSY_STATUSES = ['GENERATING', 'BUILDING'];
 const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   const projectService = new ProjectService(fastify.db, fastify.log);
   const vibeCoding = new VibeCodingExecutionService(fastify.db, fastify.log);
+  const workflowService = new WorkflowService(fastify.db, fastify.log);
+  const creditService = new CreditService(fastify.db);
   const preHandler = [fastify.authenticate, enforceTenantIsolation];
 
   // ─── POST /projects ──────────────────────────────────────────────────
@@ -170,6 +183,81 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
 
         await fastify.auditLog(request, 'GENERATE_PROJECT', 'Project', id, { description });
         return reply.status(202).send(ok({ projectId: id, status: 'GENERATING', message: 'Generation started' }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  // ─── POST /projects/:id/run ──────────────────────────────────────────
+  // Unified Vibe Coder chain — Architect → Generator → BuildCheck → Debugger
+  // (↻ up to maxDebugRetries) → Deployer. Runs as a durable workflow via the
+  // same queue as every other workflow so it survives API restarts and
+  // streams progress via /workflows/:id/stream.
+  //
+  // Replaces the separate /generate + /iterate + /deploy one-shot pattern
+  // for callers that want the full chain end-to-end. The older routes are
+  // kept for backwards compatibility with existing UI.
+  fastify.post(
+    '/:id/run',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const parseResult = runVibeCoderSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request', parseResult.error.flatten()));
+      }
+
+      const { tenantId, userId } = request.user;
+      const project = await projectService.getProject(tenantId, id);
+      if (!project) return reply.status(404).send(err('NOT_FOUND', 'Project not found'));
+
+      const { description, framework, features, envVars, deployAfterBuild, maxDebugRetries } = parseResult.data;
+
+      try {
+        // Workflow row first so SSE stream + trace UI can attach to it.
+        const workflow = await workflowService.createWorkflow(tenantId, userId, description, undefined);
+
+        // Subscription tier drives search gating (and any other paid-external
+        // service gating downstream).
+        const usage = await creditService.getUsage(tenantId);
+        const maxTier = usage?.maxModelTier ?? 1;
+        const subscriptionTier: 'free' | 'paid' = maxTier >= 2 ? 'paid' : 'free';
+
+        await fastify.auditLog(request, 'RUN_VIBE_CODER', 'Project', id, {
+          workflowId: workflow.id,
+          description,
+          framework,
+        });
+
+        fastify.swarm.enqueueExecution({
+          workflowId: workflow.id,
+          tenantId,
+          userId,
+          goal: description,
+          subscriptionTier,
+          workflowKind: 'vibe-coder',
+          vibeCoderInput: {
+            description,
+            framework,
+            features,
+            projectName: project.name,
+            envVars,
+            deployAfterBuild: deployAfterBuild ?? true,
+            maxDebugRetries: maxDebugRetries ?? 3,
+          },
+        });
+
+        return reply.status(202).send(
+          ok({
+            workflowId: workflow.id,
+            projectId: id,
+            status: 'RUNNING',
+            streamUrl: `/workflows/${workflow.id}/stream`,
+            message: 'Vibe Coder workflow queued — stream progress via the SSE endpoint',
+          }),
+        );
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;

@@ -65,6 +65,24 @@ export interface ExecuteAsyncParams {
    * search chain; 'paid' (or undefined) allows Serper primary.
    */
   subscriptionTier?: 'free' | 'paid';
+  /**
+   * Which workflow pipeline to run. Default 'standard' drives the general
+   * SwarmGraph (commander → planner → worker → verifier). 'vibe-coder' drives
+   * the dedicated Architect → Generator → Debugger → Deployer chain with
+   * build-check + retry loop.
+   */
+  workflowKind?: 'standard' | 'vibe-coder';
+  /** Optional payload for vibe-coder workflows (app spec + builder inputs). */
+  vibeCoderInput?: {
+    description: string;
+    framework?: string;
+    features?: string[];
+    existingFiles?: Array<{ path: string; content: string; language: string }>;
+    projectName?: string;
+    envVars?: Record<string, string>;
+    deployAfterBuild?: boolean;
+    maxDebugRetries?: number;
+  };
 }
 
 export interface ResumeParams {
@@ -219,7 +237,15 @@ export class SwarmExecutionService extends EventEmitter {
         } else if (action === 'cancel') {
           await this.cancelWorkflow({ workflowId: job.workflowId });
         } else {
-          await this.executeAsync(payload as unknown as ExecuteAsyncParams);
+          // Dispatch on workflowKind — 'vibe-coder' drives the dedicated
+          // Architect → Generator → BuildCheck → Debugger → Deployer chain;
+          // anything else (or undefined) runs the general SwarmGraph.
+          const kind = typeof payload['workflowKind'] === 'string' ? payload['workflowKind'] : 'standard';
+          if (kind === 'vibe-coder') {
+            await this.executeVibeCoderAsync(payload as unknown as ExecuteAsyncParams);
+          } else {
+            await this.executeAsync(payload as unknown as ExecuteAsyncParams);
+          }
         }
         const workflow = await this.db.workflow.findUnique({
           where: { id: job.workflowId },
@@ -752,6 +778,119 @@ export class SwarmExecutionService extends EventEmitter {
           this.log.warn({ workflowId, err: relErr }, '[Swarm] Failed to release workflow lock (will expire via TTL)');
         });
       }
+    }
+  }
+
+  /**
+   * Execute the Vibe Coder workflow (Architect → Generator → Build-check →
+   * Debugger ↻ → Deployer) as the processor for a queued job whose payload
+   * carries `workflowKind: 'vibe-coder'`.
+   *
+   * Persists workflow status + the final result (files, deployment URL,
+   * build logs) to the workflow DB row. Emits SSE events so the builder UI
+   * can render progress live.
+   */
+  async executeVibeCoderAsync(params: ExecuteAsyncParams): Promise<void> {
+    const { workflowId, tenantId, userId, subscriptionTier, vibeCoderInput } = params;
+
+    if (!vibeCoderInput || !vibeCoderInput.description) {
+      this.log.error(
+        { workflowId },
+        '[VibeCoder] Missing vibeCoderInput or description in payload',
+      );
+      await this.workflowService.updateWorkflowStatus(
+        workflowId,
+        'FAILED',
+        'Missing vibe-coder input payload',
+      );
+      return;
+    }
+
+    this.log.info(
+      { workflowId, tenantId, framework: vibeCoderInput.framework },
+      '[VibeCoder] Starting workflow',
+    );
+
+    await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
+
+    const { runVibeCoderWorkflow } = await import('@jak-swarm/swarm');
+    try {
+      const result = await runVibeCoderWorkflow({
+        workflowId,
+        tenantId,
+        userId,
+        subscriptionTier,
+        description: vibeCoderInput.description,
+        framework: vibeCoderInput.framework,
+        features: vibeCoderInput.features,
+        existingFiles: vibeCoderInput.existingFiles,
+        projectName: vibeCoderInput.projectName,
+        envVars: vibeCoderInput.envVars,
+        deployAfterBuild: vibeCoderInput.deployAfterBuild ?? true,
+        maxDebugRetries: vibeCoderInput.maxDebugRetries ?? 3,
+        onProgress: (event) => {
+          // Relay progress to SSE subscribers listening on /workflows/:id/stream.
+          this.emit(`workflow:${workflowId}`, {
+            type: 'vibe_coder:progress',
+            workflowId,
+            event: event.type,
+            data: event.data,
+            timestamp: event.timestamp,
+          });
+        },
+      });
+
+      // Persist the final result to the workflow row.
+      const finalStatus =
+        result.status === 'completed'
+          ? 'COMPLETED'
+          : result.status === 'needs_user_input'
+          ? 'PAUSED'
+          : 'FAILED';
+
+      await (this.db.workflow.update as any)({
+        where: { id: workflowId },
+        data: {
+          status: finalStatus,
+          error: result.error ?? null,
+          finalOutput: JSON.stringify({
+            kind: 'vibe-coder',
+            files: result.files,
+            deployment: result.deployment,
+            buildLogs: result.buildLogs,
+            debugAttempts: result.debugAttempts,
+            userQuestion: result.userQuestion,
+            architecture: result.architecture?.architecture,
+          }),
+          completedAt: finalStatus === 'PAUSED' ? null : new Date(),
+        },
+      });
+
+      this.emit(`workflow:${workflowId}`, {
+        type: 'vibe_coder:completed',
+        workflowId,
+        status: result.status,
+        deploymentUrl: result.deployment?.deploymentUrl,
+        fileCount: result.files.length,
+        debugAttempts: result.debugAttempts,
+        durationMs: result.durationMs,
+        timestamp: new Date().toISOString(),
+      });
+
+      this.log.info(
+        {
+          workflowId,
+          status: result.status,
+          fileCount: result.files.length,
+          debugAttempts: result.debugAttempts,
+          durationMs: result.durationMs,
+        },
+        '[VibeCoder] Workflow finished',
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log.error({ workflowId, err: message }, '[VibeCoder] Workflow threw unexpected error');
+      await this.workflowService.updateWorkflowStatus(workflowId, 'FAILED', message);
     }
   }
 
