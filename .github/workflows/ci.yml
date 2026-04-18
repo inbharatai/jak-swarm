@@ -174,3 +174,46 @@ jobs:
             exit 1
           fi
           echo "Production boot guard is present."
+
+  # ---------------------------------------------------------------------------
+  # Truth check — blocks merge if README / landing-page claims drift from the
+  # live tool manifest and integration maturity matrix.
+  # ---------------------------------------------------------------------------
+  truth-check:
+    name: Docs Truth Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages required by the truth-check script
+        run: |
+          pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/industry-packs build
+          pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/tools build
+
+      - name: Run docs truth check
+        run: pnpm check:truth
+
+      - name: Upload truth report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: truth-report
+          path: docs/_generated/truth-report.json
+          if-no-files-found: warn
