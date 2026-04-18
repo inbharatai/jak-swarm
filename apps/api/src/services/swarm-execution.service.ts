@@ -73,6 +73,24 @@ export interface CancelParams {
   workflowId: string;
 }
 
+/** Control actions that flow through the durable queue alongside normal executions. */
+export type ControlAction = 'resume' | 'cancel';
+
+export interface EnqueueControlParams {
+  action: ControlAction;
+  workflowId: string;
+  tenantId: string;
+  userId: string;
+  /** Required for action='resume'. Ignored for action='cancel'. */
+  decision?: 'APPROVED' | 'REJECTED' | 'DEFERRED';
+  /** Required for action='resume'. The reviewer's userId. */
+  reviewedBy?: string;
+  /** Optional free-text comment attached to the resume decision. */
+  comment?: string;
+  /** Idempotency key — prevents duplicate execution on network retries. */
+  idempotencyKey?: string;
+}
+
 type ReplaySafetyClass =
   | 'REPLAY_SAFE'
   | 'REPLAY_UNSAFE'
@@ -175,11 +193,28 @@ export class SwarmExecutionService extends EventEmitter {
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
 
-    // Instantiate the dedicated queue worker — delegates job claiming/retry/DLQ
+    // Instantiate the dedicated queue worker — delegates job claiming/retry/DLQ.
+    // Jobs carry an optional `action` discriminator in their payload so the same queue
+    // can durably process executions, resume-after-approval, and cancels. Jobs without
+    // an `action` field default to 'execute' for backwards compatibility with any rows
+    // created before this change.
     this.queueWorker = new QueueWorker(db, log, async (job: WorkflowJobRow) => {
-      const payload = (job.payloadJson ?? {}) as ExecuteAsyncParams;
+      const payload = (job.payloadJson ?? {}) as Record<string, unknown> & { action?: string };
+      const action = typeof payload.action === 'string' ? payload.action : 'execute';
       try {
-        await this.executeAsync(payload);
+        if (action === 'resume') {
+          await this.resumeAfterApproval({
+            workflowId: job.workflowId,
+            tenantId: job.tenantId,
+            decision: payload['decision'] as ResumeParams['decision'],
+            reviewedBy: String(payload['reviewedBy'] ?? job.userId),
+            comment: typeof payload['comment'] === 'string' ? (payload['comment'] as string) : undefined,
+          });
+        } else if (action === 'cancel') {
+          await this.cancelWorkflow({ workflowId: job.workflowId });
+        } else {
+          await this.executeAsync(payload as unknown as ExecuteAsyncParams);
+        }
         const workflow = await this.db.workflow.findUnique({
           where: { id: job.workflowId },
           select: { status: true, error: true },
@@ -212,10 +247,52 @@ export class SwarmExecutionService extends EventEmitter {
    * the workflow row remains in PENDING until a queue worker claims it.
    */
   enqueueExecution(params: ExecuteAsyncParams): boolean {
-    void this.upsertWorkflowJob(params).catch((err) => {
+    // Tag the payload with an explicit action so the processor's dispatch is unambiguous
+    // even alongside resume/cancel control jobs in the same queue.
+    void this.upsertWorkflowJob({ ...params, action: 'execute' }).catch((err) => {
       this.log.error(
         { workflowId: params.workflowId, err: err instanceof Error ? err.message : String(err) },
         '[SwarmQueue] Failed to enqueue workflow job',
+      );
+    });
+    return true;
+  }
+
+  /**
+   * Enqueue a durable control action (resume-after-approval, cancel).
+   *
+   * Replaces the previous `setImmediate(() => resumeAfterApproval(...))` pattern in the
+   * route handlers — that was fire-and-forget and would be lost if the API crashed after
+   * returning 202 but before the task fired. Control jobs share the `workflow_jobs` table
+   * with execution jobs and get the same atomic claim, retry/backoff, and dead-letter
+   * semantics that executions already have.
+   */
+  enqueueControl(params: EnqueueControlParams): boolean {
+    const { action, workflowId, tenantId, userId, decision, reviewedBy, comment, idempotencyKey } = params;
+
+    if (action === 'resume' && (!decision || !reviewedBy)) {
+      this.log.error(
+        { workflowId, action },
+        '[SwarmQueue] enqueueControl(resume) requires decision and reviewedBy',
+      );
+      return false;
+    }
+
+    const payload: Record<string, unknown> = {
+      action,
+      workflowId,
+      tenantId,
+      userId,
+    };
+    if (decision) payload['decision'] = decision;
+    if (reviewedBy) payload['reviewedBy'] = reviewedBy;
+    if (comment) payload['comment'] = comment;
+    if (idempotencyKey) payload['idempotencyKey'] = idempotencyKey;
+
+    void this.upsertWorkflowJob(payload as { workflowId: string; tenantId: string; userId: string } & Record<string, unknown>).catch((err) => {
+      this.log.error(
+        { workflowId, action, err: err instanceof Error ? err.message : String(err) },
+        '[SwarmQueue] Failed to enqueue control action',
       );
     });
     return true;
@@ -288,11 +365,28 @@ export class SwarmExecutionService extends EventEmitter {
     return this.queueWorker.health();
   }
 
-  private async upsertWorkflowJob(params: ExecuteAsyncParams): Promise<void> {
+  /**
+   * Persist a durable job row keyed by workflowId. Accepts any payload shape carrying at
+   * minimum { workflowId, tenantId, userId } — the rest of the object is stored verbatim
+   * in payloadJson and interpreted by the processor (via the `action` discriminator).
+   */
+  private async upsertWorkflowJob(
+    params: { workflowId: string; tenantId: string; userId: string } & Record<string, unknown>,
+  ): Promise<void> {
     const jobModel = (this.db as any).workflowJob;
     if (!jobModel) {
       this.log.warn({ workflowId: params.workflowId }, '[SwarmQueue] workflow_jobs model unavailable; executing immediately');
-      void this.executeAsync(params);
+      // Fallback path only runs for execution jobs (no action, or action='execute').
+      const actionField = (params as Record<string, unknown>)['action'];
+      const action = typeof actionField === 'string' ? actionField : 'execute';
+      if (action === 'execute') {
+        void this.executeAsync(params as unknown as ExecuteAsyncParams);
+      } else {
+        this.log.warn(
+          { workflowId: params.workflowId, action },
+          '[SwarmQueue] Control action dropped — workflow_jobs model unavailable',
+        );
+      }
       return;
     }
 

@@ -131,16 +131,17 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
           comment,
         });
 
-        // Trigger swarm resume in the background so the reviewer gets an
-        // immediate response regardless of how long the workflow takes to run.
-        setImmediate(() => {
-          void fastify.swarm.resumeAfterApproval({
-            workflowId: approval.workflowId,
-            tenantId: request.user.tenantId,
-            decision,
-            reviewedBy: request.user.userId,
-            comment,
-          });
+        // Enqueue the resume as a durable control job so the reviewer gets an
+        // immediate response AND the resume survives an API crash between now and
+        // the actual swarm run.
+        fastify.swarm.enqueueControl({
+          action: 'resume',
+          workflowId: approval.workflowId,
+          tenantId: request.user.tenantId,
+          userId: request.user.userId,
+          decision,
+          reviewedBy: request.user.userId,
+          comment,
         });
 
         return reply.status(200).send(ok(approval));

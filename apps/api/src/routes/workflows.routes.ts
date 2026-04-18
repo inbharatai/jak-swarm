@@ -288,15 +288,17 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           { decision, comment },
         );
 
-        // Kick off resume in background — returns immediately
-        setImmediate(() => {
-          void fastify.swarm.resumeAfterApproval({
-            workflowId,
-            tenantId: request.user.tenantId,
-            decision,
-            reviewedBy: request.user.userId,
-            comment,
-          });
+        // Enqueue the resume as a durable control job. The queue worker picks it up
+        // and calls swarmService.resumeAfterApproval() with the same parameters, but
+        // now it survives an API crash between the 202 and the actual resume.
+        fastify.swarm.enqueueControl({
+          action: 'resume',
+          workflowId,
+          tenantId: request.user.tenantId,
+          userId: request.user.userId,
+          decision,
+          reviewedBy: request.user.userId,
+          comment,
         });
 
         return reply.status(202).send(
@@ -428,9 +430,15 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         const workflow = await workflowService.cancelWorkflow(request.user.tenantId, workflowId);
         await fastify.auditLog(request, 'CANCEL_WORKFLOW', 'Workflow', workflowId);
 
-        // Also cancel in swarm runner's in-memory state (best-effort)
-        setImmediate(() => {
-          void fastify.swarm.cancelWorkflow({ workflowId }).catch(() => undefined);
+        // Cross-instance stop signal — whichever instance owns the runner will cancel.
+        // Matches the pause/stop routes which already use the signal bus, and replaces
+        // the previous setImmediate(swarm.cancelWorkflow) which only reached the local
+        // instance.
+        await fastify.coordination.signals.publish({
+          type: 'stop',
+          workflowId,
+          issuedBy: request.user.userId,
+          timestamp: new Date().toISOString(),
         });
 
         return reply.status(200).send(ok(workflow));
