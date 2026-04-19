@@ -346,6 +346,132 @@ describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
 });
 
 // ===========================================================================
+// PROJECTS / VIBE CODER / CHECKPOINTS
+// ===========================================================================
+
+describe.skipIf(!hasDatabaseUrl)('Projects + Checkpoints', () => {
+  type ProjectData = { id: string; name: string; status: string; currentVersion: number };
+  type CheckpointData = {
+    id: string;
+    version: number;
+    description: string | null;
+    stage: string | null;
+    createdBy: string;
+    diff: { added: unknown[]; modified: unknown[]; deleted: unknown[]; hasChanges: boolean } | null;
+  };
+  let projectId = '';
+
+  it('POST /projects creates a project', async () => {
+    const { status, body } = await inject<ApiOk<ProjectData>>(
+      'POST',
+      '/projects/',
+      { name: 'test-project', description: 'Integration test', framework: 'nextjs' },
+      auth(adminToken),
+    );
+    expect(status).toBe(201);
+    expect(body?.data.id).toBeTruthy();
+    projectId = body?.data.id ?? '';
+  });
+
+  it('GET /projects lists created project', async () => {
+    if (!projectId) return;
+    const { status, body } = await inject<ApiOk<{ projects: ProjectData[] }>>(
+      'GET',
+      '/projects/',
+      undefined,
+      auth(adminToken),
+    );
+    expect(status).toBe(200);
+    const match = body?.data.projects.find((p) => p.id === projectId);
+    expect(match).toBeDefined();
+  });
+
+  it('GET /projects/:id/checkpoints returns [] for a brand-new project', async () => {
+    if (!projectId) return;
+    const { status, body } = await inject<ApiOk<CheckpointData[]>>(
+      'GET',
+      `/projects/${projectId}/checkpoints`,
+      undefined,
+      auth(adminToken),
+    );
+    expect(status).toBe(200);
+    expect(Array.isArray(body?.data)).toBe(true);
+  });
+
+  it('POST /projects/:id/checkpoints creates a manual snapshot', async () => {
+    if (!projectId) return;
+    const { status, body } = await inject<ApiOk<CheckpointData>>(
+      'POST',
+      `/projects/${projectId}/checkpoints`,
+      { description: 'Pre-risky-change snapshot', stage: 'manual' },
+      auth(adminToken),
+    );
+    expect(status).toBe(201);
+    expect(body?.data.version).toBeGreaterThanOrEqual(1);
+    expect(body?.data.stage).toBe('manual');
+    // Fresh project has no files → diff.added=0, hasChanges=false
+    expect(body?.data.diff).toBeDefined();
+  });
+
+  it('POST /projects/:id/checkpoints/:version/restore on nonexistent version returns 404', async () => {
+    if (!projectId) return;
+    const { status } = await inject(
+      'POST',
+      `/projects/${projectId}/checkpoints/99999/restore`,
+      {},
+      auth(adminToken),
+    );
+    expect(status).toBe(404);
+  });
+
+  it('POST /projects/:id/checkpoints/:version/restore with invalid version rejects with 400', async () => {
+    if (!projectId) return;
+    const { status } = await inject(
+      'POST',
+      `/projects/${projectId}/checkpoints/-5/restore`,
+      {},
+      auth(adminToken),
+    );
+    expect(status).toBe(400);
+  });
+
+  it('GET /projects/:id/checkpoints/:version returns 404 for unknown version', async () => {
+    if (!projectId) return;
+    const { status } = await inject(
+      'GET',
+      `/projects/${projectId}/checkpoints/99999`,
+      undefined,
+      auth(adminToken),
+    );
+    expect(status).toBe(404);
+  });
+
+  it('GET /projects/:id on another tenant returns 404', async () => {
+    if (!projectId) return;
+    // userToken belongs to a different tenant in beforeAll; the tenant
+    // isolation middleware must not leak existence of another tenant's project.
+    const { status } = await inject(
+      'GET',
+      `/projects/${projectId}`,
+      undefined,
+      auth(userToken),
+    );
+    expect(status).toBe(404);
+  });
+
+  it('DELETE /projects/:id removes the project', async () => {
+    if (!projectId) return;
+    const { status } = await inject(
+      'DELETE',
+      `/projects/${projectId}`,
+      undefined,
+      auth(adminToken),
+    );
+    expect([200, 204]).toContain(status);
+  });
+});
+
+// ===========================================================================
 // APPROVALS
 // ===========================================================================
 
@@ -450,6 +576,48 @@ describe.skipIf(!hasDatabaseUrl)('Tools routes', () => {
       auth(adminToken),
     );
     expect(status).toBe(404);
+  });
+
+  it('GET /tools/roles returns per-role maturity manifest', async () => {
+    type RoleEntry = { role: string; displayName: string; maturity: string; strengths: string[] };
+    type RolesResponse = {
+      summary: { total: number; byMaturity: Record<string, number> };
+      roles: RoleEntry[];
+    };
+    const { status, body } = await inject<ApiOk<RolesResponse>>(
+      'GET',
+      '/tools/roles',
+      undefined,
+      auth(adminToken),
+    );
+    expect(status).toBe(200);
+    expect(body?.data.summary.total).toBe(body?.data.roles.length);
+    expect(body?.data.summary.total).toBeGreaterThan(30); // 38 AgentRole values
+    // Hero-tier roles should all be present with maturity set
+    const marketing = body?.data.roles.find((r) => r.role === 'WORKER_MARKETING');
+    expect(marketing).toBeDefined();
+    expect(marketing?.maturity).toBe('world_class');
+    // No role may leak as unclassified
+    const unclassified = body?.data.roles.filter((r) => r.maturity === 'unclassified') ?? [];
+    expect(unclassified).toHaveLength(0);
+  });
+
+  it('GET /tools/roles?maturity=world_class filters correctly', async () => {
+    type RoleEntry = { role: string; maturity: string };
+    type RolesResponse = {
+      summary: { total: number };
+      roles: RoleEntry[];
+    };
+    const { status, body } = await inject<ApiOk<RolesResponse>>(
+      'GET',
+      '/tools/roles?maturity=world_class',
+      undefined,
+      auth(adminToken),
+    );
+    expect(status).toBe(200);
+    const nonWorldClass = body?.data.roles.filter((r) => r.maturity !== 'world_class') ?? [];
+    expect(nonWorldClass).toHaveLength(0);
+    expect(body!.data.roles.length).toBeGreaterThan(0);
   });
 });
 

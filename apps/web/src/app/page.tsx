@@ -550,8 +550,8 @@ export default function HomePage() {
             {/* Asymmetric header - left aligned */}
             <div className="mb-16 max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Agent Network</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Meet your autonomous workforce</h2>
-              <p className="mt-4 text-slate-400 font-sans">Each agent is a specialist with domain knowledge, dedicated tools, and the ability to collaborate.</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Meet your specialist workforce</h2>
+              <p className="mt-4 text-slate-400 font-sans">Each agent is a specialist with domain knowledge, dedicated tools, and a structured output schema. High-risk actions flow through a human-in-the-loop approval gate, not straight to execution.</p>
             </div>
 
             {/* Agent cards - asymmetric grid with offset */}
@@ -616,7 +616,7 @@ export default function HomePage() {
             <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
             <div className="w-8 h-px bg-gradient-to-r from-amber-400 to-pink-400" />
             <div className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" style={{ animationDelay: '1s' }} />
-            <span className="text-xs text-slate-500 ml-2 font-sans">Agents collaborate autonomously</span>
+            <span className="text-xs text-slate-500 ml-2 font-sans">Agents collaborate via durable workflow coordination</span>
           </div>
         </div>
 
@@ -693,7 +693,7 @@ export default function HomePage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[
                 { icon: '🏛️', title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
-                { icon: '⚡', title: 'Code Generator', desc: 'Generates production-grade Next.js, React, Tailwind CSS, and Prisma code — complete files, not stubs', color: '#fbbf24' },
+                { icon: '⚡', title: 'Code Generator', desc: 'Generates complete Next.js, React, Tailwind CSS, and Prisma files with a no-truncation invariant — no stubs, no TODOs. Production-readiness still depends on your auth/ratelimit/DB choices', color: '#fbbf24' },
                 { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
                 { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
                 { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with env-var preflight, build-error classification, and automatic rollback recommendation on failure', color: '#c084fc' },
@@ -721,8 +721,8 @@ export default function HomePage() {
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Production Tools</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Everything Your Agents Need</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Real integrations, not demos. Gmail via IMAP, Calendar via CalDAV, WhatsApp control with verified numbers, Browser via Playwright, Sandbox via E2B&nbsp;&mdash; plus 21 verified MCP providers.</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">119 Tools. Honest Maturity Labels.</h2>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 verified MCP providers. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
 
             {/* Tool Categories Grid */}
