@@ -450,6 +450,7 @@ export function registerBuiltinTools(): void {
           sourceType: { type: 'string' },
         },
       },
+      maturity: 'config_dependent',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -502,6 +503,7 @@ export function registerBuiltinTools(): void {
         required: ['content'],
       },
       outputSchema: { type: 'object', properties: { summary: { type: 'string' }, keyPoints: { type: 'array' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -535,6 +537,7 @@ export function registerBuiltinTools(): void {
         required: ['content', 'fields'],
       },
       outputSchema: { type: 'object', properties: { extractedFields: { type: 'array' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -737,6 +740,7 @@ export function registerBuiltinTools(): void {
           rowCount: { type: 'number' },
         },
       },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -806,6 +810,7 @@ export function registerBuiltinTools(): void {
           stddev: { type: 'number' },
         },
       },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -879,6 +884,7 @@ export function registerBuiltinTools(): void {
         type: 'object',
         properties: { reportId: { type: 'string' }, content: { type: 'string' } },
       },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -1306,6 +1312,7 @@ export function registerBuiltinTools(): void {
         required: [],
       },
       outputSchema: { type: 'object' },
+      maturity: 'config_dependent',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -1890,6 +1897,7 @@ export function registerBuiltinTools(): void {
         },
       },
       outputSchema: { type: 'object' },
+      maturity: 'experimental',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -2889,6 +2897,7 @@ export function registerBuiltinTools(): void {
         required: ['url'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -2979,6 +2988,7 @@ export function registerBuiltinTools(): void {
         required: ['seed_keyword'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3034,6 +3044,7 @@ export function registerBuiltinTools(): void {
         required: ['keyword'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3088,6 +3099,7 @@ export function registerBuiltinTools(): void {
         required: ['keyword', 'targetUrl'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3151,6 +3163,7 @@ export function registerBuiltinTools(): void {
         required: ['name', 'steps'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3184,6 +3197,7 @@ export function registerBuiltinTools(): void {
         required: ['template', 'contactData'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3232,6 +3246,7 @@ export function registerBuiltinTools(): void {
         required: ['to', 'subject', 'body'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3272,6 +3287,7 @@ export function registerBuiltinTools(): void {
         required: ['emailId', 'event'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3315,6 +3331,7 @@ export function registerBuiltinTools(): void {
         required: ['events'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3370,6 +3387,7 @@ export function registerBuiltinTools(): void {
         required: ['engagementScore', 'daysSinceLastLogin'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3414,6 +3432,7 @@ export function registerBuiltinTools(): void {
         required: ['customerName'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3466,6 +3485,7 @@ export function registerBuiltinTools(): void {
         required: ['company'],
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4010,6 +4030,7 @@ export function registerBuiltinTools(): void {
         required: ['url'],
       },
       outputSchema: { type: 'object', properties: { audit: { type: 'object' }, keywords: { type: 'object' }, serp: { type: 'object' }, recommendations: { type: 'array' }, score: { type: 'number' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4056,6 +4077,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { tracked: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4097,6 +4119,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { okrs: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4146,6 +4169,7 @@ export function registerBuiltinTools(): void {
         required: ['competitors'],
       },
       outputSchema: { type: 'object', properties: { competitors: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4185,6 +4209,7 @@ export function registerBuiltinTools(): void {
         required: ['companyName', 'period'],
       },
       outputSchema: { type: 'object', properties: { report: { type: 'string' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4271,6 +4296,7 @@ export function registerBuiltinTools(): void {
         required: ['packageJson'],
       },
       outputSchema: { type: 'object', properties: { dependencies: { type: 'array' }, totalDeps: { type: 'number' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4313,6 +4339,7 @@ export function registerBuiltinTools(): void {
         required: ['files'],
       },
       outputSchema: { type: 'object', properties: { score: { type: 'number' }, indicators: { type: 'array' }, recommendations: { type: 'array' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4379,6 +4406,7 @@ export function registerBuiltinTools(): void {
         required: ['csvContent'],
       },
       outputSchema: { type: 'object', properties: { rows: { type: 'array' }, totals: { type: 'object' }, summary: { type: 'string' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4436,6 +4464,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { budget: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4482,6 +4511,7 @@ export function registerBuiltinTools(): void {
         required: ['historicalData', 'periods'],
       },
       outputSchema: { type: 'object', properties: { forecast: { type: 'array' }, trend: { type: 'string' }, confidence: { type: 'string' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4541,6 +4571,7 @@ export function registerBuiltinTools(): void {
         required: ['resumeText', 'jobDescription'],
       },
       outputSchema: { type: 'object', properties: { score: { type: 'number' }, matchedSkills: { type: 'array' }, missingSkills: { type: 'array' }, recommendation: { type: 'string' }, flags: { type: 'array' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4590,6 +4621,7 @@ export function registerBuiltinTools(): void {
         required: ['title', 'description', 'requirements', 'location'],
       },
       outputSchema: { type: 'object', properties: { listings: { type: 'object' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4629,6 +4661,7 @@ export function registerBuiltinTools(): void {
         required: ['candidateName', 'position', 'salary', 'startDate'],
       },
       outputSchema: { type: 'object', properties: { letter: { type: 'string' }, filename: { type: 'string' } } },
+      maturity: 'heuristic',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4689,6 +4722,7 @@ Date: _______________`;
         required: ['contractA', 'contractB'],
       },
       outputSchema: { type: 'object', properties: { differences: { type: 'array' }, summary: { type: 'string' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4743,6 +4777,7 @@ Date: _______________`;
         required: ['contractText'],
       },
       outputSchema: { type: 'object', properties: { obligations: { type: 'array' }, renewalDate: { type: 'string' }, terminationClause: { type: 'string' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4798,6 +4833,7 @@ Date: _______________`;
         required: ['industry'],
       },
       outputSchema: { type: 'object', properties: { updates: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4994,6 +5030,7 @@ Date: _______________`;
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { pipeline: { type: 'array' }, stageBreakdown: { type: 'object' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5049,6 +5086,7 @@ Date: _______________`;
         required: ['action', 'customerId'],
       },
       outputSchema: { type: 'object', properties: { current: { type: 'object' }, history: { type: 'array' } } },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5104,6 +5142,7 @@ Date: _______________`;
         required: ['customerName', 'period'],
       },
       outputSchema: { type: 'object', properties: { qbr: { type: 'string' } } },
+      maturity: 'llm_passthrough',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5849,6 +5888,7 @@ Date: _______________`;
         },
       },
       outputSchema: { type: 'object' },
+      maturity: 'real',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {

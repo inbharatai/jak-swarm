@@ -55,11 +55,13 @@ describe('ToolRegistry.getManifest()', () => {
     );
   });
 
-  it('reports unclassified tools so the truth-check can surface coverage gaps', () => {
+  it('every registered tool carries a maturity classification (regression guard)', () => {
     const m = toolRegistry.getManifest();
-    // We've explicitly classified ~13 tools; the rest are unclassified by design.
-    expect(m.byMaturity.unclassified).toBeGreaterThan(0);
-    expect(m.unclassifiedNames.length).toBe(m.byMaturity.unclassified);
+    // Session 7 closed the gap: every built-in now has a `maturity` field so
+    // the truth-check can honestly report what each tool actually does.
+    // This assertion prevents new tools from shipping without classification.
+    expect(m.byMaturity.unclassified).toBe(0);
+    expect(m.unclassifiedNames).toEqual([]);
   });
 
   it('counts requiresApproval tools (sanity)', () => {

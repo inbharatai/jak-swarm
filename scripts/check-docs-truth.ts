@@ -198,6 +198,18 @@ writeFileSync(
   'utf8',
 );
 
+// Session 7 invariant: no tool may ship without a maturity classification.
+// A new unclassified tool would silently inflate the "production tools" count
+// without any claim about what it actually does — we gate CI against that.
+if (manifest.byMaturity.unclassified > 0) {
+  mismatches.push({
+    claim: 'All built-in tools must carry a maturity classification',
+    expected: 0,
+    actual: manifest.byMaturity.unclassified,
+    source: `unclassified tools: ${manifest.unclassifiedNames.slice(0, 10).join(', ')}${manifest.unclassifiedNames.length > 10 ? ', …' : ''}`,
+  });
+}
+
 if (mismatches.length === 0) {
   // eslint-disable-next-line no-console
   console.log(
