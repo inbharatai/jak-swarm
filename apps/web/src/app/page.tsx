@@ -702,7 +702,7 @@ export default function HomePage() {
                 { icon: '⚡', title: 'Code Generator', desc: 'Generates complete Next.js, React, Tailwind CSS, and Prisma files with a no-truncation invariant — no stubs, no TODOs. Production-readiness still depends on your auth/ratelimit/DB choices', color: '#fbbf24' },
                 { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
                 { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
-                { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with env-var preflight, build-error classification, and automatic rollback recommendation on failure', color: '#c084fc' },
+                { icon: '🚀', title: 'Durable Deploy to Vercel', desc: 'Env-var preflight, build-error classification, and automatic rollback recommendation on failure. Not instant — durable, with human approval on risky steps', color: '#c084fc' },
                 { icon: '🔖', title: 'Checkpoint-Revert', desc: 'Every stage auto-snapshots with a structural diff (+added ~modified -deleted). One-click restore — restores are themselves reversible.', color: '#fb923c' },
               ].map((feature) => (
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
@@ -728,7 +728,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Tools · Honest Maturity Labels</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">119 Tools. Honest Maturity Labels.</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 verified MCP providers. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 connector and MCP surfaces labeled by maturity (production-ready / beta / partial / placeholder) in the integration matrix. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
 
             {/* Tool Categories Grid */}
