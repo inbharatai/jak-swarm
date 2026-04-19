@@ -459,14 +459,14 @@ export default function HomePage() {
                 <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
               </div>
 
-              {/* pb-2 + leading-[1.1] prevent descender clipping on 'g' / 'p' / 'y' */}
-              <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.15] sm:leading-[1.1]">
-                <span className="block text-white/90">38 Specialist Agents.</span>
-                <span className="block mt-2 gradient-text pb-1">One Control Plane.</span>
+              {/* pb-4 + leading-[1.2] give every descender (g / p / y / j) real breathing room */}
+              <h1 className="mb-6 pb-4 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.2] sm:leading-[1.15]">
+                <span className="block text-white/90">Specialist AI Agents.</span>
+                <span className="block mt-2 gradient-text pb-3">Operator-Grade Control Plane.</span>
               </h1>
 
-              <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, CFO, Engineer, Legal, HR&nbsp;&mdash; working under a durable workflow queue. High-risk actions pause for human approval. Every tool carries an honest maturity label.
+              <p className="mb-10 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
+                CEO, CTO, CMO, CFO, HR, Engineer, Legal&nbsp;&mdash; 38 role-specialist agents running under a durable workflow queue with risk-stratified approval gates.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -557,7 +557,7 @@ export default function HomePage() {
             <div className="mb-16 max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Agent Network</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Meet your specialist workforce</h2>
-              <p className="mt-4 text-slate-400 font-sans">Each agent is a specialist with domain knowledge, dedicated tools, and a structured output schema. High-risk actions flow through a human-in-the-loop approval gate, not straight to execution.</p>
+              <p className="mt-4 text-slate-300 font-sans">Each agent is a specialist with domain knowledge, dedicated tools, and a structured output schema. High-risk actions flow through a human-in-the-loop approval gate, not straight to execution.</p>
             </div>
 
             {/* Agent cards - asymmetric grid with offset */}
@@ -693,7 +693,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Vibe Coding</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Build Full-Stack Apps with AI</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Describe your app in plain English. A durable workflow runs architect → generate → 3-layer build check → debug ↻ → deploy, with auto-snapshots and diff-aware revert at every stage.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Describe your app in plain English. A durable workflow runs architect → generate → 3-layer build check → debug ↻ → deploy, with auto-snapshots and diff-aware revert at every stage.</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -708,7 +708,7 @@ export default function HomePage() {
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
                   <div className="text-2xl mb-3">{feature.icon}</div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -728,7 +728,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Tools · Honest Maturity Labels</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">119 Tools. Honest Maturity Labels.</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 verified MCP providers. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 verified MCP providers. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
 
             {/* Tool Categories Grid */}
@@ -916,7 +916,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-red-400 mb-3 font-sans">Security</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Verify Before You Act</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Built-in risk intelligence engine. Every email, document, invoice, and credential passes through 4 layers of verification before your agents act on it.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Built-in risk intelligence engine. Every email, document, invoice, and credential passes through 4 layers of verification before your agents act on it.</p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -931,7 +931,7 @@ export default function HomePage() {
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
                   <div className="text-2xl mb-3">{feature.icon}</div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -947,7 +947,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-3 font-sans">Enterprise Intelligence</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Agents That Learn, Connect &amp; Recover</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Memory-aware agents, automatic context engineering, Slack channel bridge, voice-to-workflow trigger, and a typed SDK. Extracted from DeerFlow 2.0 research.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Memory-aware agents, automatic context engineering, Slack channel bridge, voice-to-workflow trigger, and a typed SDK. Extracted from DeerFlow 2.0 research.</p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -962,7 +962,7 @@ export default function HomePage() {
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
                   <div className="text-2xl mb-3">{feature.icon}</div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed font-sans">{feature.desc}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -978,7 +978,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Pricing</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Simple, transparent pricing</h2>
-              <p className="mt-4 text-slate-400 max-w-xl mx-auto font-sans">Start free and scale as you grow. No hidden fees.</p>
+              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Start free and scale as you grow. No hidden fees.</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto items-start">
@@ -1018,7 +1018,7 @@ export default function HomePage() {
                       <span className="text-4xl font-display font-bold text-white tabular-nums">{tier.price}</span>
                       {tier.period && <span className="text-slate-500 font-sans">{tier.period}</span>}
                     </div>
-                    <p className="mt-2 text-sm text-slate-400 font-sans">{tier.description}</p>
+                    <p className="mt-2 text-sm text-slate-300 font-sans">{tier.description}</p>
                   </div>
 
                   <ul className="mb-8 space-y-3">
@@ -1068,7 +1068,7 @@ export default function HomePage() {
           <div ref={testimonialSection.ref} className={`fade-section ${testimonialSection.visible ? 'visible' : ''} mx-auto max-w-4xl text-center`}>
             <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">Open Source</p>
             <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-4">Built in the Open</h2>
-            <p className="text-slate-400 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, deploy on your own infrastructure.</p>
+            <p className="text-slate-300 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, deploy on your own infrastructure.</p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Star JAK Swarm on GitHub">
