@@ -132,20 +132,25 @@ model Workflow {
 }
 
 model WorkflowJob {
-  id          String   @id @default(cuid())
-  workflowId  String   @unique
-  tenantId    String
-  userId      String
-  status      String   @default("QUEUED") // QUEUED | ACTIVE | COMPLETED | FAILED | DEAD
-  attempts    Int      @default(0)
-  maxAttempts Int      @default(5)
-  payloadJson Json
-  availableAt DateTime @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  lastError   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  workflowId       String   @unique
+  tenantId         String
+  userId           String
+  status           String   @default("QUEUED") // QUEUED | ACTIVE | COMPLETED | FAILED | DEAD
+  attempts         Int      @default(0)
+  maxAttempts      Int      @default(5)
+  payloadJson      Json
+  availableAt      DateTime @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  lastError        String?
+  // P1b ownership — which instance owns the job right now, when its lease expires,
+  // and when it last heartbeated. Reclaim when leaseExpiresAt < NOW() and status='ACTIVE'.
+  ownerInstanceId  String?
+  leaseExpiresAt   DateTime?
+  lastHeartbeatAt  DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -154,6 +159,8 @@ model WorkflowJob {
   @@index([status, availableAt])
   @@index([tenantId, status])
   @@index([updatedAt])
+  @@index([status, leaseExpiresAt])
+  @@index([ownerInstanceId])
   @@map("workflow_jobs")
 }
 

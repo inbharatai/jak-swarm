@@ -3,6 +3,7 @@ import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
 import { toolRegistry } from '@jak-swarm/tools';
 import { ToolRiskClass, type ToolCategory, type ToolMaturity } from '@jak-swarm/shared';
+import { listRoleManifest, getRoleManifestSummary, type RoleMaturity } from '@jak-swarm/agents';
 import { randomUUID } from 'node:crypto';
 
 const toolsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -50,6 +51,28 @@ const toolsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (_request: FastifyRequest, reply: FastifyReply) => {
       return reply.status(200).send(ok(toolRegistry.getManifest()));
+    },
+  );
+
+  /**
+   * GET /tools/roles
+   * Per-agent-role maturity classification — parallel to /tools/manifest but
+   * covers the AgentRole axis. Admin UI renders depth badges from this.
+   * Returns entries ordered hero → experimental. Optional ?maturity= filter.
+   */
+  fastify.get(
+    '/roles',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { maturity } = request.query as { maturity?: RoleMaturity };
+      let list = listRoleManifest();
+      if (maturity) list = list.filter((r) => r.maturity === maturity);
+      return reply.status(200).send(
+        ok({
+          summary: getRoleManifestSummary(),
+          roles: list,
+        }),
+      );
     },
   );
 

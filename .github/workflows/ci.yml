@@ -176,6 +176,26 @@ jobs:
           echo "Production boot guard is present."
 
   # ---------------------------------------------------------------------------
+  # Gitleaks — deeper secret scanning with a mature ruleset.
+  # Runs against the full history on the branch; fails on any hit that isn't
+  # whitelisted in .gitleaks.toml (placeholders, test fixtures).
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  # ---------------------------------------------------------------------------
   # Truth check — blocks merge if README / landing-page claims drift from the
   # live tool manifest and integration maturity matrix.
   # ---------------------------------------------------------------------------

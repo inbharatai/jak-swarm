@@ -1,0 +1,34 @@
+# Gitleaks configuration for JAK Swarm.
+#
+# Extends the default ruleset with project-specific allowlists so intentional
+# placeholders (e.g. "sk-your-openai-key" in docs) don't trigger false positives.
+# The default rules cover AWS, GCP, Stripe, Slack, GitHub, OpenAI, Anthropic,
+# JWT, private keys, and dozens more.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders + doc examples + test fixtures that intentionally contain secret-shaped strings"
+
+paths = [
+  # Example env file — intentionally contains KEY= placeholders
+  '''\.env\.example$''',
+  # Generated manifests / truth-check outputs — never contain real secrets
+  '''^docs/_generated/''',
+  # Lockfiles — integrity hashes look secret-ish
+  '''pnpm-lock\.yaml$''',
+  '''package-lock\.json$''',
+]
+
+regexes = [
+  # Documentation placeholder patterns explicitly labelled "change-me"
+  '''change-me-to-a-random''',
+  '''your-[a-z-]+-key''',
+  '''test-bridge-token''',
+  '''dev-secret-change-me-NEVER-USE-IN-PROD''',
+  # Known example format "abcd efgh ijkl mnop" from Gmail app-password docs
+  '''abcd efgh ijkl mnop''',
+]
+
+commits = []

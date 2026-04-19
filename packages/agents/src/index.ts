@@ -120,10 +120,34 @@ export { SpreadsheetAgent } from './workers/spreadsheet.agent.js';
 export type { SpreadsheetTask, SpreadsheetResult } from './workers/spreadsheet.agent.js';
 
 export { OpsAgent } from './workers/ops.agent.js';
-export type { OpsTask, OpsResult } from './workers/ops.agent.js';
+export type {
+  OpsTask,
+  OpsResult,
+  OpsAction,
+  OpsStep,
+  OpsSeverity,
+  OpsIncidentTriage,
+  OpsRollbackPlan,
+} from './workers/ops.agent.js';
 
 export { VoiceAgent } from './workers/voice.agent.js';
-export type { VoiceTask, VoiceResult } from './workers/voice.agent.js';
+export type {
+  VoiceTask,
+  VoiceResult,
+  VoiceAction,
+  ActionItem,
+  CallDecision,
+  SpeakerStats,
+} from './workers/voice.agent.js';
+
+// Role manifest — honest per-role maturity classification
+export {
+  ROLE_MANIFEST,
+  getRoleManifestEntry,
+  listRoleManifest,
+  getRoleManifestSummary,
+} from './role-manifest.js';
+export type { RoleMaturity, RoleManifestEntry } from './role-manifest.js';
 
 export { KnowledgeAgent } from './workers/knowledge.agent.js';
 export type { KnowledgeTask, KnowledgeResult } from './workers/knowledge.agent.js';
