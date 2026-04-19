@@ -16,6 +16,10 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolRegistry, registerBuiltinTools } from '../packages/tools/src/index.js';
 import { AgentRole } from '@jak-swarm/shared';
+import {
+  computeSession7Counts,
+  EXPECTED_SESSION_7_BUCKETS,
+} from './verify-session7-counts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -215,6 +219,33 @@ for (const check of prohibitedInMarketing) {
   }
 }
 
+// ─── Session 7 subset bucket counts ────────────────────────────────────────
+// The 40 tools classified in commit faad80d carry expected per-bucket counts.
+// If any of them silently flips maturity, or one is removed, this block fires
+// and CI blocks the merge.
+//
+// Counts: real=17, heuristic=12, llm_passthrough=8, config_dependent=2, experimental=1.
+const session7 = computeSession7Counts();
+for (const [bucket, expected] of Object.entries(EXPECTED_SESSION_7_BUCKETS)) {
+  const actual = session7.byMaturity[bucket] ?? 0;
+  if (actual !== expected) {
+    mismatches.push({
+      claim: `Session 7 subset bucket ${bucket}`,
+      expected,
+      actual,
+      source: 'scripts/verify-session7-counts.ts (update EXPECTED_SESSION_7_BUCKETS or revert the maturity change)',
+    });
+  }
+}
+if (session7.missing.length > 0) {
+  mismatches.push({
+    claim: 'Session 7 subset tools missing from registry',
+    expected: '0',
+    actual: session7.missing.join(', '),
+    source: 'packages/tools/src/builtin/index.ts',
+  });
+}
+
 // ─── Report ────────────────────────────────────────────────────────────────
 
 const report = {
@@ -226,6 +257,11 @@ const report = {
     requiresApproval: manifest.requiresApproval,
     liveTested: manifest.liveTested,
     unclassifiedCount: manifest.byMaturity.unclassified,
+  },
+  session7Subset: {
+    total: session7.total,
+    byMaturity: session7.byMaturity,
+    expected: EXPECTED_SESSION_7_BUCKETS,
   },
   integrationMatrix: matrixCounts,
   mismatches,

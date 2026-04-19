@@ -20,7 +20,7 @@ An **operator-grade multi-agent control plane**: durable queue, cross-instance s
 - **Docker-backed build checker** (Session 4): real `npm install` + `next build` inside a disposable container. Injectable runner for tests. Graceful skip when Docker absent. 15 unit tests.
 - **Checkpoint-revert backend** (Session 5): `CheckpointService` auto-snapshots at each workflow stage with structural diff; restore creates a new rollback version so restores are themselves reversible. 16 unit tests.
 - **Checkpoint timeline UI** (Session 6): builder sidebar renders stage badges, +N ~M -K diff summary, expandable file list, inline-confirm restore button.
-- **Tool maturity classification** (Session 7): 40 previously-unclassified tools now carry honest labels. `pnpm check:truth` fails CI on regression.
+- **Tool maturity classification** (Session 7): 40 previously-unclassified tools now carry honest labels — **real: 17, heuristic: 12, llm_passthrough: 8, config_dependent: 2, experimental: 1** (verified at runtime by `scripts/verify-session7-counts.ts`). `pnpm check:truth` fails CI on any bucket drift.
 - **Role depth** (Session 8): Email / CRM / Research / Calendar prompts rewritten as operator-grade specs with optional expert-mode result fields (deliverability, dealHealth, disagreements, recommendedSlot). 8 behavioral tests.
 - **Positioning + founder actions** (Session 9): `docs/competitive-positioning.md` names what JAK is and isn't. `docs/founder-action-list.md` is the owner-only blocker list. `check:truth` strengthened with AgentRole enum count guard.
 

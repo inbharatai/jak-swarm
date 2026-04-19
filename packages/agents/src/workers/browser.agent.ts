@@ -245,12 +245,17 @@ export class BrowserAgent extends BaseAgent {
 
       try {
         const parsed = this.parseJsonResponse<Partial<BrowserResult>>(loopResult.content);
+        // Union — pre-LLM blocks from the caller-supplied allowlist take
+        // precedence, but we also accept honeypot / site-detected blocks
+        // the LLM reports. Dedupe so neither layer is hidden.
+        const mergedBlocked = [...new Set([...(parsed.blockedActions ?? []), ...blockedActions])];
         result = {
           actionsExecuted: parsed.actionsExecuted ?? [],
           extractedData: parsed.extractedData ?? {},
           screenshotsTaken: parsed.screenshotsTaken ?? 0,
-          requiresApproval: false,
-          blockedActions,
+          requiresApproval: parsed.requiresApproval ?? false,
+          approvalReason: parsed.approvalReason,
+          blockedActions: mergedBlocked,
         };
       } catch {
         // LLM returned freeform text — wrap gracefully

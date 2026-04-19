@@ -123,7 +123,7 @@ Add `workflow_jobs.ownerInstanceId`, `leaseExpiresAt`, `lastHeartbeatAt`. Reclai
 Postgres-backed integration tests for: unpause-signal recovery across instances, approval resume, worker-lease recovery. These need Postgres + Redis in CI.
 
 ### G4. 40 unclassified tools
-Closed in Session 7 — all 119 tools now carry maturity. `pnpm check:truth` gates CI against regression.
+Closed in Session 7 — all 119 tools now carry maturity. The 40-tool subset breaks down as **real: 17, heuristic: 12, llm_passthrough: 8, config_dependent: 2, experimental: 1** (total 40). `pnpm check:truth` runs `scripts/verify-session7-counts.ts` and fails CI if any bucket count drifts, or a tool silently changes maturity.
 
 ### G5. Checkpoint-revert
 Closed in Session 5 + 6. Backend service, routes, and UI timeline all shipped.
