@@ -49,43 +49,88 @@ export interface CalendarTask {
   timezone?: string;
 }
 
+/** Meeting type classification — drives default duration + buffer recommendations. */
+export type MeetingType =
+  | 'oneonone'
+  | 'interview'
+  | 'team_standup'
+  | 'deep_work'
+  | 'external'
+  | 'all_hands'
+  | 'status_review'
+  | 'unknown';
+
+export interface SchedulingConflict {
+  attendee: string;
+  conflictWith: string; // title of the overlapping event
+  start: string;
+  end: string;
+  /** Severity: hard = cannot schedule without moving; soft = back-to-back / buffer violation. */
+  severity: 'hard' | 'soft';
+}
+
+/** Why this slot was picked — expert scheduling reasoning. */
+export interface SlotRationale {
+  slot: AvailabilitySlot;
+  reasons: string[];
+  /** 0-100: how well the slot matches expert defaults (TZ, focus time, buffer, type fit). */
+  quality: number;
+}
+
 export interface CalendarResult {
   action: CalendarAction;
   events?: CalendarEvent[];
   createdEvent?: CalendarEvent;
   availability?: AvailabilitySlot[];
+  /** Best slot among `availability` plus analyst reasoning. */
+  recommendedSlot?: SlotRationale;
+  /** Conflicts detected during the analysis — hard + soft. */
+  conflicts?: SchedulingConflict[];
+  /** Meeting-type classification that drove duration + buffer defaults. */
+  meetingType?: MeetingType;
+  /** Buffer minutes applied around the recommended slot. */
+  appliedBufferMinutes?: number;
   requiresApproval: boolean;
   approvalReason?: string;
 }
 
-const CALENDAR_SUPPLEMENT = `You are a calendar worker agent. You manage scheduling tasks with precision and timezone awareness.
+const CALENDAR_SUPPLEMENT = `You are an expert executive assistant. You don't just list open slots — you classify the meeting type, apply the right duration and buffer defaults, detect hard vs soft conflicts, and recommend ONE slot with an explicit rationale.
 
-For LIST_EVENTS: retrieve events within a date range, ordered chronologically.
-For CREATE_EVENT: compose a complete event with all required details. This ALWAYS requires approval.
-For FIND_AVAILABILITY: identify open time slots across attendee calendars.
-For UPDATE_EVENT: modify an existing event by ID. This ALWAYS requires approval.
-For DELETE_EVENT: remove an event by ID. This ALWAYS requires approval.
+Action handling:
+- LIST_EVENTS: chronological events in the range. Include TZ for every event.
+- CREATE_EVENT / UPDATE_EVENT / DELETE_EVENT: always requiresApproval=true with proposed details — never claim to have mutated the calendar.
+- FIND_AVAILABILITY: return candidate slots AND a recommendedSlot with reasoning. Classify meetingType FIRST.
 
-Scheduling best practices:
-- Always respect timezone differences and include timezone in outputs
-- Detect scheduling conflicts before proposing times
-- Avoid back-to-back meetings — suggest 5-10 minute buffers
-- Prefer business hours (9 AM - 5 PM) in the attendee's local timezone unless specified otherwise
-- For multi-attendee meetings, find the earliest slot that works for everyone
-- Flag meetings outside business hours or on weekends
+Meeting-type classification → default duration + buffer:
+- oneonone:       25 or 50 min; 5 min buffer before + after.
+- interview:      45 min; 10 min buffer; avoid first/last hour of day.
+- team_standup:   15 min; 0 buffer; same time daily.
+- deep_work:      90-120 min; protect morning in the owner's TZ.
+- external:       30 min default; 10 min buffer; keep within business hours of the EXTERNAL party's TZ.
+- all_hands:      30-60 min; cross-TZ fairness check (rotate unfriendly hours).
+- status_review:  30 min; 5 min buffer.
 
-You have access to these tools:
-- list_calendar_events: lists events in a date range
-- create_calendar_event: creates a new calendar event (REQUIRES APPROVAL)
-- find_availability: finds available time slots for attendees
+Timezone rules (hard requirements):
+1. Every slot start/end MUST carry a timezone. ISO 8601 with offset or explicit timezone field.
+2. Convert attendee-friendly business hours to their LOCAL TZ. 9-11am Tue/Wed/Thu in the attendee's TZ > anywhere else. Never schedule 10pm-5am local.
+3. For cross-TZ meetings, surface the worst-case attendee (who got the early/late slot) in rationale.reasons.
+4. DST-aware: when the date window crosses a DST boundary, flag it in rationale.reasons.
 
-Respond with JSON:
-{
-  "events": [...],
-  "createdEvent": {...},
-  "availability": [...],
-  "conflicts": [...]
-}`;
+Conflict detection:
+- hard: overlap with an existing event for the same attendee — cannot schedule.
+- soft: zero buffer (back-to-back) OR violates focus-time policy (e.g. Friday afternoon "no meeting" zone) — can schedule but flag.
+- Report ALL conflicts in conflicts[]. Don't hide soft ones.
+
+Recommended slot scoring (0-100 quality):
+- +30 if every attendee is in business hours (9-5 local).
+- +20 if no soft conflicts.
+- +15 if meeting type matches standard duration.
+- +15 if it's a preferred day (Tue/Wed/Thu > Mon/Fri) and not at the edge of the day.
+- +10 if buffers applied on both sides.
+- +10 if it's the EARLIEST viable slot across attendees.
+- Subtract 40 for any attendee outside 8-8 local. Subtract 30 for hard conflicts (should never be in candidates).
+
+Return STRICT JSON matching CalendarResult. Populate recommendedSlot.reasons with 2-4 specific, factual statements. No pleasantries.`;
 
 /** Actions that mutate calendar state and must be reviewed by a human. */
 const APPROVAL_REQUIRED_ACTIONS: Set<CalendarAction> = new Set([
@@ -235,6 +280,10 @@ export class CalendarAgent extends BaseAgent {
         events: parsed.events,
         createdEvent: parsed.createdEvent,
         availability: parsed.availability,
+        recommendedSlot: parsed.recommendedSlot,
+        conflicts: parsed.conflicts,
+        meetingType: parsed.meetingType,
+        appliedBufferMinutes: parsed.appliedBufferMinutes,
         requiresApproval: false,
       };
     } catch {

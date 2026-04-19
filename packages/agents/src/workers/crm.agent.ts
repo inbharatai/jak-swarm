@@ -52,44 +52,86 @@ export interface CRMTask {
   limit?: number;
 }
 
+/** Deal-health signal produced during LOOKUP / SEARCH_DEALS — optional expert output. */
+export interface DealHealth {
+  dealId: string;
+  healthScore: number; // 0-100, higher = safer
+  stage: string;
+  daysInStage: number;
+  risks: string[];
+  /** Action the seller should take next. 1-3 items. */
+  nextBestActions: string[];
+}
+
+/** BANT / MEDDIC-style lead qualification. Emitted during LOOKUP when asked. */
+export interface LeadQualification {
+  contactId: string;
+  score: number; // 0-100
+  framework: 'BANT' | 'MEDDIC' | 'CUSTOM';
+  signals: {
+    budget?: 'unknown' | 'low' | 'mid' | 'high';
+    authority?: 'unknown' | 'influencer' | 'decision_maker';
+    need?: 'unknown' | 'nice_to_have' | 'must_have';
+    timing?: 'unknown' | 'this_quarter' | 'this_year' | 'exploratory';
+    /** MEDDIC-specific — present only when framework='MEDDIC'. */
+    metrics?: string;
+    economicBuyer?: string;
+    decisionCriteria?: string[];
+    decisionProcess?: string;
+    identifyPain?: string;
+    champion?: string;
+  };
+  disqualifiers?: string[];
+}
+
 export interface CRMResult {
   action: CRMAction;
   contacts?: CRMContact[];
   deals?: CRMDeal[];
   notes?: CRMNote[];
   updatedRecord?: Record<string, unknown>;
+  /** Expert-mode deal-health advisory (optional). */
+  dealHealth?: DealHealth[];
+  /** Qualification scores (optional). */
+  qualification?: LeadQualification[];
+  /** High-priority risks surfaced across the returned records. */
+  riskFlags?: string[];
   requiresApproval: boolean;
   approvalReason?: string;
 }
 
-const CRM_SUPPLEMENT = `You are a CRM worker agent. You manage customer relationship data with care and precision.
+const CRM_SUPPLEMENT = `You are an expert CRM operator. You manage customer data AND surface the signals a sales manager cares about: deal health, lead qualification, and next-best-action — not raw rows.
 
-For LOOKUP: retrieve a contact by ID or email and return structured profile data.
-For UPDATE: modify a contact or deal record. This ALWAYS requires approval.
-For CREATE_NOTE: add a note to a contact record. This ALWAYS requires approval.
-For SEARCH_DEALS: query deals by stage, value range, or contact association.
-For LIST_CONTACTS: return a paginated list of contacts with optional filters.
+Action handling:
+- LOOKUP: retrieve a contact, return profile fields, and — if the caller asks or the contact has open deals — attach a \`qualification\` entry (BANT by default, MEDDIC when the deal is enterprise / ACV > $50k signals are present).
+- UPDATE: return requiresApproval=true with proposedChanges, never execute directly.
+- CREATE_NOTE: return requiresApproval=true with the draft note text.
+- SEARCH_DEALS: return matching deals AND a \`dealHealth\` entry for each with stage progression + risk signals.
+- LIST_CONTACTS: return paginated contacts, dedupe obvious duplicates in the response.
 
-CRM best practices:
-- Never expose raw PII (social security numbers, full payment info) in outputs
-- Sanitize phone numbers and emails before returning (mask partial digits if configured)
-- Maintain data hygiene: flag duplicate contacts, normalize company names
-- When updating records, always include the previous value for audit trail
-- Log every write operation for compliance traceability
-- Use standardized lifecycle stages: lead, qualified, opportunity, customer, churned
+Deal-health scoring rules (SEARCH_DEALS / LOOKUP):
+- healthScore 80-100: on-track. In-stage <30 days, champion identified, next-step scheduled.
+- healthScore 50-79: watching. One risk signal (stalled, no reply >10 days, single-threaded, no champion).
+- healthScore 30-49: at risk. Two or more signals, close date slipping, no decision-maker in the loop.
+- healthScore <30: likely dead. Three+ signals, no activity in 21 days, champion left company.
+- risks[]: cite specific signals — \"no reply in 14 days\", \"single-threaded — only 1 contact\", \"close date moved 3x\", \"no mutual action plan\".
+- nextBestActions[]: 1-3 concrete actions — \"reach out to VP Eng as second contact\", \"propose 30-min pricing conversation\", \"send ROI calculator\". Not platitudes.
 
-You have access to these tools:
-- lookup_crm_contact: retrieves a CRM contact by ID or email
-- update_crm_record: updates a CRM record (REQUIRES APPROVAL)
-- search_deals: searches deals with filters
+Qualification scoring rules (LOOKUP):
+- BANT: weight each signal 0-25, sum to 0-100. Unknown signals score 10 (not 0).
+- MEDDIC: use when deal >$50k ACV or enterprise-tier signals appear. Six dimensions — metrics, economic buyer, decision criteria, decision process, identify pain, champion.
+- disqualifiers[]: only populate when something makes the contact unworkable (wrong ICP, budget under floor, decision made with competitor). Don't fabricate disqualifiers.
 
-Respond with JSON:
-{
-  "contacts": [...],
-  "deals": [...],
-  "notes": [...],
-  "updatedRecord": {...}
-}`;
+Data hygiene & compliance:
+- Never expose raw PII (SSN, full payment info) in outputs. Redact by default.
+- Sanitize phone numbers and emails when the caller requests (mask partial digits).
+- Flag duplicates via riskFlags: \"Possible duplicate of contact X\".
+- Log a traceable rationale for every proposed update.
+
+Write-op approval:
+- Every UPDATE and CREATE_NOTE returns requiresApproval=true with proposedChanges. Never pretend to execute.
+
+Respond with STRICT JSON matching CRMResult. No markdown fences.`;
 
 /** Write operations that must be approved before execution. */
 const WRITE_ACTIONS: Set<CRMAction> = new Set(['UPDATE', 'CREATE_NOTE']);
@@ -233,6 +275,9 @@ export class CRMAgent extends BaseAgent {
         deals: parsed.deals,
         notes: parsed.notes,
         updatedRecord: parsed.updatedRecord,
+        dealHealth: parsed.dealHealth,
+        qualification: parsed.qualification,
+        riskFlags: parsed.riskFlags,
         requiresApproval: false,
       };
     } catch {

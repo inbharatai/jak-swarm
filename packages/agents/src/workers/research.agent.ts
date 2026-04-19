@@ -18,6 +18,21 @@ export interface ResearchSource {
   excerpt: string;
   relevanceScore: number;
   publishedDate?: string;
+  /** Source-quality tier: 1=primary/official, 2=reputable secondary, 3=unverified/blog. */
+  qualityTier?: 1 | 2 | 3;
+  /** Freshness classification — computed from publishedDate against today. */
+  freshness?: 'fresh' | 'recent' | 'dated' | 'stale' | 'unknown';
+}
+
+/** Captures a point where sources disagree — honest research surfaces this. */
+export interface ResearchDisagreement {
+  point: string;
+  positions: Array<{
+    claim: string;
+    supportingSources: string[];
+  }>;
+  /** Which side the agent currently weighs heavier, and why. */
+  analystView?: string;
 }
 
 export interface ResearchResult {
@@ -25,39 +40,49 @@ export interface ResearchResult {
   findings: string;
   keyPoints: string[];
   sources: ResearchSource[];
+  /** Points where sources actively disagree — null when consensus. */
+  disagreements?: ResearchDisagreement[];
+  /** Citation-to-claim mapping: claim index → source indices supporting it. */
+  citations?: Array<{ claim: string; sourceIndices: number[] }>;
+  /** Recency verdict — "fresh" (<30d), "recent" (<180d), "dated" (>180d), "stale" (>2y). */
+  overallFreshness?: 'fresh' | 'recent' | 'dated' | 'stale' | 'unknown';
   confidence: number;
   limitations: string[];
   suggestedFollowUp?: string[];
 }
 
-const RESEARCH_SUPPLEMENT = `You are a research agent. Your role is to synthesize information and provide well-structured research findings.
+const RESEARCH_SUPPLEMENT = `You are a senior research analyst. You don't paraphrase search results — you synthesize them, weigh source quality, and surface disagreements honestly.
 
-When conducting research:
-1. Break down the query into sub-topics
-2. Identify key facts, trends, and insights
-3. Cite your knowledge sources (even if internal knowledge)
-4. Be explicit about confidence levels and limitations
-5. Flag when information may be outdated
+Workflow:
+1. Decompose the query into 2-5 sub-questions.
+2. Call web_search and search_knowledge as needed. Prefer web_search for time-sensitive topics (last 6 months) and knowledge for internal context.
+3. For each source you include, grade its quality tier:
+   - Tier 1 (primary/official): government sites, company financials, the entity's own announcement, peer-reviewed papers, standards bodies.
+   - Tier 2 (reputable secondary): established news (Reuters, FT, NYT), industry analysts (Gartner, Forrester), well-known trade publications.
+   - Tier 3 (unverified): personal blogs, forums, unknown aggregators, Medium posts without sourcing.
+4. For each source, determine freshness by publishedDate vs today:
+   - fresh  = within 30 days
+   - recent = within 6 months
+   - dated  = within 2 years
+   - stale  = older than 2 years
+   - unknown = no date
+5. Dedupe: if the same fact is repeated across outlets citing one primary source, keep the primary source, drop the echoes.
+6. Weigh recency where it matters — outdated numbers in a fast-moving topic (e.g., LLM benchmarks, regulations) should be flagged in limitations, not passed off as current.
+7. Surface disagreement: when two reputable sources conflict, record both positions in disagreements[], cite the sources, and (if you can justify it) give your analystView of which is likely correct.
+8. Citations: every keyPoint must be traceable — include a citations[] entry mapping each claim to the source indices that support it.
+9. overallFreshness is the worst-case of the sources you relied on for time-sensitive claims.
+10. Confidence calibration:
+    - 0.9+: at least two Tier-1 sources agree, all fresh.
+    - 0.7-0.89: multiple Tier-2 sources agree OR one Tier-1.
+    - 0.5-0.69: limited sources, minor gaps.
+    - 0.3-0.49: heavy reliance on Tier-3 or stale sources, or unresolved disagreement.
+    - <0.3: extremely speculative — say so in findings.
 
-You have access to:
-- search_knowledge: searches the knowledge base for relevant documents
-- classify_text: helps categorize and organize findings
+Refuse to fabricate:
+- Never invent statistics, quotes, dollar amounts, dates, or names not present in your sources. If a fact isn't in the sources, say \"no credible source found\" in limitations instead of guessing.
+- If web_search returns nothing relevant, lower confidence and say so. Do not fall back to parametric knowledge without labeling it as such.
 
-ALWAYS:
-- State your confidence level (0.0-1.0)
-- List limitations of your findings
-- Never fabricate statistics, quotes, or specific data points
-- If uncertain, say so explicitly
-
-Respond with JSON:
-{
-  "findings": "detailed findings paragraph",
-  "keyPoints": ["point 1", "point 2"],
-  "sources": [{"title": "...", "excerpt": "...", "relevanceScore": 0.9}],
-  "confidence": 0.0-1.0,
-  "limitations": ["limitation 1"],
-  "suggestedFollowUp": ["follow-up question 1"]
-}`;
+Respond with STRICT JSON matching ResearchResult. No markdown fences. Keep keyPoints to 3-7 items. Keep findings under 400 words — depth belongs in sources, not prose.`;
 
 export class ResearchAgent extends BaseAgent {
   constructor(apiKey?: string) {
@@ -140,6 +165,9 @@ export class ResearchAgent extends BaseAgent {
           findings: parsed.findings ?? 'Research completed. See key points for details.',
           keyPoints: parsed.keyPoints ?? [],
           sources: parsed.sources ?? [],
+          disagreements: parsed.disagreements,
+          citations: parsed.citations,
+          overallFreshness: parsed.overallFreshness,
           confidence: parsed.confidence ?? 0.7,
           limitations: parsed.limitations ?? ['Results based on available knowledge base only'],
           suggestedFollowUp: parsed.suggestedFollowUp,

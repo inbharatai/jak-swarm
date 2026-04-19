@@ -57,6 +57,8 @@ export type {
   EmailMessage,
   EmailResult,
   EmailFilter,
+  EmailDeliverability,
+  EmailABVariant,
 } from './workers/email.agent.js';
 
 export { DocumentAgent } from './workers/document.agent.js';
@@ -68,7 +70,12 @@ export type {
 } from './workers/document.agent.js';
 
 export { ResearchAgent } from './workers/research.agent.js';
-export type { ResearchTask, ResearchResult, ResearchSource } from './workers/research.agent.js';
+export type {
+  ResearchTask,
+  ResearchResult,
+  ResearchSource,
+  ResearchDisagreement,
+} from './workers/research.agent.js';
 
 export { BrowserAgent } from './workers/browser.agent.js';
 export type {
@@ -88,10 +95,26 @@ export type {
 } from './workers/support.agent.js';
 
 export { CalendarAgent } from './workers/calendar.agent.js';
-export type { CalendarTask, CalendarResult } from './workers/calendar.agent.js';
+export type {
+  CalendarTask,
+  CalendarResult,
+  CalendarEvent,
+  AvailabilitySlot,
+  SchedulingConflict,
+  SlotRationale,
+  MeetingType,
+} from './workers/calendar.agent.js';
 
 export { CRMAgent } from './workers/crm.agent.js';
-export type { CRMTask, CRMResult } from './workers/crm.agent.js';
+export type {
+  CRMTask,
+  CRMResult,
+  CRMContact,
+  CRMDeal,
+  CRMNote,
+  DealHealth,
+  LeadQualification,
+} from './workers/crm.agent.js';
 
 export { SpreadsheetAgent } from './workers/spreadsheet.agent.js';
 export type { SpreadsheetTask, SpreadsheetResult } from './workers/spreadsheet.agent.js';
