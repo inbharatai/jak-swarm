@@ -1,20 +1,78 @@
 # JAK Swarm — Production Deployment Guide
 
+## Production topology (required)
+
+**JAK runs as TWO separate processes in production** — the API and the queue worker. They share the same Postgres and Redis but are deployed and scaled independently.
+
+```
+            ┌────────────┐       ┌─────────────┐
+   HTTPS →  │  jak-api   │──────▶│  Postgres   │
+            │  (Fastify) │   ┌──▶│ (pgvector)  │
+            └─────┬──────┘   │   └─────────────┘
+                  │          │
+                  │ enqueue  │
+                  ▼          │
+            ┌────────────┐   │   ┌─────────────┐
+            │ workflow_  │   │   │   Redis     │
+            │   jobs     │   │   │ (locks +    │
+            └─────┬──────┘   │   │  SSE relay  │
+                  │          │   │  + signals) │
+                  │ claim    │   └──────┬──────┘
+                  ▼          │          │
+            ┌────────────┐   │          │
+            │ jak-worker │───┴──────────┘
+            │ (1..N pods)│
+            │ :9464/metrics
+            └─────┬──────┘
+                  │
+                  ▼
+            ┌────────────┐        ┌──────────┐
+            │ Prometheus │◀───────│ Grafana  │
+            │ /metrics   │        │ dashbrd  │
+            └─────┬──────┘        └──────────┘
+                  │
+                  ▼
+            ┌────────────┐
+            │Alertmanager│
+            └────────────┘
+```
+
+Reference implementation: `docker-compose.prod.yml` at repo root shows the
+full topology locally. Use it as a template for Kubernetes / ECS / Render /
+Fly.io deployments.
+
 ## What the application provides (code-side)
 
 | Capability | Endpoint / Module | Notes |
 |---|---|---|
-| Prometheus metrics | `GET /metrics` | prom-client, 15+ metric types |
-| Liveness probe | `GET /healthz` | Process alive check, no dependencies |
-| Readiness probe | `GET /ready` | DB + Redis connectivity, returns 503 during shutdown |
-| Legacy health | `GET /health` | DB + Redis (kept for backward compat) |
+| API Prometheus metrics | `GET /metrics` on API (:4000) | prom-client, 35+ metric types (workflow, agent, tool, LLM cost, queue, worker, signal, SSE, Vibe Coder, provider) |
+| Worker Prometheus metrics | `GET /metrics` on Worker (:9464) | Same registry; each worker exposes per-instance gauges |
+| Liveness probe | `GET /healthz` on API AND Worker | Process alive check, no dependencies |
+| Readiness probe | `GET /ready` on API AND Worker | DB + Redis connectivity, returns 503 during shutdown |
+| Legacy health | `GET /health` on API | DB + Redis (kept for backward compat) |
 | Request ID propagation | `X-Request-ID` header | Auto-generated, attached to all logs |
-| Graceful shutdown | SIGTERM handler | Drains in-flight workflows up to 30s |
-| Structured logging | Pino JSON | Request ID, tenant ID, workflow ID in all logs |
+| Graceful shutdown | SIGTERM handler on both processes | API drains in-flight; worker drains queue, in-flight lease → another worker reclaims |
+| Structured logging | Pino JSON | Request ID, tenant ID, workflow ID, instanceId in all logs |
 | Agent tracing | AgentTrace table | Input, output, tool calls, cost, duration per agent |
-| Supervisor events | SupervisorBus | Workflow lifecycle events (in-process) |
+| Supervisor events | SupervisorBus | Workflow lifecycle events |
 | Circuit breakers | Per-agent role | Exponential backoff, auto-purge |
 | Cost tracking | Per-LLM-call | Token count + USD cost per model |
+| P1b worker-lease reclaim | `workflow_jobs.leaseExpiresAt` | Dead worker's jobs are reclaimed in lease_ttl / 2 |
+
+## Worker-specific environment
+
+| Var | Default | Required | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | — | **yes** | Postgres; worker refuses to start without it in production |
+| `REDIS_URL` | — | recommended | Without it: no cross-instance signals, no SSE relay, no distributed locks |
+| `WORKFLOW_WORKER_INSTANCE_ID` | `${HOSTNAME}` or random | recommended | Stable identity so reclaim logs correlate with dead workers. **Set to pod name in k8s.** |
+| `WORKFLOW_QUEUE_CONCURRENCY` | 2 | | Max in-flight jobs per worker instance |
+| `WORKFLOW_QUEUE_POLL_INTERVAL_MS` | 1000 | | How often the worker polls for new jobs |
+| `WORKFLOW_QUEUE_LEASE_TTL_MS` | 60000 | | How long a claim lasts before reclaim-eligible. Worker heartbeats at TTL/2. |
+| `WORKER_METRICS_PORT` | 9464 | | Port for `/metrics` + `/healthz` + `/ready` |
+| `LOG_LEVEL` | info | | |
+
+Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node dist/worker-entry.js` (prod).
 
 ---
 
@@ -42,14 +100,28 @@ docker compose -f docker-compose.staging.yml up -d
 | **Prometheus** | Metrics collection | Scrapes `/metrics` every 15s |
 | **Grafana** | Dashboards + alerting | Connect to Prometheus data source |
 
-#### Prometheus scrape config
+#### Prometheus scrape + alert config
+
+A production-ready scrape config + full alert ruleset lives at:
+- `ops/prometheus/prometheus.yml` — scrape jobs for API + every worker instance
+- `ops/prometheus/alerts.yml` — 13 operator-grade alert rules (WorkerDown, QueueBacklogHigh, ReclaimStormDetected, HeartbeatFailuresSpike, DeadLetterIncreasing, WorkflowFailureRateSpike, NoWorkflowsCompleted, BuildCheckFailureSpike, Postgres/RedisDisconnected, ApprovalBacklogGrowing, ProviderErrorRateHigh, NoActiveWorkers)
+- `ops/runbooks/on-call.md` — per-alert response playbook
+- `ops/grafana/dashboards/jak-swarm.json` — operator dashboard scaffold (queue depth, worker health, throughput, Vibe Coder runs, LLM cost, provider errors)
+
+Minimum scrape config:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'jak-swarm-api'
+  - job_name: 'jak-api'
     scrape_interval: 15s
     static_configs:
       - targets: ['jak-api:4000']
+    metrics_path: /metrics
+
+  - job_name: 'jak-worker'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['jak-worker:9464']  # or k8s SD — see ops/prometheus/prometheus.yml
     metrics_path: /metrics
 ```
 

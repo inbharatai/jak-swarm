@@ -1,0 +1,61 @@
+# Prometheus scrape config for JAK Swarm production topology.
+#
+# Topology assumed:
+#   - jak-api       : Fastify API on port 4000 exposing /metrics
+#   - jak-worker    : Standalone queue worker exposing /metrics on port 9464
+#   - Alertmanager  : reachable at http://alertmanager:9093
+#
+# Drop this into your Prometheus install (e.g. via Docker Compose or
+# kube-prometheus-stack). Alert rules live in ./alerts.yml.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: jak-swarm
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # ── API service ─────────────────────────────────────────────────────────
+  - job_name: jak-api
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - jak-api:4000
+        labels:
+          service: api
+
+  # ── Worker instances ──────────────────────────────────────────────────
+  # Each worker exposes /metrics on WORKER_METRICS_PORT (default 9464).
+  # For k8s / Docker Swarm, replace static_configs with DNS-SRV or
+  # kubernetes_sd_configs that target every worker pod by label.
+  - job_name: jak-worker
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - jak-worker:9464
+        labels:
+          service: worker
+    # Example for k8s — uncomment and remove static_configs above:
+    # kubernetes_sd_configs:
+    #   - role: pod
+    #     selectors:
+    #       - role: pod
+    #         label: "app=jak-worker"
+    # relabel_configs:
+    #   - source_labels: [__meta_kubernetes_pod_label_app]
+    #     action: keep
+    #     regex: jak-worker
+    #   - source_labels: [__meta_kubernetes_pod_ip]
+    #     target_label: __address__
+    #     replacement: ${1}:9464

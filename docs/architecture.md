@@ -408,7 +408,38 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
          └─────────┘  └─────────┘  └──────────┘
 ```
 
-The API process runs the QueueWorker embedded — no separate worker process required for single-instance deployments. For horizontal scaling, QueueWorker can be extracted to a standalone process reading from the same database.
+For development and single-instance deployments, the API process can run the QueueWorker embedded. For production, the worker runs as its OWN process via `apps/api/src/worker-entry.ts` — see below.
+
+### Recommended production topology (two services)
+
+```
+            ┌────────────┐        ┌──────────────┐
+    HTTPS → │  jak-api   │───────▶│   Postgres   │◀──────┐
+            │  :4000     │        │ (pgvector)   │       │
+            │  /metrics  │        └──────┬───────┘       │
+            └─────┬──────┘               │               │
+                  │                      │               │
+                  │ enqueue via          │               │
+                  │ workflow_jobs        │               │
+                  ▼                      │               │
+            ┌────────────┐        ┌──────▼───────┐       │
+            │ jak-worker │───────▶│   Redis      │       │
+            │ :9464      │◀───────│ (locks + SSE │       │
+            │ /metrics   │        │  + signals)  │       │
+            │ 1..N pods  │        └──────────────┘       │
+            └─────┬──────┘                               │
+                  │                                      │
+                  │ claim + heartbeat + reclaim          │
+                  └──────────────────────────────────────┘
+```
+
+**Why two processes:**
+- API request latency never blocks on long-running agent chains
+- Worker can be scaled independently based on queue depth
+- One process can be restarted without affecting the other
+- Each worker carries a stable `WORKFLOW_WORKER_INSTANCE_ID` so reclaim logs correlate with dead workers
+
+Each worker exposes its own `/metrics` (port 9464 by default) scraped directly by Prometheus. Reference compose at `docker-compose.prod.yml`, scrape + alert rules at `ops/prometheus/`.
 
 ### Environment Tiers
 - **development** — local Docker Compose, hot-reload, verbose logging

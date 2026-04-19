@@ -1,0 +1,136 @@
+{
+  "annotations": {"list": []},
+  "description": "JAK Swarm — operator dashboard. Top row = health signals. Middle = queue + workers. Bottom = workflows + providers.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Workers live (last poll)",
+      "type": "stat",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "targets": [
+        {"expr": "count(time() - jak_worker_last_poll_timestamp_seconds < 30)", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+    },
+    {
+      "title": "Queue depth",
+      "type": "stat",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "jak_workflow_jobs_queued", "refId": "A"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 100}, {"color": "red", "value": 500}]}}}
+    },
+    {
+      "title": "Jobs active",
+      "type": "stat",
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "jak_workflow_jobs_active", "refId": "A"}]
+    },
+    {
+      "title": "Completed / min",
+      "type": "stat",
+      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "rate(jak_workflow_jobs_completed_total[5m]) * 60", "refId": "A"}]
+    },
+    {
+      "title": "Reclaims / hr (dead workers)",
+      "type": "stat",
+      "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "rate(jak_workflow_jobs_reclaimed_total[1h]) * 3600", "refId": "A"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}}
+    },
+    {
+      "title": "Dead-letter / hr",
+      "type": "stat",
+      "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "rate(jak_workflow_jobs_dead_total[1h]) * 3600", "refId": "A"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}}
+    },
+    {
+      "title": "Queue depth over time",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "jak_workflow_jobs_queued", "legendFormat": "QUEUED", "refId": "A"},
+        {"expr": "jak_workflow_jobs_active", "legendFormat": "ACTIVE", "refId": "B"}
+      ]
+    },
+    {
+      "title": "Worker running jobs (per instance)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "jak_worker_running_jobs", "legendFormat": "{{instance_id}}", "refId": "A"}]
+    },
+    {
+      "title": "Workflow throughput (completed vs failed vs dead)",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "rate(jak_workflow_jobs_completed_total[5m])", "legendFormat": "completed", "refId": "A"},
+        {"expr": "rate(jak_workflow_jobs_failed_total[5m])", "legendFormat": "failed (will retry)", "refId": "B"},
+        {"expr": "rate(jak_workflow_jobs_dead_total[5m])", "legendFormat": "dead", "refId": "C"}
+      ]
+    },
+    {
+      "title": "Workflow duration (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.5, sum(rate(jak_workflow_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum(rate(jak_workflow_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum(rate(jak_workflow_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "title": "Vibe Coder runs by status",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(jak_vibe_coder_runs_total[10m]) * 600", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+    {
+      "title": "Vibe Coder build-check failures by layer",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(jak_vibe_coder_build_check_failures_total[10m])", "legendFormat": "{{layer}}", "refId": "A"}]
+    },
+    {
+      "title": "LLM cost USD / hr by model",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(jak_llm_cost_usd_total[1h]) * 3600", "legendFormat": "{{model}}", "refId": "A"}]
+    },
+    {
+      "title": "Provider errors by kind",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (provider, kind) (rate(jak_integration_provider_errors_total[5m]))", "legendFormat": "{{provider}} — {{kind}}", "refId": "A"}]
+    },
+    {
+      "title": "Heartbeat failures / min (per instance)",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 36, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(jak_worker_heartbeat_failures_total[5m]) * 60", "legendFormat": "{{instance_id}}", "refId": "A"}]
+    },
+    {
+      "title": "Signals received (pause / unpause / stop / resume)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 36, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(jak_workflow_signal_total[5m])", "legendFormat": "{{signal_type}}", "refId": "A"}]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["jak", "operator", "production"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "JAK Swarm — Operator Dashboard",
+  "uid": "jak-swarm-operator",
+  "version": 1,
+  "weekStart": ""
+}

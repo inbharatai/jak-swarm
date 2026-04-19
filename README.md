@@ -171,7 +171,9 @@ flowchart LR
 | 🌐 | **30 Browser Tools** | ~20 Playwright primitives (navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation) + ~10 site-specific automation tools (social posting, Gmail inbox, auto-reply). The site-specific tools are classified `experimental` in the tool manifest — fragile on UI change. Count matches `toolRegistry.getManifest()` BROWSER category |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
 | 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
-| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers (including WhatsApp auto-start lock) |
+| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. P1b worker-lease reclaim: dead workers' jobs are auto-recovered in lease_ttl/2 (default 30s). |
+| 🔭 | **Operator-grade Observability** | API + each worker expose `/metrics` (35+ Prometheus types: queue depth, worker liveness, reclaim rate, heartbeat failures, Vibe Coder runs, LLM cost, provider errors, signals). Scrape/alert/dashboard/runbook artifacts in `ops/`. |
+| 🎛️ | **Two-service Production Topology** | API (HTTP + SSE + enqueue) runs separately from the queue worker (claim + run + reclaim). Reference: `docker-compose.prod.yml` at repo root. |
 | 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
 | 📧 | **Real Email/Calendar** | Gmail via IMAP/SMTP, Google Calendar via CalDAV. Real send, real events — not mocks |
 | 🧩 | **Skills Marketplace** | Create, sandbox-test, and deploy custom agent skills with approval workflow |

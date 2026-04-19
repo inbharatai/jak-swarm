@@ -18,6 +18,7 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@jak-swarm/db';
+import { metrics } from '../observability/metrics.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,6 +96,7 @@ export class QueueWorker extends EventEmitter {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   private timer: ReturnType<typeof setInterval> | null = null;
+  private gaugeTimer: ReturnType<typeof setInterval> | null = null;
   private draining = false;
   private pollInProgress = false;
   private reclaimInProgress = false;
@@ -159,6 +161,14 @@ export class QueueWorker extends EventEmitter {
       void this.heartbeatRunningJobs();
     }, heartbeatMs);
 
+    // Queue-depth sampler — 5s cadence. Runs one cheap COUNT query per poll
+    // that updates jak_workflow_jobs_queued / jak_workflow_jobs_active so
+    // Prometheus can see the backlog without every worker doing it
+    // simultaneously. It's a Gauge so we overwrite; last instance to tick wins.
+    this.gaugeTimer = setInterval(() => {
+      void this.sampleQueueDepth();
+    }, 5_000);
+
     // Kick off an immediate first poll
     setImmediate(() => void this.poll());
 
@@ -184,6 +194,10 @@ export class QueueWorker extends EventEmitter {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+    if (this.gaugeTimer) {
+      clearInterval(this.gaugeTimer);
+      this.gaugeTimer = null;
+    }
     this.log.info('[QueueWorker] Stopped (no graceful drain)');
     this.emit('stopped');
   }
@@ -206,6 +220,10 @@ export class QueueWorker extends EventEmitter {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.gaugeTimer) {
+      clearInterval(this.gaugeTimer);
+      this.gaugeTimer = null;
     }
 
     this.log.info(
@@ -264,6 +282,10 @@ export class QueueWorker extends EventEmitter {
     if (this.pollInProgress || this.draining) return;
     this.pollInProgress = true;
     this.lastPollAt = new Date();
+    // Prometheus freshness gauge — if this stops updating, the worker is stuck.
+    try {
+      metrics.workerLastPollTimestamp.set({ instance_id: this.instanceId }, Date.now() / 1000);
+    } catch { /* metric writes never break poll */ }
 
     try {
       // Reclaim expired leases BEFORE claiming new work — a dead owner's
@@ -276,8 +298,14 @@ export class QueueWorker extends EventEmitter {
         if (!job) break;
 
         this.claimedTotal++;
+        try {
+          metrics.workflowJobsClaimedTotal.inc({ instance_id: this.instanceId });
+        } catch { /* never break poll on metric failure */ }
         const claimTime = Date.now();
         this.runningJobs.set(job.id, { workflowId: job.workflowId, startedAt: claimTime });
+        try {
+          metrics.workerRunningJobs.set({ instance_id: this.instanceId }, this.runningJobs.size);
+        } catch { /* swallow */ }
         this.log.info(
           { jobId: job.id, workflowId: job.workflowId, tenantId: job.tenantId, attempt: job.attempts, maxAttempts: job.maxAttempts },
           '[QueueWorker] Job claimed',
@@ -294,6 +322,9 @@ export class QueueWorker extends EventEmitter {
           })
           .finally(() => {
             this.runningJobs.delete(job.id);
+            try {
+              metrics.workerRunningJobs.set({ instance_id: this.instanceId }, this.runningJobs.size);
+            } catch { /* swallow */ }
           });
       }
     } catch (err) {
@@ -453,6 +484,12 @@ export class QueueWorker extends EventEmitter {
       );
       if (result.length > 0) {
         this.reclaimedTotal += result.length;
+        try {
+          metrics.workflowJobsReclaimedTotal.inc(
+            { reclaimer_instance: this.instanceId },
+            result.length,
+          );
+        } catch { /* never break reclaim on metric failure */ }
         this.log.warn(
           {
             count: result.length,
@@ -501,9 +538,43 @@ export class QueueWorker extends EventEmitter {
         this.instanceId,
       );
     } catch (err) {
+      try {
+        metrics.workerHeartbeatFailuresTotal.inc({ instance_id: this.instanceId });
+      } catch { /* swallow */ }
       this.log.debug(
         { err: err instanceof Error ? err.message : String(err), ids: ids.length },
         '[QueueWorker] Heartbeat failed (will be reclaimed by another instance)',
+      );
+    }
+  }
+
+  /**
+   * Samples queue depth (QUEUED + ACTIVE counts) and publishes them as
+   * Prometheus gauges. Single COUNT query per worker every 5s — safe against
+   * large tables because `status` is indexed. If multiple worker instances
+   * run this simultaneously the last one wins, which is exactly the gauge
+   * semantics we want.
+   */
+  private async sampleQueueDepth(): Promise<void> {
+    try {
+      const rows = await this.db.$queryRawUnsafe<Array<{ status: string; n: bigint | number }>>(
+        `SELECT status, COUNT(*)::int AS n FROM workflow_jobs WHERE status IN ('QUEUED', 'ACTIVE') GROUP BY status`,
+      );
+      let queued = 0;
+      let active = 0;
+      for (const r of rows) {
+        const n = typeof r.n === 'bigint' ? Number(r.n) : r.n;
+        if (r.status === 'QUEUED') queued = n;
+        if (r.status === 'ACTIVE') active = n;
+      }
+      try {
+        metrics.workflowJobsQueued.set(queued);
+        metrics.workflowJobsActive.set(active);
+      } catch { /* swallow */ }
+    } catch (err) {
+      this.log.debug(
+        { err: err instanceof Error ? err.message : String(err) },
+        '[QueueWorker] Queue depth sample failed (non-fatal)',
       );
     }
   }
@@ -525,6 +596,9 @@ export class QueueWorker extends EventEmitter {
           data: { status: 'COMPLETED', completedAt: new Date(), lastError: null },
         });
         this.completedTotal++;
+        try {
+          metrics.workflowJobsCompletedTotal.inc();
+        } catch { /* swallow */ }
         const running = this.runningJobs.get(job.id);
         const durationMs = running ? Date.now() - running.startedAt : undefined;
         this.log.info(
@@ -557,6 +631,9 @@ export class QueueWorker extends EventEmitter {
         },
       });
       this.failedTotal++;
+      try {
+        metrics.workflowJobsFailedTotal.inc();
+      } catch { /* swallow */ }
       this.log.warn(
         { jobId: job.id, workflowId: job.workflowId, attempts: job.attempts, maxAttempts: job.maxAttempts, backoffMs },
         '[QueueWorker] Job failed; re-queued with backoff',
@@ -570,6 +647,9 @@ export class QueueWorker extends EventEmitter {
       data: { status: 'DEAD', completedAt: new Date(), lastError: errorMessage },
     });
     this.deadTotal++;
+    try {
+      metrics.workflowJobsDeadTotal.inc();
+    } catch { /* swallow */ }
     this.log.error(
       { jobId: job.id, workflowId: job.workflowId, attempts: job.attempts },
       '[QueueWorker] Job moved to dead-letter state',

@@ -1,0 +1,142 @@
+# JAK Swarm — production-topology compose.
+#
+# This file is a REFERENCE, not an opinionated production-ready deploy.
+# It shows the intended service graph: API + Worker are SEPARATE processes
+# sharing the same Postgres + Redis, plus Prometheus + Grafana + Alertmanager
+# for observability.
+#
+# For real production, use your orchestrator of choice (Kubernetes, ECS,
+# Render, Fly.io). This file is what to replicate.
+#
+# Start locally for end-to-end smoke:
+#   docker compose -f docker-compose.prod.yml up --build
+#
+# Scale workers:
+#   docker compose -f docker-compose.prod.yml up --scale worker=3
+
+version: '3.8'
+
+services:
+  # ── State ──────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: jakswarm
+      POSTGRES_PASSWORD: jakswarm
+      POSTGRES_DB: jakswarm
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jakswarm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── API service ────────────────────────────────────────────────────────
+  # Handles HTTP routes, SSE, approvals, enqueue, reads.
+  # Does NOT consume the queue itself — the worker does.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      PORT: 4000
+      DATABASE_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
+      DIRECT_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:?must-set-in-env}
+      # Prevent the API process from also running the embedded queue worker.
+      # With separate worker service, API must not compete for claims.
+      WORKFLOW_QUEUE_DISABLE_EMBEDDED: "1"
+    ports: ["4000:4000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Worker service (separate process) ──────────────────────────────────
+  # Consumes the durable queue, runs Vibe Coder workflow, handles signals.
+  # Exposes /metrics + /healthz + /ready on WORKER_METRICS_PORT.
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker-entry.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
+      DIRECT_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:?must-set-in-env}
+      # Stable identity so reclaim logs correlate with dead workers
+      WORKFLOW_WORKER_INSTANCE_ID: "${HOSTNAME:-worker-local}"
+      WORKFLOW_QUEUE_CONCURRENCY: "2"
+      WORKFLOW_QUEUE_POLL_INTERVAL_MS: "1000"
+      WORKFLOW_QUEUE_LEASE_TTL_MS: "60000"
+      WORKER_METRICS_PORT: "9464"
+    expose: ["9464"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9464/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # To scale: docker compose -f docker-compose.prod.yml up --scale worker=3
+    # In k8s: use a StatefulSet or Deployment with distinct pod names so
+    # WORKFLOW_WORKER_INSTANCE_ID resolves to unique values.
+
+  # ── Observability ──────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prom_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports: ["9090:9090"]
+    depends_on: [api, worker]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports: ["3001:3000"]
+    depends_on: [prometheus]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports: ["9093:9093"]
+    volumes:
+      - alertmanager_data:/alertmanager
+
+volumes:
+  postgres_data:
+  prom_data:
+  grafana_data:
+  alertmanager_data:

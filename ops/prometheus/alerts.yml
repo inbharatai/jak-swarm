@@ -1,0 +1,255 @@
+# JAK Swarm alert rules.
+#
+# Every rule ties to an operator-recognizable failure mode. Thresholds are
+# conservative defaults — tune per your traffic. Each alert carries a
+# `runbook` annotation that points at ops/runbooks/on-call.md.
+
+groups:
+  # ──────────────────────────────────────────────────────────────────────
+  # Worker liveness + queue health
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-worker
+    interval: 30s
+    rules:
+      - alert: WorkerDown
+        # No worker has polled the queue in the last 2 minutes.
+        expr: |
+          time() - max(jak_worker_last_poll_timestamp_seconds) > 120
+        for: 0m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Queue worker stalled (no poll in >2 min)"
+          description: |
+            The max `jak_worker_last_poll_timestamp_seconds` across all worker
+            instances is older than 120s. At least one worker should be
+            polling within the configured pollIntervalMs (default 1s).
+          runbook: "ops/runbooks/on-call.md#worker-down"
+
+      - alert: NoActiveWorkers
+        # Zero worker metric series visible — scrape target gone.
+        expr: |
+          absent(jak_worker_last_poll_timestamp_seconds)
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "No worker metric samples — all workers offline or unreachable"
+          description: |
+            Prometheus sees zero `jak_worker_last_poll_timestamp_seconds`
+            samples. Either every worker process is down or every worker's
+            /metrics endpoint is unreachable.
+          runbook: "ops/runbooks/on-call.md#no-active-workers"
+
+      - alert: HeartbeatFailuresSpike
+        expr: |
+          rate(jak_worker_heartbeat_failures_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Worker lease heartbeat failing"
+          description: |
+            >0.2 heartbeat failures/sec sustained for 10 min. Likely causes:
+            Postgres connection exhaustion, network flapping to DB, or
+            `workflow_jobs` lock contention.
+          runbook: "ops/runbooks/on-call.md#heartbeat-failures"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Queue backlog + stuck jobs
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-queue
+    interval: 30s
+    rules:
+      - alert: QueueBacklogHigh
+        expr: jak_workflow_jobs_queued > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Queue backlog >100 sustained"
+          description: |
+            More than 100 workflow jobs in QUEUED state for 5+ min. Options:
+            scale worker concurrency (WORKFLOW_QUEUE_CONCURRENCY), add more
+            worker instances, or investigate if a worker is stuck.
+          runbook: "ops/runbooks/on-call.md#queue-backlog-high"
+
+      - alert: QueueBacklogCritical
+        expr: jak_workflow_jobs_queued > 500
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Queue backlog >500 — users are waiting"
+          description: |
+            Severe queue backlog. At current rate, newly enqueued workflows
+            are likely waiting several minutes. Scale now or triage stuck
+            jobs.
+          runbook: "ops/runbooks/on-call.md#queue-backlog-high"
+
+      - alert: ReclaimStormDetected
+        # >50 reclaims / min = lots of dead worker leases being swept.
+        expr: rate(jak_workflow_jobs_reclaimed_total[5m]) > 0.83
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Workers are dying — reclaim rate elevated"
+          description: |
+            Reclaim sweep is firing >50 jobs/min sustained. A worker
+            instance is likely crash-looping or OOMing. Check per-instance
+            `jak_worker_last_poll_timestamp_seconds` for the one that's
+            gone silent.
+          runbook: "ops/runbooks/on-call.md#reclaim-storm"
+
+      - alert: DeadLetterIncreasing
+        expr: rate(jak_workflow_jobs_dead_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Jobs are dead-lettering"
+          description: |
+            Jobs exhausted their retry budget and moved to DEAD state.
+            These need manual investigation — check `lastError` on the
+            `workflow_jobs` table, rows with status='DEAD'.
+          runbook: "ops/runbooks/on-call.md#dead-letter"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Workflow health (higher-level)
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-workflows
+    interval: 30s
+    rules:
+      - alert: WorkflowFailureRateSpike
+        expr: |
+          (
+            sum(rate(jak_workflows_total{status="FAILED"}[10m]))
+            /
+            clamp_min(sum(rate(jak_workflows_total[10m])), 0.0001)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Workflow failure rate >20%"
+          description: |
+            More than 20% of workflows are ending in FAILED status.
+            Check provider-router logs for upstream LLM outages, or recent
+            deploys that touched the orchestrator chain.
+          runbook: "ops/runbooks/on-call.md#workflow-failure-spike"
+
+      - alert: NoWorkflowsCompleted
+        # Zero completions for 15 min despite queue activity.
+        expr: |
+          (jak_workflow_jobs_queued > 0 or jak_workflow_jobs_active > 0)
+          and
+          rate(jak_workflow_jobs_completed_total[15m]) == 0
+        for: 15m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Queue has work but zero completions in 15 min"
+          description: |
+            Jobs are in QUEUED/ACTIVE but nothing is finishing. Worker is
+            either deadlocked, all processors are throwing, or a pinned
+            dependency (LLM, DB, Redis) is silently down.
+          runbook: "ops/runbooks/on-call.md#no-completions"
+
+      - alert: ApprovalBacklogGrowing
+        expr: jak_approval_requests_total{decision="pending"} > 20
+        for: 30m
+        labels:
+          severity: info
+          team: product
+        annotations:
+          summary: ">20 pending approvals for 30+ min"
+          description: |
+            Approval reviewers are behind on the queue. Consider routing
+            notifications or auto-escalation if critical workflows are
+            stuck waiting.
+          runbook: "ops/runbooks/on-call.md#approval-backlog"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Vibe Coder specific
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-vibe-coder
+    interval: 60s
+    rules:
+      - alert: BuildCheckFailureSpike
+        expr: |
+          rate(jak_vibe_coder_build_check_failures_total[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "Vibe Coder build-check failures elevated"
+          description: |
+            More than 1 build-check failure / 10s sustained. Either the
+            Generator is regressing or a framework bump broke the Docker
+            checker's image.
+          runbook: "ops/runbooks/on-call.md#build-check-failures"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Connectivity (stateful dependencies)
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-connectivity
+    interval: 30s
+    rules:
+      - alert: PostgresDisconnected
+        expr: jak_postgres_connectivity_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Postgres disconnected"
+          description: |
+            The API or worker reports Postgres unavailable for 1+ min. This
+            will stop the queue entirely.
+          runbook: "ops/runbooks/on-call.md#postgres-disconnected"
+
+      - alert: RedisDisconnected
+        expr: jak_redis_connectivity_status == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Redis disconnected"
+          description: |
+            Redis unavailable for 2+ min. Cross-instance pause/unpause
+            signals + SSE relay + distributed locks degrade. Workers fall
+            back to in-memory coordination (single-instance effective).
+          runbook: "ops/runbooks/on-call.md#redis-disconnected"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Integration providers (Serper / OpenAI / Anthropic / Stripe / Vercel / ...)
+  # ──────────────────────────────────────────────────────────────────────
+  - name: jak-providers
+    interval: 30s
+    rules:
+      - alert: ProviderErrorRateHigh
+        expr: |
+          sum by (provider, kind) (rate(jak_integration_provider_errors_total[10m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "External provider error rate elevated"
+          description: |
+            Provider {{ $labels.provider }} returning {{ $labels.kind }}
+            errors at >0.1/s for 10 min. Check the provider's own status
+            page before rolling back.
+          runbook: "ops/runbooks/on-call.md#provider-errors"
