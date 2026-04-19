@@ -459,13 +459,14 @@ export default function HomePage() {
                 <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
               </div>
 
-              <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.02] sm:leading-[1]">
-                <span className="block text-white/90">Specialist AI Agents,</span>
-                <span className="block mt-2 gradient-text">Operator-Grade Control Plane.</span>
+              {/* pb-2 + leading-[1.1] prevent descender clipping on 'g' / 'p' / 'y' */}
+              <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.15] sm:leading-[1.1]">
+                <span className="block text-white/90">38 Specialist Agents.</span>
+                <span className="block mt-2 gradient-text pb-1">One Control Plane.</span>
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, CFO, HR, Engineer, Legal&nbsp;&mdash; 38 role-specialist agents running under a durable workflow queue with risk-stratified approval gates. High-risk actions pause for human review; every tool carries an honest maturity label; every metric is CI-enforced against runtime truth.
+                CEO, CTO, CMO, CFO, Engineer, Legal, HR&nbsp;&mdash; working under a durable workflow queue. High-risk actions pause for human approval. Every tool carries an honest maturity label.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
