@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolRegistry, registerBuiltinTools } from '../packages/tools/src/index.js';
+import { AgentRole } from '@jak-swarm/shared';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -90,6 +91,45 @@ if (landingToolMatch) {
     expected: manifest.total,
     actual: Number(landingToolMatch[1]),
     source: 'apps/web/src/app/page.tsx STATS',
+  });
+}
+
+// ─── Agent count ────────────────────────────────────────────────────────────
+// Session 9: the README + landing both claim a number of AI agents. Assert it
+// matches the actual `AgentRole` enum size so the claim can't drift when new
+// roles are added or removed.
+const agentCount = Object.values(AgentRole).filter((v) => typeof v === 'string').length;
+
+const readmeAgentMatch = readme.match(/(\d+)\s+AI\s+[Aa]gents/);
+if (readmeAgentMatch) {
+  expect({
+    claim: 'README AI agents count matches AgentRole enum',
+    expected: agentCount,
+    actual: Number(readmeAgentMatch[1]),
+    source: 'README.md (N AI Agents) vs packages/shared/src/types/agent.ts',
+  });
+}
+
+const landingAgentMatch = landing.match(
+  /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"](?:AI\s+)?Agents['"]/,
+);
+if (landingAgentMatch) {
+  expect({
+    claim: 'Landing Agents stat matches AgentRole enum',
+    expected: agentCount,
+    actual: Number(landingAgentMatch[1]),
+    source: 'apps/web/src/app/page.tsx STATS vs packages/shared/src/types/agent.ts',
+  });
+}
+
+// Also check any "N Agents Live" style badge
+const landingAgentBadgeMatch = landing.match(/>(\d+)\s+Agents\s+Live</);
+if (landingAgentBadgeMatch) {
+  expect({
+    claim: 'Landing "N Agents Live" badge matches AgentRole enum',
+    expected: agentCount,
+    actual: Number(landingAgentBadgeMatch[1]),
+    source: 'apps/web/src/app/page.tsx (N Agents Live badge)',
   });
 }
 
