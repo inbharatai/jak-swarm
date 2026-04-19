@@ -265,8 +265,12 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
   [AgentRole.WORKER_SPREADSHEET]: {
     role: AgentRole.WORKER_SPREADSHEET,
     displayName: 'Spreadsheet',
-    maturity: 'strong',
-    strengths: ['Structured data parsing', 'Statistical summaries'],
+    maturity: 'moderate',
+    strengths: ['Structured data parsing', 'Statistical summaries via compute_statistics tool', 'Chart-type recommendation'],
+    limitations: [
+      'Prompt (~30 lines) is generic data-analysis guidance — no domain-specific extraction rules like Document/Research',
+      'No explicit output-schema rigor for transformed data shapes',
+    ],
     implementation: 'packages/agents/src/workers/spreadsheet.agent.ts',
   },
   [AgentRole.WORKER_CONTENT]: {
@@ -313,9 +317,14 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
   },
   [AgentRole.WORKER_PRODUCT]: {
     role: AgentRole.WORKER_PRODUCT,
-    displayName: 'Product',
-    maturity: 'strong',
-    strengths: ['Senior PM framework discipline', 'Plain-language trade-offs'],
+    displayName: 'Product (Senior PM)',
+    maturity: 'world_class',
+    strengths: [
+      'RICE prioritization framework (Reach × Impact × Confidence / Effort)',
+      'Jobs-to-be-done + INVEST user story criteria',
+      '7-section PRD structure',
+      'Problem-first, solution-second discipline',
+    ],
     implementation: 'packages/agents/src/workers/product.agent.ts',
   },
   [AgentRole.WORKER_PROJECT]: {
