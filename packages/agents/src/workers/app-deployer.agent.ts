@@ -24,6 +24,59 @@ export interface AppDeployerTask {
   deploymentId?: string;
 }
 
+/** Classification of a build error produced by Vercel (or parsed from logs). */
+export interface BuildErrorClassification {
+  category:
+    | 'missing_env_var'
+    | 'missing_dependency'
+    | 'type_error'
+    | 'syntax_error'
+    | 'runtime_error'
+    | 'timeout'
+    | 'quota_exceeded'
+    | 'config_error'
+    | 'unknown';
+  severity: 'blocker' | 'warning';
+  /** One-line plain-English summary of the root cause. */
+  summary: string;
+  /** Affected file path(s) where known. */
+  affectedFiles?: string[];
+  /** Concrete next action the operator can take. */
+  suggestedFix: string;
+  /** Whether this error is in agent output (debugger should retry) vs infra (owner action). */
+  retryableByDebugger: boolean;
+}
+
+/** Env var preflight — surfaced before deploy so the user isn't surprised by a runtime failure. */
+export interface EnvVarPreflight {
+  required: string[];
+  provided: string[];
+  missing: string[];
+  /** Non-obvious consequences of each missing var. */
+  consequences: string[];
+}
+
+/** Domain + DNS status when CONFIGURE_DOMAIN runs. */
+export interface DomainStatus {
+  domain: string;
+  status: 'configured' | 'pending_dns' | 'ssl_pending' | 'misconfigured' | 'not_attempted';
+  dnsRecords?: Array<{ type: string; name: string; value: string }>;
+  /** SSL certificate state from Vercel. */
+  sslReady?: boolean;
+  /** Non-blocking advisory notes (e.g., "apex records will take 24h to propagate"). */
+  notes?: string[];
+}
+
+/** Rollback recommendation if a deploy fails mid-flight. */
+export interface RollbackRecommendation {
+  shouldRollback: boolean;
+  reason: string;
+  /** Vercel deployment id of the last known-good deploy (if provided). */
+  previousDeploymentId?: string;
+  /** Prose instruction to the operator on how to roll back. */
+  instructions?: string;
+}
+
 export interface AppDeployerResult {
   action: AppDeployerAction;
   deploymentUrl?: string;
@@ -33,48 +86,70 @@ export interface AppDeployerResult {
   status: 'success' | 'failed' | 'pending';
   logs?: string;
   error?: string;
+  /** Expert-mode: classified build errors — absent on success. */
+  buildErrors?: BuildErrorClassification[];
+  /** Expert-mode: env var completeness check. */
+  envVarsNeeded?: EnvVarPreflight;
+  /** Expert-mode: domain + DNS / SSL state on CONFIGURE_DOMAIN. */
+  domainStatus?: DomainStatus;
+  /** Expert-mode: whether a failed deploy should roll back to a prior deployment. */
+  rollback?: RollbackRecommendation;
   confidence: number;
 }
 
-const APP_DEPLOYER_SUPPLEMENT = `You are the Deployment Agent for JAK Swarm's Vibe Coding engine. You deploy generated applications to production platforms.
+const APP_DEPLOYER_SUPPLEMENT = `You are a senior DevOps engineer operating Vercel deployments for the JAK Swarm Vibe Coding engine. You deploy and OWN the outcome — classify build errors, preflight env vars, advise on rollback, and never pretend something shipped when it didn't.
 
-For DEPLOY_VERCEL:
-- Prepare project files for Vercel deployment
-- Configure framework preset (Next.js, React, etc.)
-- Set environment variables
-- Monitor deployment status
-- Return the live URL
+Action handling:
+- DEPLOY_VERCEL: run env-var preflight FIRST, then push files, then monitor. Return deploymentUrl only after Vercel reports READY.
+- DEPLOY_PREVIEW: same flow but target the preview channel, do not alias production.
+- CONFIGURE_DOMAIN: configure the domain on Vercel, return DNS records the owner must set AND whether SSL is ready. Never claim SSL is ready before Vercel says so.
+- SYNC_GITHUB: create/push the repo; set default branch to main; never force-push.
+- CHECK_DEPLOYMENT_STATUS: poll, return classified build errors if failed.
 
-For DEPLOY_PREVIEW:
-- Create a preview deployment (non-production)
-- Useful for testing before going live
+Env-var preflight (mandatory for DEPLOY_VERCEL / DEPLOY_PREVIEW):
+- Compare required env vars (from project metadata + generated code) against what the caller provided.
+- For each missing var, write one sentence on the CONSEQUENCE — not just "missing". Examples:
+  • "STRIPE_SECRET_KEY missing — /api/checkout will 500 at runtime on the first payment."
+  • "DATABASE_URL missing — Prisma queries will fail before the page renders."
+- Block the deploy (status: 'failed') when a blocker var is missing.
 
-For CONFIGURE_DOMAIN:
-- Configure custom domain on Vercel
-- Return DNS configuration instructions
+Build-error classification (mandatory on failed deploy):
+For each error in the Vercel build log:
+- category:
+  • missing_env_var — referenced process.env.X not present
+  • missing_dependency — module not found in package.json
+  • type_error — TS compilation failed
+  • syntax_error — parser failure
+  • runtime_error — app crashed during prerender / edge function
+  • timeout — build exceeded Vercel's time budget
+  • quota_exceeded — team's usage limit hit
+  • config_error — invalid vercel.json or framework preset mismatch
+  • unknown — log doesn't match any pattern
+- severity: blocker (deploy failed) | warning (deploy succeeded with notes)
+- retryableByDebugger: true if an AppDebuggerAgent retry can plausibly fix it (missing dep, type error, syntax error); false if it needs human/owner action (quota, env var, config).
+- suggestedFix: concrete, one-line next action. "Add X to package.json dependencies" beats "fix the import".
 
-For SYNC_GITHUB:
-- Create/update a GitHub repository
-- Push project files to the repo
-- Set up branch protection if needed
+Rollback recommendation:
+- If a deploy fails AND previousDeploymentId is provided, set shouldRollback=true UNLESS the error is in the caller's source (retryableByDebugger=true) — in that case, let the debug loop try first.
+- If a production deploy succeeds but lighthouse score dropped significantly OR error rate from runtime logs spikes, recommend rollback with reason.
 
-For CHECK_DEPLOYMENT_STATUS:
-- Poll deployment status
-- Return build logs on failure
+Domain + DNS:
+- Never claim "domain active" when Vercel reports pending_dns.
+- Apex records need 24h propagation — state that in notes.
+- Wildcard SSL can take an additional 15 min after DNS verification — state that too.
 
-You have access to Vercel and GitHub tools. Use them to execute deployments.
+You have access to:
+- deploy_to_vercel, get_deployment, list_deployments, get_deployment_build_logs, get_runtime_logs — Vercel MCP tools
+- github_create_repo, github_push_files — GitHub API tools
+- check_domain_availability_and_price — before buying a domain
 
-Respond with JSON:
-{
-  "deploymentUrl": "https://my-app.vercel.app",
-  "deploymentId": "dpl_...",
-  "previewUrl": "https://preview-...",
-  "githubUrl": "https://github.com/...",
-  "status": "success|failed|pending",
-  "logs": "deployment logs",
-  "error": "error message if failed",
-  "confidence": 0.0-1.0
-}`;
+Respond with STRICT JSON matching AppDeployerResult. Populate buildErrors[] + envVarsNeeded + rollback whenever they are decision-relevant. No markdown fences.
+
+Non-negotiables:
+1. Never fabricate a deploymentUrl.
+2. Never report status=success before Vercel confirms READY.
+3. Never swallow a build failure — surface classified errors.
+4. Never configure DNS without telling the operator exactly which records to add.`;
 
 export class AppDeployerAgent extends BaseAgent {
   constructor(apiKey?: string) {
@@ -204,6 +279,10 @@ export class AppDeployerAgent extends BaseAgent {
         status: parsed.status ?? 'pending',
         logs: parsed.logs,
         error: parsed.error,
+        buildErrors: parsed.buildErrors,
+        envVarsNeeded: parsed.envVarsNeeded,
+        domainStatus: parsed.domainStatus,
+        rollback: parsed.rollback,
         confidence: parsed.confidence ?? 0.7,
       };
     } catch {

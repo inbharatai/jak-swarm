@@ -189,7 +189,15 @@ export { AppDebuggerAgent } from './workers/app-debugger.agent.js';
 export type { AppDebuggerAction, AppDebuggerTask, AppDebuggerResult } from './workers/app-debugger.agent.js';
 
 export { AppDeployerAgent } from './workers/app-deployer.agent.js';
-export type { AppDeployerAction, AppDeployerTask, AppDeployerResult } from './workers/app-deployer.agent.js';
+export type {
+  AppDeployerAction,
+  AppDeployerTask,
+  AppDeployerResult,
+  BuildErrorClassification,
+  EnvVarPreflight,
+  DomainStatus,
+  RollbackRecommendation,
+} from './workers/app-deployer.agent.js';
 
 export { ScreenshotToCodeAgent } from './workers/screenshot-to-code.agent.js';
 export type { ScreenshotToCodeAction, ScreenshotToCodeTask, ScreenshotToCodeResult } from './workers/screenshot-to-code.agent.js';

@@ -65,7 +65,9 @@ function stubLLM<T extends { [k: string]: unknown }>(
 }
 
 describe('EmailAgent — expert-mode output schema', () => {
-  it('preserves deliverability + abVariants + sendTimeSuggestion on DRAFT', async () => {
+  // Higher timeout on the first test — first Vitest invocation incurs a
+  // warmup penalty when transforming the agents package barrel imports.
+  it('preserves deliverability + abVariants + sendTimeSuggestion on DRAFT', { timeout: 20_000 }, async () => {
     const agent = new EmailAgent('stub-key');
     stubLLM(agent, {
       draft: {

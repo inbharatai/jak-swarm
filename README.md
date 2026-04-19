@@ -152,7 +152,9 @@ flowchart LR
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
 | 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
 | 🔍 | **31 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery |
-| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → Debug → Preview → Deploy. Full-stack Next.js/React/Tailwind |
+| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
+| 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
+| 🧪 | **Tool Maturity Manifest** | All 119 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
 | 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing with failover and role-aware primary selection. Provider API keys are required unless using local models |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
@@ -434,11 +436,19 @@ graph LR
 
 <div align="center">
 
-**Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — in minutes.**
+**Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — as a single durable workflow with auto-repair and diff-aware checkpoints.**
 
-*Think Emergent.sh / Lovable / Bolt.new, but open-source, with 3-tier cost optimization and 119 production tools (including 31 research tools).*
+*Think Emergent.sh / Lovable / Bolt.new, but with operator-grade durability — cross-instance reclaim, risk-stratified approvals, structural diff on every stage, one-click revert to any checkpoint.*
 
 </div>
+
+### What makes this different
+
+- **Durable workflow**, not chat: the Vibe Coder chain runs through the queue with `workflowKind: 'vibe-coder'`. A worker can die mid-run and another instance reclaims the job.
+- **3-layer build verification**: heuristic checker catches truncation + placeholder leaks in ~1ms → TypeScript compiler API catches real syntax/type errors in-memory in sub-second → optional Docker-backed `next build` provides the real production pre-flight. Each layer fails fast and passes the earliest actionable error to the debugger.
+- **Auto-repair loop**: up to 3 debug retries per workflow, with fingerprint-based loop detection to stop the same fix from being tried repeatedly.
+- **Checkpoint-revert**: every stage (generator, debugger-retry N, deployer) auto-snapshots the project with a structural diff (+added ~modified -deleted) persisted to `project_versions.diffJson`. Restore creates a new rollback version — restores are themselves reversible.
+- **Subscription-tier gating**: free-tier runs route through cheaper models; paid routes unlock Tier 3 (Opus, GPT-4o) for the Architect / Technical / Strategist stages.
 
 ### Pipeline Architecture
 

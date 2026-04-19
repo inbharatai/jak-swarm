@@ -8,11 +8,12 @@
 4. [Agent Communication Pattern](#agent-communication-pattern)
 5. [Swarm Execution Model](#swarm-execution-model)
 6. [Voice Pipeline](#voice-pipeline)
-7. [Tool Registry](#tool-registry)
-8. [Industry Pack System](#industry-pack-system)
-9. [Security Model](#security-model)
-10. [Observability](#observability)
-11. [Deployment Topology](#deployment-topology)
+7. [Vibe Coder Workflow](#vibe-coder-workflow)
+8. [Tool Registry](#tool-registry)
+9. [Industry Pack System](#industry-pack-system)
+10. [Security Model](#security-model)
+11. [Observability](#observability)
+12. [Deployment Topology](#deployment-topology)
 
 ---
 
@@ -230,6 +231,64 @@ Browser Speaker
 - Server-side audio stream processing
 - Voice-to-workflow trigger (voice → Commander agent)
 - Transcript persistence to database
+
+---
+
+## Vibe Coder Workflow
+
+The Vibe Coder chain is NOT a `SwarmGraph` node — the debug-retry back-edge makes it cyclic, which is incompatible with the DAG executor. It runs as a plain async function (`runVibeCoderWorkflow` at `packages/swarm/src/workflows/vibe-coder-workflow.ts`) that gets queue durability by being dispatched inside the `SwarmExecutionService` processor when `workflowKind === 'vibe-coder'`.
+
+### Chain
+
+```
+AppArchitect → AppGenerator → BuildCheck → ok? → AppDeployer
+                                    |
+                                    no → AppDebugger (≤3 retries) → Generator / Debugger loop
+                                    |
+                                    every stage-boundary → onCheckpoint(stage, files) hook
+```
+
+### Three-layer BuildCheck
+
+Composed so the debugger receives the earliest actionable error. Layers stop on first real failure:
+
+| Layer | Implementation | Typical time | Catches |
+|---|---|---|---|
+| Heuristic | `heuristicBuildChecker` | ~1ms | Empty files, truncation, placeholder `TODO`, unbalanced braces, "Not implemented" stubs |
+| Static TS | `staticBuildChecker` (TypeScript Compiler API, in-memory) | 200-800ms | Real syntax errors, local type errors, missing intra-file exports, duplicate declarations. Ignores module-not-found (npm resolution is Vercel's job). |
+| Docker | `DockerBuildChecker` (disposable `node:20-slim` container) | 30-120s | Real `npm install` + `next build`. Catches missing deps, Next.js-specific issues, runtime/SSR violations. Graceful skip when Docker is absent — returns `{ok: true, skipped: true}`. |
+
+### Auto-repair loop
+
+- `maxDebugRetries` default 3.
+- Debugger receives `errorLog` + `affectedFiles` from whichever layer failed.
+- `applyFixes()` merges debugger output with existing files (replace on path match, append on new path), no mutation of the previous set.
+- Fingerprint-based loop detection at the tool level prevents the debugger from retrying the identical fix.
+
+### Durability
+
+- Dispatch: `POST /projects/:id/run` → creates `Workflow` row → `fastify.swarm.enqueueExecution({ workflowKind: 'vibe-coder', vibeCoderInput: { projectId, ... } })`.
+- Queue row in `workflow_jobs` with `FOR UPDATE SKIP LOCKED` semantics — any instance can claim and execute.
+- Progress emitted via `onProgress` callback, relayed to SSE subscribers on `/workflows/:id/stream`.
+- Final result (files, deployment URL, build logs, debug attempts) persisted to `Workflow.finalOutput` on completion.
+
+### Checkpoint-Revert
+
+Every workflow stage triggers `onCheckpoint(stage, {files, attempt, workflowId})`:
+
+- `SwarmExecutionService` wires this to `CheckpointService.createCheckpoint()` when `projectId` is set.
+- Checkpoint creation: `ProjectService.saveFiles()` persists current files → `CheckpointService` creates a `ProjectVersion` row with `snapshotJson` (full file tree) + `diffJson` (structural diff vs previous version: added / modified / deleted with size and SHA-256 hash per file).
+- Stages snapshot: `generator`, `debugger` (per retry), `deployer`.
+- Restore (`POST /projects/:id/checkpoints/:version/restore`) hard-deletes current `ProjectFile` rows, re-creates from the target snapshot, and creates a new `ProjectVersion` tagged as a rollback — so restores are themselves reversible.
+- Cross-tenant guards on every read / write path.
+
+API surface:
+- `GET /projects/:id/checkpoints` — newest-first list with diffs embedded
+- `GET /projects/:id/checkpoints/:version` — full snapshot + diff
+- `POST /projects/:id/checkpoints` — manual snapshot (pre-risky-change affordance)
+- `POST /projects/:id/checkpoints/:version/restore` — revert to that checkpoint
+
+UI: `apps/web/src/components/builder/CheckpointTimeline.tsx` renders a newest-first list with stage badges (architect / generator / debugger / deployer / manual / rollback), +N ~M -K diff summary, expandable file list, and an inline-confirm restore button.
 
 ---
 

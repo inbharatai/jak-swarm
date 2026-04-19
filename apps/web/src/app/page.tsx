@@ -687,17 +687,17 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Vibe Coding</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Build Full-Stack Apps with AI</h2>
-              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Describe your app in plain English. Watch 5 specialized agents architect, generate, debug, and deploy it&nbsp;&mdash; in minutes, not months.</p>
+              <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Describe your app in plain English. A durable workflow runs architect → generate → 3-layer build check → debug ↻ → deploy, with auto-snapshots and diff-aware revert at every stage.</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[
                 { icon: '🏛️', title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
                 { icon: '⚡', title: 'Code Generator', desc: 'Generates production-grade Next.js, React, Tailwind CSS, and Prisma code — complete files, not stubs', color: '#fbbf24' },
-                { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors, diagnoses root cause, applies surgical fixes, rebuilds — up to 3 retries automatically', color: '#f472b6' },
+                { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
                 { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
-                { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with environment variables, custom domains, and zero-downtime updates', color: '#c084fc' },
-                { icon: '🔀', title: 'Version Control', desc: 'Every change creates a snapshot. Roll back to any version instantly. GitHub sync built-in.', color: '#fb923c' },
+                { icon: '🚀', title: 'One-Click Deploy', desc: 'Deploy to Vercel with env-var preflight, build-error classification, and automatic rollback recommendation on failure', color: '#c084fc' },
+                { icon: '🔖', title: 'Checkpoint-Revert', desc: 'Every stage auto-snapshots with a structural diff (+added ~modified -deleted). One-click restore — restores are themselves reversible.', color: '#fb923c' },
               ].map((feature) => (
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
                   <div className="text-2xl mb-3">{feature.icon}</div>
