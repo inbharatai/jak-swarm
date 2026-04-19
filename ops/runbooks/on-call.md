@@ -173,9 +173,33 @@ LIMIT 20;
 
 ---
 
-## postgres-disconnected / redis-disconnected
+## postgres-disconnected
 
-**Same playbook:** the dependency is down. Focus on the dependency, not JAK. The worker will auto-recover when connectivity returns (P1b reclaim handles in-flight work).
+**Alert:** `PostgresDisconnected` — `jak_postgres_connectivity_status == 0` for 1+ min.
+
+**The dependency is down; the worker will auto-recover when connectivity returns.** P1b reclaim handles in-flight work.
+
+**Check first:**
+1. Is Postgres actually up? Your managed-DB provider's status page
+2. `psql $DATABASE_URL -c "SELECT 1"` from the cluster network
+3. Connection pool exhaustion? `SELECT count(*) FROM pg_stat_activity`
+
+**Action:** fix the dependency, not JAK.
+
+---
+
+## redis-disconnected
+
+**Alert:** `RedisDisconnected` — `jak_redis_connectivity_status == 0` for 2+ min.
+
+**The dependency is down; workers fall back to in-memory coordination** (single-instance effective). Cross-instance pause/unpause + SSE relay + distributed locks degrade until recovery.
+
+**Check first:**
+1. Is Redis actually up? Provider status page
+2. `redis-cli -u $REDIS_URL ping`
+3. Network path between worker and Redis
+
+**Action:** fix the dependency, not JAK.
 
 ---
 

@@ -64,35 +64,35 @@ const matrix = read('docs/integration-maturity-matrix.md');
 
 // ─── Tool count ─────────────────────────────────────────────────────────────
 
-// README: "Production_Tools-119"
-const readmeToolBadgeMatch = readme.match(/Production_Tools-(\d+)/);
+// README badge: "Classified_Tools-119" (or legacy "Production_Tools-N")
+const readmeToolBadgeMatch = readme.match(/(?:Classified_Tools|Production_Tools)-(\d+)/);
 if (readmeToolBadgeMatch) {
   expect({
-    claim: 'README production-tools badge count',
+    claim: 'README tools badge count',
     expected: manifest.total,
     actual: Number(readmeToolBadgeMatch[1]),
-    source: 'README.md (Production_Tools-N badge)',
+    source: 'README.md tools badge',
   });
 }
 
-// README: "119 Production Tools"
-const readmeToolHeadlineMatch = readme.match(/(\d+)\s+Production\s+Tools/i);
+// README headline: "119 Classified Tools" (or legacy "119 Production Tools")
+const readmeToolHeadlineMatch = readme.match(/(\d+)\s+(?:Classified|Production)\s+Tools/i);
 if (readmeToolHeadlineMatch) {
   expect({
-    claim: 'README production-tools headline count',
+    claim: 'README tools headline count',
     expected: manifest.total,
     actual: Number(readmeToolHeadlineMatch[1]),
-    source: 'README.md (N Production Tools)',
+    source: 'README.md (N Classified/Production Tools)',
   });
 }
 
-// Landing: { value: 119, label: 'Production Tools' }
+// Landing stats: { value: 119, label: 'Classified Tools' } (or legacy 'Production Tools')
 const landingToolMatch = landing.match(
-  /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"]Production Tools['"]/,
+  /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"](?:Classified|Production) Tools['"]/,
 );
 if (landingToolMatch) {
   expect({
-    claim: 'Landing production-tools stat',
+    claim: 'Landing tools stat',
     expected: manifest.total,
     actual: Number(landingToolMatch[1]),
     source: 'apps/web/src/app/page.tsx STATS',
@@ -220,6 +220,36 @@ const prohibitedInMarketing: Array<{ pattern: RegExp; sourceFile: 'README.md' | 
     pattern: /\b\d+x\s+cheaper\b/i,
     sourceFile: 'landing',
     why: 'Cost-multiplier claims require a linked benchmark — run `pnpm bench:search` with real keys and link the report, or drop the claim.',
+  },
+  // ─── Strict-truth pass: hero / stats / footer overclaims ───────────────
+  {
+    pattern: /Your\s+Entire\s+Company,?\s+Automated/i,
+    sourceFile: 'landing',
+    why: '"Your Entire Company, Automated" implies end-to-end autonomy that does not exist — every high-risk action goes through a HITL approval gate. Use "Specialist AI Agents, Operator-Grade Control Plane" or similar.',
+  },
+  {
+    pattern: /autonomous\s+multi-agent\s+AI\s+platform/i,
+    sourceFile: 'landing',
+    why: '"Autonomous multi-agent AI platform" is stronger than runtime truth. Workflows are operator-grade with approval gates, not fully autonomous. Use "operator-grade multi-agent control plane".',
+  },
+  {
+    pattern: /autonomous\s+multi-agent\s+AI\s+platform/i,
+    sourceFile: 'README.md',
+    why: 'Same as landing — "autonomous multi-agent AI platform" is stronger than runtime truth.',
+  },
+  {
+    // "Production Tools" in marketing context blanket-claims every tool is
+    // production-grade. In reality only ~47% (56/119) are `real`; the rest
+    // are heuristic / llm_passthrough / config_dependent / experimental.
+    // Use "Classified Tools" which points at the honest maturity labels.
+    pattern: /\bproduction\s+tools\b/i,
+    sourceFile: 'landing',
+    why: '"Production Tools" blanket-implies all 119 are production-grade. Real breakdown: ~56 real, ~30 config_dependent, ~19 llm_passthrough, ~13 heuristic, 1 experimental. Use "Classified Tools" or "119 Tools · Honest Maturity Labels".',
+  },
+  {
+    pattern: /\bproduction\s+tools\b/i,
+    sourceFile: 'README.md',
+    why: '"Production Tools" blanket-implies all 119 are production-grade. Use "Classified Tools" and link to `GET /tools/manifest` for the runtime breakdown.',
   },
 ];
 

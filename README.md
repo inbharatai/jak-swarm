@@ -2,17 +2,17 @@
 
 # 🐝 JAK Swarm
 
-### Autonomous Multi-Agent AI Platform
+### Operator-Grade Multi-Agent Control Plane
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
-[![Tools](https://img.shields.io/badge/Production_Tools-119-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
+[![Tools](https://img.shields.io/badge/Classified_Tools-119-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-277_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-448_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**38 AI agents, 119 production tools, and a mixed integration layer (fully implemented + in-progress providers). Real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, and vibe coding. Memory-aware agents with context engineering, Slack bridge, voice sessions, and internal TypeScript packages. API keys are required for external LLM/integration providers unless using local models.**
+**Operator-grade multi-agent control plane. 38 specialist agents + 119 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -150,7 +150,7 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
-| 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
+| 🔧 | **119 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
 | 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
@@ -560,7 +560,7 @@ flowchart TD
 | **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **119 production tools** | ✅ | ❌ | ❌ | ❌ |
+| **119 classified tools** (CI-enforced maturity) | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
 | **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |

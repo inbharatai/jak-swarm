@@ -150,8 +150,13 @@ const AGENTS = [
 ];
 
 const STATS = [
-  { value: 38, label: 'Agents', suffix: '' },
-  { value: 119, label: 'Production Tools', suffix: '' },
+  { value: 38, label: 'Specialist Agents', suffix: '' },
+  // 119 total tools. Every tool carries an honest maturity label — real,
+  // heuristic, llm_passthrough, config_dependent, or experimental — CI-enforced
+  // against the live registry. The old universal-grade label was retired because
+  // only ~56 of 119 are `real` runtime integrations; the rest are honest
+  // heuristics, LLM passthroughs, or config-gated.
+  { value: 119, label: 'Classified Tools', suffix: '' },
   // 21 = 12 external SaaS connectors + 9 infrastructure/MCP adapters surfaced in the UI.
   // Only a subset are production-ready runtime paths — see docs/integration-maturity-matrix.md.
   { value: 21, label: 'Connectors', suffix: '' },
@@ -455,12 +460,12 @@ export default function HomePage() {
               </div>
 
               <h1 className="mb-6 text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl leading-[1.02] sm:leading-[1]">
-                <span className="block text-white/90">Your Entire Company,</span>
-                <span className="block mt-2 gradient-text">Automated.</span>
+                <span className="block text-white/90">Specialist AI Agents,</span>
+                <span className="block mt-2 gradient-text">Operator-Grade Control Plane.</span>
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, Engineer, Legal, Finance, HR&nbsp;&mdash; expert-grade role agents working together under a durable workflow. Risk-stratified approval gates + 4-layer verification (rules &rarr; AI &rarr; human review) flag fraud before destructive actions ship.
+                CEO, CTO, CMO, CFO, HR, Engineer, Legal&nbsp;&mdash; 38 role-specialist agents running under a durable workflow queue with risk-stratified approval gates. High-risk actions pause for human review; every tool carries an honest maturity label; every metric is CI-enforced against runtime truth.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -720,7 +725,7 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Production Tools</p>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Tools · Honest Maturity Labels</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">119 Tools. Honest Maturity Labels.</h2>
               <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 verified MCP providers. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
@@ -1098,7 +1103,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Autonomous multi-agent AI platform. 38 agents, 119 production tools, 21 integrations, managed AI, memory system, Slack + WhatsApp bridges, voice-to-workflow, vibe coding, and a typed SDK.
+                  Operator-grade multi-agent control plane. 38 specialist agents, 119 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 21 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
                 </p>
               </div>
 
