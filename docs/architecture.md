@@ -314,7 +314,7 @@ Every tool is classified as READ_ONLY, WRITE, EXTERNAL_SIDE_EFFECT, or DESTRUCTI
 
 Industry packs customise the swarm's behaviour for specific verticals. A pack is loaded at workflow start based on the tenant's `industry` setting.
 
-11 industry packs: healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, general.
+13 industry packs: healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, manufacturing, consulting, general. Count is CI-enforced — `pnpm check:truth` fails if `listIndustries()` returns a different number than this paragraph claims.
 
 **Pack application:**
 1. IndustryPack selected based on `Tenant.industry` enum value

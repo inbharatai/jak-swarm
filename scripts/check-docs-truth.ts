@@ -16,6 +16,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolRegistry, registerBuiltinTools } from '../packages/tools/src/index.js';
 import { AgentRole } from '@jak-swarm/shared';
+import { listIndustries } from '@jak-swarm/industry-packs';
 import {
   computeSession7Counts,
   EXPECTED_SESSION_7_BUCKETS,
@@ -153,6 +154,22 @@ if (landingConnectorMatch && matrixConnectorTotalMatch) {
     expected: Number(matrixConnectorTotalMatch[1]),
     actual: Number(landingConnectorMatch[1]),
     source: 'apps/web/src/app/page.tsx STATS vs docs/integration-maturity-matrix.md',
+  });
+}
+
+// ─── Industry pack count ───────────────────────────────────────────────────
+// Architecture doc claims a specific number of industry packs. Assert it
+// matches the live `listIndustries()` output so a new pack (or a removed
+// one) can't silently drift from the claim.
+const industryPackCount = listIndustries().length;
+const archDoc = read('docs/architecture.md');
+const archPackCountMatch = archDoc.match(/(\d+)\s+industry\s+packs:/i);
+if (archPackCountMatch) {
+  expect({
+    claim: 'docs/architecture.md industry pack count matches listIndustries()',
+    expected: industryPackCount,
+    actual: Number(archPackCountMatch[1]),
+    source: 'packages/industry-packs/src/registry.ts (listIndustries)',
   });
 }
 

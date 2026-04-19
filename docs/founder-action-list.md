@@ -122,8 +122,8 @@ Add `workflow_jobs.ownerInstanceId`, `leaseExpiresAt`, `lastHeartbeatAt`. Reclai
 ### G3. Phase 7 cross-instance integration tests
 Postgres-backed integration tests for: unpause-signal recovery across instances, approval resume, worker-lease recovery. These need Postgres + Redis in CI.
 
-### G4. 40 unclassified tools
-Closed in Session 7 — all 119 tools now carry maturity. The 40-tool subset breaks down as **real: 17, heuristic: 12, llm_passthrough: 8, config_dependent: 2, experimental: 1** (total 40). `pnpm check:truth` runs `scripts/verify-session7-counts.ts` and fails CI if any bucket count drifts, or a tool silently changes maturity.
+### G4. Session 7 tool maturity classification (closed)
+Before Session 7, 40 of the 119 registered built-in tools had no maturity label and were bucketed as `unclassified` in the manifest. Closed in commit `faad80d` — all 119 tools now carry a maturity label. Within the 40-tool subset that was classified in that commit, the breakdown is **real: 17, heuristic: 12, llm_passthrough: 8, config_dependent: 2, experimental: 1** (total 40). `pnpm check:truth` runs `scripts/verify-session7-counts.ts` and fails CI if any of those 40 tools silently changes maturity or is removed from the registry.
 
 ### G5. Checkpoint-revert
 Closed in Session 5 + 6. Backend service, routes, and UI timeline all shipped.
