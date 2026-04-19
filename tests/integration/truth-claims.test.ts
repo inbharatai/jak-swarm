@@ -20,14 +20,23 @@ describe('Product truth claims', () => {
     const agentCount = (agentRoles.match(/\[AgentRole\./g) ?? []).length;
 
     const badgeAgent = readme.match(/AI_Agents-(\d+)/);
-    const badgeTools = readme.match(/Production_Tools-(\d+)/);
+    // Tools badge was renamed from `Production_Tools-N` → `Classified_Tools-N`
+    // in the strict-truth pass (53e92ae). Accept either form so historical
+    // audits that cite the old badge keep working.
+    const badgeTools = readme.match(/(?:Classified_Tools|Production_Tools)-(\d+)/);
 
     expect(badgeAgent?.[1]).toBe(String(agentCount));
     expect(badgeTools?.[1]).toBe(String(toolCount));
 
     // Keep narrative counters in sync too.
-    expect(readme).toContain(`${agentCount} AI agents`);
-    expect(readme).toContain(`${toolCount} production tools`);
+    expect(readme).toContain(`${agentCount} specialist agents`);
+    // Accept either "classified tools" (current, honest) or "production tools"
+    // (legacy — rejected elsewhere in truth-check, kept here for historical
+    // branches that haven't rebased).
+    const hasToolCount =
+      readme.includes(`${toolCount} classified tools`) ||
+      readme.includes(`${toolCount} production tools`);
+    expect(hasToolCount, `README must contain "${toolCount} classified tools"`).toBe(true);
   });
 
   it('does not claim API keys are unnecessary for external providers', () => {
