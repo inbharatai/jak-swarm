@@ -537,7 +537,53 @@ export const projectApi = {
   versions: (id: string) => apiClient.get<unknown>(`/projects/${id}/versions`),
   conversations: (id: string) => apiClient.get<unknown>(`/projects/${id}/conversations`),
   delete: (id: string) => apiClient.delete<unknown>(`/projects/${id}`),
+
+  // ─── Checkpoints (diff-aware revert, replaces rollback/versions for new UI) ───
+  // Each of these unwraps the `{success, data}` envelope via apiDataFetch so
+  // consumers get a typed value directly (no `res.data` gymnastics).
+  listCheckpoints: (id: string, limit?: number) =>
+    apiDataFetch<Checkpoint[]>(`/projects/${id}/checkpoints${limit ? `?limit=${limit}` : ''}`),
+  getCheckpoint: (id: string, version: number) =>
+    apiDataFetch<CheckpointDetail>(`/projects/${id}/checkpoints/${version}`),
+  createCheckpoint: (id: string, body?: { description?: string; stage?: string; workflowId?: string }) =>
+    apiDataFetch<Checkpoint>(`/projects/${id}/checkpoints`, { method: 'POST', body: body ?? {} }),
+  restoreCheckpoint: (id: string, version: number) =>
+    apiDataFetch<Checkpoint>(`/projects/${id}/checkpoints/${version}/restore`, { method: 'POST', body: {} }),
 };
+
+// ─── Checkpoint types (mirror CheckpointService output shape) ───────────
+export type CheckpointStage = 'architect' | 'generator' | 'debugger' | 'deployer' | 'manual' | 'rollback';
+
+export interface CheckpointDiffEntry {
+  path: string;
+  prevSize?: number;
+  nextSize?: number;
+  prevHash?: string;
+  nextHash?: string;
+}
+
+export interface CheckpointDiff {
+  added: CheckpointDiffEntry[];
+  modified: CheckpointDiffEntry[];
+  deleted: CheckpointDiffEntry[];
+  totalFiles: number;
+  hasChanges: boolean;
+}
+
+export interface Checkpoint {
+  id: string;
+  version: number;
+  description: string | null;
+  stage: CheckpointStage | null;
+  workflowId: string | null;
+  createdBy: string;
+  createdAt: string;
+  diff: CheckpointDiff | null;
+}
+
+export interface CheckpointDetail extends Checkpoint {
+  snapshot: Array<{ path: string; content: string; language: string | null }>;
+}
 
 // ─── Usage & Billing ──────────────────────────────────────────────────
 

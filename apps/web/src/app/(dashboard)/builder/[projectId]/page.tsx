@@ -1,22 +1,23 @@
 'use client';
 
-import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 // Lazy-load Monaco to avoid SSR issues and reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(mod => ({ default: mod.default })));
 import { useProject, type ProjectFile } from '@/hooks/useProject';
 import { useProjectStream } from '@/hooks/useProjectStream';
-import { projectApi } from '@/lib/api-client';
+import { projectApi, type Checkpoint } from '@/lib/api-client';
 import { Button, Badge, Spinner, Card, CardContent, Input } from '@/components/ui';
 import { BuildProgress, eventsToBuildSteps } from '@/components/builder/BuildProgress';
 import { ImageUpload } from '@/components/builder/ImageUpload';
 import { DeployDialog } from '@/components/builder/DeployDialog';
 import { GitHubSync } from '@/components/builder/GitHubSync';
+import { CheckpointTimeline, CheckpointTimelineHeader } from '@/components/builder/CheckpointTimeline';
 import {
   ArrowLeft, Play, Rocket, GitBranch, Settings, Eye, Code2,
   ChevronRight, ChevronDown, FileText, FolderOpen, Folder, Send,
-  RotateCcw, ExternalLink, Loader2, Image as ImageIcon,
+  ExternalLink, Loader2, Image as ImageIcon,
 } from 'lucide-react';
 
 // ─── File Tree Helpers ──────────────────────────────────────────────────
@@ -149,6 +150,26 @@ export default function BuilderIDEPage() {
   const { events: streamEvents } = useProjectStream(isGenerating ? projectId : undefined);
   const buildSteps = eventsToBuildSteps(streamEvents);
 
+  // ─── Checkpoint timeline state ────────────────────────────────────
+  // Pulled separately from `project.versions` so it carries the diff
+  // metadata the timeline renders. Refetched after runs complete, after
+  // restore, and when the user presses "Snapshot now".
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [showCheckpoints, setShowCheckpoints] = useState(false);
+
+  const reloadCheckpoints = useCallback(async () => {
+    try {
+      const list = await projectApi.listCheckpoints(projectId, 30);
+      setCheckpoints(list ?? []);
+    } catch {
+      // Non-fatal — timeline stays empty until the next reload.
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void reloadCheckpoints();
+  }, [reloadCheckpoints, project?.currentVersion, isGenerating]);
+
   // Cleanup save timeout on unmount
   useEffect(() => {
     return () => {
@@ -246,17 +267,6 @@ export default function BuilderIDEPage() {
     }, 1500);
   };
 
-  const handleRollback = async (version: number) => {
-    if (!confirm(`Rollback to version ${version}? Current changes will be preserved in the version history.`)) return;
-    try {
-      await projectApi.rollback(projectId, version);
-      refresh();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Rollback failed';
-      setErrorMessage(msg);
-      setTimeout(() => setErrorMessage(null), 8000);
-    }
-  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
@@ -317,20 +327,37 @@ export default function BuilderIDEPage() {
             ))
           )}
 
-          {/* Version History */}
-          {project.versions && project.versions.length > 0 && (
-            <div className="mt-4 border-t pt-2">
-              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Versions</p>
-              {project.versions.slice(0, 5).map(v => (
-                <div key={v.id} className="flex items-center justify-between px-3 py-1 text-xs">
-                  <span className="text-muted-foreground">v{v.version}</span>
-                  <button onClick={() => handleRollback(v.version)} className="text-primary hover:underline" title="Rollback">
-                    <RotateCcw className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Checkpoint timeline — diff-aware replacement for the old Versions list */}
+          <div className="mt-4 border-t pt-3 px-3">
+            <button
+              onClick={() => setShowCheckpoints((s) => !s)}
+              className="w-full flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors pb-2"
+              aria-expanded={showCheckpoints}
+            >
+              <span className="flex items-center gap-1">
+                {showCheckpoints ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Checkpoints {checkpoints.length > 0 ? `(${checkpoints.length})` : ''}
+              </span>
+            </button>
+            {showCheckpoints ? (
+              <div className="space-y-2">
+                <CheckpointTimelineHeader
+                  projectId={projectId}
+                  onSnapshot={() => reloadCheckpoints()}
+                  disabled={isGenerating}
+                />
+                <CheckpointTimeline
+                  projectId={projectId}
+                  checkpoints={checkpoints}
+                  onRestored={() => {
+                    refresh();
+                    void reloadCheckpoints();
+                  }}
+                  onReload={reloadCheckpoints}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Center: Code / Preview */}
