@@ -160,6 +160,22 @@ export interface VibeCoderParams {
   buildChecker?: BuildChecker;
   /** Progress callback — called on every state transition. Also emits on SupervisorBus. */
   onProgress?: (event: VibeCoderEvent) => void;
+  /**
+   * Optional checkpoint hook — called AFTER the workflow has persisted the
+   * files at a stage boundary, so the caller can snapshot them to durable
+   * storage (e.g. ProjectVersion). Stages emitted:
+   *   - 'generator' after the first Generator pass succeeds
+   *   - 'debugger'  after each successful debug-retry iteration (Nth retry)
+   *   - 'deployer'  after Deployer returns (success or soft-fail)
+   *
+   * The callback MUST NOT mutate `files`. It should be non-fatal — the
+   * workflow continues even if checkpointing throws (logged, not raised).
+   */
+  onCheckpoint?: (stage: 'generator' | 'debugger' | 'deployer', context: {
+    files: readonly GeneratedFile[];
+    attempt?: number;
+    workflowId: string;
+  }) => Promise<void>;
   /** Agent injection points for tests. Undefined = use real agents. */
   agents?: {
     architect?: AppArchitectAgent;
@@ -220,6 +236,31 @@ function applyFixes(files: GeneratedFile[], fixes: Array<{ path: string; content
     });
   }
   return [...map.values()];
+}
+
+/**
+ * Invoke the optional onCheckpoint callback, swallowing any error so the
+ * workflow is never killed by a checkpoint-storage hiccup. Checkpoints
+ * are a nicety — missing one is logged, not raised.
+ */
+async function safeCheckpoint(
+  params: VibeCoderParams,
+  stage: 'generator' | 'debugger' | 'deployer',
+  context: { files: readonly GeneratedFile[]; attempt?: number },
+): Promise<void> {
+  if (!params.onCheckpoint) return;
+  try {
+    await params.onCheckpoint(stage, {
+      files: context.files,
+      attempt: context.attempt,
+      workflowId: params.workflowId,
+    });
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), stage, workflowId: params.workflowId },
+      'onCheckpoint threw — continuing workflow',
+    );
+  }
 }
 
 function inferLanguage(path: string): string {
@@ -333,6 +374,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
         fileCount: generated.files.length,
         confidence: generated.confidence,
       });
+      await safeCheckpoint(params, 'generator', { files });
     }
 
     // Build check
@@ -424,6 +466,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
       confidence: debugResult.confidence,
       diagnosis: debugResult.diagnosis,
     });
+    await safeCheckpoint(params, 'debugger', { files, attempt: debugAttempts });
   }
 
   // ─── 5. Deploy ───────────────────────────────────────────────────────────
@@ -462,6 +505,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
         confidence: 0,
       };
     }
+    await safeCheckpoint(params, 'deployer', { files });
   }
 
   emit('completed', params, {

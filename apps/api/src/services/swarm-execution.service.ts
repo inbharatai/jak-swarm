@@ -82,6 +82,13 @@ export interface ExecuteAsyncParams {
     envVars?: Record<string, string>;
     deployAfterBuild?: boolean;
     maxDebugRetries?: number;
+    /**
+     * Optional — when set, the executor persists generated files to this
+     * project (via ProjectService) and records a checkpoint (via
+     * CheckpointService) after each stage. Absent = ephemeral run, no
+     * project rows touched.
+     */
+    projectId?: string;
   };
 }
 
@@ -814,6 +821,15 @@ export class SwarmExecutionService extends EventEmitter {
     await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
 
     const { runVibeCoderWorkflow } = await import('@jak-swarm/swarm');
+
+    // Lazy-import the checkpoint and project services so swarm-execution can
+    // stay agnostic to builder-specific concerns when no projectId is given.
+    const { CheckpointService } = await import('./checkpoint.service.js');
+    const { ProjectService } = await import('./project.service.js');
+    const projectId = vibeCoderInput.projectId;
+    const checkpointService = projectId ? new CheckpointService(this.db, this.log) : null;
+    const projectService = projectId ? new ProjectService(this.db, this.log) : null;
+
     try {
       const result = await runVibeCoderWorkflow({
         workflowId,
@@ -838,6 +854,45 @@ export class SwarmExecutionService extends EventEmitter {
             timestamp: event.timestamp,
           });
         },
+        onCheckpoint: projectId && checkpointService && projectService
+          ? async (stage, ctx) => {
+              // Persist the current file set to the project, then snapshot it.
+              // Both steps are best-effort — the vibe-coder workflow already
+              // swallows checkpoint errors, but we still log here for the
+              // operator's audit trail.
+              try {
+                await projectService.saveFiles(
+                  projectId,
+                  ctx.files.map((f) => ({ path: f.path, content: f.content, language: f.language })),
+                );
+                const snap = await checkpointService.createCheckpoint({
+                  projectId,
+                  tenantId,
+                  stage,
+                  workflowId,
+                  createdBy: `workflow:${stage}`,
+                  description:
+                    stage === 'debugger' && typeof ctx.attempt === 'number'
+                      ? `Checkpoint after debugger retry #${ctx.attempt}`
+                      : undefined,
+                });
+                this.emit(`workflow:${workflowId}`, {
+                  type: 'vibe_coder:checkpoint',
+                  workflowId,
+                  projectId,
+                  stage,
+                  version: snap.version,
+                  hasChanges: snap.diff?.hasChanges ?? false,
+                  timestamp: new Date().toISOString(),
+                });
+              } catch (err) {
+                this.log.warn(
+                  { workflowId, projectId, stage, err: err instanceof Error ? err.message : String(err) },
+                  '[VibeCoder] Checkpoint persistence failed (non-fatal)',
+                );
+              }
+            }
+          : undefined,
       });
 
       // Persist the final result to the workflow row.

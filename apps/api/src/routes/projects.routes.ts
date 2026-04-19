@@ -5,6 +5,7 @@ import { ProjectService } from '../services/project.service.js';
 import { VibeCodingExecutionService } from '../services/vibe-coding-execution.service.js';
 import { WorkflowService } from '../services/workflow.service.js';
 import { CreditService } from '../billing/credit-service.js';
+import { CheckpointService, CheckpointNotFoundError } from '../services/checkpoint.service.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
@@ -41,6 +42,12 @@ const rollbackSchema = z.object({
   version: z.number().int().positive(),
 });
 
+const createCheckpointSchema = z.object({
+  description: z.string().max(500).optional(),
+  stage: z.enum(['architect', 'generator', 'debugger', 'deployer', 'manual', 'rollback']).optional(),
+  workflowId: z.string().max(100).optional(),
+});
+
 const updateFileSchema = z.object({
   content: z.string().max(5_000_000), // FIX: 5MB max file content
 });
@@ -53,6 +60,7 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   const vibeCoding = new VibeCodingExecutionService(fastify.db, fastify.log);
   const workflowService = new WorkflowService(fastify.db, fastify.log);
   const creditService = new CreditService(fastify.db);
+  const checkpointService = new CheckpointService(fastify.db, fastify.log);
   const preHandler = [fastify.authenticate, enforceTenantIsolation];
 
   // ─── POST /projects ──────────────────────────────────────────────────
@@ -246,6 +254,7 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
             envVars,
             deployAfterBuild: deployAfterBuild ?? true,
             maxDebugRetries: maxDebugRetries ?? 3,
+            projectId: id,
           },
         });
 
@@ -518,6 +527,129 @@ const projectsRoutes: FastifyPluginAsync = async (fastify) => {
         clearInterval(heartbeat);
         fastify.swarm.off(`project:${id}`, handler);
       });
+    },
+  );
+
+  // ─── Checkpoint endpoints ───────────────────────────────────────────
+  // Thin wrappers around CheckpointService. The older /versions + /rollback
+  // endpoints remain for back-compat, but the UI should prefer these for
+  // diff-aware reads and audit-tagged restores.
+
+  // GET /projects/:id/checkpoints — newest-first list with diff metadata
+  fastify.get(
+    '/:id/checkpoints',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
+      const query = request.query as { limit?: string };
+      const parsedLimit = query.limit ? Number.parseInt(query.limit, 10) : undefined;
+      try {
+        const checkpoints = await checkpointService.listCheckpoints({
+          projectId: id,
+          tenantId,
+          limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+        });
+        return reply.send(ok(checkpoints));
+      } catch (e) {
+        if (e instanceof CheckpointNotFoundError) {
+          return reply.status(404).send(err('NOT_FOUND', e.message));
+        }
+        throw e;
+      }
+    },
+  );
+
+  // GET /projects/:id/checkpoints/:version — full snapshot + diff
+  fastify.get(
+    '/:id/checkpoints/:version',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id, version } = request.params as { id: string; version: string };
+      const parsedVersion = Number.parseInt(version, 10);
+      if (!Number.isFinite(parsedVersion) || parsedVersion <= 0) {
+        return reply.status(400).send(err('VALIDATION_ERROR', 'Version must be a positive integer'));
+      }
+      const { tenantId } = request.user;
+      try {
+        const checkpoint = await checkpointService.getCheckpoint({
+          projectId: id,
+          tenantId,
+          version: parsedVersion,
+        });
+        return reply.send(ok(checkpoint));
+      } catch (e) {
+        if (e instanceof CheckpointNotFoundError) {
+          return reply.status(404).send(err('NOT_FOUND', e.message));
+        }
+        throw e;
+      }
+    },
+  );
+
+  // POST /projects/:id/checkpoints — manual checkpoint (pre-risky-change affordance)
+  fastify.post(
+    '/:id/checkpoints',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const parseResult = createCheckpointSchema.safeParse(request.body ?? {});
+      if (!parseResult.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request', parseResult.error.flatten()));
+      }
+      const { tenantId, userId } = request.user;
+      try {
+        const checkpoint = await checkpointService.createCheckpoint({
+          projectId: id,
+          tenantId,
+          description: parseResult.data.description,
+          stage: parseResult.data.stage ?? 'manual',
+          workflowId: parseResult.data.workflowId,
+          createdBy: `user:${userId}`,
+        });
+        await fastify.auditLog(request, 'CREATE_CHECKPOINT', 'Project', id, {
+          version: checkpoint.version,
+          stage: checkpoint.stage,
+        });
+        return reply.status(201).send(ok(checkpoint));
+      } catch (e) {
+        if (e instanceof CheckpointNotFoundError) {
+          return reply.status(404).send(err('NOT_FOUND', e.message));
+        }
+        throw e;
+      }
+    },
+  );
+
+  // POST /projects/:id/checkpoints/:version/restore — revert files to checkpoint
+  fastify.post(
+    '/:id/checkpoints/:version/restore',
+    { preHandler },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id, version } = request.params as { id: string; version: string };
+      const parsedVersion = Number.parseInt(version, 10);
+      if (!Number.isFinite(parsedVersion) || parsedVersion <= 0) {
+        return reply.status(400).send(err('VALIDATION_ERROR', 'Version must be a positive integer'));
+      }
+      const { tenantId, userId } = request.user;
+      try {
+        const restored = await checkpointService.restoreCheckpoint({
+          projectId: id,
+          tenantId,
+          targetVersion: parsedVersion,
+          actor: `user:${userId}`,
+        });
+        await fastify.auditLog(request, 'RESTORE_CHECKPOINT', 'Project', id, {
+          targetVersion: parsedVersion,
+          newVersion: restored.version,
+        });
+        return reply.send(ok(restored));
+      } catch (e) {
+        if (e instanceof CheckpointNotFoundError) {
+          return reply.status(404).send(err('NOT_FOUND', e.message));
+        }
+        throw e;
+      }
     },
   );
 };
