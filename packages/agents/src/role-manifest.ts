@@ -264,12 +264,14 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
   },
   [AgentRole.WORKER_SPREADSHEET]: {
     role: AgentRole.WORKER_SPREADSHEET,
-    displayName: 'Spreadsheet',
-    maturity: 'moderate',
-    strengths: ['Structured data parsing', 'Statistical summaries via compute_statistics tool', 'Chart-type recommendation'],
-    limitations: [
-      'Prompt (~30 lines) is generic data-analysis guidance — no domain-specific extraction rules like Document/Research',
-      'No explicit output-schema rigor for transformed data shapes',
+    displayName: 'Spreadsheet / Data Analyst',
+    maturity: 'upgraded',
+    strengths: [
+      'Forensic data profile (five-number summary + IQR outlier detection)',
+      'Honest chart-type selection with explicit rules (never pie >6 categories, never 3D)',
+      'Aggregation-matches-semantics discipline (never average IDs)',
+      'Small-sample discipline: n<30 uses non-parametric summary',
+      'Refuse-to-fabricate rule (no column inference from ambient knowledge)',
     ],
     implementation: 'packages/agents/src/workers/spreadsheet.agent.ts',
   },

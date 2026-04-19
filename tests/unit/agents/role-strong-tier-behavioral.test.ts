@@ -20,6 +20,7 @@ import {
   AnalyticsAgent,
   ProjectAgent,
   ScreenshotToCodeAgent,
+  SpreadsheetAgent,
   AgentContext,
 } from '@jak-swarm/agents';
 import type OpenAI from 'openai';
@@ -321,6 +322,82 @@ describe('ProjectAgent — timeline + risks + status report', () => {
     expect(result.risks?.[0]?.score).toBeCloseTo(0.48, 2);
     expect(result.milestones).toHaveLength(2);
     expect(result.milestones?.[1]?.status).toBe('at_risk');
+  });
+});
+
+// ─── Spreadsheet / Data Analyst ────────────────────────────────────────────
+
+describe('SpreadsheetAgent — forensic data analysis', () => {
+  it('preserves profile + five-number summary + outliers + qualityIssues on ANALYZE', async () => {
+    const agent = new SpreadsheetAgent('stub-key');
+    stubLLM(agent, {
+      analysis: {
+        rowCount: 1247,
+        colCount: 6,
+        columns: [
+          { name: 'revenue', inferredType: 'number', nullRatePct: 2, uniqueCount: 1189, sampleValues: ['$1,420', '$3,100', '$890'] },
+          { name: 'customer_id', inferredType: 'string', nullRatePct: 0, uniqueCount: 1247, sampleValues: ['c-001', 'c-002'] },
+        ],
+        qualityIssues: ['3 rows with malformed dates in signup_date', 'revenue column has trailing $ signs — will coerce to number'],
+      },
+      statistics: {
+        revenue: {
+          mean: 2450.32,
+          median: 1950.00,
+          stddev: 1820.5,
+          min: 120.00,
+          max: 18500.00,
+          q1: 890.00,
+          q3: 3400.00,
+          outliers: { count: 12, rule: '1.5×IQR', included: true },
+        },
+      },
+      report: {
+        title: 'Revenue distribution analysis (n=1247)',
+        sections: [
+          { title: 'TL;DR', body: 'Revenue is right-skewed with 12 high-value outliers; median $1,950 is more representative than mean $2,450.' },
+          { title: 'Methodology', body: 'Five-number summary + 1.5×IQR outlier detection; outliers included in aggregates but flagged.' },
+        ],
+      },
+      confidence: 0.88,
+    });
+
+    const result = await agent.execute(
+      { action: 'ANALYZE', data: 'csv content here...' },
+      stubContext(),
+    );
+
+    expect(result.analysis?.rowCount).toBe(1247);
+    expect(result.analysis?.columns.length).toBeGreaterThanOrEqual(2);
+    expect(result.analysis?.columns[0]?.inferredType).toBe('number');
+    expect(result.analysis?.qualityIssues?.length).toBeGreaterThanOrEqual(1);
+    const revStats = (result.statistics as Record<string, { median: number; outliers: { count: number; rule: string } }>)?.['revenue'];
+    expect(revStats?.median).toBe(1950);
+    expect(revStats?.outliers?.rule).toBe('1.5×IQR');
+    expect(revStats?.outliers?.count).toBe(12);
+  });
+
+  it('preserves chartConfig type recommendation on CHART_DATA', async () => {
+    const agent = new SpreadsheetAgent('stub-key');
+    stubLLM(agent, {
+      chartConfig: {
+        type: 'bar',
+        xAxis: 'category',
+        yAxis: 'count',
+        title: 'Orders by region',
+        rationale: '8 distinct categories — bar is more readable than pie',
+      },
+      confidence: 0.9,
+    });
+
+    const result = await agent.execute(
+      { action: 'CHART_DATA', data: 'region,count\nUS,420\nEU,310\n...' },
+      stubContext(),
+    );
+    expect(result.chartConfig?.type).toBe('bar');
+    // Rationale is expected text in the Result from the upgraded prompt.
+    const cfg = result.chartConfig as Record<string, unknown>;
+    expect(String(cfg['rationale'] ?? '')).toMatch(/bar|pie/i);
   });
 });
 
