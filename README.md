@@ -151,7 +151,7 @@ flowchart LR
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
 | 🔧 | **119 Production Tools** | Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification |
-| 🔍 | **31 Research Tools** | Web search, SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery |
+| 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
 | 🧪 | **Tool Maturity Manifest** | All 119 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
@@ -168,7 +168,7 @@ flowchart LR
 | 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
 | 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
 | 🔌 | **MCP Integrations (Implemented + Extendable)** | Slack, GitHub, Notion are wired with provider management; additional providers are extendable via MCP and adapter work |
-| 🌐 | **30 Browser Tools** | Full Playwright: navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation, social posting |
+| 🌐 | **30 Browser Tools** | ~20 Playwright primitives (navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation) + ~10 site-specific automation tools (social posting, Gmail inbox, auto-reply). The site-specific tools are classified `experimental` in the tool manifest — fragile on UI change. Count matches `toolRegistry.getManifest()` BROWSER category |
 | 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
 | 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers (including WhatsApp auto-start lock) |

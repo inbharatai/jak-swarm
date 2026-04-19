@@ -460,7 +460,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-xl text-base text-slate-400 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, Engineer, Legal, Finance, HR&nbsp;&mdash; all autonomous. All working together. A verification layer that catches fraud before your AI acts. No other platform does all three.
+                CEO, CTO, CMO, Engineer, Legal, Finance, HR&nbsp;&mdash; expert-grade role agents working together under a durable workflow. Risk-stratified approval gates + 4-layer verification (rules &rarr; AI &rarr; human review) flag fraud before destructive actions ship.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4">

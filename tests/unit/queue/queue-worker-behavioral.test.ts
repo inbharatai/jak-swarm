@@ -15,8 +15,16 @@ function createMockDb(jobs: WorkflowJobRow[] = []) {
   const jobStore = new Map(jobs.map((j) => [j.id, { ...j }]));
 
   return {
-    $queryRawUnsafe: vi.fn(async () => {
-      // Simulate SKIP LOCKED: return first QUEUED job
+    $queryRawUnsafe: vi.fn(async (sql: string, ..._args: unknown[]) => {
+      // P1b: the worker now calls $queryRawUnsafe for TWO distinct queries:
+      //   1. reclaim sweep (flips stale ACTIVE → QUEUED, no args)
+      //   2. claim (args[0] = instanceId, args[1] = leaseSeconds)
+      // Route by checking the SQL shape before mutating the in-memory store.
+      if (typeof sql === 'string' && sql.includes("status = 'QUEUED'") && sql.includes('leaseExpiresAt') && sql.includes('< NOW()')) {
+        // Reclaim sweep — no expired leases in the mock store by default.
+        return [];
+      }
+      // Claim SKIP-LOCKED: pick the first QUEUED job.
       for (const [_id, job] of jobStore) {
         if (job.status === 'QUEUED' && job.availableAt <= new Date()) {
           job.status = 'ACTIVE';
@@ -26,6 +34,7 @@ function createMockDb(jobs: WorkflowJobRow[] = []) {
       }
       return [];
     }),
+    $executeRawUnsafe: vi.fn(async () => 0),
     workflowJob: {
       findFirst: vi.fn(async ({ where }: any) => {
         for (const [_id, job] of jobStore) {
