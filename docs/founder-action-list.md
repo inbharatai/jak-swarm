@@ -175,23 +175,27 @@ Before starting: run `pnpm -w run bootstrap:prod-automation` (see [scripts/autom
 8. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-api` with a `.env.render-api` that includes `WORKFLOW_WORKER_MODE=standalone` and `REQUIRE_REDIS_IN_PROD=true`. This is the critical flip — do it AFTER the worker is live, not before.
 9. Watch API logs: should now say `[Swarm] Queue worker disabled in API process (standalone mode expected)`
 
-### Stage 5 — Grafana Cloud observability
-10. Sign up for Grafana Cloud Free (https://grafana.com/products/cloud/). Create a stack.
-11. In Grafana Cloud → Connections → Prometheus → "Send Metrics": copy the Remote Write URL, numeric user, and create an access-policy token with `metrics:write`.
-12. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-grafana-agent` with these three values as `GRAFANA_CLOUD_PROM_URL` / `GRAFANA_CLOUD_PROM_USER` / `GRAFANA_CLOUD_PROM_API_KEY`.
-13. Verify scraping: Grafana Cloud → Explore → run query `up{project="jak-swarm"}` — should return two rows (api=1, worker=1).
-14. Import dashboard: Dashboards → New → Import → upload `ops/grafana/dashboards/jak-swarm.json`.
-15. Import alerts: Alerting → Alert rules → New → Import → upload `ops/prometheus/alerts.yml`.
-16. Wire Slack + email contact points (Alerting → Contact points → New), assign to the severity matchers, test send.
+### Stage 5 — Vercel frontend env sync
+10. Run `pnpm -w run automation:configure-vercel-env` with local `.env.vercel-production` file containing the `NEXT_PUBLIC_*` vars from [DEPLOYMENT.md](DEPLOYMENT.md). Needs `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID`.
 
-### Stage 6 — Vercel frontend env sync
-17. Run `pnpm -w run automation:configure-vercel-env` with local `.env.vercel-production` file containing the `NEXT_PUBLIC_*` vars from [DEPLOYMENT.md](DEPLOYMENT.md). Needs `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID`.
+### Stage 6 — smoke tests (manual, cannot automate)
+11. Log in via magic-pin on the live site → land on `/workspace`
+12. Kick off a toy Vibe Coder spec → confirm trace shows AppArchitect → AppGenerator → build check → AppDeployer running on the WORKER (check worker logs, not API logs)
+13. Kill the worker mid-run via Render dashboard "Manual Deploy → Clear cache & deploy" → within ~60s a NEW worker boot reclaims the orphaned job (verify in Render worker logs)
 
-### Stage 7 — smoke tests (manual, cannot automate)
-18. Log in via magic-pin on the live site → land on `/workspace`
-19. Kick off a toy Vibe Coder spec → confirm trace shows AppArchitect → AppGenerator → build check → AppDeployer running on the WORKER (check worker logs, not API logs)
-20. Kill the worker mid-run via Render dashboard "Manual Deploy → Clear cache & deploy" → within ~60s the `jak_workflow_jobs_reclaimed_total` counter in Grafana Cloud increments by ≥1
-21. Trigger one warn alert deliberately (enqueue 101 dummy jobs to trip `QueueBacklogHigh`) → verify Slack receives within 5 minutes
+### Stage 7 — OPTIONAL: observability via Grafana Cloud (defer until needed)
+
+**Don't do this until you have real user load.** Render's built-in logs + service-down email alerts cover the critical failure modes pre-launch. When you have >50 paying users OR >500 workflows/day, enable this stack:
+
+14. Uncomment the `jak-swarm-grafana-agent` block in `render.yaml`
+15. Sign up for Grafana Cloud Free (https://grafana.com/products/cloud/). Create a stack.
+16. In Grafana Cloud → Connections → Prometheus → "Send Metrics": copy the Remote Write URL, numeric user, and create an access-policy token with `metrics:write`.
+17. Re-apply the blueprint → Render creates `jak-swarm-grafana-agent` pserv
+18. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-grafana-agent` with these three values as `GRAFANA_CLOUD_PROM_URL` / `GRAFANA_CLOUD_PROM_USER` / `GRAFANA_CLOUD_PROM_API_KEY`.
+19. Verify scraping: Grafana Cloud → Explore → run query `up{project="jak-swarm"}` — should return two rows (api=1, worker=1).
+20. Import dashboard: Dashboards → New → Import → upload `ops/grafana/dashboards/jak-swarm.json`.
+21. Import alerts: Alerting → Alert rules → New → Import → upload `ops/prometheus/alerts.yml`.
+22. Wire Slack + email contact points.
 
 ---
 

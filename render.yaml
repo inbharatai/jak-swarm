@@ -158,26 +158,38 @@ services:
         sync: false
 
   # ────────────────────────────────────────────────────────────────────
-  # Grafana Agent — scrapes API + Worker /metrics every 15s and
-  # remote_writes to Grafana Cloud's hosted Prometheus. Dashboards,
-  # alert evaluation, and Alertmanager all live in Grafana Cloud.
+  # OPTIONAL: Grafana Agent — scrapes API + Worker /metrics and
+  # remote_writes to Grafana Cloud's hosted Prometheus.
   #
-  # Uses the committed config at ops/grafana-agent/agent.yaml, baked
-  # into the image by ops/grafana-agent/Dockerfile.
+  # NOT part of the default production deploy — it costs $7/mo and isn't
+  # worth that until you have real user load. Render's built-in logs +
+  # service-down email alerts cover the critical failure modes.
+  #
+  # When to enable (uncomment + re-apply blueprint):
+  #   - >50 paying users OR >500 workflows/day
+  #   - You need alert-driven paging (queue backlog, LLM cost spikes,
+  #     worker-down beyond 120s)
+  #   - You want a unified metrics dashboard across API + Worker
+  #
+  # When enabled, requires (set in Render dashboard as secrets):
+  #   GRAFANA_CLOUD_PROM_URL       — from Grafana Cloud → Connections → Prometheus → "Send Metrics"
+  #   GRAFANA_CLOUD_PROM_USER      — numeric user id on same page
+  #   GRAFANA_CLOUD_PROM_API_KEY   — access policy token with metrics:write
+  #
+  # Config files are committed at ops/grafana-agent/{agent.yaml,Dockerfile}
+  # so re-enabling is a single uncomment + re-apply.
   # ────────────────────────────────────────────────────────────────────
-  - type: pserv
-    name: jak-swarm-grafana-agent
-    runtime: docker
-    dockerfilePath: ./ops/grafana-agent/Dockerfile
-    dockerContext: .
-    region: oregon
-    plan: starter
-    envVars:
-      # All three come from Grafana Cloud → Connections → Prometheus →
-      # "Send Metrics". Paste values in the Render dashboard.
-      - key: GRAFANA_CLOUD_PROM_URL
-        sync: false
-      - key: GRAFANA_CLOUD_PROM_USER
-        sync: false
-      - key: GRAFANA_CLOUD_PROM_API_KEY
-        sync: false
+  # - type: pserv
+  #   name: jak-swarm-grafana-agent
+  #   runtime: docker
+  #   dockerfilePath: ./ops/grafana-agent/Dockerfile
+  #   dockerContext: .
+  #   region: oregon
+  #   plan: starter
+  #   envVars:
+  #     - key: GRAFANA_CLOUD_PROM_URL
+  #       sync: false
+  #     - key: GRAFANA_CLOUD_PROM_USER
+  #       sync: false
+  #     - key: GRAFANA_CLOUD_PROM_API_KEY
+  #       sync: false

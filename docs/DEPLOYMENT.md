@@ -1,6 +1,6 @@
 # JAK Swarm — Production Deployment Guide
 
-## Topology at a glance (Vercel + Render-split + Supabase + Upstash + Grafana Cloud)
+## Topology at a glance (Vercel + Render-split + Supabase + Upstash)
 
 This is the exact topology the committed `render.yaml` ships. Every env var, healthcheck, and dashboard step below targets this stack — not a generic "cloud" deploy.
 
@@ -9,10 +9,11 @@ This is the exact topology the committed `render.yaml` ships. Every env var, hea
 | `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the Render API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
 | `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Render** `jak-swarm-api` (web service, public) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
 | `apps/api/dist/worker-entry.js` (durable queue consumer) | **Render** `jak-swarm-worker` (pserv, private) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
-| Grafana Agent (scrape + remote_write) | **Render** `jak-swarm-grafana-agent` (pserv, private) | Scrapes API + Worker metrics every 15s, ships to Grafana Cloud |
 | Postgres (+ pgvector) | **Supabase** | `DATABASE_URL` = pooler:6543, `DIRECT_URL` = direct:5432 (migrations only) |
 | Redis | **Upstash** | `rediss://default:PASS@host.upstash.io:6379` — ioredis handles TLS transparently |
-| Dashboards + Alerts + Alertmanager | **Grafana Cloud Free** | Imports `ops/grafana/dashboards/jak-swarm.json` + `ops/prometheus/alerts.yml` |
+| Observability | **Render dashboard (built-in)** | Log streaming + service-down email alerts. Adequate pre-launch. |
+
+**When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Render's built-in logs + alerts cover the critical failure modes. All config needed to resurrect the observability stack later is committed at `ops/grafana-agent/*` and in `render.yaml` (commented out) — one-liner to re-enable.
 
 **CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. `render.yaml` ships with `https://jakswarm.com,https://www.jakswarm.com`. The split is raw comma — NO spaces after commas ([apps/api/src/config.ts:92](apps/api/src/config.ts:92) splits without trimming).
 
