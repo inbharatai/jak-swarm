@@ -59,7 +59,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?must-set-in-env}
       # Prevent the API process from also running the embedded queue worker.
       # With separate worker service, API must not compete for claims.
-      WORKFLOW_QUEUE_DISABLE_EMBEDDED: "1"
+      # The real env var is WORKFLOW_WORKER_MODE (embedded | standalone).
+      WORKFLOW_WORKER_MODE: standalone
     ports: ["4000:4000"]
     depends_on:
       postgres: {condition: service_healthy}

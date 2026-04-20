@@ -1,14 +1,31 @@
-# Render Blueprint — JAK Swarm API
+# Render Blueprint — JAK Swarm API (+ optional separate Worker)
 # https://render.com/docs/blueprint-spec
 #
-# Deploy: Connect this repo to Render, it auto-detects this file.
-# The API runs as a web service. Frontend deploys separately on Vercel.
+# Deploy modes
+# ────────────
+# A) SINGLE-SERVICE (default, what this file ships as):
+#    - Only `jak-swarm-api` below is active.
+#    - `WORKFLOW_WORKER_MODE=embedded` (the default) means the API process
+#      ALSO runs the queue worker. Fine for small-to-medium traffic —
+#      one event loop handles HTTP + queue. Cheapest Render deploy.
 #
-# Required env vars (set in Render dashboard):
+# B) TWO-SERVICE (recommended at scale — when queue depth grows or API
+#    latency p95 grows because a long agent call blocked a request):
+#    1. Uncomment the `jak-swarm-worker` block at the bottom.
+#    2. Set `WORKFLOW_WORKER_MODE=standalone` on `jak-swarm-api` so it
+#       stops competing for queue claims (the separate worker handles them).
+#    3. Set `WORKFLOW_WORKER_INSTANCE_ID=$RENDER_SERVICE_NAME` on the worker
+#       so reclaim logs correlate with the right instance.
+#
+# Required env vars (set secrets in Render dashboard — sync: false below):
 #   DATABASE_URL, DIRECT_URL, AUTH_SECRET, OPENAI_API_KEY
-#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (for web app)
 
 services:
+  # ────────────────────────────────────────────────────────────────────
+  # API service — handles HTTP routes, SSE, auth, enqueue.
+  # In single-service mode this ALSO runs the embedded queue worker.
+  # ────────────────────────────────────────────────────────────────────
   - type: web
     name: jak-swarm-api
     runtime: docker
@@ -28,6 +45,11 @@ services:
         value: warn
       - key: CORS_ORIGINS
         value: https://jakswarm.com,https://www.jakswarm.com
+      # Worker mode — default 'embedded' runs the queue worker inside the
+      # API process (single-service mode). Change to 'standalone' AND
+      # uncomment the jak-swarm-worker block below to split.
+      - key: WORKFLOW_WORKER_MODE
+        value: embedded
       # Set these in Render dashboard (secret):
       - key: DATABASE_URL
         sync: false
@@ -49,3 +71,55 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false # Optional — skip for now, add Upstash later
+
+  # ────────────────────────────────────────────────────────────────────
+  # OPTIONAL: Worker service (two-service mode).
+  #
+  # Uncomment the block below AND change WORKFLOW_WORKER_MODE above to
+  # `standalone` when you need to scale worker capacity independently
+  # from API request traffic. `type: pserv` = private service, only
+  # reachable by other Render services in the same project (perfect for
+  # a worker that exposes /metrics + /healthz on port 9464 for Prometheus
+  # to scrape but should not be on the public internet).
+  #
+  # All secrets should be identical to jak-swarm-api (same DB, same LLM
+  # keys). When you uncomment, re-run `render blueprint apply`.
+  #
+  # - type: pserv
+  #   name: jak-swarm-worker
+  #   runtime: docker
+  #   dockerfilePath: ./Dockerfile
+  #   dockerContext: .
+  #   dockerCommand: "node dist/worker-entry.js"
+  #   region: oregon
+  #   plan: starter
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: LOG_LEVEL
+  #       value: info
+  #     # Stable identity so reclaim logs correlate with dead workers.
+  #     # RENDER_SERVICE_NAME is auto-populated by Render with the service name.
+  #     - key: WORKFLOW_WORKER_INSTANCE_ID
+  #       value: "$RENDER_SERVICE_NAME"
+  #     - key: WORKFLOW_QUEUE_CONCURRENCY
+  #       value: "2"
+  #     - key: WORKFLOW_QUEUE_POLL_INTERVAL_MS
+  #       value: "1000"
+  #     - key: WORKFLOW_QUEUE_LEASE_TTL_MS
+  #       value: "60000"
+  #     - key: WORKER_METRICS_PORT
+  #       value: "9464"
+  #     # Same secrets as API (sync: false in dashboard):
+  #     - key: DATABASE_URL
+  #       sync: false
+  #     - key: DIRECT_URL
+  #       sync: false
+  #     - key: AUTH_SECRET
+  #       sync: false
+  #     - key: OPENAI_API_KEY
+  #       sync: false
+  #     - key: ANTHROPIC_API_KEY
+  #       sync: false
+  #     - key: REDIS_URL
+  #       sync: false # Strongly recommended in two-service mode for cross-instance coordination

@@ -1,8 +1,58 @@
 # JAK Swarm — Production Deployment Guide
 
-## Production topology (required)
+## Two deploy modes — pick the one that matches your traffic
 
-**JAK runs as TWO separate processes in production** — the API and the queue worker. They share the same Postgres and Redis but are deployed and scaled independently.
+JAK ships with ONE binary + TWO runtime roles. The env var
+`WORKFLOW_WORKER_MODE` picks which role(s) the process plays.
+
+### Mode A — Single-service (embedded worker)
+
+`WORKFLOW_WORKER_MODE=embedded` (the default). ONE process does both
+HTTP and queue work. This is what `render.yaml` ships as — and what
+you should run on Render Starter for small-to-medium traffic.
+
+- Cheapest deploy (one container, one plan)
+- API requests and agent work share the same event loop → a long-running
+  LLM call briefly blocks incoming HTTP. Acceptable at low-medium traffic.
+- P1b worker-lease reclaim still runs; still safe if you later run
+  multiple embedded instances behind a load balancer.
+
+**When to stay on this mode:**
+- You're on Render Starter, have <1 QPS sustained to the API, and the
+  queue is usually empty.
+- You don't want to pay for two services yet.
+
+### Mode B — Two-service (API + separate worker)
+
+`WORKFLOW_WORKER_MODE=standalone` on the API service, plus a second
+service running `node dist/worker-entry.js`. The API never competes
+for queue claims; the worker never serves HTTP.
+
+- Scale workers horizontally without scaling the API.
+- API latency p95 stays flat regardless of queue depth.
+- Each worker exposes its own `/metrics` + `/healthz` + `/ready` on
+  `WORKER_METRICS_PORT` (default 9464) so Prometheus scrapes each
+  instance directly.
+- Reference: `docker-compose.prod.yml` (local Compose) or the
+  commented-out worker block in `render.yaml` (Render blueprint).
+
+**When to switch to this mode** (quantitative triggers, not opinions):
+- Queue depth p95 sustained > 20 jobs, OR
+- API request p95 latency > your target AND your APM shows LLM
+  tool-calls blocking the event loop, OR
+- You need to scale worker capacity independently during peak hours.
+
+**Running both modes safely:** the claim SQL uses `FOR UPDATE SKIP LOCKED`
+with per-row ownership, so an API embedded worker and a standalone worker
+on the same DB cannot both claim the same job. BUT: running both
+simultaneously defeats the point of splitting. Set `WORKFLOW_WORKER_MODE=standalone`
+on the API when you enable the worker service.
+
+---
+
+## Topology diagram — two-service mode
+
+When deployed as two services, the graph is:
 
 ```
             ┌────────────┐       ┌─────────────┐
