@@ -1,0 +1,52 @@
+# Grafana Agent config for JAK Swarm
+#
+# Scrapes jak-swarm-api:4000/metrics and jak-swarm-worker:9464/metrics
+# every 15s (service names resolved via Render internal DNS) and
+# remote_writes to a Grafana Cloud hosted Prometheus endpoint.
+#
+# Env vars (injected by Render — set as secrets in the
+# jak-swarm-grafana-agent service env):
+#   GRAFANA_CLOUD_PROM_URL       — Grafana Cloud → Connections → Prometheus → "Remote Write URL"
+#   GRAFANA_CLOUD_PROM_USER      — numeric user id (shown on same page)
+#   GRAFANA_CLOUD_PROM_API_KEY   — Access policy token with metrics:write
+#
+# To run locally against the same targets (agent binary must be installed):
+#   GRAFANA_CLOUD_PROM_URL=... GRAFANA_CLOUD_PROM_USER=... \
+#     GRAFANA_CLOUD_PROM_API_KEY=... grafana-agent -config.file=agent.yaml
+
+server:
+  log_level: info
+
+metrics:
+  wal_directory: /tmp/grafana-agent-wal
+  global:
+    scrape_interval: 15s
+    external_labels:
+      env: production
+      project: jak-swarm
+  configs:
+    - name: jak-swarm
+      scrape_configs:
+        # API — HTTP + SSE + auth + enqueue. Metrics at /metrics on 4000.
+        - job_name: jak-api
+          static_configs:
+            - targets: ['jak-swarm-api:4000']
+              labels:
+                service: api
+          metrics_path: /metrics
+          scheme: http
+
+        # Worker — durable queue consumer. Metrics at /metrics on 9464.
+        - job_name: jak-worker
+          static_configs:
+            - targets: ['jak-swarm-worker:9464']
+              labels:
+                service: worker
+          metrics_path: /metrics
+          scheme: http
+
+      remote_write:
+        - url: ${GRAFANA_CLOUD_PROM_URL}
+          basic_auth:
+            username: ${GRAFANA_CLOUD_PROM_USER}
+            password: ${GRAFANA_CLOUD_PROM_API_KEY}

@@ -2,16 +2,33 @@
 
 Ordered by risk first, then by blocking impact, then by effort. Each section names what the owner has to do — nobody else can.
 
-Last reviewed: 2026-04-19.
+Last reviewed: 2026-04-20.
 
 ---
 
 ## A. SECURITY (urgent — do now)
 
-### A1. Rotate the Supabase service token
-A Supabase service token was pasted in a Claude chat on 2026-04-18. It remains in the session transcript regardless of whether JAK ever wired Supabase. Rotate it in the Supabase dashboard. No code-side action is needed; if a future Supabase integration lands, it reads from env.
+Three credentials have been pasted into Claude chat across the 2026-04-18 and 2026-04-20 sessions. All three are now in the session transcript permanently. Rotate all three before anything else — rotation is cheap, compromise is not.
 
-**How**: Supabase Dashboard → Project Settings → API → "Regenerate service_role key". Invalidate any place that token was stored.
+### A1. Rotate the Supabase service_role key (leaked 2026-04-18)
+- **Where**: Supabase Dashboard → Project Settings → API → "service_role" → "Regenerate"
+- **Why**: Supabase is JAK's auth layer and database — a leaked service_role key gives admin access to every user and every table regardless of RLS
+- **Blast if skipped**: attacker can forge sessions, reset any user password, read/write every row
+- **Success check**: new key visible in Supabase UI; JAK API continues working (it only uses the anon key at runtime — verified)
+
+### A2. Rotate the Render API key (leaked 2026-04-20, prefix `rnd_I38L…`)
+- **Where**: Render Dashboard → Account Settings → API Keys (https://dashboard.render.com/account/api-keys) → find the key with that prefix → Revoke. Create a new key for automation scripts.
+- **Why**: `rnd_*` keys grant FULL account access — any service can be created, deleted, or modified
+- **Blast if skipped**: attacker can delete your prod services, exfiltrate all env-var secrets (DATABASE_URL, AUTH_SECRET, every LLM key)
+- **Success check**: old key no longer listed; new key stored ONLY in password manager
+
+### A3. Rotate the Upstash credential (leaked 2026-04-20, UUID `d364f4a4-d368-…`)
+- **Where**: Upstash Console → Account → Management API (https://console.upstash.com/account/api) — revoke any token with that UUID. Additionally: your Redis DB → "Details" → "Reset Password" (rotates the password inside the `rediss://` URL).
+- **Why**: depending on what it is, either the management API (can create/delete DBs) or the DB password itself (read/write Redis data including signal bus + distributed locks)
+- **Blast if skipped**: attacker can flush your Redis (pause/resume/stop signals + SSE relay + distributed locks go with it), or inject fake messages on the signal bus
+- **Success check**: after password reset, you have a new `rediss://default:NEW_PASS@host.upstash.io:6379` URL. Paste this as `REDIS_URL` on both Render services in step B below.
+
+**Do NOT proceed to any other step in this document until A1 / A2 / A3 are all rotated.**
 
 ---
 
@@ -124,6 +141,57 @@ Closed in Session 4. DockerBuildChecker + injectable runner + graceful skip.
 
 ### G7. Role depth upgrades (first 4)
 Closed in Session 8. Email / CRM / Research / Calendar now have expert-mode schemas + behavioral tests.
+
+---
+
+## H. Render API+Worker split migration — step-by-step checklist
+
+This is the exact order to go from the current single Render service (embedded worker) to the production topology (API + Worker + Grafana Agent). Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) for context; this section is the execution plan.
+
+Before starting: run `pnpm -w run bootstrap:prod-automation` (see [scripts/automation/README.md](../scripts/automation/README.md)) — this checks you have the rotated tokens from section A and installs prerequisites (curl, jq).
+
+### Stage 1 — rotate leaked credentials (section A above)
+1. Rotate Supabase service_role key (A1)
+2. Rotate Render API key (A2) → save new key as `RENDER_API_KEY` env var for automation scripts
+3. Rotate Upstash credential (A3) → save new `rediss://` URL
+
+### Stage 2 — manual one-time Supabase + Upstash config (cannot automate cleanly)
+4. **Supabase → Authentication → URL Configuration**:
+   - Site URL: `https://jakswarm.com`
+   - Redirect URLs: add `https://jakswarm.com/auth/callback`, `https://jakswarm.com/auth/confirm`, `https://www.jakswarm.com/auth/callback`, `https://www.jakswarm.com/auth/confirm`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/confirm`
+   - (Automation available: `pnpm -w run automation:supabase-redirects` — needs `SUPABASE_PROJECT_REF` + `SUPABASE_MANAGEMENT_TOKEN`)
+5. **Upstash** → your Redis DB → copy the `rediss://default:...@host:6379` URL (post-rotation)
+
+### Stage 3 — provision the Render worker + Grafana Agent
+6. Run `pnpm -w run automation:provision-render-worker`. Needs these env vars set locally:
+   - `RENDER_API_KEY` (from step 2)
+   - `RENDER_OWNER_ID` (found at https://dashboard.render.com/u/settings/general under "Workspace ID")
+   - `JAK_REPO_URL` (e.g. `https://github.com/inbharatai/jak-swarm`)
+   - `JAK_REPO_BRANCH` (e.g. `main`)
+   - The script creates `jak-swarm-worker` (pserv) and `jak-swarm-grafana-agent` (pserv) and returns their service IDs.
+7. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-worker` with a local `.env.render-worker` file containing all the worker env vars from [DEPLOYMENT.md](DEPLOYMENT.md). Script uploads each as a secret.
+
+### Stage 4 — flip the API to standalone mode
+8. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-api` with a `.env.render-api` that includes `WORKFLOW_WORKER_MODE=standalone` and `REQUIRE_REDIS_IN_PROD=true`. This is the critical flip — do it AFTER the worker is live, not before.
+9. Watch API logs: should now say `[Swarm] Queue worker disabled in API process (standalone mode expected)`
+
+### Stage 5 — Grafana Cloud observability
+10. Sign up for Grafana Cloud Free (https://grafana.com/products/cloud/). Create a stack.
+11. In Grafana Cloud → Connections → Prometheus → "Send Metrics": copy the Remote Write URL, numeric user, and create an access-policy token with `metrics:write`.
+12. Run `pnpm -w run automation:sync-env-to-render -- jak-swarm-grafana-agent` with these three values as `GRAFANA_CLOUD_PROM_URL` / `GRAFANA_CLOUD_PROM_USER` / `GRAFANA_CLOUD_PROM_API_KEY`.
+13. Verify scraping: Grafana Cloud → Explore → run query `up{project="jak-swarm"}` — should return two rows (api=1, worker=1).
+14. Import dashboard: Dashboards → New → Import → upload `ops/grafana/dashboards/jak-swarm.json`.
+15. Import alerts: Alerting → Alert rules → New → Import → upload `ops/prometheus/alerts.yml`.
+16. Wire Slack + email contact points (Alerting → Contact points → New), assign to the severity matchers, test send.
+
+### Stage 6 — Vercel frontend env sync
+17. Run `pnpm -w run automation:configure-vercel-env` with local `.env.vercel-production` file containing the `NEXT_PUBLIC_*` vars from [DEPLOYMENT.md](DEPLOYMENT.md). Needs `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID`.
+
+### Stage 7 — smoke tests (manual, cannot automate)
+18. Log in via magic-pin on the live site → land on `/workspace`
+19. Kick off a toy Vibe Coder spec → confirm trace shows AppArchitect → AppGenerator → build check → AppDeployer running on the WORKER (check worker logs, not API logs)
+20. Kill the worker mid-run via Render dashboard "Manual Deploy → Clear cache & deploy" → within ~60s the `jak_workflow_jobs_reclaimed_total` counter in Grafana Cloud increments by ≥1
+21. Trigger one warn alert deliberately (enqueue 101 dummy jobs to trip `QueueBacklogHigh`) → verify Slack receives within 5 minutes
 
 ---
 

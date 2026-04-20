@@ -1,0 +1,82 @@
+# Alertmanager routing TEMPLATE for JAK Swarm.
+#
+# This file is a reference for SELF-HOSTED Alertmanager (see
+# docker-compose.prod.yml). The production deploy uses Grafana Cloud
+# Alertmanager instead — receivers are configured in the Grafana Cloud
+# UI (Alerting → Contact points), not this file.
+#
+# If you switch to self-hosting Prometheus+Alertmanager on a VPS:
+#   1. Copy this file to alertmanager.yml on the host
+#   2. Replace placeholder values below with real webhooks/emails
+#   3. Mount at /etc/alertmanager/alertmanager.yml
+#
+# Placeholders expected to be filled in:
+#   ${SLACK_WEBHOOK_URL}  — Slack "Incoming Webhook" URL for #jak-alerts
+#   ${ALERT_EMAIL_TO}     — primary on-call email address
+#   ${ALERT_EMAIL_FROM}   — SMTP from address (e.g. alerts@jakswarm.com)
+#   ${SMTP_HOST}          — e.g. smtp.sendgrid.net:587
+#   ${SMTP_USER}          — SMTP username
+#   ${SMTP_PASSWORD}      — SMTP password (secret)
+#   ${PAGERDUTY_KEY}      — PagerDuty integration key (only if using PagerDuty)
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: ${SMTP_HOST}
+  smtp_from: ${ALERT_EMAIL_FROM}
+  smtp_auth_username: ${SMTP_USER}
+  smtp_auth_password: ${SMTP_PASSWORD}
+  smtp_require_tls: true
+
+# All alerts hit Slack; critical alerts also hit email + PagerDuty.
+route:
+  receiver: slack-default
+  group_by: [alertname, service, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: critical-multi
+      continue: true
+    - matchers:
+        - severity = "warning"
+      receiver: slack-default
+
+inhibit_rules:
+  # If the worker is down, suppress downstream queue-backlog noise.
+  - source_matchers:
+      - alertname = "WorkerDown"
+    target_matchers:
+      - alertname =~ "QueueBacklog.*"
+    equal: [service]
+
+receivers:
+  - name: slack-default
+    slack_configs:
+      - api_url: ${SLACK_WEBHOOK_URL}
+        channel: '#jak-alerts'
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} ({{ .GroupLabels.severity }})'
+        text: |
+          {{ range .Alerts }}
+          *Service:* {{ .Labels.service }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+
+  - name: critical-multi
+    slack_configs:
+      - api_url: ${SLACK_WEBHOOK_URL}
+        channel: '#jak-alerts'
+        send_resolved: true
+        title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+    email_configs:
+      - to: ${ALERT_EMAIL_TO}
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL] JAK Swarm — {{ .GroupLabels.alertname }}'
+    # Uncomment only if you have PagerDuty:
+    # pagerduty_configs:
+    #   - service_key: ${PAGERDUTY_KEY}
+    #     send_resolved: true

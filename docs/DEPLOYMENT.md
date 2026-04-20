@@ -1,80 +1,45 @@
 # JAK Swarm — Production Deployment Guide
 
-## Topology at a glance
+## Topology at a glance (Vercel + Render-split + Supabase + Upstash + Grafana Cloud)
 
-JAK is deployed as **frontend on Vercel + backend on Render**, wired
-through a single public API URL:
+This is the exact topology the committed `render.yaml` ships. Every env var, healthcheck, and dashboard step below targets this stack — not a generic "cloud" deploy.
 
-| Piece | Where | What runs | Notes |
-|---|---|---|---|
-| `apps/web` (Next.js landing + builder UI) | **Vercel** | Static + edge SSR | Points at the Render API via `NEXT_PUBLIC_API_URL` |
-| `apps/api` (Fastify HTTP + SSE + queue worker) | **Render** (`jak-swarm-api` web service) | Node container from `./Dockerfile` | Default `WORKFLOW_WORKER_MODE=embedded` — one process does HTTP + queue |
-| Postgres (+ pgvector) | Supabase / Render Postgres / your choice | shared DB | Set `DATABASE_URL` + `DIRECT_URL` on Render |
-| Redis (optional) | Upstash / Render Redis | signal bus + SSE relay | Only needed when you run >1 API instance or split workers (Mode B) |
+| Piece | Where | What runs |
+|---|---|---|
+| `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the Render API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
+| `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Render** `jak-swarm-api` (web service, public) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
+| `apps/api/dist/worker-entry.js` (durable queue consumer) | **Render** `jak-swarm-worker` (pserv, private) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
+| Grafana Agent (scrape + remote_write) | **Render** `jak-swarm-grafana-agent` (pserv, private) | Scrapes API + Worker metrics every 15s, ships to Grafana Cloud |
+| Postgres (+ pgvector) | **Supabase** | `DATABASE_URL` = pooler:6543, `DIRECT_URL` = direct:5432 (migrations only) |
+| Redis | **Upstash** | `rediss://default:PASS@host.upstash.io:6379` — ioredis handles TLS transparently |
+| Dashboards + Alerts + Alertmanager | **Grafana Cloud Free** | Imports `ops/grafana/dashboards/jak-swarm.json` + `ops/prometheus/alerts.yml` |
 
-**CORS alignment (important):** the Render API's `CORS_ORIGINS` env var
-must list the exact Vercel frontend origins. `render.yaml` ships with
-`https://jakswarm.com,https://www.jakswarm.com`; add preview-deploy
-origins (`https://*.vercel.app`) only if you intentionally want preview
-branches talking to production API.
+**CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. `render.yaml` ships with `https://jakswarm.com,https://www.jakswarm.com`. The split is raw comma — NO spaces after commas ([apps/api/src/config.ts:92](apps/api/src/config.ts:92) splits without trimming).
 
-**Frontend env vars on Vercel:**
-- `NEXT_PUBLIC_API_URL` → your Render API URL (e.g. `https://jak-swarm-api.onrender.com` or a custom domain)
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — if using Supabase auth directly from the browser
-
-The rest of this doc covers the **backend** deployment choices on Render
-(or any equivalent orchestrator). The frontend side is a standard
-Next.js Vercel project — no special topology.
+**The whole migration runbook** (rotate credentials → provision worker → flip env → import dashboards → smoke test) is documented in [docs/founder-action-list.md](founder-action-list.md). Read it start-to-finish before touching any dashboard.
 
 ---
 
-## Two deploy modes — pick the one that matches your traffic
+## Two deploy modes — which one you're on
 
-JAK ships with ONE binary + TWO runtime roles. The env var
-`WORKFLOW_WORKER_MODE` picks which role(s) the process plays.
+JAK ships with ONE binary + TWO runtime roles. The env var `WORKFLOW_WORKER_MODE` picks which role(s) the API process plays. The worker binary (`apps/api/dist/worker-entry.js`) is always the standalone worker.
 
-### Mode A — Single-service (embedded worker)
+### Mode B — Two-service (production default, `render.yaml`)
 
-`WORKFLOW_WORKER_MODE=embedded` (the default). ONE process does both
-HTTP and queue work. This is what `render.yaml` ships as — and what
-you should run on Render Starter for small-to-medium traffic.
+`WORKFLOW_WORKER_MODE=standalone` on the API + separate `jak-swarm-worker` pserv running `node apps/api/dist/worker-entry.js`. This is what the committed `render.yaml` applies.
 
-- Cheapest deploy (one container, one plan)
-- API requests and agent work share the same event loop → a long-running
-  LLM call briefly blocks incoming HTTP. Acceptable at low-medium traffic.
-- P1b worker-lease reclaim still runs; still safe if you later run
-  multiple embedded instances behind a load balancer.
+- API p95 latency stays flat regardless of queue depth.
+- Worker scales horizontally without touching the API plan.
+- Each worker exposes its own `/metrics` + `/healthz` + `/ready` on :9464.
+- Grafana Agent scrapes both by internal DNS (`jak-swarm-api:4000`, `jak-swarm-worker:9464`).
 
-**When to stay on this mode:**
-- You're on Render Starter, have <1 QPS sustained to the API, and the
-  queue is usually empty.
-- You don't want to pay for two services yet.
+### Mode A — Single-service (development / staging only)
 
-### Mode B — Two-service (API + separate worker)
+`WORKFLOW_WORKER_MODE=embedded`. One process does HTTP + queue. Legitimate for local dev, staging, or a genuinely tiny deploy. **Not what production runs.** Do not use Mode A on the same Render project as Mode B — the API's embedded worker would race the standalone worker (safe under `FOR UPDATE SKIP LOCKED` but wasteful).
 
-`WORKFLOW_WORKER_MODE=standalone` on the API service, plus a second
-service running `node dist/worker-entry.js`. The API never competes
-for queue claims; the worker never serves HTTP.
+### The critical flip during migration
 
-- Scale workers horizontally without scaling the API.
-- API latency p95 stays flat regardless of queue depth.
-- Each worker exposes its own `/metrics` + `/healthz` + `/ready` on
-  `WORKER_METRICS_PORT` (default 9464) so Prometheus scrapes each
-  instance directly.
-- Reference: `docker-compose.prod.yml` (local Compose) or the
-  commented-out worker block in `render.yaml` (Render blueprint).
-
-**When to switch to this mode** (quantitative triggers, not opinions):
-- Queue depth p95 sustained > 20 jobs, OR
-- API request p95 latency > your target AND your APM shows LLM
-  tool-calls blocking the event loop, OR
-- You need to scale worker capacity independently during peak hours.
-
-**Running both modes safely:** the claim SQL uses `FOR UPDATE SKIP LOCKED`
-with per-row ownership, so an API embedded worker and a standalone worker
-on the same DB cannot both claim the same job. BUT: running both
-simultaneously defeats the point of splitting. Set `WORKFLOW_WORKER_MODE=standalone`
-on the API when you enable the worker service.
+If you currently run Mode A and are moving to Mode B: **create the worker service first, watch it claim jobs, THEN flip `WORKFLOW_WORKER_MODE=standalone` on the API.** Doing the flip before the worker is live means the queue stops draining. Order is enforced in the founder-action-list checklist.
 
 ---
 
@@ -150,7 +115,29 @@ Fly.io deployments.
 | `WORKER_METRICS_PORT` | 9464 | | Port for `/metrics` + `/healthz` + `/ready` |
 | `LOG_LEVEL` | info | | |
 
-Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node dist/worker-entry.js` (prod).
+Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node apps/api/dist/worker-entry.js` (prod — this is the exact command `render.yaml` sets for `jak-swarm-worker`).
+
+---
+
+## Upstash Redis wiring (exactly)
+
+JAK's Redis client ([apps/api/src/plugins/redis.plugin.ts:128](../apps/api/src/plugins/redis.plugin.ts), [apps/api/src/worker-entry.ts:90](../apps/api/src/worker-entry.ts)) is ioredis, which auto-detects `rediss://` (double `s`) and enables TLS + SNI with no extra config. Use the Redis-protocol endpoint from the Upstash UI — NOT the REST URL.
+
+```
+rediss://default:<PASSWORD>@<db-name>.upstash.io:6379
+```
+
+- Set the **identical** `REDIS_URL` on both `jak-swarm-api` and `jak-swarm-worker` (same Upstash DB — they coordinate through it).
+- `REQUIRE_REDIS_IN_PROD=true` on both services. Without this, a missing `REDIS_URL` silently degrades to in-memory coordination which breaks cross-instance signals and SSE fan-out ([apps/api/src/config.ts:72](../apps/api/src/config.ts)).
+- Free-tier Upstash limits: 10k commands/day and (tier-dependent) 1 concurrent connection. ioredis reuses one connection per process, so API+Worker = 2 concurrent connections. Paid tier if you exceed.
+
+## Render healthcheck gotcha
+
+The worker pserv's `/healthz` is on **port 9464**, not the default `PORT`. In the Render dashboard, when you create `jak-swarm-worker`, you MUST explicitly set "Health Check Port: 9464". If you leave it blank, Render tries `PORT` (unset on worker) and enters a restart loop that looks like a build failure. `render.yaml` can't express this yet — it's a dashboard-only field — so verify in the UI after `render blueprint apply`.
+
+## CORS_ORIGINS gotcha
+
+`CORS_ORIGINS` splits on raw `,` without trimming. If you paste `https://jakswarm.com, https://www.jakswarm.com` with a space, the second origin becomes ` https://www.jakswarm.com` (leading space) which never matches — every www request gets rejected. Comma only, no space.
 
 ---
 

@@ -1,38 +1,47 @@
-# Render Blueprint — JAK Swarm API (+ optional separate Worker)
+# Render Blueprint — JAK Swarm (API + Worker + Grafana Agent)
 # https://render.com/docs/blueprint-spec
 #
-# Deploy modes
-# ────────────
-# A) SINGLE-SERVICE (default, what this file ships as):
-#    - Only `jak-swarm-api` below is active.
-#    - `WORKFLOW_WORKER_MODE=embedded` (the default) means the API process
-#      ALSO runs the queue worker. Fine for small-to-medium traffic —
-#      one event loop handles HTTP + queue. Cheapest Render deploy.
+# Production topology for JAK Swarm on Render:
+#   • jak-swarm-api         (web, public)   — HTTP/SSE/auth/enqueue
+#   • jak-swarm-worker      (pserv, private) — durable queue consumer
+#   • jak-swarm-grafana-agent (pserv, private) — scrapes both → Grafana Cloud
 #
-# B) TWO-SERVICE (recommended at scale — when queue depth grows or API
-#    latency p95 grows because a long agent call blocked a request):
-#    1. Uncomment the `jak-swarm-worker` block at the bottom.
-#    2. Set `WORKFLOW_WORKER_MODE=standalone` on `jak-swarm-api` so it
-#       stops competing for queue claims (the separate worker handles them).
-#    3. Set `WORKFLOW_WORKER_INSTANCE_ID=$RENDER_SERVICE_NAME` on the worker
-#       so reclaim logs correlate with the right instance.
+# Frontend is on Vercel (apps/web), not Render.
+# State is on Supabase Postgres (DATABASE_URL + DIRECT_URL) and Upstash Redis
+# (rediss:// URL). Both services share the same DB + Redis.
 #
-# Required env vars (set secrets in Render dashboard — sync: false below):
-#   DATABASE_URL, DIRECT_URL, AUTH_SECRET, OPENAI_API_KEY
-#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (for web app)
+# ────────────────────────────────────────────────────────────────────────────
+# Rollout order (see docs/DEPLOYMENT.md for the full runbook):
+#   1. Rotate all chat-leaked credentials (Supabase service_role, Render API
+#      key, Upstash credential).
+#   2. Apply this blueprint (creates jak-swarm-worker + jak-swarm-grafana-agent
+#      if not already present; updates env on jak-swarm-api).
+#   3. Set secrets in Render dashboard for every `sync: false` entry below.
+#   4. Watch worker logs — "Queue worker started — instance=jak-swarm-worker".
+#   5. Confirm API logs show "Queue worker disabled in API process
+#      (standalone mode expected)" — proves the split is live.
+#
+# Required secrets (set in Render dashboard — sync: false entries):
+#   DATABASE_URL, DIRECT_URL, AUTH_SECRET, REDIS_URL,
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY (and whichever other LLM keys you use),
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#   GRAFANA_CLOUD_PROM_URL, GRAFANA_CLOUD_PROM_USER, GRAFANA_CLOUD_PROM_API_KEY
+# ────────────────────────────────────────────────────────────────────────────
 
 services:
   # ────────────────────────────────────────────────────────────────────
   # API service — handles HTTP routes, SSE, auth, enqueue.
-  # In single-service mode this ALSO runs the embedded queue worker.
+  # NEVER runs the queue worker in this blueprint (WORKFLOW_WORKER_MODE
+  # is hard-set to 'standalone'). If you deploy this blueprint without
+  # the worker service, the queue will stop draining.
   # ────────────────────────────────────────────────────────────────────
   - type: web
     name: jak-swarm-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    region: oregon # Closest to most US users + Supabase default region
-    plan: starter # $7/mo — persistent process, no sleep
+    region: oregon
+    plan: starter
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
@@ -44,19 +53,29 @@ services:
       - key: LOG_LEVEL
         value: warn
       - key: CORS_ORIGINS
+        # comma-separated, NO spaces after commas — config.ts splits raw
         value: https://jakswarm.com,https://www.jakswarm.com
-      # Worker mode — default 'embedded' runs the queue worker inside the
-      # API process (single-service mode). Change to 'standalone' AND
-      # uncomment the jak-swarm-worker block below to split.
+      # Queue-worker role is OFF in API. The separate jak-swarm-worker
+      # service below owns all queue claims.
       - key: WORKFLOW_WORKER_MODE
-        value: embedded
-      # Set these in Render dashboard (secret):
+        value: standalone
+      # Fail fast if REDIS_URL is missing in prod — prevents silently
+      # falling back to in-memory coordination.
+      - key: REQUIRE_REDIS_IN_PROD
+        value: "true"
+      # Secrets — paste in Render dashboard:
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
+      - key: REDIS_URL
+        sync: false
       - key: AUTH_SECRET
-        generateValue: true # Render auto-generates a random string
+        generateValue: true
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -69,57 +88,96 @@ services:
         sync: false
       - key: OLLAMA_BASE_URL
         sync: false
-      - key: REDIS_URL
-        sync: false # Optional — skip for now, add Upstash later
 
   # ────────────────────────────────────────────────────────────────────
-  # OPTIONAL: Worker service (two-service mode).
+  # Worker service — consumes the durable queue, runs agent workflows,
+  # handles pause/resume/stop signals. Exposes /metrics, /healthz, /ready
+  # on WORKER_METRICS_PORT so the Grafana Agent can scrape it.
   #
-  # Uncomment the block below AND change WORKFLOW_WORKER_MODE above to
-  # `standalone` when you need to scale worker capacity independently
-  # from API request traffic. `type: pserv` = private service, only
-  # reachable by other Render services in the same project (perfect for
-  # a worker that exposes /metrics + /healthz on port 9464 for Prometheus
-  # to scrape but should not be on the public internet).
+  # Private service (pserv): reachable only by other Render services in
+  # this project. Not on the public internet. This is deliberate —
+  # metrics + healthcheck endpoints are not auth-protected, so exposing
+  # them publicly would leak operational telemetry.
+  # ────────────────────────────────────────────────────────────────────
+  - type: pserv
+    name: jak-swarm-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Override default CMD (which runs the API). WORKDIR in Dockerfile is
+    # /app; worker build output is /app/apps/api/dist/worker-entry.js.
+    dockerCommand: "node apps/api/dist/worker-entry.js"
+    region: oregon
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      # Stable identity per service — reclaim logs correlate with
+      # the right instance. RENDER_SERVICE_NAME is auto-populated.
+      # Upgrade to $RENDER_INSTANCE_ID if you scale to multiple replicas.
+      - key: WORKFLOW_WORKER_INSTANCE_ID
+        value: "$RENDER_SERVICE_NAME"
+      - key: WORKFLOW_QUEUE_CONCURRENCY
+        value: "2"
+      - key: WORKFLOW_QUEUE_POLL_INTERVAL_MS
+        value: "1000"
+      - key: WORKFLOW_QUEUE_LEASE_TTL_MS
+        value: "60000"
+      - key: WORKER_METRICS_PORT
+        value: "9464"
+      - key: REQUIRE_REDIS_IN_PROD
+        value: "true"
+      # Same DB + Redis as API:
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      # AUTH_SECRET MUST match the API's generated value — paste it
+      # from the API service's env into the worker env.
+      - key: AUTH_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+
+  # ────────────────────────────────────────────────────────────────────
+  # Grafana Agent — scrapes API + Worker /metrics every 15s and
+  # remote_writes to Grafana Cloud's hosted Prometheus. Dashboards,
+  # alert evaluation, and Alertmanager all live in Grafana Cloud.
   #
-  # All secrets should be identical to jak-swarm-api (same DB, same LLM
-  # keys). When you uncomment, re-run `render blueprint apply`.
-  #
-  # - type: pserv
-  #   name: jak-swarm-worker
-  #   runtime: docker
-  #   dockerfilePath: ./Dockerfile
-  #   dockerContext: .
-  #   dockerCommand: "node dist/worker-entry.js"
-  #   region: oregon
-  #   plan: starter
-  #   envVars:
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: LOG_LEVEL
-  #       value: info
-  #     # Stable identity so reclaim logs correlate with dead workers.
-  #     # RENDER_SERVICE_NAME is auto-populated by Render with the service name.
-  #     - key: WORKFLOW_WORKER_INSTANCE_ID
-  #       value: "$RENDER_SERVICE_NAME"
-  #     - key: WORKFLOW_QUEUE_CONCURRENCY
-  #       value: "2"
-  #     - key: WORKFLOW_QUEUE_POLL_INTERVAL_MS
-  #       value: "1000"
-  #     - key: WORKFLOW_QUEUE_LEASE_TTL_MS
-  #       value: "60000"
-  #     - key: WORKER_METRICS_PORT
-  #       value: "9464"
-  #     # Same secrets as API (sync: false in dashboard):
-  #     - key: DATABASE_URL
-  #       sync: false
-  #     - key: DIRECT_URL
-  #       sync: false
-  #     - key: AUTH_SECRET
-  #       sync: false
-  #     - key: OPENAI_API_KEY
-  #       sync: false
-  #     - key: ANTHROPIC_API_KEY
-  #       sync: false
-  #     - key: REDIS_URL
-  #       sync: false # Strongly recommended in two-service mode for cross-instance coordination
+  # Uses the committed config at ops/grafana-agent/agent.yaml, baked
+  # into the image by ops/grafana-agent/Dockerfile.
+  # ────────────────────────────────────────────────────────────────────
+  - type: pserv
+    name: jak-swarm-grafana-agent
+    runtime: docker
+    dockerfilePath: ./ops/grafana-agent/Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: starter
+    envVars:
+      # All three come from Grafana Cloud → Connections → Prometheus →
+      # "Send Metrics". Paste values in the Render dashboard.
+      - key: GRAFANA_CLOUD_PROM_URL
+        sync: false
+      - key: GRAFANA_CLOUD_PROM_USER
+        sync: false
+      - key: GRAFANA_CLOUD_PROM_API_KEY
+        sync: false
