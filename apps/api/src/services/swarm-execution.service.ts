@@ -23,6 +23,42 @@ import { QueueWorker } from './queue-worker.js';
 import type { WorkflowJobRow, WorkerHealth } from './queue-worker.js';
 
 /**
+ * Strip non-JSON-serializable values from a deep object graph.
+ *
+ * Why: Prisma persists `workflow.stateJson` as JSONB. Any `Function`, `Symbol`,
+ * BigInt, undefined, or circular reference crashes the write with an
+ * unhelpful `[object Function]` serialize error. That had been masking
+ * workflow failures in production — the state persist silently failed and
+ * a subsequent resume couldn't find the checkpoint.
+ *
+ * Policy:
+ *   - Functions, Symbols, BigInts, undefined → dropped
+ *   - Circular refs → replaced with string `'[circular]'`
+ *   - Dates → ISO string
+ *   - Everything else → passed through
+ */
+function stripNonSerializable(input: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (input === null || input === undefined) return input;
+  const t = typeof input;
+  if (t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
+  if (t !== 'object') return input;
+  if (input instanceof Date) return input.toISOString();
+  if (seen.has(input as object)) return '[circular]';
+  seen.add(input as object);
+  if (Array.isArray(input)) {
+    return input
+      .map((v) => stripNonSerializable(v, seen))
+      .filter((v) => v !== undefined);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    const cleaned = stripNonSerializable(v, seen);
+    if (cleaned !== undefined) out[k] = cleaned;
+  }
+  return out;
+}
+
+/**
  * Map the rich internal WorkflowStatus enum to the DB-persisted string literal.
  * The swarm uses fine-grained statuses; the API surface and DB use a simpler set.
  */
@@ -636,8 +672,14 @@ export class SwarmExecutionService extends EventEmitter {
             const s = stateData as Record<string, unknown>;
             const normalizedStatus = mapSwarmStatusToDb(String(s.status ?? 'RUNNING'));
             const replaySafety = classifyReplaySafety(s);
+            // Defense in depth: strip any non-JSON-serializable values (functions,
+            // symbols, circular refs) before writing state to Prisma. The
+            // breaker-registry side-channel should already prevent functions
+            // from landing in state, but any future rogue field would crash
+            // `prisma.workflow.update` with `[object Function]`.
+            const safeState = stripNonSerializable(s) as Record<string, unknown>;
             const checkpoint = {
-              ...s,
+              ...safeState,
               __checkpoint: {
                 version: 2,
                 checkpointAt: new Date().toISOString(),

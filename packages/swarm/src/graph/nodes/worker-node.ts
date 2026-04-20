@@ -3,6 +3,7 @@ import { AgentContext } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
+import { getBreakerFactory } from '../../supervisor/breaker-registry.js';
 import { createWorkerAgent } from './worker/agent-factory.js';
 import { buildTaskInput } from './worker/task-input-builders.js';
 
@@ -69,10 +70,11 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     } else {
       const taskInput = buildTaskInput(task, state);
 
-      // Distributed breaker (shared across instances) if injected; else local.
-      const breakerFactory = (state as unknown as Record<string, unknown>)['circuitBreakerFactory'] as
-        | ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> })
-        | undefined;
+      // Distributed breaker (shared across instances) if registered for this
+      // workflow in the breaker-registry side-channel; else local per-process.
+      // State cannot carry the factory directly — Function values crash Prisma
+      // persistence (`[object Function]` serialization error).
+      const breakerFactory = getBreakerFactory(state.workflowId);
 
       const breaker = breakerFactory
         ? breakerFactory(`worker:${task.agentRole}`, { failureThreshold: 5, resetTimeoutMs: 30_000 })

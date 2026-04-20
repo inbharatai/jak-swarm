@@ -296,11 +296,11 @@ export class MarketingAgent extends BaseAgent {
       result = {
         action: task.action,
         strategy: loopResult.content || '',
-        targetAudience: '',
+        targetAudience: 'Manual review required — parse failure; re-derive target audience before launch.',
         messaging: '',
         channels: [],
-        kpis: [],
-        confidence: 0.5,
+        kpis: ['Manual review required — LLM output was not structured JSON. Do not ship this campaign without human verification.'],
+        confidence: 0.3,
       };
     }
 

@@ -278,10 +278,16 @@ export class FinanceAgent extends BaseAgent {
         action: task.action,
         analysis: loopResult.content || '',
         metrics: {},
-        assumptions: [],
-        recommendations: [],
-        risks: [],
-        confidence: 0.5,
+        assumptions: [
+          'Manual review required — LLM output was not structured JSON. Assumptions, projections, and scenarios may be missing.',
+        ],
+        recommendations: [
+          'Do not execute any financial decision based on this output without finance-team verification and CFO sign-off where applicable.',
+        ],
+        risks: [
+          'Parse-failure output — all risk analysis is incomplete. Re-run or escalate to a human analyst.',
+        ],
+        confidence: 0.3,
       };
     }
 

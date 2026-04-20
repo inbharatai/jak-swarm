@@ -23,6 +23,59 @@ export interface MemoryProvider {
 
 /** Loop detection: fingerprint → count */
 type ToolCallFingerprints = Map<string, number>;
+
+/**
+ * Extract the first balanced JSON object or array blob from a string.
+ *
+ * Handles LLMs that wrap JSON in prose. Respects string escapes — `"\"}"`
+ * inside a quoted value does NOT close the outer brace. Returns `null` if
+ * no balanced blob is found. This is the fallback path used by
+ * `parseJsonResponse` when direct `JSON.parse` fails.
+ */
+export function extractFirstJsonBlob(text: string): string | null {
+  const len = text.length;
+  let start = -1;
+  let opener = '';
+  for (let i = 0; i < len; i++) {
+    const ch = text[i];
+    if (ch === '{' || ch === '[') {
+      start = i;
+      opener = ch;
+      break;
+    }
+  }
+  if (start < 0) return null;
+
+  const closer = opener === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < len; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === opener) depth++;
+    else if (ch === closer) {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  // Unbalanced — no matching closer found.
+  return null;
+}
 const LOOP_DETECTION_THRESHOLD = 3;
 
 /** Result of a multi-turn tool execution loop */
@@ -964,13 +1017,55 @@ RESEARCH & PLANNING METHODOLOGY:
     return trace;
   }
 
+  /**
+   * Parse a JSON response from an LLM tolerantly.
+   *
+   * LLMs sometimes return the JSON we asked for, and sometimes return prose
+   * with a JSON blob buried inside ("Looking at the transcript, here's the
+   * result: { ... }"). Agents crashing on `Unexpected token 'L'` is an
+   * avoidable class of bug — the raw strict parser was the fragile path.
+   *
+   * Strategy, in order:
+   *   1. Fast path — strip markdown fences, try `JSON.parse`.
+   *   2. Extract the first balanced `{...}` or `[...]` from the content
+   *      (handles LLM prefaces + trailing commentary).
+   *   3. Give up with an error that includes a truncated snippet of what
+   *      was actually returned, so agent logs are actionable.
+   *
+   * Never returns `undefined` implicitly — either returns the parsed value
+   * or throws a clear Error. Callers wrap this in try/catch and emit their
+   * own "Manual review required" fallback.
+   */
   protected parseJsonResponse<T>(content: string): T {
-    // Strip markdown code fences if present
-    const cleaned = content
+    const text = content ?? '';
+
+    // Fast path: fenced or bare JSON.
+    const fenceStripped = text
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/i, '')
       .trim();
-    return JSON.parse(cleaned) as T;
+    try {
+      return JSON.parse(fenceStripped) as T;
+    } catch {
+      // fall through to extraction
+    }
+
+    // Extraction path: find the first balanced { ... } or [ ... ] blob in
+    // the text, honoring string escapes so quoted braces don't throw it off.
+    const extracted = extractFirstJsonBlob(text);
+    if (extracted !== null) {
+      try {
+        return JSON.parse(extracted) as T;
+      } catch {
+        // Unbalanced brace count can still produce invalid JSON (e.g. the
+        // LLM wrote `{"a": 1,}` or truncated mid-object). Fall through.
+      }
+    }
+
+    const preview = text.length > 200 ? `${text.slice(0, 200)}…` : text;
+    throw new Error(
+      `parseJsonResponse: no valid JSON in LLM output (length=${text.length}). Preview: ${preview}`,
+    );
   }
 
   protected generateId(prefix?: string): string {

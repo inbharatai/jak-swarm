@@ -290,7 +290,17 @@ export class ProjectAgent extends BaseAgent {
       result = {
         action: task.action,
         summary: loopResult.content || '',
-        confidence: 0.5,
+        risks: [
+          {
+            description: 'Manual review required — LLM output was not structured JSON; risks, timeline, and blockers are incomplete.',
+            probability: 1.0,
+            impact: 1.0,
+            score: 1.0,
+            mitigation: 'Re-run the agent or escalate to a human PM before sharing this status.',
+            owner: 'Project manager',
+          },
+        ],
+        confidence: 0.3,
       };
     }
 

@@ -95,9 +95,13 @@ describe('StrategistAgent (CEO) — strategic analysis output schema', () => {
       async () => fakeCompletion('Not JSON at all'),
     );
     const result = await agent.execute({ action: 'STRATEGIC_ANALYSIS' }, stubContext());
-    expect(result.analysis).toBe('Not JSON at all');
-    expect(result.recommendations).toEqual([]);
-    expect(result.confidence).toBeLessThan(0.7);
+    // Analysis carries the raw content (prefixed or not)
+    expect(result.analysis).toContain('Not JSON at all');
+    // Upgrade 2026-04-20: parse-failure fallback now carries an explicit
+    // "Manual review required" recommendation instead of silently returning [].
+    expect(result.recommendations.length).toBe(1);
+    expect(result.recommendations[0]?.title).toMatch(/manual review/i);
+    expect(result.confidence).toBeLessThanOrEqual(0.5);
   });
 });
 

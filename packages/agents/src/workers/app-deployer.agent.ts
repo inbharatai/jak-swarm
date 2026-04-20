@@ -289,7 +289,8 @@ export class AppDeployerAgent extends BaseAgent {
       result = {
         action: task.action,
         status: 'failed',
-        error: 'Could not parse deployer output.',
+        error:
+          'Manual review required — LLM output was not structured JSON. Deployment plan, env-var preflight, and rollback criteria are missing. Do NOT push this deploy without a human operator.',
         confidence: 0.2,
       };
     }

@@ -173,14 +173,16 @@ export class ResearchAgent extends BaseAgent {
           suggestedFollowUp: parsed.suggestedFollowUp,
         };
       } catch {
-        // LLM returned freeform text instead of JSON — wrap it gracefully
+        // LLM returned freeform text instead of JSON — flag as manual review
         result = {
           query: task.query,
           findings: loopResult.content || 'No findings returned.',
           keyPoints: loopResult.content ? [loopResult.content.slice(0, 200)] : [],
           sources: [],
-          confidence: 0.6,
-          limitations: ['Output was plain text rather than structured JSON'],
+          confidence: 0.3,
+          limitations: [
+            'Manual review required — LLM output was not structured JSON. Sources and freshness checks are incomplete. Do not cite these findings without re-verifying against primary sources.',
+          ],
         };
       }
 

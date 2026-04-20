@@ -285,7 +285,15 @@ export class SEOAgent extends BaseAgent {
       result = {
         action: task.action,
         summary: loopResult.content || '',
-        confidence: 0.5,
+        optimizations: [
+          {
+            item: 'Manual review required — LLM output was not structured JSON; SEO recommendations are incomplete.',
+            priority: 'P0' as const,
+            effort: 'low' as const,
+            description: 'Do not ship any page change based on this output. Re-run or escalate to an SEO specialist.',
+          },
+        ],
+        confidence: 0.3,
       };
     }
 

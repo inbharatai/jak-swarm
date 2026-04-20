@@ -238,7 +238,9 @@ describe('ResearchAgent — expert-mode output schema', () => {
     expect(result.query).toBe('anything');
     expect(result.findings).toContain('not JSON');
     expect(result.confidence).toBeLessThan(0.7);
-    expect(result.limitations.join(' ')).toMatch(/plain text/i);
+    // Upgrade 2026-04-20: limitations carries an explicit "Manual review
+    // required" do-not-cite warning instead of a generic "plain text" note.
+    expect(result.limitations.join(' ')).toMatch(/manual review required/i);
   });
 });
 

@@ -285,8 +285,10 @@ export class SuccessAgent extends BaseAgent {
       result = {
         action: task.action,
         summary: loopResult.content || '',
-        recommendations: [],
-        confidence: 0.5,
+        recommendations: [
+          'Manual review required — LLM output was not structured JSON. Do not execute customer outreach, health scores, or churn predictions without CS-manager verification.',
+        ],
+        confidence: 0.3,
       };
     }
 

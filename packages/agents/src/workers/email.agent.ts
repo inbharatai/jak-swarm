@@ -264,11 +264,14 @@ export class EmailAgent extends BaseAgent {
           approvalReason: parsed.approvalReason,
         };
       } catch {
-        // LLM returned freeform text — wrap gracefully
+        // LLM returned freeform text — wrap gracefully + require human approval
         result = {
           action: task.action,
-          summary: loopResult.content || 'Email task processed but output format was unexpected.',
-          requiresApproval: false,
+          summary:
+            'Manual review required — LLM output was not structured JSON. Do NOT send this email without human review.\n\n' +
+            (loopResult.content || ''),
+          requiresApproval: true,
+          approvalReason: 'Parse failure in email agent. Review content before send.',
         };
       }
 

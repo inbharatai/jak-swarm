@@ -252,7 +252,23 @@ export class LegalAgent extends BaseAgent {
       result = {
         action: task.action,
         summary: loopResult.content || '',
-        confidence: 0.5,
+        risks: [
+          {
+            risk: 'Manual review required — LLM output was not structured JSON; risk findings are incomplete. Do not sign / file / publicize without counsel review.',
+            severity: 'high' as const,
+            clause: 'parse-failure',
+            recommendation: 'Consult counsel before relying on any portion of this output.',
+          },
+        ],
+        complianceItems: [
+          {
+            item: 'Manual review required — parse failure',
+            status: 'missing' as const,
+            regulation: 'unknown',
+            action: 'Re-run the agent with a stricter prompt or escalate to legal.',
+          },
+        ],
+        confidence: 0.3,
       };
     }
 

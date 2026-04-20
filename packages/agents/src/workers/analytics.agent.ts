@@ -279,8 +279,10 @@ export class AnalyticsAgent extends BaseAgent {
       result = {
         action: task.action,
         summary: loopResult.content || '',
-        insights: [],
-        confidence: 0.5,
+        insights: [
+          'Manual review required — LLM output was not structured JSON. Do not publish dashboards or act on these metrics without human verification.',
+        ],
+        confidence: 0.3,
       };
     }
 

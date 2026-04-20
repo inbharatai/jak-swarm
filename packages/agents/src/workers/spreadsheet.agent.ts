@@ -262,17 +262,24 @@ export class SpreadsheetAgent extends BaseAgent {
         confidence: parsed.confidence ?? 0.7,
       };
     } catch {
-      // LLM returned prose — wrap as a report section
+      // LLM returned prose — wrap as a report section + flag parse failure
       result = {
         action: task.action,
-        confidence: 0.5,
-        report: loopResult.content
-          ? {
-              title: task.reportTitle ?? 'Analysis Result',
-              sections: [{ heading: 'Summary', content: loopResult.content }],
-              generatedAt: new Date().toISOString(),
-            }
-          : undefined,
+        confidence: 0.3,
+        report: {
+          title: task.reportTitle ?? 'Analysis Result — MANUAL REVIEW REQUIRED',
+          sections: [
+            {
+              heading: 'Manual review required',
+              content:
+                'LLM output was not structured JSON. Statistics, charts, and quality checks are incomplete. Do not use these results for decisions without human verification.',
+            },
+            ...(loopResult.content
+              ? [{ heading: 'Raw LLM content', content: loopResult.content }]
+              : []),
+          ],
+          generatedAt: new Date().toISOString(),
+        },
       };
     }
 

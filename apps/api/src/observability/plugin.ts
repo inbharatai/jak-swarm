@@ -43,7 +43,23 @@ export function getActiveWorkflowCount(): number {
 
 const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
   // ── 1. Prometheus /metrics endpoint ────────────────────────────────────
-  fastify.get('/metrics', async (_request: FastifyRequest, reply: FastifyReply) => {
+  // Protected by bearer token when `METRICS_TOKEN` is set in env. Leaving
+  // METRICS_TOKEN unset keeps it publicly readable — matches dev ergonomics
+  // and is an explicit choice, not an accident. Production should ALWAYS
+  // set METRICS_TOKEN to prevent leaking tenant_id labels, LLM cost totals,
+  // queue depth, and other operational signal to the public internet.
+  fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+    const expected = process.env['METRICS_TOKEN'];
+    if (expected) {
+      const authHeader = request.headers['authorization'];
+      const provided =
+        typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : (request.headers['x-metrics-token'] as string | undefined);
+      if (provided !== expected) {
+        return reply.status(401).send({ error: 'metrics endpoint requires bearer token' });
+      }
+    }
     reply.header('Content-Type', metricsRegistry.contentType);
     return reply.send(await metricsRegistry.metrics());
   });

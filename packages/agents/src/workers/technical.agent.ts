@@ -265,10 +265,13 @@ export class TechnicalAgent extends BaseAgent {
       result = {
         action: task.action,
         tradeoffs: [],
-        recommendations: [loopResult.content || ''],
-        risks: [],
+        recommendations: [
+          'Manual review required — LLM output was not structured JSON. Raw content below; verify technical recommendations before acting.',
+          loopResult.content || '',
+        ].filter(Boolean),
+        risks: ['Parse-failure output: architectural and security findings may be incomplete. Re-run or escalate.'],
         securityFindings: [],
-        confidence: 0.5,
+        confidence: 0.3,
       };
     }
 

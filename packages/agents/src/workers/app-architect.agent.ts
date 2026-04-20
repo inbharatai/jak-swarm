@@ -242,14 +242,16 @@ export class AppArchitectAgent extends BaseAgent {
     } catch {
       result = {
         action: task.action,
-        architecture: loopResult.content || '',
+        architecture:
+          'Manual review required — LLM output was not structured JSON. Do not pass this to the generator; architecture decisions are missing. Raw output below if non-empty.\n\n' +
+          (loopResult.content || ''),
         fileTree: [],
         dependencies: {},
         routes: [],
         dataModels: [],
         apiEndpoints: [],
         componentHierarchy: '',
-        confidence: 0.3,
+        confidence: 0.2,
       };
     }
 

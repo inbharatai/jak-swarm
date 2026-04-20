@@ -285,7 +285,11 @@ export class CRMAgent extends BaseAgent {
         action: task.action,
         contacts: [],
         deals: [],
-        requiresApproval: false,
+        riskFlags: [
+          'Manual review required — LLM output was not structured JSON. CRM actions, deal health scores, and contact updates are incomplete. Do not auto-update CRM without human review.',
+        ],
+        requiresApproval: true,
+        approvalReason: 'Parse failure in CRM agent. Verify before persisting CRM changes.',
       };
     }
 

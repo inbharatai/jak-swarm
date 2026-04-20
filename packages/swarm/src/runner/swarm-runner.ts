@@ -9,6 +9,10 @@ import { buildSwarmGraph } from '../graph/swarm-graph.js';
 import type { WorkflowStateStore } from '../state/workflow-state-store.js';
 import { InMemoryStateStore } from '../state/workflow-state-store.js';
 import { supervisorBus } from '../supervisor/supervisor-bus.js';
+import {
+  registerBreakerFactory,
+  unregisterBreakerFactory,
+} from '../supervisor/breaker-registry.js';
 
 export interface RunParams {
   goal: string;
@@ -140,27 +144,30 @@ export class SwarmRunner {
       workflowId,
     });
 
-    const initialState = {
-      ...createInitialSwarmState({
-        goal: params.goal,
-        tenantId: params.tenantId,
-        userId: params.userId,
-        workflowId,
-        industry: params.industry,
-        roleModes: params.roleModes,
-        idempotencyKey: params.idempotencyKey,
-        maxCostUsd: params.maxCostUsd,
-        approvalThreshold: params.approvalThreshold,
-        allowedDomains: params.allowedDomains,
-        browserAutomationEnabled: params.browserAutomationEnabled,
-        restrictedCategories: params.restrictedCategories,
-        disabledToolNames: params.disabledToolNames,
-        connectedProviders: params.connectedProviders,
-        subscriptionTier: params.subscriptionTier,
-      }),
-      // Inject distributed circuit breaker factory if provided
-      ...(params.circuitBreakerFactory ? { circuitBreakerFactory: params.circuitBreakerFactory } : {}),
-    };
+    const initialState = createInitialSwarmState({
+      goal: params.goal,
+      tenantId: params.tenantId,
+      userId: params.userId,
+      workflowId,
+      industry: params.industry,
+      roleModes: params.roleModes,
+      idempotencyKey: params.idempotencyKey,
+      maxCostUsd: params.maxCostUsd,
+      approvalThreshold: params.approvalThreshold,
+      allowedDomains: params.allowedDomains,
+      browserAutomationEnabled: params.browserAutomationEnabled,
+      restrictedCategories: params.restrictedCategories,
+      disabledToolNames: params.disabledToolNames,
+      connectedProviders: params.connectedProviders,
+      subscriptionTier: params.subscriptionTier,
+    });
+
+    // Register circuit-breaker factory in a side-channel (NOT state).
+    // Factories are Functions — putting them in state crashes Prisma persistence.
+    // Worker nodes look up the factory via workflowId; unregister on cleanup.
+    if (params.circuitBreakerFactory) {
+      registerBreakerFactory(workflowId, params.circuitBreakerFactory);
+    }
 
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
@@ -217,6 +224,7 @@ export class SwarmRunner {
         this.graph.off(event, fn);
       }
       this.activeWorkflows.delete(workflowId);
+      unregisterBreakerFactory(workflowId);
 
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.error({ workflowId, err: errorMessage }, 'Swarm workflow failed');
@@ -241,6 +249,7 @@ export class SwarmRunner {
       this.graph.off(event, fn);
     }
     this.activeWorkflows.delete(workflowId);
+    unregisterBreakerFactory(workflowId);
 
     // Persist state for resume/cancel
     try {

@@ -287,16 +287,22 @@ export class CalendarAgent extends BaseAgent {
         requiresApproval: false,
       };
     } catch {
-      // LLM returned freeform text — wrap gracefully
+      // LLM returned freeform text — do not auto-book anything without review
       result = {
         action: task.action,
         events: [],
-        requiresApproval: false,
+        conflicts: [
+          {
+            attendee: '(all)',
+            conflictWith: 'Manual review required — LLM output was not structured JSON. Scheduling decisions are incomplete. Do NOT create, modify, or delete calendar events without a human review.',
+            start: new Date().toISOString(),
+            end: new Date().toISOString(),
+            severity: 'hard' as const,
+          },
+        ],
+        requiresApproval: true,
+        approvalReason: 'Parse failure in calendar agent. Verify before sending invites.',
       };
-      if (loopResult.content) {
-        // Attempt to extract any useful info as a single-event list
-        result.events = [];
-      }
     }
 
     this.recordTrace(context, input, result, loopResult.toolCalls, startedAt);

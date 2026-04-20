@@ -253,11 +253,21 @@ export class StrategistAgent extends BaseAgent {
       result = {
         action: task.action,
         analysis: loopResult.content || '',
-        recommendations: [],
-        risks: [],
+        recommendations: [
+          {
+            title: 'Manual review required',
+            description:
+              'LLM output was not structured JSON. Do not act on this strategic analysis without human verification.',
+            priority: 'high' as const,
+            effort: 'low' as const,
+            impact: 'high' as const,
+            timeframe: 'immediate',
+          },
+        ],
+        risks: ['Parse failure — strategic risk analysis incomplete'],
         opportunities: [],
         metrics: [],
-        confidence: 0.5,
+        confidence: 0.3,
       };
     }
 
