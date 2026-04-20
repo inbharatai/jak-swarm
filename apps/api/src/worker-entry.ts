@@ -26,9 +26,22 @@ function validateWorkerEnv(log: pino.Logger): void {
     problems.push('DATABASE_URL is required (worker cannot run without Postgres)');
   }
   if (!config.redisUrl && config.nodeEnv === 'production') {
-    problems.push(
-      'REDIS_URL strongly recommended in production (without it: no cross-instance signals, no SSE relay, no distributed locks — workers become single-tenant effective)',
-    );
+    // Honor the REQUIRE_REDIS_IN_PROD escape hatch (same flag the API
+    // checks at apps/api/src/config.ts). Setting it to 'false' permits
+    // booting in degraded single-instance mode — no cross-instance
+    // signals, no SSE relay, no distributed locks. Useful for a new
+    // deploy while Upstash hasn't been wired yet.
+    const requireRedis =
+      (process.env['REQUIRE_REDIS_IN_PROD'] ?? 'true').toLowerCase() !== 'false';
+    if (requireRedis) {
+      problems.push(
+        'REDIS_URL required in production (set REQUIRE_REDIS_IN_PROD=false to run in degraded single-instance mode without cross-instance signals / SSE relay / distributed locks)',
+      );
+    } else {
+      log.warn(
+        '[Worker] REDIS_URL not set and REQUIRE_REDIS_IN_PROD=false — running in degraded single-instance mode (no cross-instance signals / SSE relay / distributed locks)',
+      );
+    }
   }
   if (config.nodeEnv === 'production' && !process.env['WORKFLOW_WORKER_INSTANCE_ID']) {
     log.warn(
