@@ -121,8 +121,8 @@ Nothing replaces these:
 
 Tracked here so it doesn't get lost.
 
-### G1. P1b-ownership (Prisma migration)
-Add `workflow_jobs.ownerInstanceId`, `leaseExpiresAt`, `lastHeartbeatAt`. Reclaim queue items when lease expires. Prevents a truly-dead worker from holding jobs indefinitely.
+### G1. ~~P1b-ownership~~ (CLOSED 2026-04-20)
+`workflow_jobs.ownerInstanceId / leaseExpiresAt / lastHeartbeatAt` all live. Migration 8 applied. Reclaim logic in `apps/api/src/services/queue-worker.ts`. Contract tests pinning the SQL shape at `tests/integration/queue-recovery-contract.test.ts` (5 tests). Real behavioural kill-worker-mid-run test still needs Docker + Postgres CI.
 
 ### G2. P2b-split (monolith cleanup)
 `packages/tools/src/builtin/index.ts` is 5946 lines. Finish splitting into per-category files via the prep script at `scripts/split-builtin-tools.ts`. Not urgent — the file works — but it becomes the single point of merge conflicts.
@@ -196,6 +196,81 @@ Before starting: run `pnpm -w run bootstrap:prod-automation` (see [scripts/autom
 20. Import dashboard: Dashboards → New → Import → upload `ops/grafana/dashboards/jak-swarm.json`.
 21. Import alerts: Alerting → Alert rules → New → Import → upload `ops/prometheus/alerts.yml`.
 22. Wire Slack + email contact points.
+
+---
+
+## I. Last-mile actions — 15 minutes each (your hands, not mine)
+
+These are the items that actually require YOU to click through a dashboard, sign up for a service, or drive a browser. Each is 15 minutes or less. Do them in order; each depends on the prior one being done.
+
+### I1. Rotate the 5 credentials pasted in chat (15 min total)
+
+| # | Credential | Where | Steps |
+|---|---|---|---|
+| 1 | Supabase `service_role` | https://supabase.com/dashboard/project/ttrhawuqydfecndehdhx/settings/api | scroll to "service_role" → "Regenerate". Store new key in password manager ONLY. (JAK doesn't use it yet so no re-paste needed.) |
+| 2 | Render API key (`rnd_I38L…`) | https://dashboard.render.com/account/api-keys | find the key by prefix → "Revoke" → "Create API Key" → label "jak-automation-2026-04-20" → store new key ONLY in password manager |
+| 3 | Upstash management token (UUID `d364f4a4-…`) | https://console.upstash.com/account/api | if this UUID is a management API token: revoke. If it's a DB ID: safe — skip. |
+| 4 | Upstash Redis password | https://console.upstash.com/redis → your DB → "Details" → "Reset Password" | copy the NEW `rediss://` URL. Paste on both Render services as `REDIS_URL` — Render dashboard → each service → Environment → edit REDIS_URL → Save. Both services auto-redeploy. |
+| 5 | Serper `47c0d34…` | https://serper.dev/api-key | "Regenerate". Copy new key. Paste on both Render services as `SERPER_API_KEY`. |
+
+**Success check**: after rotation, run `curl -sS https://jak-swarm-api.onrender.com/ready` — should still show all deps healthy. If Redis shows failed, your new `REDIS_URL` wasn't set correctly on the API service.
+
+### I2. Sign up for Grafana Cloud Free + wire metrics (15 min)
+
+1. https://grafana.com/products/cloud/ → "Create free account"
+2. Create a stack (pick **AWS us-east-1** — lowest latency from Render Oregon)
+3. Connections → Prometheus → "Send Metrics" → copy: remote_write URL, numeric user id, create API key with `metrics:write`
+4. In Render dashboard → create new Private Service "jak-swarm-grafana-agent" → uncomment the block in `render.yaml` (or use the existing config committed at `ops/grafana-agent/Dockerfile`)
+5. Set 3 env vars on jak-swarm-grafana-agent: `GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_PROM_USER`, `GRAFANA_CLOUD_PROM_API_KEY`
+6. Verify in Grafana Cloud → Explore → `up{project="jak-swarm"}` → returns 2 rows (api, worker)
+7. Dashboards → Import → upload `ops/grafana/dashboards/jak-swarm.json`
+8. Alerting → Alert rules → Import → upload `ops/prometheus/alerts.yml`
+9. Alerting → Contact points → add Slack webhook + your email → test send
+
+**Success check**: the test alert shows up in Slack and email within 2 minutes.
+
+### I3. Ship 3 real Vibe Coder apps (1 hour total, your hands in a browser)
+
+Open https://jakswarm.com → log in → Builder → create 3 projects with these exact prompts:
+
+| Spec | Expected output | Pass criteria |
+|---|---|---|
+| "A simple todo app with in-memory state. No backend. Single page." | Next.js page + 2-3 components | builds, deploys, `/` shows todos, add/remove works |
+| "A blog with 3 hardcoded posts. Home page lists them, clicking a post shows its content." | Next.js pages + dynamic route | builds, deploys, `/posts/1`, `/posts/2`, `/posts/3` all render |
+| "A contact form page that POSTs to an API route and returns a JSON acknowledgment." | Page + API route | builds, deploys, form submit hits API, API returns 200 |
+
+Record: (a) did the full DAG complete, (b) how many debug-retry attempts, (c) final Vercel URL, (d) total wall-clock time.
+
+**Success check**: all 3 deploy successfully. Record the traces — those are your proof Vibe Coder genuinely works (score 7 → 9).
+
+### I4. BYO Gmail / Vercel credentials per-tenant (UI work, ~2-3 days — mostly mine, but you need to register OAuth apps)
+
+You: register OAuth apps on Vercel + Google (once).
+
+- Vercel: https://vercel.com/dashboard/integrations/console → "Create Integration" → OAuth type → redirect URL `https://jakswarm.com/api/integrations/vercel/callback` → note the client_id + client_secret, paste them onto Render API as `VERCEL_OAUTH_CLIENT_ID` + `VERCEL_OAUTH_CLIENT_SECRET`
+- Google: https://console.cloud.google.com/apis/credentials → "Create OAuth 2.0 Client ID" → Web → redirect URL `https://jakswarm.com/api/integrations/gmail/callback` → paste as `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` on Render API.
+
+Me: once those env vars are set, I implement the "Connect Vercel" / "Connect Gmail" routes + UI buttons. The `apps/api/src/services/credential.service.ts` foundation is already shipped (resolves tenant creds with env fallback).
+
+Then: existing Gmail/Vercel tool adapters read via `resolveCredentials(tenantId, 'GMAIL')` instead of `process.env['GMAIL_EMAIL']`.
+
+### I5. Kill-worker-mid-run reclaim smoke test (2 min, in Render dashboard)
+
+1. Kick off a Vibe Coder build (one from I3 is fine)
+2. Mid-build, go to Render → jak-swarm-worker → "Manual Deploy" → "Clear cache & deploy" (this terminates the current worker process mid-job)
+3. Wait ~90 seconds
+4. Check Grafana Cloud (after I2): `increase(jak_workflow_jobs_reclaimed_total[5m])` → should show at least 1
+5. Confirm the original workflow eventually completes (the newly-booted worker reclaims + replays)
+
+**Success check**: the workflow completes successfully even after the mid-run kill.
+
+### I6. Decide on Supabase region + Vercel edge caching (1 hour investigation — read the doc)
+
+See [docs/region-and-caching-strategy.md](region-and-caching-strategy.md).
+
+Decision point: stay on Tokyo DB + Oregon backend (current), move API to Singapore, or migrate DB to us-east-1? Depends on your target market (India/Asia → Singapore; US-first → keep current).
+
+**Success check**: you've read the doc and know which option you'll execute (if any) when your first latency complaint arrives.
 
 ---
 

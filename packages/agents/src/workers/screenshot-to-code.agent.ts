@@ -46,6 +46,27 @@ export interface ScreenshotToCodeResult {
 
 const SCREENSHOT_TO_CODE_SUPPLEMENT = `You are the Screenshot-to-Code Agent for JAK Swarm's Vibe Coding engine. You analyze UI screenshots and convert them into pixel-accurate React + Tailwind CSS code.
 
+NON-NEGOTIABLES (hard-fail any output that violates these):
+1. Measured colors, not guessed. Use color_palette_detect on the image to extract exact hex values. "Looks like a shade of blue" is rejected — give the hex.
+2. Measured typography. Use vision_extract to read text, then ocr_text to capture exact text content if present. Font size/weight estimates must cite the pixel height observed.
+3. Accessibility baseline. Every generated component has: semantic HTML (nav / main / section / button not div-onclick), aria-labels on icon-only buttons, alt text on every img. Contrast ratio ≥ 4.5:1 on body text verified via check_color_contrast (delegate to Designer agent tool when unclear).
+4. Responsive from the start. Every layout is mobile-first with sm: / md: / lg: / xl: breakpoints. A desktop-only layout is rejected.
+5. No inline styles. Tailwind classes only. When a class doesn't exist, extend tailwind.config via designTokens output — do NOT inline style={{ ... }}.
+6. Real props, not "example" comments. A component with \`// TODO: accept props\` is not shipped. Every component has a typed Props interface.
+7. Interactive states are NOT optional. Hover, focus-visible, active, disabled, loading, empty, error — six states per interactive component.
+
+FAILURE MODES to avoid (these are the tells of lazy screenshot-to-code):
+- Returning \`<div className="flex">\` without measuring actual gap, padding, or alignment.
+- Using arbitrary Tailwind values (\`className="w-[327px]"\`) when a standard scale step fits.
+- Missing image alt text — copy-pasted lorem layouts fail accessibility.
+- Hallucinating content ("Welcome to Acme Corp") when the screenshot shows different text.
+- Black-on-dark-grey because the LLM "saw" what it expected instead of what was there.
+- Using deprecated Tailwind classes (bg-gray-50 vs bg-stone-50 depending on config).
+- Generating a "Hero" component when the screenshot shows a dashboard — misreading the screenshot category.
+- Dropping shadows / borders / rounded corners that visually define the component boundary.
+- Missing loading skeletons for data-driven components.
+- Forgetting that Tailwind dark:* variants exist when the screenshot shows a dark theme.
+
 You have EXCEPTIONAL visual analysis abilities. You can identify:
 - Layout structure (grid, flex, spacing, alignment)
 - Color palette (exact hex values from the image)
@@ -148,6 +169,68 @@ export class ScreenshotToCodeAgent extends BaseAgent {
       {
         type: 'function',
         function: {
+          name: 'vision_extract',
+          description: 'Extract structured visual data from the screenshot: bounding boxes of components, text regions, visual hierarchy. Returns { boxes[{x,y,w,h,role}], textRegions[{bbox, text}], hierarchy[{parent,children[]}] }. USE FIRST on every ANALYZE_SCREENSHOT / REPLICATE_UI — this gives you concrete measurements instead of prose descriptions.',
+          parameters: {
+            type: 'object',
+            properties: {
+              imageRef: { type: 'string', description: 'Image reference (URL or base64)' },
+              extractionDepth: { type: 'string', enum: ['components', 'text', 'all'], description: 'What to extract' },
+            },
+            required: ['imageRef'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'ocr_text',
+          description: 'Run OCR to read the EXACT text visible in the screenshot. Returns { text, perRegion[{bbox, text, confidence}] }. USE whenever the screenshot contains labels, headings, button copy, or form fields — never guess at visible text.',
+          parameters: {
+            type: 'object',
+            properties: {
+              imageRef: { type: 'string', description: 'Image reference' },
+              language: { type: 'string', description: 'Expected language (e.g. "en")' },
+            },
+            required: ['imageRef'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'color_palette_detect',
+          description: 'Extract the dominant color palette from the screenshot with exact hex values + coverage percentages. Returns { palette[{hex, hsl, coveragePct, likelyRole (primary | secondary | accent | surface | text | border)}] }. USE BEFORE populating colorPalette or designTokens — no more "looks like a shade of blue".',
+          parameters: {
+            type: 'object',
+            properties: {
+              imageRef: { type: 'string', description: 'Image reference' },
+              maxColors: { type: 'number', description: 'Max colors to return (default 12)' },
+              clusteringMethod: { type: 'string', enum: ['kmeans', 'median-cut', 'octree'], description: 'Clustering algorithm' },
+            },
+            required: ['imageRef'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'check_color_contrast',
+          description: 'Compute WCAG contrast ratio between two detected colors. Returns { ratio, passesAA, passesAAA }. USE to verify text-over-background pairs observed in the screenshot meet accessibility — if the source design fails WCAG, flag it (don\'t silently ship inaccessible code).',
+          parameters: {
+            type: 'object',
+            properties: {
+              foreground: { type: 'string', description: 'Foreground hex' },
+              background: { type: 'string', description: 'Background hex' },
+              largeText: { type: 'boolean', description: 'True if ≥18pt or ≥14pt bold' },
+            },
+            required: ['foreground', 'background'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'search_knowledge',
           description: 'Search for UI component patterns, design system references, and existing component examples',
           parameters: {
@@ -201,13 +284,15 @@ export class ScreenshotToCodeAgent extends BaseAgent {
     } catch {
       result = {
         action: task.action,
-        layoutAnalysis: loopResult.content || '',
+        layoutAnalysis:
+          'Manual review required — LLM output was not structured JSON. No components, tokens, or palette could be extracted. DO NOT ship any code below without human re-verification against the source screenshot.\n\n' +
+          (loopResult.content || ''),
         components: [],
         designTokens: [],
         colorPalette: {},
         typography: {},
-        overallDescription: 'Output was not in expected format.',
-        confidence: 0.3,
+        overallDescription: 'Parse failure — manual review required. Re-run with a clearer screenshot or escalate.',
+        confidence: 0.2,
       };
     }
 

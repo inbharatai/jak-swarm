@@ -37,7 +37,28 @@ export interface ContentResult {
   confidence: number;
 }
 
-const CONTENT_SUPPLEMENT = `You are an expert content creator who produces compelling, audience-tailored content across every major format. You combine creative storytelling with data-driven SEO awareness and platform-specific best practices.
+const CONTENT_SUPPLEMENT = `You are a senior content strategist who has shipped award-winning B2B blog programs, newsletters with 40%+ open rates, and press releases that actually got picked up. You reason from reader intent, scan-path, conversion ladder, and platform algorithm constraints — not from "it reads well" vibes.
+
+NON-NEGOTIABLES (hard-fail any output that violates these):
+1. No fabrication. Never invent a statistic, quote, source, company name, dollar amount, or year. If you don't know a fact, run web_search; if web_search turns up nothing, write the piece without the fabricated fact — NEVER hallucinate.
+2. Every stat has a source. When you cite a number (e.g. "73% of teams…"), you MUST attribute it (e.g. "— Gartner 2025 State of X") OR clearly mark it as an example ("hypothetically"). Unattributed numbers are the most common way content agents fail — avoid completely.
+3. Audience first. The first sentence passes check_readability and answers "why should THIS reader keep reading?" Generic "In today's fast-paced world…" openers are rejected.
+4. Platform-specific constraints are hard limits, not suggestions. LinkedIn ≤1300 chars, Twitter/X ≤280, Instagram caption ≤2200, email subject ≤60, email preheader ≤100.
+5. Brand voice continuity. Run brand_voice_check against the piece. If it drifts from the known brand voice, flag it — don't silently publish off-brand content.
+6. No plagiarism. Never output content copied from a source — paraphrase + attribute. If the user asks you to literally quote, use quotation marks + attribution.
+7. Accessibility baseline. Every image recommendation includes alt text. Avoid color-only semantic cues in any visual prompt.
+
+FAILURE MODES to avoid (these are the mistakes that get content unpublished or lawyers called):
+- Fabricating a quote from a real person ("As CEO Jane Doe said, …" when she didn't).
+- Citing a study that doesn't exist (or misquoting one that does).
+- Using "73% of businesses agree…" without a source — this is the #1 AI-content tell.
+- Writing 1200 words when the brief said 400 — ignoring word count is not "going above and beyond".
+- Keyword stuffing — 5%+ density trips Google spam signals.
+- Passive corporate speak ("solutions that leverage synergies to drive outcomes").
+- Forgetting the CTA. Every piece has one clear action for the reader.
+- Missing preheader on newsletters — the preview text in the inbox IS part of the subject line.
+- Recommending a hashtag blindly without volume data (on Twitter, an unused hashtag is a dead link).
+- Writing long paragraphs on LinkedIn — algorithm penalizes ≥4 line blocks.
 
 Your content philosophy:
 - Every piece must serve a clear purpose and audience. Never write generic filler.
@@ -169,6 +190,51 @@ export class ContentAgent extends BaseAgent {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'research_keywords',
+          description: 'Get keyword research data: monthly search volume, difficulty (0-100), SERP intent (informational / commercial / transactional / navigational), related queries. USE before drafting WRITE_BLOG / OPTIMIZE_SEO_CONTENT.',
+          parameters: {
+            type: 'object',
+            properties: {
+              seedKeyword: { type: 'string', description: 'Primary keyword to research' },
+              locale: { type: 'string', description: 'Geo-locale (e.g. en-US, en-IN)' },
+            },
+            required: ['seedKeyword'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'brand_voice_check',
+          description: 'Score content against the tenant\'s known brand voice profile. Returns { alignmentScore (0-1), driftedAttributes[], recommendations[] }. USE on final content before publish to catch off-brand drift.',
+          parameters: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'Content to score' },
+              format: { type: 'string', description: 'blog | social | newsletter | email | press-release' },
+            },
+            required: ['content'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'check_readability',
+          description: 'Compute Flesch-Kincaid grade level, Hemingway-style complex-sentence flags, and average sentence length. Returns { gradeLevel, avgSentenceLen, longSentences[], passiveCount, suggestions[] }. USE on WRITE_BLOG, WRITE_NEWSLETTER. Target: grade 8-10 for B2B, 6-8 for B2C.',
+          parameters: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'Content to analyze' },
+              targetGradeLevel: { type: 'number', description: 'Target reading grade level (default 8)' },
+            },
+            required: ['content'],
+          },
+        },
+      },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -231,8 +297,9 @@ export class ContentAgent extends BaseAgent {
       result = {
         action: task.action,
         content: loopResult.content || '',
-        summary: loopResult.content?.slice(0, 200) || '',
-        confidence: 0.5,
+        summary:
+          'Manual review required — LLM output was not structured JSON. Do NOT publish this content without editorial review. SEO metadata, headline, and platform variants are missing.',
+        confidence: 0.3,
       };
     }
 

@@ -38,6 +38,27 @@ export interface ProductResult {
 
 const PRODUCT_SUPPLEMENT = `You are a Senior Product Manager at a top-tier product organization who has shipped products used by millions. You are the product management brain of the JAK Swarm platform. You think in frameworks but communicate in plain language.
 
+NON-NEGOTIABLES (hard-fail any output that violates these):
+1. Problem first. Every PRD / feature / roadmap item starts with the problem statement in one sentence. A solution without a stated problem is rejected.
+2. Evidence for every claim. "Users want X" requires a citation (interview quote, survey %, support ticket volume, usage data). "I think users want X" is not evidence.
+3. RICE scores must be computable. Every priority claim has reach (actual N), impact (enumerated), confidence (%), effort (person-weeks). Use compute_rice to calculate — no fabricated scores.
+4. Acceptance criteria per user story. "As a X I want Y so that Z" is half a story. Without testable acceptance criteria, engineering can't know when it's done.
+5. Success metrics are measurable + time-bound. "Improve engagement" is not a metric. "Increase weekly active users from 1,200 to 1,800 by Q3" is.
+6. No scope creep in PRDs. Non-goals section is mandatory. If you can't say what's OUT of scope, scope is undefined.
+7. Dependencies are explicit. Infra needs, data needs, other teams, legal/compliance — list all blockers with owners before greenlighting work.
+
+FAILURE MODES to avoid (these are the mistakes that ship the wrong thing):
+- Writing a PRD without talking to a single user ("I think Gen-Z users want…").
+- Vanity metrics (total signups when the business runs on active users).
+- Prioritizing by HIPPO (highest-paid person's opinion) instead of RICE.
+- Scope + deadline fixed, quality unspecified — something has to flex.
+- "MVP" that includes 8 features — that's not minimum, that's everything.
+- User stories phrased from the team's perspective ("we need to build X") instead of user's ("as a team lead I need…").
+- Roadmaps with specific dates for unknown-unknowns (quarters are safer).
+- Not using score_prd on a spec before handoff — reviewers catch issues too late.
+- Competitor analysis that only lists features (missing positioning, pricing, distribution).
+- No risk register — every project has risks, a PRD without them is under-thought.
+
 Your product philosophy:
 - Start with the problem, not the solution. If you cannot articulate the problem in one sentence, you do not understand it yet.
 - Features without user problems are solutions in search of a problem. Always tie features to user needs.
@@ -154,6 +175,53 @@ export class ProductAgent extends BaseAgent {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'compute_rice',
+          description: 'Compute RICE score (Reach × Impact × Confidence / Effort) with calibrated impact scale. Returns { riceScore, breakdown, band (high|medium|low) }. USE for every priority claim — no fabricated scores.',
+          parameters: {
+            type: 'object',
+            properties: {
+              reach: { type: 'number', description: 'Users affected per quarter (actual number)' },
+              impact: { type: 'number', enum: [0.25, 0.5, 1, 2, 3], description: 'Impact: 3=massive, 2=high, 1=medium, 0.5=low, 0.25=minimal' },
+              confidence: { type: 'number', description: 'Confidence 0-1 (0.5=low/rough, 0.8=medium, 1.0=high)' },
+              effortPersonWeeks: { type: 'number', description: 'Total engineering effort in person-weeks' },
+            },
+            required: ['reach', 'impact', 'confidence', 'effortPersonWeeks'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'score_prd',
+          description: 'Score a PRD document against the 7-section rubric (problem, goals/non-goals, user stories with AC, success metrics, technical, timeline, risks). Returns { completenessScore, missingSections[], weakSections[], recommendations[] }. USE before handing off a PRD to engineering.',
+          parameters: {
+            type: 'object',
+            properties: {
+              prdContent: { type: 'string', description: 'Full PRD content in markdown' },
+            },
+            required: ['prdContent'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'competitor_feature_matrix',
+          description: 'Build a feature × competitor matrix with evidence-backed entries (pricing page URLs, docs links, screenshots). Returns { features[], competitors[], matrix (2D string grid), gaps[], positioning_notes[] }. USE on COMPETITIVE_ANALYSIS / any market-positioning output.',
+          parameters: {
+            type: 'object',
+            properties: {
+              competitors: { type: 'array', items: { type: 'string' }, description: 'Competitor names' },
+              featuresOfInterest: { type: 'array', items: { type: 'string' }, description: 'Features to compare' },
+              depth: { type: 'string', enum: ['surface', 'standard', 'deep'], description: 'How thorough to make the analysis' },
+            },
+            required: ['competitors', 'featuresOfInterest'],
+          },
+        },
+      },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -213,8 +281,17 @@ export class ProductAgent extends BaseAgent {
     } catch {
       result = {
         action: task.action,
-        summary: loopResult.content || '',
-        confidence: 0.5,
+        summary:
+          'Manual review required — LLM output was not structured JSON. Do NOT share this as a PRD, roadmap, or prioritization artifact without rewrite by a human PM. User stories, acceptance criteria, RICE scores, and risks are all incomplete.',
+        competitiveGaps: [
+          {
+            feature: 'Manual review required',
+            us: 'Parse failure — cannot compare',
+            competitor: 'Parse failure — cannot compare',
+            gap: 'Re-run agent with stricter prompt or escalate to a human PM before acting.',
+          },
+        ],
+        confidence: 0.3,
       };
     }
 

@@ -163,7 +163,11 @@ describe('AppGeneratorAgent — files[] + explanation output schema', () => {
     );
     expect(result.files).toEqual([]);
     expect(result.confidence).toBeLessThan(0.5);
-    expect(result.explanation).toContain('Sorry');
+    // Upgrade 2026-04-20: fallback now flags manual-review + attaches build-
+    // readiness diagnostics so the Vibe Coder pipeline knows not to proceed.
+    expect(result.explanation).toMatch(/manual review required/i);
+    expect(result.buildReadiness?.typecheckPasses).toBe(false);
+    expect(result.diagnostics?.some((d) => d.severity === 'error')).toBe(true);
   });
 });
 

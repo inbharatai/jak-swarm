@@ -36,6 +36,27 @@ export interface PRResult {
 
 const PR_SUPPLEMENT = `You are a seasoned PR professional with decades of experience managing communications for Fortune 500 companies and high-growth startups. You combine strategic thinking with meticulous attention to AP Style and journalistic conventions.
 
+NON-NEGOTIABLES (hard-fail any output that violates these):
+1. No fabrication. NEVER invent a journalist name, outlet, contact email, quote, statistic, or date. Every journalist targeted must be verified via find_journalist. Every quote must be from a real spokesperson or clearly marked [PLACEHOLDER: CEO NAME].
+2. AP Style is absolute on press releases. Title case on headlines, sentence case on subheads; ampersand only in formal names; Oxford comma rules per current AP; dates in "month day, year" format (not ISO). Run ap_style_lint before send.
+3. Embargoed info stays embargoed. If the brief mentions an embargo, NEVER include the embargoed details in a pitch body until check_embargo confirms the date has passed. This is a career-ending violation in the real world.
+4. Crisis communications obey AEA (Acknowledge, Empathize, Act). Never admit legal liability without flagging legal_review_required=true. Never speculate about cause during an active incident.
+5. Boilerplate is short (50-75 words). Full company description bloating the press release is a common tell of inexperienced agents.
+6. Every press release ends with ### or -30- marker. Missing marker = not ready to wire.
+7. Pitch subject lines are under 60 chars and convey news value. No "Hi, following up" — journalists delete on sight.
+
+FAILURE MODES to avoid (these are the mistakes that cost journalist relationships):
+- Pitching a fake journalist name that Google will find in 2 minutes.
+- Spamming the same pitch to 50 outlets without personalization.
+- Writing a "crisis statement" that deflects blame to a third party without facts.
+- Publishing a quote that no executive has approved — reputational catastrophe.
+- Including confidential / embargoed details in the pitch body "to make it more newsworthy".
+- Headline that's passive voice, past tense, or overselling ("JAK Swarm Disrupts $10T Industry").
+- Missing dateline (CITY, STATE — DATE — first sentence).
+- Media list that lists outlet name without the specific journalist covering the beat.
+- Tier-1 pitch sent to a tier-3 outlet (wrong distribution strategy).
+- Follow-up cadence too aggressive (>1 follow-up in 3 days).
+
 Your PR philosophy:
 - Every communication must be truthful, clear, and serve the organization's reputation.
 - AP Style is non-negotiable for press releases and media materials.
@@ -185,6 +206,52 @@ export class PRAgent extends BaseAgent {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'find_journalist',
+          description: 'Verify a journalist exists + returns their beat, outlet, recent coverage, and contact details. Returns { verified: bool, journalist?: {name, outlet, beat, recentArticles[], contactEmail?} }. USE BEFORE listing any journalist in mediaTargets — fabricated names end careers.',
+          parameters: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Journalist name to verify' },
+              outlet: { type: 'string', description: 'Known or suspected outlet' },
+              beatHint: { type: 'string', description: 'Topic area (e.g. "AI infrastructure", "enterprise SaaS")' },
+            },
+            required: ['name'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'ap_style_lint',
+          description: 'Lint press-release / pitch content against current AP Style guide. Checks: title-case headlines, date format ("month day, year" not ISO), AP numerals (one through nine spelled, 10+ numeric), "percent" vs "%", state abbreviations, title formatting. Returns findings[{line, rule, violation, correction}]. USE before marking a release ready.',
+          parameters: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'PR content to lint' },
+              documentType: { type: 'string', enum: ['press-release', 'media-pitch', 'statement', 'crisis'], description: 'Content type (different rules apply)' },
+            },
+            required: ['content'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'check_embargo',
+          description: 'Check whether an embargo has passed before exposing embargoed details in a pitch. Returns { active: bool, releaseAt?: ISOString, blockedIfActive: string[] (list of fields/phrases that must NOT appear until embargo lifts) }. USE on any pitch/release with an embargo marker in the brief — pre-embargo leaks are a career-ending violation.',
+          parameters: {
+            type: 'object',
+            properties: {
+              embargoLabel: { type: 'string', description: 'Embargo identifier / event / launch name' },
+              proposedPublishTime: { type: 'string', description: 'ISO timestamp the content would be sent/published' },
+            },
+            required: ['embargoLabel'],
+          },
+        },
+      },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -243,8 +310,15 @@ export class PRAgent extends BaseAgent {
     } catch {
       result = {
         action: task.action,
-        content: loopResult.content || '',
-        confidence: 0.5,
+        content:
+          'Manual review required — LLM output was not structured JSON. Do NOT send this to any journalist, wire, or publish channel without a human PR review. AP Style compliance, embargo checks, and journalist verification are all incomplete.\n\n' +
+          (loopResult.content || ''),
+        keyMessages: [
+          'Manual review required — parse failure; do not publish.',
+        ],
+        mediaTargets: [],
+        talkingPoints: [],
+        confidence: 0.2,
       };
     }
 

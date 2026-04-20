@@ -37,7 +37,26 @@ export interface AppDebuggerResult {
   userQuestion?: string;
 }
 
-const APP_DEBUGGER_SUPPLEMENT = `You are the Self-Debugging Agent for JAK Swarm's Vibe Coding engine. You diagnose and fix build errors, type errors, and runtime errors in generated applications.
+const APP_DEBUGGER_SUPPLEMENT = `You are the Self-Debugging Agent for JAK Swarm's Vibe Coding engine. You diagnose and fix build errors, type errors, and runtime errors in generated applications. You are SURGICAL — surgical means fix the one broken thing, not rewrite adjacent working code.
+
+NON-NEGOTIABLES (hard-fail any fix that violates these):
+1. Root cause, then fix. Every output has rootCause stated FIRST. A fix without an explicit root cause is a guess. If you can't state the root cause, set requiresUserInput=true.
+2. Fix the smallest surface area. If the error is one line in one file, the fix is one line in one file. Do not reformat the file, do not rename imports, do not "improve" nearby code — surgical means surgical.
+3. Never add \`as any\` / \`@ts-ignore\` / \`// eslint-disable-next-line\`. Those are accumulating technical debt, not fixes. Flag and refuse.
+4. Preserve existing behavior. Fix the error without changing the component's visible semantics (props, exports, return shape). If the fix requires a behavioral change, surface it in preventionAdvice so the reviewer knows.
+5. Track previous fixes. If previousFixes contains an attempt that looks similar to what you're about to try, DON'T repeat it. Either pick a different approach or requiresUserInput=true.
+6. Three strikes → escalate. After 3 failed attempts, set requiresUserInput=true with a detailed diagnostic of what each attempt tried and why it failed. Don't loop indefinitely.
+7. Never touch user data. If the fix would require modifying DB migrations, seed data, or env vars, that's outside your scope — surface it to the user instead of silently changing it.
+
+FAILURE MODES to avoid (these are the bugs that make self-debug loops waste LLM spend):
+- Fixing the SYMPTOM (the error line) without understanding WHY (the root cause). The error recurs in a different form next build.
+- Fix A conflicts with fix B in the same round. If multiple files need changes, the set must be internally consistent — apply all together.
+- Re-generating an entire file when one line was broken (wastes tokens, introduces new bugs).
+- Silencing errors with type assertions (\`x as unknown as Foo\`, \`!.\`, \`// @ts-expect-error\`) instead of fixing types.
+- Assuming the error log is complete — Next.js often prints the SECONDARY error first. Look for "Failed to compile" / "Module not found" / "Type error:" markers and trace back.
+- Fixing a build error by commenting out the failing code. That's not a fix, that's avoidance.
+- Proposing a dependency install (\`npm i X\`) without confirming the tenant's package.json supports it.
+- Infinite retry loop: trying the same fix with minor variations across attempts 1, 2, 3. If attempt N didn't work, don't tweak it — reason about WHY it didn't.
 
 You are SURGICAL and EFFICIENT. You fix exactly what's broken, nothing more. Every token counts — you run on the cheapest LLM tier because you need to iterate fast.
 
@@ -133,6 +152,56 @@ export class AppDebuggerAgent extends BaseAgent {
       {
         type: 'function',
         function: {
+          name: 'run_typecheck',
+          description: 'Re-run the TypeScript compiler against the current set of files (including any proposed fix) and return { ok, errors[{file, line, code, message}] }. USE to verify a proposed fix actually resolves the compile error before returning it.',
+          parameters: {
+            type: 'object',
+            properties: {
+              files: {
+                type: 'array',
+                items: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } } },
+                description: 'Full file tree to check (including proposed fixes substituted in)',
+              },
+              strict: { type: 'boolean', description: 'Use strict mode (default true)' },
+            },
+            required: ['files'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'read_stacktrace',
+          description: 'Parse a stack trace (Next.js build, Vite, Node runtime), identify the root frame, and surface the minimal relevant source context for debugging. Returns { rootFrame: {file, line, function}, precedingContext, hypothesis, confidence }. USE on every DIAGNOSE_BUILD_ERROR / FIX_RUNTIME_ERROR as first step.',
+          parameters: {
+            type: 'object',
+            properties: {
+              trace: { type: 'string', description: 'Raw stack trace / error log text' },
+              errorType: { type: 'string', enum: ['build', 'runtime', 'type', 'lint', 'hydration'] },
+            },
+            required: ['trace'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'apply_patch',
+          description: 'Validate that a proposed minimal patch (not a full file) applies cleanly to the original content. Prevents the "regenerate the whole file and introduce new bugs" failure mode. Returns { applied: bool, resultContent?, conflictLines? }. USE when the fix is small and surgical (1-5 lines).',
+          parameters: {
+            type: 'object',
+            properties: {
+              originalContent: { type: 'string' },
+              patch: { type: 'string', description: 'Unified diff or described minimal change' },
+              mode: { type: 'string', enum: ['diff', 'described-minimal'] },
+            },
+            required: ['originalContent', 'patch'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'search_knowledge',
           description: 'Search the knowledge base for known error patterns, previous fixes, and debugging strategies',
           parameters: {
@@ -183,10 +252,15 @@ export class AppDebuggerAgent extends BaseAgent {
     } catch {
       result = {
         action: task.action,
-        diagnosis: loopResult.content || 'Could not parse debugger output.',
-        rootCause: 'unknown',
+        diagnosis:
+          'Manual review required — LLM output was not structured JSON. No fixes delivered. DO NOT retry the build with the current files, and DO NOT loop the debugger again — escalate to a human engineer with the error log.\n\n' +
+          (loopResult.content || ''),
+        rootCause: 'parse-failure',
         fixes: [],
-        confidence: 0.2,
+        requiresUserInput: true,
+        userQuestion:
+          'The debugger could not produce a structured fix for this error. The previous build error is unchanged. Please review the error log manually and either fix directly or re-trigger with more context.',
+        confidence: 0.1,
       };
     }
 
