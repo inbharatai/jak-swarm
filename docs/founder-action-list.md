@@ -56,19 +56,10 @@ The Redis SSE relay is implemented. In production, either pin EventSource client
 
 ## D. Product / UX decisions (your voice, nobody else's)
 
-### D1. Which of the remaining shallow roles get upgraded vs stay `experimental` vs get removed?
-Session 8 upgraded Email / CRM / Research / Calendar. Still shallow:
-- **WORKER_SUPPORT** — ~20 lines of prompt, no structured output beyond classification
-- **WORKER_OPS** — thin
-- **WORKER_VOICE** — browser automation, fragile
-- **WORKER_HR** — basic
-- **WORKER_DESIGNER** — generic
-- **WORKER_BROWSER** — capable but the prompt is generic
+### D1. ~~Shallow role upgrades~~ (closed 2026-04-20)
+All 6 previously-shallow roles — Support, Ops, Voice, HR, Designer, Browser — were upgraded to 9/10+ depth on 2026-04-20. Each now has: expert-level prompt with non-negotiables + failure-mode guidance, domain-specific output schema, ≥3 domain tools, manual-review fallback on parse failure, and behavioral tests. Audit + tests in [tests/unit/agents/role-world-class-upgrades.test.ts](tests/unit/agents/role-world-class-upgrades.test.ts).
 
-Three options per role:
-1. Upgrade (1-2 sessions of prompt + schema work each, following the Session 8 pattern)
-2. Mark `experimental` in the role manifest (honest "use at your own risk")
-3. Remove from the roster (if you don't ship the capability at all)
+No remaining role falls below the 9/10 bar in the role manifest.
 
 ### D2. Screenshot-to-Code marketing
 The agent is wired end-to-end through vibe-coding-execution.service.ts. The claim "Upload a UI design → AI generates matching React + Tailwind components" is true when tested. It needs a real-world end-to-end smoke with a complex Figma screenshot before external launch — owner to run + record.

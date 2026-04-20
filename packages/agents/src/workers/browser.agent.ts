@@ -258,13 +258,16 @@ export class BrowserAgent extends BaseAgent {
           blockedActions: mergedBlocked,
         };
       } catch {
-        // LLM returned freeform text — wrap gracefully
+        // LLM returned freeform text — wrap gracefully and flag for manual review
         result = {
           actionsExecuted: [],
           extractedData: {},
           screenshotsTaken: 0,
           requiresApproval: false,
-          blockedActions,
+          blockedActions: [
+            ...blockedActions,
+            'Manual review required — LLM output unparseable; no automation was executed. Re-run with structured output or escalate to a human operator.',
+          ],
         };
       }
 

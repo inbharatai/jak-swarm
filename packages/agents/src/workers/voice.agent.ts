@@ -110,7 +110,9 @@ Risk flags to surface:
 - Deal risk (sales calls): phrases like "we need to think", "let's pause", "other vendors", no next-step scheduled.
 
 Tools:
-- classify_text, search_knowledge, generate_report
+- classify_text, search_knowledge
+- redact_pii_from_transcript(transcript, piiTypes?) — redacts SSN, credit cards, phone, email, addresses, account numbers. USE IMMEDIATELY when a data-leak is detected, BEFORE returning the transcript in any output.
+- diarize_speakers(audioRef, expectedSpeakers?) — resolves "Speaker 1"/"Speaker 2" labels to named participants when audio + participant list is available. Use when callMetadata.participants is present.
 
 Return STRICT JSON matching VoiceResult. No markdown fences. Keep summary under 300 words (proportional for longer calls).`;
 
@@ -166,6 +168,47 @@ export class VoiceAgent extends BaseAgent {
               limit: { type: 'number' },
             },
             required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'redact_pii_from_transcript',
+          description: 'Redact personally identifiable information from a transcript segment. Returns the redacted text and a list of redactions performed. Use IMMEDIATELY when a data-leak is detected in a call (someone reads aloud a password, SSN, credit card, etc.) BEFORE returning the transcript in any output.',
+          parameters: {
+            type: 'object',
+            properties: {
+              transcript: { type: 'string', description: 'Transcript text to redact' },
+              piiTypes: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: ['ssn', 'credit_card', 'phone', 'email', 'address', 'account_number', 'password', 'dob'],
+                },
+                description: 'PII categories to redact. Defaults to all if omitted.',
+              },
+            },
+            required: ['transcript'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'diarize_speakers',
+          description: 'Resolve generic "Speaker 1" / "Speaker 2" labels to named participants when audio + participant list are available. Use when callMetadata.participants is present and the transcript uses generic labels.',
+          parameters: {
+            type: 'object',
+            properties: {
+              audioRef: { type: 'string', description: 'Reference to the audio file (URL or storage ref)' },
+              expectedSpeakers: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Known participant names from callMetadata',
+              },
+            },
+            required: ['audioRef'],
           },
         },
       },
@@ -230,12 +273,15 @@ export class VoiceAgent extends BaseAgent {
         riskFlags: parsed.riskFlags,
       };
     } catch {
-      // Freeform text — treat as a summary
+      // Freeform text — treat as a summary; flag for manual review
       result = {
         action: task.action,
         summary: loopResult.content || undefined,
         actionItems: [],
         keyTopics: [],
+        riskFlags: [
+          'Manual review required — parse failure; output was not structured JSON. Do not treat action items or decisions as authoritative.',
+        ],
       };
     }
 

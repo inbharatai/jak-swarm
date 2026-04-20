@@ -211,6 +211,21 @@ export class OpsAgent extends BaseAgent {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'check_runbook',
+          description: 'Look up a runbook by known-issue signature (error message, stack trace, alert name). Returns matching runbookId + steps if found. USE FIRST on TROUBLESHOOT — a known-issue match bypasses new hypothesizing.',
+          parameters: {
+            type: 'object',
+            properties: {
+              signature: { type: 'string', description: 'Error message, alert name, or stack trace hash' },
+              service: { type: 'string', description: 'Optional service name for narrower match' },
+            },
+            required: ['signature'],
+          },
+        },
+      },
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -271,7 +286,9 @@ export class OpsAgent extends BaseAgent {
         action: task.action,
         result: loopResult.content || 'Operation completed with unstructured output.',
         steps: [],
-        recommendations: [],
+        recommendations: [
+          'Manual review required — output format was unexpected. Do not execute any proposed action without operator verification.',
+        ],
         requiresApproval: false,
       };
     }
