@@ -707,7 +707,14 @@ export class SwarmExecutionService extends EventEmitter {
         allowedDomains: (tenant as any)?.allowedDomains ?? [],
         browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),
         restrictedCategories: industryPack.restrictedTools,
-        disabledToolNames: tenant?.disabledToolNames ?? [],
+        // Merge tenant-admin disabled tools (at-admin blocklist) with
+        // industry-pack per-name blocks (compliance-driven blocklist).
+        // Both go into TenantToolRegistry.disabledToolNames — at isAllowed()
+        // time a tool blocked by EITHER source is rejected.
+        disabledToolNames: [
+          ...(tenant?.disabledToolNames ?? []),
+          ...(industryPack.restrictedToolNames ?? []),
+        ],
         connectedProviders,
         onAgentActivity: (data: unknown) => {
           this.emit(`workflow:${workflowId}`, data);

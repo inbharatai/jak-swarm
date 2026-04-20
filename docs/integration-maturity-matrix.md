@@ -1,9 +1,9 @@
 # Integration Maturity Matrix
 
 This document is the source of truth for current integration depth. The landing page's
-"21 Connectors" stat is the union of every brand surfaced in `apps/web/src/app/page.tsx`
+"22 Connectors" stat is the union of every brand surfaced in `apps/web/src/app/page.tsx`
 (`INTEGRATIONS_CORE` + `INTEGRATIONS_INFRA`). The table below classifies every one of
-those 21 — plus the adapters (Gmail, Google Calendar, CRM fallback) that ship in the
+those 22 — plus the adapters (Gmail, Google Calendar, CRM fallback) that ship in the
 tools layer without a dedicated UI tile.
 
 ## Maturity Levels
@@ -58,7 +58,7 @@ tools layer without a dedicated UI tile.
 
 ## Summary counts (used by the landing page)
 
-- **21 Connectors** = 12 external SaaS connectors (`INTEGRATIONS_CORE`) + 9 infrastructure adapters (`INTEGRATIONS_INFRA`). Most are UI tiles pending real adapters; only the subset marked `production-ready` or `beta` has a runtime path today.
+- **22 Connectors** = 13 external SaaS connectors (`INTEGRATIONS_CORE`, includes WhatsApp native bridge) + 9 infrastructure adapters (`INTEGRATIONS_INFRA`). Most are UI tiles pending real adapters; only the subset marked `production-ready` or `beta` has a runtime path today.
 - **production-ready**: Slack, Gmail, Google Calendar, PostgreSQL, Puppeteer, Filesystem, Fetch, Memory (8)
 - **beta**: GitHub, Notion, Brave Search, Sequential Thinking (4)
 - **partial**: HubSpot, Salesforce, CRM fallback (3)

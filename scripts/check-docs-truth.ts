@@ -157,6 +157,143 @@ if (landingConnectorMatch && matrixConnectorTotalMatch) {
   });
 }
 
+// Also assert the Connectors stat card matches INTEGRATIONS_CORE +
+// INTEGRATIONS_INFRA tile counts in the landing file itself. This catches
+// drift where the number is updated but the tiles aren't (or vice versa).
+const coreTilesMatch = landing.match(/const INTEGRATIONS_CORE\s*=\s*\[([\s\S]*?)\n\];/);
+const infraTilesMatch = landing.match(/const INTEGRATIONS_INFRA\s*=\s*\[([\s\S]*?)\n\];/);
+if (coreTilesMatch && infraTilesMatch && landingConnectorMatch) {
+  const coreCount = (coreTilesMatch[1].match(/name:\s*'/g) ?? []).length;
+  const infraCount = (infraTilesMatch[1].match(/name:\s*'/g) ?? []).length;
+  const tileTotal = coreCount + infraCount;
+  expect({
+    claim: 'Landing Connectors stat matches INTEGRATIONS_CORE + INTEGRATIONS_INFRA tile count',
+    expected: tileTotal,
+    actual: Number(landingConnectorMatch[1]),
+    source: 'apps/web/src/app/page.tsx (Connectors stat vs tile arrays)',
+  });
+}
+
+// ─── PremiumCTA stat counters ──────────────────────────────────────────────
+// The `CTA_STATS` array in PremiumCTA.tsx once drifted to "113" tools after
+// a toolRegistry change bumped the live count to 119. Pin each stat card
+// value so that drift fails CI.
+
+const premiumCta = read('apps/web/src/components/landing/PremiumCTA.tsx');
+const ctaToolsMatch = premiumCta.match(/\{\s*value:\s*['"](\d+)['"]\s*,\s*label:\s*['"]Tools['"]/);
+const ctaIntegMatch = premiumCta.match(/\{\s*value:\s*['"](\d+)['"]\s*,\s*label:\s*['"]Integrations['"]/);
+const ctaAgentsMatch = premiumCta.match(/\{\s*value:\s*['"](\d+)['"]\s*,\s*label:\s*['"]Agents['"]/);
+
+if (ctaToolsMatch) {
+  expect({
+    claim: 'PremiumCTA Tools counter matches toolRegistry.register() calls',
+    expected: manifest.total,
+    actual: Number(ctaToolsMatch[1]),
+    source: 'apps/web/src/components/landing/PremiumCTA.tsx (CTA_STATS)',
+  });
+}
+if (ctaIntegMatch && landingConnectorMatch) {
+  expect({
+    claim: 'PremiumCTA Integrations counter matches landing Connectors stat',
+    expected: Number(landingConnectorMatch[1]),
+    actual: Number(ctaIntegMatch[1]),
+    source: 'apps/web/src/components/landing/PremiumCTA.tsx vs apps/web/src/app/page.tsx',
+  });
+}
+if (ctaAgentsMatch) {
+  expect({
+    claim: 'PremiumCTA Agents counter matches AgentRole enum',
+    expected: agentCount,
+    actual: Number(ctaAgentsMatch[1]),
+    source: 'apps/web/src/components/landing/PremiumCTA.tsx vs packages/shared/src/types/agent.ts',
+  });
+}
+
+// ─── WhatsApp on landing (real route, real tile) ───────────────────────────
+// Invariant: if apps/api/src/routes/whatsapp.routes.ts is non-trivial (>1KB)
+// then the landing MUST surface WhatsApp as an integration. Hiding a working
+// integration from marketing copy is still a truth-drift — under-claiming is
+// as bad as over-claiming for this check.
+
+try {
+  const whatsappRoute = read('apps/api/src/routes/whatsapp.routes.ts');
+  if (whatsappRoute.length > 1000 && !landing.includes("name: 'WhatsApp'")) {
+    mismatches.push({
+      claim: 'WhatsApp is implemented but missing from landing integration tiles',
+      expected: "WhatsApp tile in INTEGRATIONS_CORE",
+      actual: 'absent',
+      source: 'apps/api/src/routes/whatsapp.routes.ts vs apps/web/src/app/page.tsx',
+    });
+  }
+} catch {
+  // If whatsapp.routes.ts doesn't exist, this check is a no-op
+}
+
+// ─── Sentry tile honesty ───────────────────────────────────────────────────
+// The Sentry tile on the landing page implies SDK-level observability. Only
+// true if @sentry/node is imported in the API. Otherwise the tile must be
+// labeled "Sentry MCP" to make clear it's only the agent-callable MCP server.
+
+try {
+  const apiIndex = read('apps/api/src/index.ts');
+  const sentrySDKWired = apiIndex.includes('@sentry/node');
+  const landingHasSentry = landing.includes("name: 'Sentry'");
+  const landingHasSentryMCP = landing.includes("name: 'Sentry MCP'");
+  if (!sentrySDKWired && landingHasSentry && !landingHasSentryMCP) {
+    mismatches.push({
+      claim: 'Sentry tile implies SDK but @sentry/node is not wired',
+      expected: "tile labeled 'Sentry MCP' (agent-query only)",
+      actual: "tile labeled 'Sentry' (implies SDK observability)",
+      source: 'apps/web/src/app/page.tsx vs apps/api/src/index.ts',
+    });
+  }
+} catch {
+  // If apps/api/src/index.ts is missing, this check is a no-op
+}
+
+// ─── Voice mock token footgun ──────────────────────────────────────────────
+// voice.routes.ts used to emit a synthesized placeholder token + isMock flag
+// when OPENAI_API_KEY was unset. Any frontend that forgot to check the flag
+// would open a broken WebRTC session. Guard against regression.
+
+try {
+  const voiceRoute = read('apps/api/src/routes/voice.routes.ts');
+  const badPatterns = [/clientToken:\s*[`'"]mock_token_/, /isMock:\s*true/];
+  for (const p of badPatterns) {
+    if (p.test(voiceRoute)) {
+      mismatches.push({
+        claim: 'voice.routes.ts must not emit a mock token in any response',
+        expected: '503 VOICE_NOT_CONFIGURED when OPENAI_API_KEY unset',
+        actual: `found match for ${p}`,
+        source: 'apps/api/src/routes/voice.routes.ts',
+      });
+    }
+  }
+} catch {
+  // skip if file doesn't exist
+}
+
+// ─── Paddle placeholder price IDs ──────────────────────────────────────────
+// Placeholder defaults masked Paddle misconfig in dev. Guard against
+// regression.
+
+try {
+  const paddleRoute = read('apps/api/src/routes/paddle.routes.ts');
+  const badDefaults = ['pri_pro_placeholder', 'pri_team_placeholder', 'pri_enterprise_placeholder'];
+  for (const bad of badDefaults) {
+    if (paddleRoute.includes(bad)) {
+      mismatches.push({
+        claim: 'paddle.routes.ts must not default to placeholder price IDs',
+        expected: 'plan map built only from real PADDLE_PRICE_* env vars',
+        actual: `found '${bad}'`,
+        source: 'apps/api/src/routes/paddle.routes.ts',
+      });
+    }
+  }
+} catch {
+  // skip
+}
+
 // ─── Industry pack count ───────────────────────────────────────────────────
 // Architecture doc claims a specific number of industry packs. Assert it
 // matches the live `listIndustries()` output so a new pack (or a removed

@@ -112,16 +112,16 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
           throw new ForbiddenError('Access to voice session in another tenant is not allowed');
         }
 
-        // If no API key is available, return a mock token for local development
+        // Refuse to issue a fake token. Previously this path emitted a
+        // synthesized placeholder + isMock flag when OPENAI_API_KEY was
+        // unset — a footgun: any frontend that forgot to check the flag
+        // would open a WebRTC session that silently never worked. 503 is
+        // safer, surfaced cleanly to the caller via VOICE_NOT_CONFIGURED.
         if (!config.openaiApiKey) {
-          return reply.status(200).send(
-            ok({
-              sessionId,
-              clientToken: `mock_token_${Date.now()}`,
-              model: config.openaiRealtimeModel,
-              expiresAt: new Date(Date.now() + 60_000).toISOString(),
-              isMock: true,
-            }),
+          throw new AppError(
+            503,
+            'VOICE_NOT_CONFIGURED',
+            'Voice provider is not configured on this instance. Set OPENAI_API_KEY (or another supported realtime provider) and redeploy. For local development, export the env var before starting the API.',
           );
         }
 

@@ -157,9 +157,10 @@ const STATS = [
   // only ~56 of 119 are `real` runtime integrations; the rest are honest
   // heuristics, LLM passthroughs, or config-gated.
   { value: 119, label: 'Classified Tools', suffix: '' },
-  // 21 = 12 external SaaS connectors + 9 infrastructure/MCP adapters surfaced in the UI.
-  // Only a subset are production-ready runtime paths — see docs/integration-maturity-matrix.md.
-  { value: 21, label: 'Connectors', suffix: '' },
+  // 22 = 13 external SaaS connectors (incl. WhatsApp native bridge) + 9
+  // infrastructure/MCP adapters surfaced in the UI. Only a subset are
+  // production-ready runtime paths — see docs/integration-maturity-matrix.md.
+  { value: 22, label: 'Connectors', suffix: '' },
   { value: 6, label: 'AI Providers', suffix: '' },
 ];
 
@@ -184,11 +185,18 @@ const INTEGRATIONS_CORE = [
   { name: 'ClickUp', color: '#7B68EE', bg: 'rgba(123,104,238,0.1)' },
   { name: 'SendGrid', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
   { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
+  // WhatsApp: native bridge (not MCP) — apps/api/src/routes/whatsapp.routes.ts
+  // Register number, verify, send command, receive via the bridge token.
+  { name: 'WhatsApp', color: '#25D366', bg: 'rgba(37,211,102,0.1)' },
 ];
 
 const INTEGRATIONS_INFRA = [
   { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
-  { name: 'Sentry', color: '#A855F7', bg: 'rgba(168,85,247,0.1)' },
+  // Sentry MCP: JAK agents can query your Sentry projects via the official
+  // Sentry MCP server. NOT the Sentry SDK for error reporting from this API
+  // — that would require wiring @sentry/node, which is deliberately not
+  // installed (no runtime dependency added until you actually want it).
+  { name: 'Sentry MCP', color: '#A855F7', bg: 'rgba(168,85,247,0.1)' },
   { name: 'Brave Search', color: '#FB6A25', bg: 'rgba(251,106,37,0.1)' },
   { name: 'PostgreSQL', color: '#336791', bg: 'rgba(51,103,145,0.1)' },
   { name: 'Puppeteer', color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
@@ -728,7 +736,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">119 Tools · Honest Maturity Labels</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">119 Tools. Honest Maturity Labels.</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 21 connector and MCP surfaces labeled by maturity (production-ready / beta / partial / placeholder) in the integration matrix. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 22 connector and MCP surfaces labeled by maturity (production-ready / beta / partial / placeholder) in the integration matrix. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
 
             {/* Tool Categories Grid */}
@@ -1104,7 +1112,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Operator-grade multi-agent control plane. 38 specialist agents, 119 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 21 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
+                  Operator-grade multi-agent control plane. 38 specialist agents, 119 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 22 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
                 </p>
               </div>
 

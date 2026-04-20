@@ -17,13 +17,25 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'crypto';
 import { CreditService } from '../billing/credit-service.js';
 
-// Map Paddle price IDs to Jaak plan IDs
-const PADDLE_PLAN_MAP: Record<string, string> = {
-  // Set these to your actual Paddle price IDs
-  [process.env['PADDLE_PRICE_PRO'] ?? 'pri_pro_placeholder']: 'pro',
-  [process.env['PADDLE_PRICE_TEAM'] ?? 'pri_team_placeholder']: 'team',
-  [process.env['PADDLE_PRICE_ENTERPRISE'] ?? 'pri_enterprise_placeholder']: 'enterprise',
-};
+// Map Paddle price IDs to Jak plan IDs.
+//
+// Builds from env at import-time. Any price env var that isn't set is
+// simply omitted from the map — better than silently matching a
+// `pri_*_placeholder` string that would NEVER appear in a real Paddle
+// webhook, which produced the misleading behaviour of "webhook arrived
+// but plan wasn't recognized" for every real event when env wasn't
+// configured. Unknown price IDs now surface cleanly (no match → warn +
+// reject) instead of matching a placeholder by accident.
+const PADDLE_PLAN_MAP: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  const pro = process.env['PADDLE_PRICE_PRO'];
+  const team = process.env['PADDLE_PRICE_TEAM'];
+  const enterprise = process.env['PADDLE_PRICE_ENTERPRISE'];
+  if (pro) map[pro] = 'pro';
+  if (team) map[team] = 'team';
+  if (enterprise) map[enterprise] = 'enterprise';
+  return map;
+})();
 
 function verifyPaddleSignature(rawBody: string, signature: string | undefined, secret: string): boolean {
   if (!signature || !secret) return false;
