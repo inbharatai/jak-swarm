@@ -10,6 +10,7 @@ docs
 docker
 scripts
 tests
+!tests/package.json
 community-content
 apps/web/node_modules
 apps/web/.next
