@@ -1,5 +1,33 @@
 # JAK Swarm — Production Deployment Guide
 
+## Topology at a glance
+
+JAK is deployed as **frontend on Vercel + backend on Render**, wired
+through a single public API URL:
+
+| Piece | Where | What runs | Notes |
+|---|---|---|---|
+| `apps/web` (Next.js landing + builder UI) | **Vercel** | Static + edge SSR | Points at the Render API via `NEXT_PUBLIC_API_URL` |
+| `apps/api` (Fastify HTTP + SSE + queue worker) | **Render** (`jak-swarm-api` web service) | Node container from `./Dockerfile` | Default `WORKFLOW_WORKER_MODE=embedded` — one process does HTTP + queue |
+| Postgres (+ pgvector) | Supabase / Render Postgres / your choice | shared DB | Set `DATABASE_URL` + `DIRECT_URL` on Render |
+| Redis (optional) | Upstash / Render Redis | signal bus + SSE relay | Only needed when you run >1 API instance or split workers (Mode B) |
+
+**CORS alignment (important):** the Render API's `CORS_ORIGINS` env var
+must list the exact Vercel frontend origins. `render.yaml` ships with
+`https://jakswarm.com,https://www.jakswarm.com`; add preview-deploy
+origins (`https://*.vercel.app`) only if you intentionally want preview
+branches talking to production API.
+
+**Frontend env vars on Vercel:**
+- `NEXT_PUBLIC_API_URL` → your Render API URL (e.g. `https://jak-swarm-api.onrender.com` or a custom domain)
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — if using Supabase auth directly from the browser
+
+The rest of this doc covers the **backend** deployment choices on Render
+(or any equivalent orchestrator). The frontend side is a standard
+Next.js Vercel project — no special topology.
+
+---
+
 ## Two deploy modes — pick the one that matches your traffic
 
 JAK ships with ONE binary + TWO runtime roles. The env var
