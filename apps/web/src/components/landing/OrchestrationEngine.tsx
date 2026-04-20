@@ -126,26 +126,66 @@ export default function OrchestrationEngine() {
             fill="none"
             aria-hidden="true"
           >
-            {/* Radial guide rings */}
-            <circle cx="360" cy="360" r="240" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-            <circle cx="360" cy="360" r="120" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+            {/* SVG <defs>: a soft green glow filter for active connection
+                lines, plus a radar-sweep arc gradient. This adds depth
+                and motion energy to what was previously a flat ring of
+                identical elements. */}
+            <defs>
+              <filter id="orch-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id="orch-sweep" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0" />
+                <stop offset="60%" stopColor="#34d399" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+              </linearGradient>
+            </defs>
 
-            {/* Connection lines from center to modules */}
+            {/* Radial guide rings — opacity bumped from 0.02/0.03 to
+                0.08/0.05 so the concentric structure actually reads. The
+                outer ring gets a subtle dashed stroke to suggest orbit. */}
+            <circle cx="360" cy="360" r="240" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="2 6" />
+            <circle cx="360" cy="360" r="180" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+            <circle cx="360" cy="360" r="120" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+
+            {/* Radar sweep — a rotating arc over the outer ring. Slow,
+                low-opacity, respects prefers-reduced-motion through the
+                global CSS reset that short-circuits animations. */}
+            <g style={{ transformOrigin: '360px 360px', animation: 'orch-radar 12s linear infinite' }}>
+              <path
+                d="M 360 360 L 600 360 A 240 240 0 0 0 480 152.9 Z"
+                fill="url(#orch-sweep)"
+                opacity="0.6"
+              />
+            </g>
+
+            {/* Connection lines from center to modules.
+                Coords rounded to 3 decimals so SSR + client serialize
+                identically — raw Math.cos/sin floats drift at the 14th
+                decimal in React's attribute stringifier, triggering
+                hydration warnings. */}
             {MODULES.map((mod) => {
               const rad = (mod.angle * Math.PI) / 180;
-              const endX = 360 + Math.cos(rad) * 240;
-              const endY = 360 + Math.sin(rad) * 240;
+              const endX = Number((360 + Math.cos(rad) * 240).toFixed(3));
+              const endY = Number((360 + Math.sin(rad) * 240).toFixed(3));
               const isActive = activeModules.includes(mod.id);
               const isRouting = phase === 'routing';
 
               return (
-                <g key={mod.id}>
-                  {/* Base line */}
+                <g key={mod.id} filter={isActive ? 'url(#orch-glow)' : undefined}>
+                  {/* Base line — active gets a thicker stroke + glow filter
+                      (see <defs>), dormant gets a softer dashed line with
+                      higher base opacity (0.04 → 0.08) so the graph is
+                      legible without activity. */}
                   <line
                     x1="360" y1="360"
                     x2={endX} y2={endY}
-                    stroke={isActive ? mod.color : 'rgba(255,255,255,0.04)'}
-                    strokeWidth={isActive ? 2 : 1}
+                    stroke={isActive ? mod.color : 'rgba(255,255,255,0.08)'}
+                    strokeWidth={isActive ? 2.5 : 1}
                     strokeDasharray={isActive ? 'none' : '4 8'}
                     style={{
                       transition: 'stroke 0.5s ease, stroke-width 0.3s ease',
@@ -154,7 +194,7 @@ export default function OrchestrationEngine() {
 
                   {/* Animated data packet traveling along line */}
                   {(isActive || isRouting) && (
-                    <circle r="4" fill={mod.color} opacity="0.8">
+                    <circle r="4" fill={mod.color} opacity="0.9">
                       <animateMotion
                         dur={isActive ? '1.2s' : '0.8s'}
                         repeatCount={isActive ? 'indefinite' : '1'}
@@ -210,11 +250,12 @@ export default function OrchestrationEngine() {
             </motion.div>
           </div>
 
-          {/* Module nodes around the perimeter */}
+          {/* Module nodes around the perimeter. Rounded to 3 decimals so
+              SSR percentage strings match client exactly. */}
           {MODULES.map((mod) => {
             const rad = (mod.angle * Math.PI) / 180;
-            const x = 50 + (Math.cos(rad) * 33.3); // percentage positioning
-            const y = 50 + (Math.sin(rad) * 33.3);
+            const x = Number((50 + Math.cos(rad) * 33.3).toFixed(3));
+            const y = Number((50 + Math.sin(rad) * 33.3).toFixed(3));
             const isActive = activeModules.includes(mod.id);
 
             return (

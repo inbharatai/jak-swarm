@@ -292,6 +292,15 @@
     animation: fade-up 0.6s cubic-bezier(0.33, 1, 0.68, 1) both;
   }
 
+  /* Radar sweep for OrchestrationEngine — a subtle rotating arc over the
+     outer ring that adds motion energy without competing with the
+     primary typing/routing/executing animation. Respects reduced-motion
+     via the global @media query at the bottom of this file. */
+  @keyframes orch-radar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
   /* Staggered children */
   .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
   .stagger-children > *:nth-child(2) { animation-delay: 80ms; }

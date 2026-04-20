@@ -4,3 +4,4 @@ export { default as CapabilityMap } from './CapabilityMap';
 export { default as LiveDemo } from './LiveDemo';
 export { default as PremiumCTA } from './PremiumCTA';
 export { default as SupervisorSection } from './SupervisorSection';
+export { LandingIcon, type LandingIconName } from './landing-icons';

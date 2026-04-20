@@ -290,11 +290,15 @@ function StepGraphic({
           {step.title.toUpperCase().slice(0, 12)}
         </text>
 
-        {/* Orbital dots */}
+        {/* Orbital dots — coords rounded to 3 decimals to keep SSR + client
+            string serialization identical. Raw Math.cos/sin floats render
+            slightly differently in React's attribute stringifier between
+            Node and the browser (14th-decimal drift), triggering hydration
+            warnings and the dev overlay on every page load. */}
         {[0, 72, 144, 216, 288].map((angle, j) => {
           const rad = (angle * Math.PI) / 180;
-          const cx = 100 + Math.cos(rad) * 65;
-          const cy = 100 + Math.sin(rad) * 65;
+          const cx = Number((100 + Math.cos(rad) * 65).toFixed(3));
+          const cy = Number((100 + Math.sin(rad) * 65).toFixed(3));
           return (
             <circle
               key={j}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection } from '@/components/landing';
+import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection, LandingIcon, type LandingIconName } from '@/components/landing';
 
 /* ─── Animated Counter Hook ──────────────────────────────────────────────── */
 
@@ -259,7 +259,22 @@ function StatCard({ value, label, suffix }: { value: number; label: string; suff
   const { count, ref } = useCountUp(value, 1800);
   return (
     <div ref={ref} className="glass-card rounded-xl p-6 text-center">
-      <div className="text-5xl sm:text-6xl font-display font-bold tracking-tight tabular-nums" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+      {/* Stat numbers use a monospace font so every digit gets equal width —
+          the previous Syne display font is proportional (no real `tnum`
+          OpenType table), so "3" and "8" rendered visibly different widths
+          at 48-60px. JetBrains Mono is already loaded for code blocks and
+          guarantees visually balanced numerals. The `font-feature-settings`
+          explicitly turns on tabular + lining figures for belt-and-braces
+          consistency on future font swaps. */}
+      <div
+        className="text-5xl sm:text-6xl font-mono font-bold tracking-tight"
+        style={{
+          background: 'linear-gradient(135deg, #34d399, #fbbf24)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          fontFeatureSettings: '"tnum" 1, "lnum" 1',
+        }}
+      >
         {count}{suffix}
       </div>
       <div className="mt-2 text-sm font-medium text-slate-400 uppercase tracking-widest font-sans">{label}</div>
@@ -374,23 +389,31 @@ export default function HomePage() {
       <main id="main-content" className="min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
         {/* ── Nav ──────────────────────────────────────────────────────────── */}
         <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(9,9,11,0.6)' }} role="navigation" aria-label="Main navigation">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
+            {/*
+              Brand lockup: whitespace-nowrap on the "JAK Swarm" text so
+              it never wraps to two lines on narrow viewports (375px was
+              previously cramped — "JAK" on line 1, "Swarm" on line 2).
+              shrink-0 on the wrapper protects the brand when the CTA
+              group is under pressure.
+            */}
+            <div className="flex items-center gap-2 shrink-0">
               <JakLogo size={32} />
-              <span className="text-lg font-display font-bold tracking-tight">JAK Swarm</span>
+              <span className="text-base sm:text-lg font-display font-bold tracking-tight whitespace-nowrap">JAK Swarm</span>
             </div>
             <div className="hidden md:flex items-center gap-8 text-sm text-slate-400">
               <a href="#agents" className="hover:text-white focus-visible:text-white transition-colors duration-200">Agents</a>
               <a href="#workflow" className="hover:text-white focus-visible:text-white transition-colors duration-200">How It Works</a>
               <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Mobile hamburger */}
               <button
                 className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-menu"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                   {mobileMenuOpen
@@ -399,10 +422,13 @@ export default function HomePage() {
                   }
                 </svg>
               </button>
-              <Link href="/login" className="text-sm font-medium text-slate-400 hover:text-white focus-visible:text-white transition-colors">
+              {/* Sign In is hidden on mobile to free up horizontal space —
+                  it lives inside the mobile menu dropdown instead. Also
+                  whitespace-nowrap so "Sign In" never wraps on tablet. */}
+              <Link href="/login" className="hidden sm:inline-flex text-sm font-medium text-slate-400 hover:text-white focus-visible:text-white transition-colors whitespace-nowrap">
                 Sign In
               </Link>
-              <Link href="/register" className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#09090b] transition-all duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-400" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', touchAction: 'manipulation' }}>
+              <Link href="/register" className="inline-flex items-center gap-1.5 rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold text-[#09090b] transition-all duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', touchAction: 'manipulation' }}>
                 Get Started
                 <ArrowRightIcon className="h-3.5 w-3.5" />
               </Link>
@@ -411,11 +437,14 @@ export default function HomePage() {
 
           {/* Mobile menu dropdown */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
+            <div id="mobile-menu" className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
               <a href="#agents" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Agents</a>
               <a href="#workflow" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
               <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
               <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-emerald-400 hover:text-emerald-300 transition-colors">Builder</Link>
+              {/* Sign In moved here from the top bar so the brand + Get Started
+                  have room to breathe without wrapping on 375px viewports. */}
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-300 hover:text-white transition-colors pt-2 border-t border-white/5">Sign In</Link>
             </div>
           )}
         </nav>
@@ -467,17 +496,38 @@ export default function HomePage() {
                 <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
               </div>
 
-              {/* pb-4 + leading-[1.2] give every descender (g / p / y / j) real breathing room */}
-              <h1 className="mb-6 pb-4 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.2] sm:leading-[1.15]">
-                <span className="block text-white/90">Specialist AI Agents.</span>
-                <span className="block mt-2 gradient-text pb-3">Operator-Grade Control Plane.</span>
+              {/*
+                Hero H1 design choices:
+                - Line 1 stays solid white — lets the headline read first as
+                  pure type, no color noise.
+                - Only ONE phrase carries the brand gradient (the differentiator
+                  word "That Actually Executes"), not the whole subhead.
+                  Previously both the subhead AND the Start Free CTA used the
+                  same emerald→amber gradient, creating visual collision and
+                  hierarchy flattening.
+                - leading-[1.15] on mobile + pb-3 on the gradient span gives
+                  descenders on "g"/"p" real breathing room even when the
+                  background-clip'd gradient constrains the line box.
+                - overflow-visible on the gradient span prevents any stray
+                  descender clipping from background-clip: text + background-size.
+              */}
+              {/* Literal non-breaking hyphen (U+2011) in "Operator-Grade"
+                  keeps the compound on one line even on 375px. JSX entity
+                  &#8209; can trip up HMR in dev, so we use the raw
+                  character directly. `break-keep` on the span reinforces
+                  that whitespace-containing-hyphen inside the span stays
+                  together as a word unit. */}
+              <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15] sm:leading-[1.1]">
+                <span className="block text-white" style={{ wordBreak: 'keep-all' }}>The Operator‑Grade</span>
+                <span className="block mt-2 text-white">AI Workforce</span>
+                <span className="block mt-2 gradient-text pb-3" style={{ overflow: 'visible' }}>That Actually Executes.</span>
               </h1>
 
-              <p className="mb-10 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-                CEO, CTO, CMO, CFO, HR, Engineer, Legal&nbsp;&mdash; 38 role-specialist agents running under a durable workflow queue with risk-stratified approval gates.
+              <p className="mb-8 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
+                38 specialist agents &mdash; from CEO to Legal &mdash; decompose your intent, execute in parallel, and deliver verified results. Human approval on every high-risk action. Not a chatbot &mdash; a workforce.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
                 <Link href="/register" className="group relative inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', boxShadow: '0 0 30px rgba(52,211,153,0.3), 0 10px 40px rgba(52,211,153,0.15)', touchAction: 'manipulation' }}>
                   Start Free
                   <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -486,6 +536,41 @@ export default function HomePage() {
                   <GitHubIcon className="h-5 w-5" />
                   View on GitHub
                 </a>
+              </div>
+
+              {/*
+                Trust strip — addresses the "no social proof, no credibility
+                signal between hero and first content section" gap. Four
+                lightweight badges: open-source license, tech stack signal,
+                operator-grade posture, security posture. Text-only (no logos
+                we don't have rights to), small and restrained so it reads
+                as a signature row, not a billboard.
+              */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400 font-sans">
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M10 1.5a.5.5 0 01.5.5v1.55a6.5 6.5 0 015.454 5.453h1.55a.5.5 0 010 1h-1.55a6.5 6.5 0 01-5.453 5.454v1.55a.5.5 0 01-1 0v-1.55a6.5 6.5 0 01-5.454-5.453H1.5a.5.5 0 010-1h1.55a6.5 6.5 0 015.453-5.454V2a.5.5 0 01.497-.5zM10 4.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zm0 2.5a3 3 0 110 6 3 3 0 010-6z" clipRule="evenodd" />
+                  </svg>
+                  <span>Open-source core</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M10 1a1 1 0 01.707.293l7 7A1 1 0 0117 10h-1v6a2 2 0 01-2 2h-2a1 1 0 01-1-1v-4H9v4a1 1 0 01-1 1H6a2 2 0 01-2-2v-6H3a1 1 0 01-.707-1.707l7-7A1 1 0 0110 1z" clipRule="evenodd" />
+                  </svg>
+                  <span>Self-hostable</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Approval gates on every high-risk action</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                  </svg>
+                  <span>Durable queue &amp; lease reclaim</span>
+                </span>
               </div>
             </div>
 
@@ -496,12 +581,15 @@ export default function HomePage() {
                 <JakLogo size={40} />
               </div>
 
-              {/* Orbiting agent nodes */}
+              {/* Orbiting agent nodes. Coords rounded to 3 decimals so the
+                  SSR + client string serialization match exactly — raw
+                  Math.cos/sin floats drift at the 14th decimal in React's
+                  attribute stringifier and fire hydration warnings. */}
               {AGENTS.map((agent, i) => {
                 const angle = (i * 60 - 30) * (Math.PI / 180);
                 const radius = 140;
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
+                const x = Number((Math.cos(angle) * radius).toFixed(3));
+                const y = Number((Math.sin(angle) * radius).toFixed(3));
                 return (
                   <div
                     key={agent.label}
@@ -521,13 +609,14 @@ export default function HomePage() {
                 );
               })}
 
-              {/* Connection lines SVG */}
+              {/* Connection lines SVG. Percentages rounded to 3 decimals
+                  to keep SSR + client string output identical. */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
                 {AGENTS.map((agent, i) => {
                   const angle = (i * 60 - 30) * (Math.PI / 180);
                   const radius = 140;
-                  const x = 50 + (Math.cos(angle) * radius / 4);
-                  const y = 50 + (Math.sin(angle) * radius / 4);
+                  const x = Number((50 + Math.cos(angle) * radius / 4).toFixed(3));
+                  const y = Number((50 + Math.sin(angle) * radius / 4).toFixed(3));
                   return (
                     <line
                       key={i}
@@ -706,15 +795,20 @@ export default function HomePage() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[
-                { icon: '🏛️', title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
-                { icon: '⚡', title: 'Code Generator', desc: 'Generates complete Next.js, React, Tailwind CSS, and Prisma files with a no-truncation invariant — no stubs, no TODOs. Production-readiness still depends on your auth/ratelimit/DB choices', color: '#fbbf24' },
-                { icon: '🔧', title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
-                { icon: '📸', title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
-                { icon: '🚀', title: 'Durable Deploy to Vercel', desc: 'Env-var preflight, build-error classification, and automatic rollback recommendation on failure. Not instant — durable, with human approval on risky steps', color: '#c084fc' },
-                { icon: '🔖', title: 'Checkpoint-Revert', desc: 'Every stage auto-snapshots with a structural diff (+added ~modified -deleted). One-click restore — restores are themselves reversible.', color: '#fb923c' },
+                { iconName: 'architecture' as LandingIconName, title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
+                { iconName: 'bolt' as LandingIconName, title: 'Code Generator', desc: 'Generates complete Next.js, React, Tailwind CSS, and Prisma files with a no-truncation invariant — no stubs, no TODOs. Production-readiness still depends on your auth/ratelimit/DB choices', color: '#fbbf24' },
+                { iconName: 'wrench' as LandingIconName, title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
+                { iconName: 'camera' as LandingIconName, title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
+                { iconName: 'rocket' as LandingIconName, title: 'Durable Deploy to Vercel', desc: 'Env-var preflight, build-error classification, and automatic rollback recommendation on failure. Not instant — durable, with human approval on risky steps', color: '#c084fc' },
+                { iconName: 'bookmark' as LandingIconName, title: 'Checkpoint-Revert', desc: 'Every stage auto-snapshots with a structural diff (+added ~modified -deleted). One-click restore — restores are themselves reversible.', color: '#fb923c' },
               ].map((feature) => (
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
-                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <div
+                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
+                    style={{ background: `${feature.color}15`, color: feature.color }}
+                  >
+                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
+                  </div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
                   <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>
@@ -742,19 +836,21 @@ export default function HomePage() {
             {/* Tool Categories Grid */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
               {[
-                { icon: '📧', category: 'Email', count: 10, tools: 'Read, draft, send, search, labels, filters', color: '#EA4335' },
-                { icon: '📅', category: 'Calendar', count: 3, tools: 'List events, create events, find availability', color: '#4285F4' },
-                { icon: '🌐', category: 'Browser', count: 30, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, social posting', color: '#34d399' },
-                { icon: '📄', category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, image gen', color: '#8B5CF6' },
-                { icon: '📊', category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
-                { icon: '👤', category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
-                { icon: '🔍', category: 'Research', count: 31, tools: 'Web search, fetch, SEO audit, keywords, SERP, platform discovery', color: '#06B6D4' },
-                { icon: '🧠', category: 'Knowledge', count: 9, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
-                { icon: '🔔', category: 'Webhooks', count: 2, tools: 'External webhook delivery, Vercel deploy', color: '#fb923c' },
+                { iconName: 'mail' as LandingIconName, category: 'Email', count: 10, tools: 'Read, draft, send, search, labels, filters', color: '#EA4335' },
+                { iconName: 'calendar' as LandingIconName, category: 'Calendar', count: 3, tools: 'List events, create events, find availability', color: '#4285F4' },
+                { iconName: 'globe' as LandingIconName, category: 'Browser', count: 30, tools: 'Navigate, click, fill forms, screenshot, PDF, cookies, social posting', color: '#34d399' },
+                { iconName: 'document' as LandingIconName, category: 'Document', count: 16, tools: 'Read, write, summarize, extract data, PDF analysis, image gen', color: '#8B5CF6' },
+                { iconName: 'chart' as LandingIconName, category: 'Spreadsheet', count: 4, tools: 'Parse CSV, compute stats, generate reports, export', color: '#10B981' },
+                { iconName: 'user' as LandingIconName, category: 'CRM', count: 14, tools: 'Contacts, deals, enrichment, lead scoring, dedup, signals', color: '#F59E0B' },
+                { iconName: 'search' as LandingIconName, category: 'Research', count: 31, tools: 'Web search, fetch, SEO audit, keywords, SERP, platform discovery', color: '#06B6D4' },
+                { iconName: 'brain' as LandingIconName, category: 'Knowledge', count: 9, tools: 'Memory store, retrieve, search, classify, Q&A', color: '#c084fc' },
+                { iconName: 'bell' as LandingIconName, category: 'Webhooks', count: 2, tools: 'External webhook delivery, Vercel deploy', color: '#fb923c' },
               ].map((cat) => (
                 <div key={cat.category} className="glass-card rounded-xl p-4 card-lift">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{cat.icon}</span>
+                    <span className="inline-flex h-6 w-6 items-center justify-center" style={{ color: cat.color }}>
+                      <LandingIcon name={cat.iconName} className="h-5 w-5" />
+                    </span>
                     <h3 className="font-display font-semibold text-sm text-white">{cat.category}</h3>
                     <span className="ml-auto text-xs font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{cat.count === 0 ? '∞' : cat.count}</span>
                   </div>
@@ -805,15 +901,18 @@ export default function HomePage() {
             {/* Pipeline Steps */}
             <div className="grid gap-6 md:grid-cols-5 mb-16">
               {[
-                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', icon: '💬', color: '#34d399' },
-                { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', icon: '🏛️', color: '#fbbf24' },
-                { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', icon: '⚡', color: '#38bdf8' },
-                { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', icon: '🔧', color: '#f472b6' },
-                { step: '05', title: 'Preview', desc: 'Live preview in browser. Iterate via chat. Deploy.', icon: '🚀', color: '#c084fc' },
+                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', iconName: 'chat' as LandingIconName, color: '#34d399' },
+                { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', iconName: 'architecture' as LandingIconName, color: '#fbbf24' },
+                { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', iconName: 'bolt' as LandingIconName, color: '#38bdf8' },
+                { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', iconName: 'wrench' as LandingIconName, color: '#f472b6' },
+                { step: '05', title: 'Preview', desc: 'Live preview in browser. Iterate via chat. Deploy.', iconName: 'rocket' as LandingIconName, color: '#c084fc' },
               ].map((s, i) => (
                 <div key={s.step} className="text-center">
-                  <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl" style={{ background: `${s.color}15`, border: `1px solid ${s.color}30` }}>
-                    {s.icon}
+                  <div
+                    className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                    style={{ background: `${s.color}15`, border: `1px solid ${s.color}30`, color: s.color }}
+                  >
+                    <LandingIcon name={s.iconName} className="h-6 w-6" />
                   </div>
                   <div className="text-[10px] font-mono text-slate-500 mb-1 uppercase tracking-widest">Step {s.step}</div>
                   <h3 className="font-display font-semibold text-white text-sm mb-1">{s.title}</h3>
@@ -929,15 +1028,20 @@ export default function HomePage() {
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {[
-                { icon: '📧', title: 'Email Threat Detection', desc: 'Phishing, spoofing, BEC fraud, credential harvesting, social engineering. SPF/DKIM validation, sender reputation, content analysis.', color: '#ef4444' },
-                { icon: '📄', title: 'Document Verification', desc: 'Metadata tampering, forgery indicators, font anomalies, author mismatches. Catches fake certificates and altered contracts.', color: '#f59e0b' },
-                { icon: '💳', title: 'Transaction Risk Analysis', desc: 'Invoice fraud, duplicate detection, bank detail changes (BEC pattern), suspicious amounts, crypto payment flags.', color: '#8b5cf6' },
-                { icon: '🎓', title: 'Identity Verification', desc: 'Resume timeline validation, impossible experience claims, credential anomalies, skill inflation detection.', color: '#06b6d4' },
-                { icon: '🔗', title: 'Cross-Evidence Correlation', desc: 'Connects findings across emails + documents + transactions + identities to detect coordinated fraud that single-type analysis misses.', color: '#ec4899' },
-                { icon: '🛡️', title: '4-Layer Escalation', desc: 'Free rules first ($0). Then AI Tier 1 ($0.01). Premium AI only on ambiguity ($0.50). Human review as last resort. 70% of checks stop at Layer 1.', color: '#34d399' },
+                { iconName: 'mail' as LandingIconName, title: 'Email Threat Detection', desc: 'Phishing, spoofing, BEC fraud, credential harvesting, social engineering. SPF/DKIM validation, sender reputation, content analysis.', color: '#ef4444' },
+                { iconName: 'document' as LandingIconName, title: 'Document Verification', desc: 'Metadata tampering, forgery indicators, font anomalies, author mismatches. Catches fake certificates and altered contracts.', color: '#f59e0b' },
+                { iconName: 'card' as LandingIconName, title: 'Transaction Risk Analysis', desc: 'Invoice fraud, duplicate detection, bank detail changes (BEC pattern), suspicious amounts, crypto payment flags.', color: '#8b5cf6' },
+                { iconName: 'academic-cap' as LandingIconName, title: 'Identity Verification', desc: 'Resume timeline validation, impossible experience claims, credential anomalies, skill inflation detection.', color: '#06b6d4' },
+                { iconName: 'link' as LandingIconName, title: 'Cross-Evidence Correlation', desc: 'Connects findings across emails + documents + transactions + identities to detect coordinated fraud that single-type analysis misses.', color: '#ec4899' },
+                { iconName: 'shield' as LandingIconName, title: '4-Layer Escalation', desc: 'Free rules first ($0). Then AI Tier 1 ($0.01). Premium AI only on ambiguity ($0.50). Human review as last resort. 70% of checks stop at Layer 1.', color: '#34d399' },
               ].map((feature) => (
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
-                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <div
+                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
+                    style={{ background: `${feature.color}15`, color: feature.color }}
+                  >
+                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
+                  </div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
                   <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>
@@ -954,21 +1058,26 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl">
             <div className="text-center mb-16">
               <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-3 font-sans">Enterprise Intelligence</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Agents That Learn, Connect &amp; Recover</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Memory-aware agents, automatic context engineering, Slack channel bridge, voice-to-workflow trigger, and a typed SDK. Extracted from DeerFlow 2.0 research.</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">Agents That Remember, Integrate, and Recover.</h2>
+              <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">Persistent memory. Self-healing retries. Slack and voice bridges. A typed SDK. <span className="text-slate-400">Production depth &mdash; not demo magic.</span></p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {[
-                { icon: '🧠', title: 'Memory System', desc: 'LLM-powered fact extraction from completed workflows. Token-budgeted retrieval injected into agent prompts via <memory> tags. Every execution makes agents smarter.', color: '#8b5cf6' },
-                { icon: '🎯', title: 'Context Engineering', desc: 'Automatic context summarization prevents token overflow on long DAGs. Protects current task + dependencies, compresses older results. Never lose context.', color: '#06b6d4' },
-                { icon: '💬', title: 'Slack Channel Bridge', desc: 'Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling, team-scoped tenancy.', color: '#4A154B' },
-                { icon: '🎤', title: 'Voice → Workflow', desc: 'Convert voice session transcripts into full workflow executions. Speak your intent, agents execute. 4 voice providers supported.', color: '#f472b6' },
-                { icon: '📦', title: '@jak-swarm/client SDK', desc: 'Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, and health checks. npm install @jak-swarm/client.', color: '#34d399' },
-                { icon: '🔄', title: 'Error Recovery & Loop Detection', desc: 'Tool crashes produce recoverable error messages. Fingerprint-based loop detection (3x threshold) prevents infinite retries. Workflows self-heal.', color: '#fbbf24' },
+                { iconName: 'brain' as LandingIconName, title: 'Memory System', desc: 'LLM-powered fact extraction from completed workflows. Token-budgeted retrieval injected into agent prompts via <memory> tags. Every execution makes agents smarter.', color: '#8b5cf6' },
+                { iconName: 'target' as LandingIconName, title: 'Context Engineering', desc: 'Automatic context summarization prevents token overflow on long DAGs. Protects current task + dependencies, compresses older results. Never lose context.', color: '#06b6d4' },
+                { iconName: 'chat' as LandingIconName, title: 'Slack Channel Bridge', desc: 'Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling, team-scoped tenancy.', color: '#4A154B' },
+                { iconName: 'microphone' as LandingIconName, title: 'Voice → Workflow', desc: 'Convert voice session transcripts into full workflow executions. Speak your intent, agents execute. 4 voice providers supported.', color: '#f472b6' },
+                { iconName: 'package' as LandingIconName, title: '@jak-swarm/client SDK', desc: 'Typed TypeScript API client with SSE streaming, workflow management, memory CRUD, and health checks. npm install @jak-swarm/client.', color: '#34d399' },
+                { iconName: 'refresh' as LandingIconName, title: 'Error Recovery & Loop Detection', desc: 'Tool crashes produce recoverable error messages. Fingerprint-based loop detection (3x threshold) prevents infinite retries. Workflows self-heal.', color: '#fbbf24' },
               ].map((feature) => (
                 <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
-                  <div className="text-2xl mb-3">{feature.icon}</div>
+                  <div
+                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
+                    style={{ background: `${feature.color}15`, color: feature.color }}
+                  >
+                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
+                  </div>
                   <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
                   <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
                 </div>

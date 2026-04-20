@@ -64,9 +64,14 @@ const CONNECTIONS = [
 function getNodePosition(ring: typeof CAPABILITY_RINGS[number], index: number) {
   const angleStep = (2 * Math.PI) / ring.items.length;
   const angle = angleStep * index - Math.PI / 2;
+  // Round to 3 decimal places so SSR + client string serialization match
+  // exactly. Raw Math.cos/sin floats produce identical numbers but React's
+  // attribute stringifier truncates them slightly differently on Node vs
+  // browser (drift in the 14th decimal) — firing a hydration warning +
+  // dev overlay on every page load.
   return {
-    x: Math.cos(angle) * ring.radius,
-    y: Math.sin(angle) * ring.radius,
+    x: Number((Math.cos(angle) * ring.radius).toFixed(3)),
+    y: Number((Math.sin(angle) * ring.radius).toFixed(3)),
   };
 }
 
@@ -119,11 +124,12 @@ export default function CapabilityMap() {
           transition={{ duration: 0.6 }}
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">Architecture</p>
-          <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
+          <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">
             38 agents. 119 tools. One platform.
           </h2>
-          <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">
-            Every agent connects to the tools it needs. Hover to see the architecture.
+          <p className="mt-5 text-slate-400 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">
+            Every agent wires into the exact tools it needs &mdash; no glue code, no duct tape.
+            <span className="block mt-1 text-xs sm:text-sm text-slate-500">Tap or hover any node to trace the graph.</span>
           </p>
         </motion.div>
 
@@ -196,21 +202,24 @@ export default function CapabilityMap() {
               </text>
             </g>
 
-            {/* Ring labels */}
-            {CAPABILITY_RINGS.map((ring) => (
-              <text
-                key={ring.ring}
-                x={center}
-                y={center - ring.radius - 10}
-                textAnchor="middle"
-                fontSize="8"
-                fontFamily="var(--font-mono)"
-                fill="rgba(255,255,255,0.15)"
-                letterSpacing="2"
-              >
-                {ring.label.toUpperCase()}
-              </text>
-            ))}
+            {/* Ring labels — offset above the top node of each ring so they never overlap */}
+            {CAPABILITY_RINGS.map((ring) => {
+              const nodeSize = ring.ring === 'core' ? 22 : 16;
+              return (
+                <text
+                  key={ring.ring}
+                  x={center}
+                  y={center - ring.radius - nodeSize - 14}
+                  textAnchor="middle"
+                  fontSize="9"
+                  fontFamily="var(--font-mono)"
+                  fill="rgba(255,255,255,0.22)"
+                  letterSpacing="2.5"
+                >
+                  {ring.label.toUpperCase()}
+                </text>
+              );
+            })}
 
             {/* Nodes */}
             {CAPABILITY_RINGS.map((ring) =>
