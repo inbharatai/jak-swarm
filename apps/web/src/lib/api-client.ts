@@ -349,6 +349,93 @@ export const toolApi = {
     apiClient.post<unknown>(`/tools/${toolName}/execute`, input),
 };
 
+// ─── Documents API (Track 2) ────────────────────────────────────────────────
+
+export interface TenantDocument {
+  id: string;
+  tenantId: string;
+  uploadedBy: string | null;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey: string;
+  contentHash: string | null;
+  status: 'PENDING' | 'INDEXED' | 'FAILED' | 'DELETED';
+  ingestionError: string | null;
+  tags: string[];
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Included only on GET /documents/:id — short-lived signed URL. */
+  signedUrl?: string;
+  signedUrlExpiresIn?: number;
+}
+
+export interface DocumentListResponse {
+  items: TenantDocument[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const documentApi = {
+  /** GET /documents — paginated list of tenant documents. */
+  list: (params?: { limit?: number; offset?: number; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    if (params?.status) q.set('status', params.status);
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return apiFetch<{ success: true; data: DocumentListResponse }>(`/documents${suffix}`);
+  },
+
+  /** GET /documents/:id — metadata + fresh signed URL. */
+  get: (id: string) =>
+    apiFetch<{ success: true; data: TenantDocument }>(`/documents/${id}`),
+
+  /**
+   * POST /documents/upload — multipart/form-data.
+   *
+   * Uses raw fetch instead of the JSON-default `apiClient.post` because the
+   * multipart body must carry a FormData payload + browser-managed Content-Type
+   * boundary. Auth header is injected via getToken() the same way other calls do.
+   */
+  upload: async (file: File, opts?: { tags?: string[]; metadata?: Record<string, unknown> }) => {
+    const token = await getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    if (opts?.tags && opts.tags.length > 0) {
+      formData.append('tags', opts.tags.join(','));
+    }
+    if (opts?.metadata) {
+      formData.append('metadataJson', JSON.stringify(opts.metadata));
+    }
+
+    const response = await fetch(`${BASE_URL}/documents/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: { message: 'Upload failed' } }));
+      throw {
+        message: err.error?.message ?? 'Upload failed',
+        code: err.error?.code ?? 'UPLOAD_FAILED',
+        status: response.status,
+      } as ApiError;
+    }
+
+    return response.json() as Promise<{ success: true; data: TenantDocument }>;
+  },
+
+  /** DELETE /documents/:id — removes storage object + cascades chunk cleanup. */
+  delete: (id: string) =>
+    apiClient.delete<{ success: true; data: { id: string; deleted: true } }>(
+      `/documents/${id}`,
+    ),
+};
+
 export const voiceApi = {
   /**
    * Alias for createSession — used by the VoiceInput hook.

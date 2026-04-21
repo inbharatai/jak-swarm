@@ -16,6 +16,7 @@ import {
   BarChart3,
   Network,
   ShieldCheck,
+  FileText,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: '/builder', label: 'Builder', icon: Hammer },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/integrations', label: 'Integrations', icon: Plug },
+  { href: '/files', label: 'Files', icon: FileText },
   { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
   { href: '/skills', label: 'Skills', icon: Sparkles },
   { href: '/admin', label: 'Admin', icon: ShieldCheck },
