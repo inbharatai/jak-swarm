@@ -55,7 +55,19 @@ export interface SwarmState {
   accumulatedCostUsd: number;
   maxCostUsd?: number;
 
-  // Auto-approval threshold
+  // Auto-approval policy.
+  //
+  // Default policy: every task routed to the approval node pauses at
+  // WorkflowStatus.AWAITING_APPROVAL until an operator decides via
+  // POST /approvals/:id/decide. Tenants that want lower-risk tasks to
+  // skip human review must explicitly set `autoApproveEnabled = true`
+  // AND configure an `approvalThreshold` (LOW | MEDIUM | HIGH | CRITICAL).
+  //
+  // Tasks with risk BELOW that threshold auto-approve; everything at-or-above
+  // the threshold still pauses. This keeps landing-page claims ("human
+  // approval on high-risk actions") structurally honest: the gate is
+  // blocking by default, opt-in-bypass by tenant choice.
+  autoApproveEnabled?: boolean;
   approvalThreshold?: string;
 
   // Tenant browser config
@@ -87,6 +99,7 @@ export function createInitialSwarmState(params: {
   roleModes?: string[];
   idempotencyKey?: string;
   maxCostUsd?: number;
+  autoApproveEnabled?: boolean;
   approvalThreshold?: string;
   allowedDomains?: string[];
   browserAutomationEnabled?: boolean;
@@ -119,6 +132,7 @@ export function createInitialSwarmState(params: {
     taskRetryCount: {},
     accumulatedCostUsd: 0,
     maxCostUsd: params.maxCostUsd,
+    autoApproveEnabled: params.autoApproveEnabled ?? false,
     approvalThreshold: params.approvalThreshold,
     allowedDomains: params.allowedDomains ?? [],
     browserAutomationEnabled: params.browserAutomationEnabled ?? false,

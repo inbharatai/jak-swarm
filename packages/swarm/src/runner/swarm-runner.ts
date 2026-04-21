@@ -26,6 +26,12 @@ export interface RunParams {
   onStateChange?: (workflowId: string, state: unknown) => Promise<void>;
   onAgentActivity?: (data: unknown) => void;
   maxCostUsd?: number;
+  /**
+   * Opt-in auto-approve bypass for tasks with risk strictly below
+   * `approvalThreshold`. Default (false) means every task routed to
+   * the approval node pauses for human review.
+   */
+  autoApproveEnabled?: boolean;
   approvalThreshold?: string;
   allowedDomains?: string[];
   browserAutomationEnabled?: boolean;
@@ -153,6 +159,7 @@ export class SwarmRunner {
       roleModes: params.roleModes,
       idempotencyKey: params.idempotencyKey,
       maxCostUsd: params.maxCostUsd,
+      autoApproveEnabled: params.autoApproveEnabled,
       approvalThreshold: params.approvalThreshold,
       allowedDomains: params.allowedDomains,
       browserAutomationEnabled: params.browserAutomationEnabled,

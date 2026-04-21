@@ -131,6 +131,33 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
           comment,
         });
 
+        // Append-only structured record of the decision (parallel to the
+        // generic audit log; this one is queryable by compliance for "who
+        // approved action X on date Y" without having to parse action strings).
+        // Best-effort — never block the resume on an audit write failure.
+        try {
+          await fastify.db.approvalAuditLog.create({
+            data: {
+              approvalId: approval.id,
+              workflowId: approval.workflowId,
+              tenantId: request.user.tenantId,
+              taskId: approval.taskId,
+              agentRole: approval.agentRole,
+              riskLevel: approval.riskLevel ?? 'HIGH',
+              decision,
+              autoApproved: false,
+              approverId: request.user.userId,
+              rationale: comment ?? null,
+              rawDecisionJson: { decision, comment: comment ?? null, ip: request.ip },
+            },
+          });
+        } catch (auditErr) {
+          request.log.warn(
+            { approvalId: approval.id, err: auditErr instanceof Error ? auditErr.message : String(auditErr) },
+            '[approvals] Failed to persist ApprovalAuditLog row — decision still applied',
+          );
+        }
+
         // Enqueue the resume as a durable control job so the reviewer gets an
         // immediate response AND the resume survives an API crash between now and
         // the actual swarm run.
@@ -173,6 +200,30 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
         );
 
         await fastify.auditLog(request, 'APPROVAL_DEFERRED', 'ApprovalRequest', approvalId);
+
+        try {
+          await fastify.db.approvalAuditLog.create({
+            data: {
+              approvalId: approval.id,
+              workflowId: approval.workflowId,
+              tenantId: request.user.tenantId,
+              taskId: approval.taskId,
+              agentRole: approval.agentRole,
+              riskLevel: approval.riskLevel ?? 'HIGH',
+              decision: 'DEFERRED',
+              autoApproved: false,
+              approverId: request.user.userId,
+              rationale: body?.comment ?? null,
+              rawDecisionJson: { decision: 'DEFERRED', comment: body?.comment ?? null, ip: request.ip },
+            },
+          });
+        } catch (auditErr) {
+          request.log.warn(
+            { approvalId: approval.id, err: auditErr instanceof Error ? auditErr.message : String(auditErr) },
+            '[approvals] Failed to persist ApprovalAuditLog row for deferral',
+          );
+        }
+
         return reply.status(200).send(ok(approval));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));

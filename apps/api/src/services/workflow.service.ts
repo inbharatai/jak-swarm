@@ -342,6 +342,8 @@ export class WorkflowService {
     id: row['id'] as string,
     workflowId: row['workflowId'] as string,
     tenantId: row['tenantId'] as string,
+    taskId: row['taskId'] as string,
+    agentRole: row['agentRole'] as string,
     requestedBy: '',
     reviewedBy: (row['reviewedBy'] as string | null) ?? null,
     action: row['action'] as string,

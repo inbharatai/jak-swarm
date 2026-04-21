@@ -16,6 +16,12 @@ model Tenant {
   plan                    String   @default("FREE")   // TenantPlan enum
   industry                String?  // Industry enum
   requireApprovals        Boolean  @default(true)
+  // When false (default for NEW tenants), every task routed to the approval
+  // node pauses for human review regardless of approvalThreshold. When true,
+  // tasks with risk strictly below approvalThreshold auto-approve. Existing
+  // tenants are back-filled to `true` in the migration to preserve behavior;
+  // only tenants created AFTER the migration get the strict default.
+  autoApproveEnabled      Boolean  @default(false)
   approvalThreshold       String   @default("HIGH")   // RiskLevel
   allowedDomains          String[] @default([])
   maxConcurrentWorkflows  Int      @default(5)
@@ -213,6 +219,34 @@ model ApprovalRequest {
   @@index([workflowId, status])
   @@index([tenantId, status])
   @@map("approval_requests")
+}
+
+// Append-only audit log of every approval decision ever made, including
+// auto-approvals, rejections, deferrals, and human approvals. This is the
+// source of truth for compliance queries ("prove who approved action X on
+// date Y") and for observing tenant auto-approve behaviour over time.
+//
+// Rows are NEVER deleted except via explicit data-retention jobs; updating
+// the ApprovalRequest row does not mutate the history recorded here.
+model ApprovalAuditLog {
+  id             String   @id @default(cuid())
+  approvalId     String   // FK to ApprovalRequest (soft ref — kept even after request cleanup)
+  workflowId     String
+  tenantId       String
+  taskId         String
+  agentRole      String
+  riskLevel      String
+  decision       String   // APPROVED | REJECTED | DEFERRED | AUTO_APPROVED
+  autoApproved   Boolean  @default(false)
+  approverId     String?  // null for auto-approvals
+  rationale      String?
+  rawDecisionJson Json?   // full request body for forensic debugging
+  decidedAt      DateTime @default(now())
+
+  @@index([tenantId, decidedAt])
+  @@index([workflowId])
+  @@index([approvalId])
+  @@map("approval_audit_logs")
 }
 
 model Skill {

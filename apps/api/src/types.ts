@@ -131,6 +131,11 @@ export interface ApprovalRequest {
   id: string;
   workflowId: string;
   tenantId: string;
+  // Task-scope fields from the underlying ApprovalRequest row. Exposed so
+  // the audit-log writer in approvals.routes.ts can persist a structured
+  // record without re-querying the DB.
+  taskId: string;
+  agentRole: string;
   requestedBy: string;
   reviewedBy: string | null;
   action: string;

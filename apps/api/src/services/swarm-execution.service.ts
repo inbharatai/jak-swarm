@@ -703,6 +703,12 @@ export class SwarmExecutionService extends EventEmitter {
               '[Swarm] CRITICAL: Failed to persist workflow state — state may be lost on restart');
           }
         },
+        // Approval auto-bypass is now opt-in. Tenants must explicitly set
+        // `autoApproveEnabled = true` AND `approvalThreshold` for risk-below-
+        // threshold tasks to skip human review. Default false keeps the gate
+        // blocking, matching the landing-page claim of human approval on high-risk
+        // actions.
+        autoApproveEnabled: Boolean((tenant as any)?.autoApproveEnabled),
         approvalThreshold: (tenant as any)?.approvalThreshold ?? undefined,
         allowedDomains: (tenant as any)?.allowedDomains ?? [],
         browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),

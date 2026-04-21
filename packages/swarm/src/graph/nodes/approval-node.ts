@@ -7,14 +7,22 @@ import { getCurrentTask } from '../../state/swarm-state.js';
 const RISK_ORDER: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
 
 export async function approvalNode(state: SwarmState): Promise<Partial<SwarmState>> {
-  // Auto-approve if task risk is below tenant's approval threshold
-  if (state.approvalThreshold) {
+  // Auto-approve only if the tenant has EXPLICITLY opted in via
+  // `autoApproveEnabled = true` AND the task risk is strictly below the
+  // configured threshold. Default (false) is: every task routed here
+  // pauses at AWAITING_APPROVAL until an operator decides. This keeps
+  // the landing-page claim ("human approval on high-risk actions")
+  // structurally honest instead of being a marketing promise the code
+  // silently bypasses.
+  if (state.autoApproveEnabled === true && state.approvalThreshold) {
     const autoTask = getCurrentTask(state);
     if (autoTask) {
       const taskRisk = RISK_ORDER[autoTask.riskLevel ?? 'HIGH'] ?? 4;
       const threshold = RISK_ORDER[state.approvalThreshold] ?? 3;
       if (taskRisk < threshold) {
-        // Auto-approve: task risk is below the threshold
+        // Auto-approve: tenant opted in + task risk is below the threshold.
+        // Every auto-approval is still recorded (autoApproved: true) so the
+        // audit trail shows WHY it skipped human review, not just that it did.
         return {
           pendingApprovals: [{
             id: generateId('apr_'),
@@ -22,8 +30,8 @@ export async function approvalNode(state: SwarmState): Promise<Partial<SwarmStat
             taskId: autoTask.id,
             agentRole: autoTask.agentRole,
             action: autoTask.name,
-            rationale: `Auto-approved: risk level ${autoTask.riskLevel ?? 'UNKNOWN'} is below threshold ${state.approvalThreshold}`,
-            proposedData: { autoApproved: true },
+            rationale: `Auto-approved: tenant opt-in + risk level ${autoTask.riskLevel ?? 'UNKNOWN'} is below threshold ${state.approvalThreshold}`,
+            proposedData: { autoApproved: true, taskRisk: autoTask.riskLevel, threshold: state.approvalThreshold },
             riskLevel: autoTask.riskLevel,
             status: 'APPROVED',
             reviewedAt: new Date(),
