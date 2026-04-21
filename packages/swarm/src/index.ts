@@ -117,3 +117,11 @@ export {
   applySummarizationIfNeeded,
 } from './context/index.js';
 export type { SummarizationConfig } from './context/index.js';
+
+// Coordination — unified resilience wrapper (timeout + retry + breaker + error taxonomy)
+export {
+  executeGuarded,
+  classifyError,
+  ExecutionError,
+} from './coordination/execute-guarded.js';
+export type { ExecutionErrorClass, ExecuteGuardedOptions } from './coordination/execute-guarded.js';
