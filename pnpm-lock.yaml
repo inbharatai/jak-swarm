@@ -414,6 +414,9 @@ importers:
 
   packages/tools:
     dependencies:
+      '@jak-swarm/db':
+        specifier: workspace:*
+        version: link:../db
       '@jak-swarm/shared':
         specifier: workspace:*
         version: link:../shared
@@ -447,10 +450,6 @@ importers:
       zod:
         specifier: ^3.23.8
         version: 3.25.76
-    optionalDependencies:
-      '@jak-swarm/db':
-        specifier: workspace:*
-        version: link:../db
     devDependencies:
       '@types/node':
         specifier: ^22.10.7

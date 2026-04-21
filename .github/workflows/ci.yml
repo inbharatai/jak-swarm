@@ -36,10 +36,15 @@ jobs:
         run: pnpm --filter @jak-swarm/db exec prisma generate
 
       - name: Build all packages (dependency order)
+        # @jak-swarm/db MUST build before tools: Track 2's find_document tool
+        # imports Prisma's `prisma` singleton from @jak-swarm/db for the
+        # TenantDocument name/tag lookup path. Keeping db out of the build
+        # order produces a "Cannot find module '@jak-swarm/db'" TS2307 error.
         run: |
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
@@ -109,6 +114,7 @@ jobs:
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
 
@@ -335,6 +341,7 @@ jobs:
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
 
       - name: Run docs truth check

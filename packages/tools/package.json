@@ -17,6 +17,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@jak-swarm/db": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/verification": "workspace:^",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -28,9 +29,6 @@
     "playwright": "^1.59.1",
     "tsdav": "^2.1.8",
     "zod": "^3.23.8"
-  },
-  "optionalDependencies": {
-    "@jak-swarm/db": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
