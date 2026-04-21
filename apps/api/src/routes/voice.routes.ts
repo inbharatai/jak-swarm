@@ -62,17 +62,36 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Build the WebRTC offer configuration.
       // The client uses these to connect to the OpenAI Realtime API directly.
+      //
+      // ICE strategy:
+      //   1. Google STUN as a baseline — works from residential + most
+      //      corporate networks with standard (non-symmetric) NAT.
+      //   2. Operator-provided TURN relay if configured via
+      //      VOICE_TURN_URL / VOICE_TURN_USERNAME / VOICE_TURN_CREDENTIAL —
+      //      required for symmetric NAT, restrictive firewalls, and
+      //      mobile carriers that block UDP. If any of the three env
+      //      vars is unset, TURN is silently omitted and we fall back
+      //      to STUN-only (documented in docs/demos/voice-to-workflow.md).
+      const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
+        { urls: 'stun:stun.l.google.com:19302' },
+      ];
+      if (config.voiceTurnUrl && config.voiceTurnUsername && config.voiceTurnCredential) {
+        iceServers.push({
+          urls: config.voiceTurnUrl,
+          username: config.voiceTurnUsername,
+          credential: config.voiceTurnCredential,
+        });
+      }
+
       const webRtcConfig = {
         model: config.openaiRealtimeModel,
         voice,
         language,
-        // ICE servers — in production replace with TURN credentials
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        iceServers,
         // The client should use this endpoint to exchange SDP with OpenAI
         realtimeEndpoint: 'https://api.openai.com/v1/realtime',
-        // NOTE: Never expose the raw API key to the client.
-        // A production implementation would exchange a short-lived ephemeral token
-        // here via the OpenAI Realtime Sessions API.
+        // NEVER expose the raw API key to the client. Exchange a short-lived
+        // ephemeral token here via the OpenAI Realtime Sessions API.
         ephemeralTokenEndpoint: `/voice/sessions/${sessionId}/token`,
       };
 

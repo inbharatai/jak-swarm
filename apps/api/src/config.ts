@@ -77,6 +77,16 @@ export const config = {
   // LLM provider API keys. At least one is required. Agents log a warning if all are missing.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',
   openaiRealtimeModel: process.env['OPENAI_REALTIME_MODEL'] ?? 'gpt-4o-realtime-preview',
+  // WebRTC ICE servers for voice sessions.
+  // Google STUN is a permissive default that works from most residential networks.
+  // For corporate networks behind symmetric NAT, operators should provision a
+  // TURN server (e.g. via Twilio Network Traversal or coturn) and set these
+  // three env vars; the voice route will then emit a turn: URL alongside the
+  // stun: fallback so clients can connect through the relay when direct
+  // peer-to-peer fails.
+  voiceTurnUrl: process.env['VOICE_TURN_URL'] ?? '',       // e.g. turn:relay.example.com:3478
+  voiceTurnUsername: process.env['VOICE_TURN_USERNAME'] ?? '',
+  voiceTurnCredential: process.env['VOICE_TURN_CREDENTIAL'] ?? '',
   anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? '',
   geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
   deepseekApiKey: process.env['DEEPSEEK_API_KEY'] ?? '',

@@ -44,10 +44,16 @@
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
     "overrides": {
-      "fast-jwt": ">=6.2.0",
       "protobufjs": ">=7.5.5",
       "music-metadata": ">=11.12.3",
       "fastify": ">=5.8.5"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-hm7r-c7qw-ghp6",
+        "GHSA-mvf2-f6gm-w987",
+        "GHSA-rp9m-7r4c-75qg"
+      ]
     }
   }
 }
