@@ -196,6 +196,73 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   # ---------------------------------------------------------------------------
+  # Dependency audit — blocks merge if any transitive prod dep has a known
+  # high/critical CVE. Dependabot PRs flow through this same gate so security
+  # fixes can never regress silently.
+  # ---------------------------------------------------------------------------
+  dependency-audit:
+    name: Dependency Audit (pnpm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies (fail on high/critical)
+        # --prod limits the scan to what ships to users; dev-only tooling (eslint,
+        # vitest, etc.) is intentionally excluded so a vulnerability in, say, a
+        # test helper can't block a release.
+        run: pnpm audit --audit-level=high --prod
+
+  # ---------------------------------------------------------------------------
+  # SBOM generation — emits a CycloneDX software bill of materials for every
+  # push to main. Operators or auditors pulling a release can answer "what
+  # library versions were in production on date X" without a rebuild.
+  # ---------------------------------------------------------------------------
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate CycloneDX SBOM (JSON)
+        run: pnpm dlx @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.json
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------
   # Truth check — blocks merge if README / landing-page claims drift from the
   # live tool manifest and integration maturity matrix.
   # ---------------------------------------------------------------------------

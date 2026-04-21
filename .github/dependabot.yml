@@ -1,0 +1,84 @@
+# Dependabot config — weekly dependency updates with security-focused grouping.
+#
+# Strategy:
+# - Weekly cadence (Monday 09:00 UTC) keeps noise low while staying current.
+# - npm updates are grouped per ecosystem so we get ~2-3 PRs/week max.
+# - github-actions pins are updated separately (rarer, security-sensitive).
+# - All PRs carry the `security` label so the security-gate CI job runs them.
+# - Security-only updates open immediately, regardless of schedule, for
+#   anything Dependabot classifies as a vulnerability.
+version: 2
+updates:
+  # ─── Node workspace (monorepo root + all packages/apps) ─────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Group related ecosystems so we don't drown in one-off PRs.
+    groups:
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+      fastify:
+        patterns:
+          - "fastify"
+          - "@fastify/*"
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "playwright"
+          - "@playwright/*"
+      tooling:
+        patterns:
+          - "typescript"
+          - "eslint*"
+          - "prettier"
+          - "turbo"
+      # All other runtime deps flow through the default "production-deps" group.
+      production-deps:
+        dependency-type: "production"
+        exclude-patterns:
+          - "fastify"
+          - "@fastify/*"
+          - "prisma"
+          - "@prisma/*"
+      development-deps:
+        dependency-type: "development"
+        exclude-patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "playwright"
+          - "@playwright/*"
+          - "typescript"
+          - "eslint*"
+          - "prettier"
+          - "turbo"
+
+  # ─── GitHub Actions ──────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
