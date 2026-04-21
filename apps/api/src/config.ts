@@ -87,6 +87,15 @@ export const config = {
   voiceTurnUrl: process.env['VOICE_TURN_URL'] ?? '',       // e.g. turn:relay.example.com:3478
   voiceTurnUsername: process.env['VOICE_TURN_USERNAME'] ?? '',
   voiceTurnCredential: process.env['VOICE_TURN_CREDENTIAL'] ?? '',
+
+  // Sentry — optional. When SENTRY_DSN is unset, the init becomes a silent
+  // no-op and zero bytes are shipped to Sentry. Operators turn this on by
+  // adding SENTRY_DSN to the Render env. tracesSampleRate + profilesSampleRate
+  // are tunable via env in case the default 10% produces too much volume.
+  sentryDsn: process.env['SENTRY_DSN'] ?? '',
+  sentryEnvironment: process.env['SENTRY_ENVIRONMENT'] ?? (process.env['NODE_ENV'] ?? 'development'),
+  sentryTracesSampleRate: Number(process.env['SENTRY_TRACES_SAMPLE_RATE'] ?? '0.1'),
+  sentryProfilesSampleRate: Number(process.env['SENTRY_PROFILES_SAMPLE_RATE'] ?? '0.1'),
   anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? '',
   geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
   deepseekApiKey: process.env['DEEPSEEK_API_KEY'] ?? '',

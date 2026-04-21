@@ -1,6 +1,10 @@
 // OTel MUST be initialized before any other import for proper auto-instrumentation
 import { initTracing } from './observability/tracing.js';
+import { initSentry, captureException, flushSentry } from './observability/sentry.js';
 await initTracing();
+// Sentry is safe to init after OTel — it hooks the same global process events.
+// If SENTRY_DSN is unset this is a silent no-op with zero overhead.
+await initSentry();
 
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
@@ -250,8 +254,14 @@ async function buildApp() {
       });
     }
 
-    // Unhandled/unexpected errors — log full details server-side, return safe message
+    // Unhandled/unexpected errors — log full details server-side, return safe message.
+    // Also ship to Sentry if configured; no-op otherwise.
     request.log.error({ err: error }, 'Unhandled error');
+    captureException(error, {
+      method: request.method,
+      url: request.url,
+      tenantId: (request as { user?: { tenantId?: string } }).user?.tenantId,
+    });
     return reply.status(500).send({
       success: false,
       error: {
@@ -284,10 +294,14 @@ async function main() {
       await stopWhatsAppClient(fastify.log);
       await releaseWhatsAppAutoStartLock(fastify.log, config.redisUrl ? fastify.redis : null);
       await fastify.close();
+      // Flush any pending Sentry events before exit — 2s is below Render's
+      // 10s SIGTERM→SIGKILL grace window.
+      await flushSentry(2000);
       fastify.log.info('Server closed gracefully');
       process.exit(0);
     } catch (err) {
       fastify.log.error({ err }, 'Error during graceful shutdown');
+      await flushSentry(2000);
       process.exit(1);
     }
   };

@@ -1,0 +1,138 @@
+# JAK Swarm — Grafana / Prometheus alert rules
+#
+# These are the alert conditions that page an on-call responder. They are the
+# hardening-plan Phase 6 minimum set:
+#
+#   1. Workflow stuck > 10 min at a single node (indicates a hung agent,
+#      a lost queue lease, or a stuck approval).
+#   2. 5+ tool failures in 5 min for a single tenant (provider outage or
+#      a specific tenant's credentials failing).
+#   3. Approval backlog > 20 (tenants who can't keep up with review).
+#   4. Paddle webhook failure (billing pipeline broken).
+#   5. Realtime voice 502 rate > 5% over 10 min (OpenAI realtime down or
+#      our proxy layer misbehaving).
+#
+# How to wire up:
+#   - Grafana Cloud → Alerting → Import YAML.
+#   - Configure the contact point (Slack / PagerDuty / email) separately;
+#     this file only declares the rules + severity.
+#   - The `jak_*` metrics are emitted by the API process (see
+#     apps/api/src/observability/metrics.ts). If a metric has no data in
+#     Prometheus yet, the alert will not fire (no-data behaviour: keep silent).
+#
+# Severity guide:
+#   - critical  → pages immediately, 24/7
+#   - warning   → notifies in-hours
+#   - info      → logged, no page
+
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: jak-swarm-core
+    folder: JAK Swarm
+    interval: 1m
+    rules:
+      - uid: wf-stuck-10min
+        title: Workflow stuck > 10 minutes
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by (workflow_id, tenant_id) (jak_workflow_current_node_age_seconds) > 600
+              intervalMs: 60000
+              refId: A
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          service: jak-swarm-api
+        annotations:
+          summary: "Workflow {{ $labels.workflow_id }} stuck at a node for > 10 min"
+          description: "Tenant {{ $labels.tenant_id }} — check traces UI or `/workflows/{{ $labels.workflow_id }}`. If the approval gate is blocking, it's expected; otherwise investigate queue-worker lease reclaim."
+
+      - uid: tool-failure-burst
+        title: 5+ tool failures in 5 min per tenant
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum by (tenant_id) (increase(jak_tool_execution_failures_total[5m])) >= 5
+              intervalMs: 60000
+              refId: A
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: jak-swarm-api
+        annotations:
+          summary: "Tenant {{ $labels.tenant_id }} — tool failure burst"
+          description: "Likely a provider outage or expired credentials. Check the tenant's integration statuses and the tool-failure breakdown by name."
+
+      - uid: approval-backlog
+        title: Approval backlog > 20 per tenant
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by (tenant_id) (jak_approvals_pending) > 20
+              intervalMs: 60000
+              refId: A
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: jak-swarm-api
+        annotations:
+          summary: "Tenant {{ $labels.tenant_id }} — approval backlog > 20"
+          description: "Human reviewer capacity is overwhelmed. Consider enabling autoApproveEnabled for low-risk categories via tenant settings, OR alert the tenant admin."
+
+      - uid: paddle-webhook-failure
+        title: Paddle webhook failures
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum(increase(jak_paddle_webhook_failures_total[15m])) > 0
+              intervalMs: 60000
+              refId: A
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          service: jak-swarm-api
+        annotations:
+          summary: "Paddle webhook pipeline failed in the last 15 min"
+          description: "Billing events not landing. Check /paddle logs, verify the webhook secret in Render env matches the Paddle dashboard value, and replay affected events via the Paddle admin."
+
+      - uid: realtime-voice-502-rate
+        title: Voice realtime 502 rate > 5%
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum(rate(jak_voice_token_failures_total[10m])) / sum(rate(jak_voice_token_total[10m])) > 0.05
+              intervalMs: 60000
+              refId: A
+        for: 3m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: jak-swarm-api
+        annotations:
+          summary: "Voice token-exchange failure rate > 5%"
+          description: "OpenAI realtime session API is likely degraded. Check https://status.openai.com. If local, verify OPENAI_API_KEY and the /voice/sessions/:id/token route logs."

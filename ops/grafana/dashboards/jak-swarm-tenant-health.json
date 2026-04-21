@@ -1,0 +1,209 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "JAK Swarm — tenant health snapshot. Active users, workflows per hour, approvals backlog, tool failure rate. Covers the operator's first question: is every tenant actually running workflows right now, and is anything stuck?",
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active workflows (last 5min)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(jak_workflow_started_total[5m])) * 300",
+          "legendFormat": "started",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Approvals awaiting review",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(jak_approvals_pending)",
+          "legendFormat": "pending",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Tool failure rate (last 15min)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(jak_tool_execution_failures_total[15m])) / sum(rate(jak_tool_execution_total[15m]))",
+          "legendFormat": "failure rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Circuit breakers OPEN",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(jak_circuit_breaker_state == 1)",
+          "legendFormat": "open",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Workflow latency p50 / p95 / p99 (per agent role)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (agent_role, le) (rate(jak_workflow_duration_ms_bucket[5m])))",
+          "legendFormat": "p50 {{agent_role}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (agent_role, le) (rate(jak_workflow_duration_ms_bucket[5m])))",
+          "legendFormat": "p95 {{agent_role}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (agent_role, le) (rate(jak_workflow_duration_ms_bucket[5m])))",
+          "legendFormat": "p99 {{agent_role}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue lag (oldest pending job age)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "max(jak_workflow_queue_oldest_pending_seconds) by (tenant_id)",
+          "legendFormat": "{{tenant_id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "red", "value": 120 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Realtime session success rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(jak_voice_session_success_total[5m])) / sum(rate(jak_voice_session_total[5m]))",
+          "legendFormat": "success rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.9 },
+              { "color": "green", "value": 0.98 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Auto-approvals vs human approvals (last 24h)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(jak_approval_decision_total{decision=\"AUTO_APPROVED\"}[1h]))",
+          "legendFormat": "auto-approved",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(jak_approval_decision_total{decision=\"APPROVED\"}[1h]))",
+          "legendFormat": "human-approved",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(jak_approval_decision_total{decision=\"REJECTED\"}[1h]))",
+          "legendFormat": "rejected",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["jak-swarm", "tenant-health"],
+  "templating": {
+    "list": [
+      {
+        "name": "tenant_id",
+        "type": "query",
+        "query": "label_values(jak_workflow_started_total, tenant_id)",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "JAK Swarm — Tenant Health",
+  "uid": "jak-swarm-tenant-health",
+  "version": 1,
+  "weekStart": ""
+}
