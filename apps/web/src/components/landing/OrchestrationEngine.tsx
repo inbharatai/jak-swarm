@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
+import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
@@ -24,11 +25,17 @@ const ACTIVE_SEQUENCE = [
   { modules: ['crm', 'email', 'docs'], label: 'Send personalized outreach sequence', duration: 3000 },
 ];
 
+const SVG_SIZE = 720;
+const ORBIT_RADIUS = 240;
+const CENTER = SVG_SIZE / 2;
+const ORBIT_PERCENT = Number(((ORBIT_RADIUS / CENTER) * 50).toFixed(3));
+
 /* ─── Component ─────────────────────────────────────────────────────────── */
 
 export default function OrchestrationEngine() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: false, amount: 0.3 });
+  const isStillMode = useStillMode();
   const [activeStep, setActiveStep] = useState(0);
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const [commandText, setCommandText] = useState('');
@@ -38,7 +45,7 @@ export default function OrchestrationEngine() {
 
   // Animation cycle
   useEffect(() => {
-    if (!isInView) return;
+    if (!isInView || isStillMode) return;
 
     let timeout: ReturnType<typeof setTimeout>;
     let charIndex = 0;
@@ -82,7 +89,16 @@ export default function OrchestrationEngine() {
 
     runCycle();
     return () => clearTimeout(timeout);
-  }, [isInView, activeStep]);
+  }, [isInView, isStillMode, activeStep]);
+
+  useEffect(() => {
+    if (!isStillMode) return;
+    const stillCommand = ACTIVE_SEQUENCE[0];
+    setActiveStep(0);
+    setActiveModules(stillCommand.modules);
+    setCommandText(stillCommand.label);
+    setPhase('idle');
+  }, [isStillMode]);
 
   return (
     <section
@@ -105,24 +121,24 @@ export default function OrchestrationEngine() {
         <motion.div
           className="text-center mb-10 sm:mb-20"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6 }}
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Orchestration Engine</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
             One command. Every module activated.
           </h2>
-          <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">
+          <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">
             JAK doesn&apos;t just chat. It decomposes your intent, routes to the right capabilities, executes in parallel, and delivers results.
           </p>
         </motion.div>
 
         {/* Main orchestration visual */}
-        <div className="relative mx-auto w-full" style={{ maxWidth: 720, aspectRatio: '1', maxHeight: '80vh' }}>
+        <div className="relative mx-auto w-full max-w-[720px] aspect-square" style={{ maxHeight: '80vh' }}>
           {/* SVG connections layer */}
           <svg
             className="absolute inset-0 w-full h-full"
-            viewBox="0 0 720 720"
+            viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
             fill="none"
             aria-hidden="true"
           >
@@ -148,20 +164,22 @@ export default function OrchestrationEngine() {
             {/* Radial guide rings — opacity bumped from 0.02/0.03 to
                 0.08/0.05 so the concentric structure actually reads. The
                 outer ring gets a subtle dashed stroke to suggest orbit. */}
-            <circle cx="360" cy="360" r="240" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="2 6" />
-            <circle cx="360" cy="360" r="180" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-            <circle cx="360" cy="360" r="120" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            <circle cx={CENTER} cy={CENTER} r={ORBIT_RADIUS} stroke="rgba(255,255,255,0.14)" strokeWidth="1.2" strokeDasharray="3 7" />
+            <circle cx={CENTER} cy={CENTER} r="180" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <circle cx={CENTER} cy={CENTER} r="120" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
 
             {/* Radar sweep — a rotating arc over the outer ring. Slow,
                 low-opacity, respects prefers-reduced-motion through the
                 global CSS reset that short-circuits animations. */}
-            <g style={{ transformOrigin: '360px 360px', animation: 'orch-radar 12s linear infinite' }}>
-              <path
-                d="M 360 360 L 600 360 A 240 240 0 0 0 480 152.9 Z"
-                fill="url(#orch-sweep)"
-                opacity="0.6"
-              />
-            </g>
+            {!isStillMode && (
+              <g style={{ transformOrigin: `${CENTER}px ${CENTER}px`, animation: 'orch-radar 12s linear infinite' }}>
+                <path
+                  d={`M ${CENTER} ${CENTER} L ${CENTER + ORBIT_RADIUS} ${CENTER} A ${ORBIT_RADIUS} ${ORBIT_RADIUS} 0 0 0 ${CENTER + ORBIT_RADIUS * 0.5} ${CENTER - ORBIT_RADIUS * 0.866} Z`}
+                  fill="url(#orch-sweep)"
+                  opacity="0.6"
+                />
+              </g>
+            )}
 
             {/* Connection lines from center to modules.
                 Coords rounded to 3 decimals so SSR + client serialize
@@ -170,8 +188,8 @@ export default function OrchestrationEngine() {
                 hydration warnings. */}
             {MODULES.map((mod) => {
               const rad = (mod.angle * Math.PI) / 180;
-              const endX = Number((360 + Math.cos(rad) * 240).toFixed(3));
-              const endY = Number((360 + Math.sin(rad) * 240).toFixed(3));
+              const endX = Number((CENTER + Math.cos(rad) * ORBIT_RADIUS).toFixed(3));
+              const endY = Number((CENTER + Math.sin(rad) * ORBIT_RADIUS).toFixed(3));
               const isActive = activeModules.includes(mod.id);
               const isRouting = phase === 'routing';
 
@@ -182,9 +200,9 @@ export default function OrchestrationEngine() {
                       higher base opacity (0.04 → 0.08) so the graph is
                       legible without activity. */}
                   <line
-                    x1="360" y1="360"
+                    x1={CENTER} y1={CENTER}
                     x2={endX} y2={endY}
-                    stroke={isActive ? mod.color : 'rgba(255,255,255,0.08)'}
+                    stroke={isActive ? mod.color : 'rgba(255,255,255,0.12)'}
                     strokeWidth={isActive ? 2.5 : 1}
                     strokeDasharray={isActive ? 'none' : '4 8'}
                     style={{
@@ -193,12 +211,12 @@ export default function OrchestrationEngine() {
                   />
 
                   {/* Animated data packet traveling along line */}
-                  {(isActive || isRouting) && (
+                  {(isActive || isRouting) && !isStillMode && (
                     <circle r="4" fill={mod.color} opacity="0.9">
                       <animateMotion
                         dur={isActive ? '1.2s' : '0.8s'}
                         repeatCount={isActive ? 'indefinite' : '1'}
-                        path={`M360,360 L${endX},${endY}`}
+                        path={`M${CENTER},${CENTER} L${endX},${endY}`}
                       />
                     </circle>
                   )}
@@ -225,8 +243,8 @@ export default function OrchestrationEngine() {
                   : '0 0 30px rgba(52,211,153,0.05)',
                 transition: 'all 0.5s ease',
               }}
-              animate={phase === 'executing' ? { scale: [1, 1.05, 1] } : {}}
-              transition={{ duration: 2, repeat: Infinity }}
+              animate={phase === 'executing' && !isStillMode ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+              transition={isStillMode ? { duration: 0 } : { duration: 2, repeat: Infinity }}
             >
               {/* Inner glow ring */}
               <div
@@ -240,7 +258,7 @@ export default function OrchestrationEngine() {
                 <div className="text-2xl font-display font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                   JAK
                 </div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
+                <div className="text-[9px] font-mono text-slate-400 uppercase tracking-widest mt-0.5">
                   {phase === 'typing' ? 'listening' :
                    phase === 'routing' ? 'routing' :
                    phase === 'executing' ? 'executing' :
@@ -254,8 +272,8 @@ export default function OrchestrationEngine() {
               SSR percentage strings match client exactly. */}
           {MODULES.map((mod) => {
             const rad = (mod.angle * Math.PI) / 180;
-            const x = Number((50 + Math.cos(rad) * 33.3).toFixed(3));
-            const y = Number((50 + Math.sin(rad) * 33.3).toFixed(3));
+            const x = Number((50 + Math.cos(rad) * ORBIT_PERCENT).toFixed(3));
+            const y = Number((50 + Math.sin(rad) * ORBIT_PERCENT).toFixed(3));
             const isActive = activeModules.includes(mod.id);
 
             return (
@@ -267,15 +285,15 @@ export default function OrchestrationEngine() {
                   left: `${x}%`,
                   transform: 'translate(-50%, -50%)',
                 }}
-                animate={isActive ? { scale: [1, 1.1, 1] } : { scale: 1 }}
-                transition={{ duration: 1.5, repeat: isActive ? Infinity : 0 }}
+                animate={isActive && !isStillMode ? { scale: [1, 1.1, 1] } : { scale: 1 }}
+                transition={isStillMode ? { duration: 0 } : { duration: 1.5, repeat: isActive ? Infinity : 0 }}
               >
                 <div
                   className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-500"
                   style={{
-                    background: isActive ? `${mod.color}20` : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isActive ? `${mod.color}60` : 'rgba(255,255,255,0.06)'}`,
-                    boxShadow: isActive ? `0 0 30px ${mod.color}25, 0 0 60px ${mod.color}10` : 'none',
+                    background: isActive ? `${mod.color}20` : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${isActive ? `${mod.color}65` : 'rgba(255,255,255,0.15)'}`,
+                    boxShadow: isActive ? `0 0 30px ${mod.color}35, 0 0 60px ${mod.color}15` : '0 0 20px rgba(255,255,255,0.08)',
                   }}
                 >
                   <svg
@@ -285,7 +303,7 @@ export default function OrchestrationEngine() {
                     strokeWidth={1.5}
                     stroke="currentColor"
                     style={{
-                      color: isActive ? mod.color : 'rgba(255,255,255,0.25)',
+                      color: isActive ? mod.color : 'rgba(255,255,255,0.55)',
                       transition: 'color 0.5s ease',
                     }}
                     aria-hidden="true"
@@ -295,7 +313,7 @@ export default function OrchestrationEngine() {
                   <span
                     className="text-[6px] sm:text-[8px] md:text-[9px] font-mono uppercase tracking-wider hidden sm:block"
                     style={{
-                      color: isActive ? mod.color : 'rgba(255,255,255,0.2)',
+                      color: isActive ? mod.color : 'rgba(255,255,255,0.5)',
                       transition: 'color 0.5s ease',
                     }}
                   >
@@ -311,8 +329,8 @@ export default function OrchestrationEngine() {
         <motion.div
           className="mt-12 mx-auto max-w-xl"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.3 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6, delay: isStillMode ? 0 : 0.3 }}
         >
           <div
             className="rounded-2xl p-4 sm:p-5"
@@ -341,15 +359,15 @@ export default function OrchestrationEngine() {
             </div>
 
             {/* Status bar */}
-            <div className="flex items-center gap-4 text-[10px] font-mono text-slate-500">
+            <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400">
               <span style={{ color: phase !== 'idle' ? '#34d399' : undefined, transition: 'color 0.3s' }}>
                 {phase === 'typing' ? '● parsing' : phase === 'routing' ? '● routing' : phase === 'executing' ? '● executing' : phase === 'complete' ? '✓ complete' : '○ waiting'}
               </span>
-              <span className="text-slate-700">|</span>
+              <span className="text-slate-600">|</span>
               <span>
                 {activeModules.length > 0 ? `${activeModules.length} modules active` : 'modules standby'}
               </span>
-              <span className="text-slate-700">|</span>
+              <span className="text-slate-600">|</span>
               <span>step {activeStep + 1}/{ACTIVE_SEQUENCE.length}</span>
             </div>
           </div>

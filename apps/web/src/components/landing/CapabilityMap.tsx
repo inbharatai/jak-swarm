@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
+import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
@@ -83,22 +84,45 @@ function findNodePos(id: string): { x: number; y: number } {
   return { x: 0, y: 0 };
 }
 
+function findNodeInfo(id: string) {
+  for (const ring of CAPABILITY_RINGS) {
+    const match = ring.items.find((item) => item.id === id);
+    if (match) return { label: match.label, desc: match.desc, color: match.color };
+  }
+  return null;
+}
+
 /* ─── Component ─────────────────────────────────────────────────────────── */
 
 export default function CapabilityMap() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: false, amount: 0.2 });
+  const isStillMode = useStillMode();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [hoveredInfo, setHoveredInfo] = useState<{ label: string; desc: string; color: string } | null>(null);
+  const [lockedNode, setLockedNode] = useState<string | null>(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const update = () => setIsCompact(mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
 
   // Find connections related to hovered node
-  const activeConnections = hoveredNode
-    ? CONNECTIONS.filter((c) => c.from === hoveredNode || c.to === hoveredNode)
+  const activeNode = lockedNode ?? hoveredNode;
+  const activeConnections = activeNode
+    ? CONNECTIONS.filter((c) => c.from === activeNode || c.to === activeNode)
     : [];
   const connectedIds = new Set(activeConnections.flatMap((c) => [c.from, c.to]));
+  const hoveredInfo = activeNode ? findNodeInfo(activeNode) : null;
 
   const svgSize = 600;
   const center = svgSize / 2;
+  const coreNodeSize = 24;
+  const toolNodeSize = 18;
+  const ringLabelOffset = 18;
 
   return (
     <section
@@ -120,26 +144,36 @@ export default function CapabilityMap() {
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6 }}
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">Architecture</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">
             38 agents. 119 tools. One platform.
           </h2>
-          <p className="mt-5 text-slate-400 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">
+          <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">
             Every agent wires into the exact tools it needs &mdash; no glue code, no duct tape.
-            <span className="block mt-1 text-xs sm:text-sm text-slate-500">Tap or hover any node to trace the graph.</span>
+            <span className="block mt-1 text-xs sm:text-sm text-slate-400">Tap or hover any node to trace the graph.</span>
           </p>
         </motion.div>
 
         {/* Interactive map */}
-        <div className="relative mx-auto flex items-center justify-center" style={{ maxWidth: svgSize }}>
+        <div className="relative mx-auto w-full max-w-[600px] aspect-square flex items-center justify-center">
           <svg
             viewBox={`0 0 ${svgSize} ${svgSize}`}
-            className="w-full h-auto"
-            style={{ maxHeight: '70vh' }}
+            className="w-full h-full"
+            preserveAspectRatio="xMidYMid meet"
           >
+            <defs>
+              <filter id="cap-glow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
             {/* Ring guides */}
             {CAPABILITY_RINGS.map((ring) => (
               <circle
@@ -147,9 +181,9 @@ export default function CapabilityMap() {
                 cx={center} cy={center}
                 r={ring.radius}
                 fill="none"
-                stroke="rgba(255,255,255,0.03)"
-                strokeWidth="1"
-                strokeDasharray={ring.ring === 'tools' ? '2 6' : 'none'}
+                stroke={ring.ring === 'tools' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.1)'}
+                strokeWidth={ring.ring === 'tools' ? 1.2 : 1}
+                strokeDasharray={ring.ring === 'tools' ? '3 7' : 'none'}
               />
             ))}
 
@@ -168,8 +202,8 @@ export default function CapabilityMap() {
                   y1={center + from.y}
                   x2={center + to.x}
                   y2={center + to.y}
-                  stroke={isActive ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.02)'}
-                  strokeWidth={isActive ? 1.5 : 0.5}
+                  stroke={isActive ? 'rgba(52,211,153,0.55)' : 'rgba(255,255,255,0.06)'}
+                  strokeWidth={isActive ? 1.6 : 0.8}
                   style={{ transition: 'stroke 0.3s ease, stroke-width 0.3s ease' }}
                 />
               );
@@ -204,17 +238,17 @@ export default function CapabilityMap() {
 
             {/* Ring labels — offset above the top node of each ring so they never overlap */}
             {CAPABILITY_RINGS.map((ring) => {
-              const nodeSize = ring.ring === 'core' ? 22 : 16;
+              const nodeSize = ring.ring === 'core' ? coreNodeSize : toolNodeSize;
               return (
                 <text
                   key={ring.ring}
                   x={center}
-                  y={center - ring.radius - nodeSize - 14}
+                  y={center - ring.radius - nodeSize - ringLabelOffset}
                   textAnchor="middle"
-                  fontSize="9"
+                  fontSize="10"
                   fontFamily="var(--font-mono)"
-                  fill="rgba(255,255,255,0.22)"
-                  letterSpacing="2.5"
+                  fill="rgba(255,255,255,0.45)"
+                  letterSpacing="3"
                 >
                   {ring.label.toUpperCase()}
                 </text>
@@ -225,22 +259,28 @@ export default function CapabilityMap() {
             {CAPABILITY_RINGS.map((ring) =>
               ring.items.map((item, i) => {
                 const pos = getNodePosition(ring, i);
-                const isHovered = hoveredNode === item.id;
+                const isHovered = activeNode === item.id;
                 const isConnected = connectedIds.has(item.id);
-                const dimmed = hoveredNode !== null && !isHovered && !isConnected;
-                const nodeSize = ring.ring === 'core' ? 22 : 16;
+                const dimmed = activeNode !== null && !isHovered && !isConnected;
+                const nodeSize = ring.ring === 'core' ? coreNodeSize : toolNodeSize;
+                const showLabel = ring.ring === 'core' || !isCompact;
 
                 return (
                   <g
                     key={item.id}
                     style={{ cursor: 'pointer' }}
                     onMouseEnter={() => {
+                      if (lockedNode) return;
                       setHoveredNode(item.id);
-                      setHoveredInfo({ label: item.label, desc: item.desc, color: item.color });
                     }}
                     onMouseLeave={() => {
+                      if (lockedNode) return;
                       setHoveredNode(null);
-                      setHoveredInfo(null);
+                    }}
+                    onClick={() => {
+                      if (!isCompact) return;
+                      setLockedNode((prev) => (prev === item.id ? null : item.id));
+                      setHoveredNode(item.id);
                     }}
                   >
                     {/* Glow */}
@@ -248,8 +288,9 @@ export default function CapabilityMap() {
                       <circle
                         cx={center + pos.x}
                         cy={center + pos.y}
-                        r={nodeSize + 8}
-                        fill={`${item.color}08`}
+                        r={nodeSize + 9}
+                        fill={`${item.color}12`}
+                        filter="url(#cap-glow)"
                         style={{ transition: 'all 0.3s ease' }}
                       />
                     )}
@@ -259,9 +300,9 @@ export default function CapabilityMap() {
                       cx={center + pos.x}
                       cy={center + pos.y}
                       r={nodeSize}
-                      fill={isHovered ? `${item.color}25` : dimmed ? 'rgba(255,255,255,0.01)' : `${item.color}10`}
-                      stroke={isHovered ? `${item.color}70` : dimmed ? 'rgba(255,255,255,0.03)' : `${item.color}30`}
-                      strokeWidth={isHovered ? 2 : 1}
+                      fill={isHovered ? `${item.color}30` : dimmed ? 'rgba(255,255,255,0.02)' : `${item.color}16`}
+                      stroke={isHovered ? `${item.color}80` : dimmed ? 'rgba(255,255,255,0.08)' : `${item.color}45`}
+                      strokeWidth={isHovered ? 2 : 1.2}
                       style={{ transition: 'all 0.3s ease' }}
                     />
 
@@ -271,12 +312,12 @@ export default function CapabilityMap() {
                       y={center + pos.y + 1}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize={ring.ring === 'core' ? '8' : '7'}
-                      fontWeight="700"
+                      fontSize={ring.ring === 'core' ? '9' : '8'}
+                      fontWeight="600"
                       fontFamily="var(--font-mono)"
-                      letterSpacing="0.5"
-                      fill={dimmed ? 'rgba(255,255,255,0.1)' : item.color}
-                      style={{ transition: 'fill 0.3s ease' }}
+                      letterSpacing="0.6"
+                      fill={dimmed ? 'rgba(255,255,255,0.2)' : item.color}
+                      style={{ transition: 'fill 0.3s ease', display: showLabel ? 'block' : 'none' }}
                     >
                       {item.label}
                     </text>
@@ -299,7 +340,7 @@ export default function CapabilityMap() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: isStillMode ? 0 : 0.2 }}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div
@@ -310,14 +351,14 @@ export default function CapabilityMap() {
                     {hoveredInfo.label}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-sans">{hoveredInfo.desc}</p>
+                <p className="text-xs text-slate-300 font-sans">{hoveredInfo.desc}</p>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Ring legend */}
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-6 sm:mt-8 text-[10px] sm:text-xs font-mono text-slate-500">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-6 sm:mt-8 text-[10px] sm:text-xs font-mono text-slate-400">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full border border-emerald-400/30 bg-emerald-400/10" />
             <span>Core Agents (6)</span>

@@ -267,7 +267,7 @@ function StatCard({ value, label, suffix }: { value: number; label: string; suff
           explicitly turns on tabular + lining figures for belt-and-braces
           consistency on future font swaps. */}
       <div
-        className="text-5xl sm:text-6xl font-mono font-bold tracking-tight"
+        className="landing-gradient-text text-5xl sm:text-6xl font-mono font-bold tracking-tight leading-[1.05]"
         style={{
           background: 'linear-gradient(135deg, #34d399, #fbbf24)',
           WebkitBackgroundClip: 'text',
@@ -277,7 +277,7 @@ function StatCard({ value, label, suffix }: { value: number; label: string; suff
       >
         {count}{suffix}
       </div>
-      <div className="mt-2 text-sm font-medium text-slate-400 uppercase tracking-widest font-sans">{label}</div>
+      <div className="mt-2 text-sm font-medium text-slate-300 uppercase tracking-widest font-sans">{label}</div>
     </div>
   );
 }
@@ -353,6 +353,12 @@ export default function HomePage() {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        .landing-root .landing-gradient-text {
+          display: inline-block;
+          padding-bottom: 0.12em;
+          line-height: 1.1;
+          overflow: visible;
+        }
         .gradient-bg {
           background: linear-gradient(135deg, #09090b, #0a1a15, #09090b, #1a150a);
           background-size: 400% 400%;
@@ -386,7 +392,7 @@ export default function HomePage() {
         Skip to main content
       </a>
 
-      <main id="main-content" className="min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
+      <main id="main-content" className="landing-root min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
         {/* ── Nav ──────────────────────────────────────────────────────────── */}
         <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(9,9,11,0.6)' }} role="navigation" aria-label="Main navigation">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
@@ -520,7 +526,7 @@ export default function HomePage() {
               <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15] sm:leading-[1.1]">
                 <span className="block text-white" style={{ wordBreak: 'keep-all' }}>The Operator‑Grade</span>
                 <span className="block mt-2 text-white">AI Workforce</span>
-                <span className="block mt-2 gradient-text pb-3" style={{ overflow: 'visible' }}>That Actually Executes.</span>
+                <span className="block mt-2 gradient-text landing-gradient-text">That Actually Executes.</span>
               </h1>
 
               <p className="mb-8 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
@@ -537,7 +543,6 @@ export default function HomePage() {
                   View on GitHub
                 </a>
               </div>
-
               {/*
                 Trust strip — addresses the "no social proof, no credibility
                 signal between hero and first content section" gap. Four
@@ -597,9 +602,10 @@ export default function HomePage() {
                     style={{
                       top: `calc(50% + ${y}px - 24px)`,
                       left: `calc(50% + ${x}px - 24px)`,
-                      background: `${agent.color}15`,
-                      border: `1px solid ${agent.color}40`,
+                      background: `${agent.color}20`,
+                      border: `1.5px solid ${agent.color}70`,
                       color: agent.color,
+                      boxShadow: `0 0 24px ${agent.color}25`,
                       animation: `pulse-glow 3s ease-in-out infinite`,
                       animationDelay: `${i * 0.5}s`,
                     }}
@@ -623,8 +629,8 @@ export default function HomePage() {
                       x1="50%" y1="50%"
                       x2={`${x}%`} y2={`${y}%`}
                       stroke={agent.color}
-                      strokeWidth="1"
-                      opacity="0.15"
+                      strokeWidth="1.2"
+                      opacity="0.25"
                       strokeDasharray="4 4"
                       style={{ animation: 'dash-flow 2s linear infinite' }}
                     />
@@ -671,7 +677,7 @@ export default function HomePage() {
                 {AGENTS.map((agent, i) => (
                   <div
                     key={agent.label}
-                    className={`group relative rounded-2xl p-6 transition-all duration-300 cursor-default glass-card card-lift animate-fade-up ${
+                    className={`group relative rounded-2xl p-7 min-h-[210px] flex flex-col transition-all duration-300 cursor-default glass-card card-lift animate-fade-up ${
                       i === 0 ? 'lg:translate-y-0' :
                       i === 1 ? 'lg:translate-y-4' :
                       i === 2 ? 'lg:-translate-y-2' :
@@ -681,24 +687,25 @@ export default function HomePage() {
                     }`}
                     style={{
                       background: hoveredAgent === i
-                        ? `linear-gradient(135deg, ${agent.color}10, ${agent.color}05)`
-                        : 'rgba(255,255,255,0.02)',
+                        ? `linear-gradient(135deg, ${agent.color}12, ${agent.color}06)`
+                        : 'rgba(255,255,255,0.03)',
                       borderLeft: `3px solid ${agent.color}`,
-                      borderColor: hoveredAgent === i ? `${agent.color}40` : undefined,
+                      borderColor: hoveredAgent === i ? `${agent.color}55` : 'rgba(255,255,255,0.08)',
+                      boxShadow: hoveredAgent === i ? `0 12px 40px ${agent.color}10` : undefined,
                     }}
                     onMouseEnter={() => setHoveredAgent(i)}
                     onMouseLeave={() => setHoveredAgent(null)}
                   >
                     {/* Node indicator */}
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3 mb-4">
                       <div className="flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold tracking-wider font-mono" style={{ background: `${agent.color}15`, color: agent.color, border: `1px solid ${agent.color}30` }}>
                         {agent.icon}
                       </div>
-                      <h3 className="font-display font-semibold text-white">{agent.label}</h3>
+                      <h3 className="font-display font-semibold text-white leading-snug">{agent.label}</h3>
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-slate-400 leading-relaxed transition-opacity duration-300 font-sans" style={{ opacity: hoveredAgent === i ? 1 : 0.6 }}>
+                    <p className="text-sm text-slate-300 leading-relaxed transition-opacity duration-300 font-sans" style={{ opacity: hoveredAgent === i ? 1 : 0.85 }}>
                       {agent.desc}
                     </p>
 
@@ -927,19 +934,19 @@ export default function HomePage() {
               <h3 className="font-display font-semibold text-white text-center mb-6">Cost Per Generated App</h3>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-2xl font-display font-bold gradient-text">$0.50</div>
-                  <div className="text-xs text-slate-500 mt-1 font-sans">Simple app<br />Tier 1-2 models</div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.50</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Simple app<br />Tier 1-2 models</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-display font-bold gradient-text">$1.50</div>
-                  <div className="text-xs text-slate-500 mt-1 font-sans">Medium app<br />With debug loop</div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$1.50</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Medium app<br />With debug loop</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-display font-bold gradient-text">$0.10</div>
-                  <div className="text-xs text-slate-500 mt-1 font-sans">Per iteration<br />Only changed files</div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.10</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Per iteration<br />Only changed files</div>
                 </div>
               </div>
-              <p className="text-center text-[10px] text-slate-600 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug — routes each task to the cheapest model that can handle it.</p>
+              <p className="text-center text-[10px] text-slate-500 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug — routes each task to the cheapest model that can handle it.</p>
             </div>
 
             {/* Builder IDE Preview */}

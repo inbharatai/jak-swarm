@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { motion, useInView, useScroll, useTransform } from 'framer-motion';
+import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
@@ -53,6 +54,7 @@ const FLOW_STEPS = [
 export default function ExecutionFlow() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: false, amount: 0.1 });
+  const isStillMode = useStillMode();
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -81,7 +83,7 @@ export default function ExecutionFlow() {
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
             From intent to outcome
           </h2>
-          <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">
+          <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">
             Every command follows a precise execution path. No guessing. No hallucination loops. Real work, verified results.
           </p>
         </motion.div>
@@ -102,7 +104,7 @@ export default function ExecutionFlow() {
             {FLOW_STEPS.map((step, i) => {
               const isEven = i % 2 === 0;
               return (
-                <FlowStep key={step.number} step={step} index={i} isEven={isEven} />
+                <FlowStep key={step.number} step={step} index={i} isEven={isEven} isStillMode={isStillMode} />
               );
             })}
           </div>
@@ -118,10 +120,12 @@ function FlowStep({
   step,
   index,
   isEven,
+  isStillMode,
 }: {
   step: (typeof FLOW_STEPS)[number];
   index: number;
   isEven: boolean;
+  isStillMode: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, amount: 0.5 });
@@ -133,8 +137,8 @@ function FlowStep({
         isEven ? '' : 'lg:direction-rtl'
       }`}
       initial={{ opacity: 0, y: 40 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.7, delay: 0.1 }}
+      animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: isStillMode ? 0 : 0.7, delay: isStillMode ? 0 : 0.1 }}
     >
       {/* Node dot on the timeline */}
       <div
@@ -176,7 +180,7 @@ function FlowStep({
         <h3 className="text-xl sm:text-2xl font-display font-bold text-white mb-2">
           {step.title}
         </h3>
-        <p className="text-slate-400 font-sans mb-4 leading-relaxed">
+        <p className="text-slate-300 font-sans mb-4 leading-relaxed">
           {step.description}
         </p>
 
@@ -196,7 +200,7 @@ function FlowStep({
 
       {/* Visual side - mini execution graphic */}
       <div className={`hidden lg:flex items-center justify-center ${isEven ? 'lg:col-start-2' : 'lg:col-start-1 lg:row-start-1'}`}>
-        <StepGraphic step={step} index={index} isActive={isInView} />
+        <StepGraphic step={step} index={index} isActive={isInView} isStillMode={isStillMode} />
       </div>
     </motion.div>
   );
@@ -208,10 +212,12 @@ function StepGraphic({
   step,
   index,
   isActive,
+  isStillMode,
 }: {
   step: (typeof FLOW_STEPS)[number];
   index: number;
   isActive: boolean;
+  isStillMode: boolean;
 }) {
   return (
     <div className="relative w-48 h-48">
@@ -226,7 +232,7 @@ function StepGraphic({
         />
 
         {/* Animated arc */}
-        {isActive && (
+        {isActive && !isStillMode && (
           <circle
             cx="100" cy="100" r="80"
             fill="none"
@@ -307,7 +313,7 @@ function StepGraphic({
               opacity={isActive ? 0.5 : 0.2}
               style={{ transition: 'all 0.6s ease' }}
             >
-              {isActive && (
+              {isActive && !isStillMode && (
                 <animate
                   attributeName="opacity"
                   values="0.3;0.8;0.3"

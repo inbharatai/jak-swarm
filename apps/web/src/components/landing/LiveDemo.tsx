@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
+import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
@@ -49,6 +50,7 @@ const DEMO_SCENARIOS = [
 export default function LiveDemo() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: false, amount: 0.3 });
+  const isStillMode = useStillMode();
   const [scenarioIndex, setScenarioIndex] = useState(0);
   const [visibleSteps, setVisibleSteps] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -59,7 +61,7 @@ export default function LiveDemo() {
 
   // Run the demo animation
   useEffect(() => {
-    if (!isInView) return;
+    if (!isInView || isStillMode) return;
 
     let timeouts: ReturnType<typeof setTimeout>[] = [];
     let charIndex = 0;
@@ -107,7 +109,15 @@ export default function LiveDemo() {
       clearInterval(typeInterval);
       timeouts.forEach(clearTimeout);
     };
-  }, [isInView, scenarioIndex]);
+  }, [isInView, isStillMode, scenarioIndex]);
+
+  useEffect(() => {
+    if (!isStillMode) return;
+    setTyping(false);
+    setTypedText(scenario.command);
+    setVisibleSteps(scenario.steps.length);
+    setShowResult(true);
+  }, [isStillMode, scenario.command, scenario.steps.length]);
 
   return (
     <section
@@ -120,14 +130,14 @@ export default function LiveDemo() {
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6 }}
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Live Execution</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
             Watch JAK work in real time
           </h2>
-          <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">
+          <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">
             Real commands. Real agent routing. Real execution traces.
           </p>
         </motion.div>
@@ -140,8 +150,8 @@ export default function LiveDemo() {
             border: '1px solid rgba(255,255,255,0.06)',
           }}
           initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6, delay: isStillMode ? 0 : 0.2 }}
         >
           {/* Title bar */}
           <div className="flex items-center gap-3 px-5 py-3 border-b border-white/5">
@@ -150,7 +160,7 @@ export default function LiveDemo() {
               <div className="w-3 h-3 rounded-full bg-amber-500/60" />
               <div className="w-3 h-3 rounded-full bg-emerald-500/60" />
             </div>
-            <span className="text-xs text-slate-500 font-mono">JAK Execution Trace</span>
+            <span className="text-xs text-slate-400 font-mono">JAK Execution Trace</span>
             <div className="ml-auto flex items-center gap-2">
               <div
                 className="w-1.5 h-1.5 rounded-full"
@@ -159,7 +169,7 @@ export default function LiveDemo() {
                   boxShadow: showResult ? '0 0 6px #34d39960' : '0 0 6px #fbbf2460',
                 }}
               />
-              <span className="text-[10px] font-mono text-slate-600">
+              <span className="text-[10px] font-mono text-slate-400">
                 {showResult ? 'complete' : 'running'}
               </span>
             </div>
@@ -172,7 +182,7 @@ export default function LiveDemo() {
               <span className="text-emerald-400 font-mono text-xs sm:text-sm shrink-0 mt-0.5">{'>'}</span>
               <div className="font-mono text-xs sm:text-sm text-white/90 break-words min-w-0">
                 {typedText}
-                {typing && (
+                {typing && !isStillMode && (
                   <span
                     className="inline-block w-[2px] h-4 bg-emerald-400 ml-0.5 align-middle"
                     style={{ animation: 'blink 1s step-end infinite' }}
@@ -190,7 +200,7 @@ export default function LiveDemo() {
                     className="flex items-start gap-3"
                     initial={{ opacity: 0, x: -10 }}
                     animate={i < visibleSteps ? { opacity: 1, x: 0 } : {}}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: isStillMode ? 0 : 0.3 }}
                   >
                     {/* Status indicator */}
                     <div className="shrink-0 mt-1">
@@ -225,14 +235,14 @@ export default function LiveDemo() {
                         >
                           {step.agent}
                         </span>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-sans break-words min-w-0">
+                        <span className="text-[11px] sm:text-xs text-slate-300 font-sans break-words min-w-0">
                           {step.action}
                         </span>
                       </div>
                     </div>
 
                     {/* Timing */}
-                    <span className="text-[10px] font-mono text-slate-600 shrink-0 mt-0.5">
+                    <span className="text-[10px] font-mono text-slate-500 shrink-0 mt-0.5">
                       {i < visibleSteps ? `${step.ms}ms` : ''}
                     </span>
                   </motion.div>
@@ -246,7 +256,7 @@ export default function LiveDemo() {
                 className="mt-4 pt-4 border-t border-white/5"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
+                transition={{ duration: isStillMode ? 0 : 0.4 }}
               >
                 <div className="flex items-start gap-3">
                   <span className="text-emerald-400 font-mono text-sm shrink-0">{'✓'}</span>
@@ -259,11 +269,11 @@ export default function LiveDemo() {
           </div>
 
           {/* Bottom status bar */}
-          <div className="border-t border-white/5 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] font-mono text-slate-600 overflow-x-auto">
+          <div className="border-t border-white/5 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] font-mono text-slate-500 overflow-x-auto">
             <span>scenario {scenarioIndex + 1}/{DEMO_SCENARIOS.length}</span>
-            <span className="text-slate-700">|</span>
+            <span className="text-slate-600">|</span>
             <span>{visibleSteps}/{scenario.steps.length} steps</span>
-            <span className="text-slate-700">|</span>
+            <span className="text-slate-600">|</span>
             <div className="flex-1 max-w-24 h-1 bg-white/5 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald-400 to-amber-400 rounded-full transition-all duration-500"

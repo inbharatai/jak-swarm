@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { motion, useInView, AnimatePresence } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
+import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
@@ -69,12 +70,13 @@ const FEATURES = [
 export default function SupervisorSection() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: false, amount: 0.15 });
+  const isStillMode = useStillMode();
   const [visibleEvents, setVisibleEvents] = useState(0);
   const [circuitState, setCircuitState] = useState(0);
 
   // Animate the event log
   useEffect(() => {
-    if (!isInView) return;
+    if (!isInView || isStillMode) return;
     setVisibleEvents(0);
     setCircuitState(0);
 
@@ -96,7 +98,13 @@ export default function SupervisorSection() {
     }, 600);
 
     return () => clearInterval(interval);
-  }, [isInView]);
+  }, [isInView, isStillMode]);
+
+  useEffect(() => {
+    if (!isStillMode) return;
+    setVisibleEvents(EVENT_TYPES.length);
+    setCircuitState(0);
+  }, [isStillMode]);
 
   return (
     <section
@@ -118,14 +126,14 @@ export default function SupervisorSection() {
         <motion.div
           className="text-center mb-12 sm:mb-20"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: isStillMode ? 0 : 0.6 }}
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-red-400 mb-3 font-sans">System Intelligence</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
             Self-healing. Observable. Resilient.
           </h2>
-          <p className="mt-4 text-slate-400 max-w-2xl mx-auto font-sans">
+          <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">
             The Supervisor module is JAK&apos;s central nervous system. It monitors every workflow, prevents cascading failures, and gives you full observability into what your agents are doing.
           </p>
         </motion.div>
@@ -141,8 +149,8 @@ export default function SupervisorSection() {
               border: '1px solid rgba(255,255,255,0.06)',
             }}
             initial={{ opacity: 0, x: -20 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            animate={isInView || isStillMode ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: isStillMode ? 0 : 0.6, delay: isStillMode ? 0 : 0.2 }}
           >
             {/* Title bar */}
             <div className="flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-white/5">
@@ -151,10 +159,10 @@ export default function SupervisorSection() {
                 <div className="w-3 h-3 rounded-full bg-amber-500/60" />
                 <div className="w-3 h-3 rounded-full bg-emerald-500/60" />
               </div>
-              <span className="text-xs text-slate-500 font-mono">SupervisorBus — Event Stream</span>
+              <span className="text-xs text-slate-400 font-mono">SupervisorBus — Event Stream</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse 2s ease-in-out infinite' }} />
-                <span className="text-[10px] font-mono text-slate-600">live</span>
+                <span className="text-[10px] font-mono text-slate-400">live</span>
               </div>
             </div>
 
@@ -166,10 +174,10 @@ export default function SupervisorSection() {
                   className="flex items-center gap-2 sm:gap-3 py-1"
                   initial={{ opacity: 0, x: -10 }}
                   animate={i < visibleEvents ? { opacity: 1, x: 0 } : { opacity: 0 }}
-                  transition={{ duration: 0.25 }}
+                  transition={{ duration: isStillMode ? 0 : 0.25 }}
                 >
                   {/* Timestamp */}
-                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-700 shrink-0 tabular-nums w-16 sm:w-20">
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 shrink-0 tabular-nums w-16 sm:w-20">
                     {i < visibleEvents ? `00:${String(Math.floor(i * 0.6)).padStart(2, '0')}.${String((i * 600) % 1000).padStart(3, '0')}` : ''}
                   </span>
 
@@ -186,7 +194,7 @@ export default function SupervisorSection() {
                   </span>
 
                   {/* Agent */}
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-sans break-words min-w-0">
+                  <span className="text-[10px] sm:text-xs text-slate-300 font-sans break-words min-w-0">
                     {event.agent}
                   </span>
                 </motion.div>
@@ -202,15 +210,15 @@ export default function SupervisorSection() {
               border: '1px solid rgba(255,255,255,0.06)',
             }}
             initial={{ opacity: 0, x: 20 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.3 }}
+            animate={isInView || isStillMode ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: isStillMode ? 0 : 0.6, delay: isStillMode ? 0 : 0.3 }}
           >
             {/* Title bar */}
             <div className="flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-white/5">
               <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75" />
               </svg>
-              <span className="text-xs text-slate-500 font-mono">Circuit Breaker — State Machine</span>
+              <span className="text-xs text-slate-400 font-mono">Circuit Breaker — State Machine</span>
             </div>
 
             <div className="p-4 sm:p-6">
@@ -226,8 +234,8 @@ export default function SupervisorSection() {
                           border: `1.5px solid ${circuitState === i ? `${state.color}50` : 'rgba(255,255,255,0.06)'}`,
                           boxShadow: circuitState === i ? `0 0 24px ${state.color}15` : 'none',
                         }}
-                        animate={circuitState === i ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-                        transition={{ duration: 1.5, repeat: circuitState === i ? Infinity : 0 }}
+                        animate={circuitState === i && !isStillMode ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+                        transition={isStillMode ? { duration: 0 } : { duration: 1.5, repeat: circuitState === i ? Infinity : 0 }}
                       >
                         <svg
                           className="w-6 h-6 sm:w-7 sm:h-7"
@@ -246,14 +254,14 @@ export default function SupervisorSection() {
                       >
                         {state.name}
                       </div>
-                      <div className="text-[9px] sm:text-[10px] text-slate-500 font-sans max-w-[100px] sm:max-w-[120px] mx-auto">
+                      <div className="text-[9px] sm:text-[10px] text-slate-400 font-sans max-w-[100px] sm:max-w-[120px] mx-auto">
                         {state.desc}
                       </div>
                     </div>
 
                     {/* Arrow between states */}
                     {i < CIRCUIT_STATES.length - 1 && (
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700 shrink-0 -mt-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 shrink-0 -mt-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                       </svg>
                     )}
@@ -266,8 +274,8 @@ export default function SupervisorSection() {
                 className="rounded-xl p-3 sm:p-4"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
               >
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">How it protects your workflows</div>
-                <div className="space-y-2 text-xs text-slate-400 font-sans">
+                <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">How it protects your workflows</div>
+                <div className="space-y-2 text-xs text-slate-300 font-sans">
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-400 shrink-0 mt-0.5">1.</span>
                     <span>Every agent call passes through a named circuit breaker</span>
@@ -302,8 +310,8 @@ export default function SupervisorSection() {
                 borderTop: `2px solid ${feature.color}40`,
               }}
               initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.3 + i * 0.1 }}
+              animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: isStillMode ? 0 : 0.5, delay: isStillMode ? 0 : 0.3 + i * 0.1 }}
             >
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
@@ -314,8 +322,8 @@ export default function SupervisorSection() {
                 </svg>
               </div>
               <h3 className="font-display font-semibold text-white text-sm mb-0.5">{feature.title}</h3>
-              <p className="text-[10px] font-mono text-slate-500 mb-2">{feature.subtitle}</p>
-              <p className="text-xs text-slate-400 font-sans leading-relaxed mb-3">{feature.desc}</p>
+              <p className="text-[10px] font-mono text-slate-400 mb-2">{feature.subtitle}</p>
+              <p className="text-xs text-slate-300 font-sans leading-relaxed mb-3">{feature.desc}</p>
               <div className="flex flex-wrap gap-1.5">
                 {feature.stats.map((stat) => (
                   <span

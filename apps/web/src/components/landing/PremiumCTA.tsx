@@ -168,7 +168,7 @@ export default function PremiumCTA() {
           {CTA_STATS.map((stat, i) => (
             <div key={stat.label} className="text-center">
               <motion.div
-                className="text-2xl sm:text-3xl font-display font-bold tabular-nums"
+                className="landing-gradient-text text-2xl sm:text-3xl font-display font-bold tabular-nums"
                 style={{
                   background: 'linear-gradient(135deg, #34d399, #fbbf24)',
                   WebkitBackgroundClip: 'text',
@@ -194,10 +194,11 @@ export default function PremiumCTA() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
-          <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
+          <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.15]">
             <span className="text-white/90">The AI workforce</span>
             <br />
             <span
+              className="landing-gradient-text"
               style={{
                 background: 'linear-gradient(135deg, #34d399 0%, #fbbf24 50%, #f472b6 100%)',
                 WebkitBackgroundClip: 'text',
@@ -208,7 +209,7 @@ export default function PremiumCTA() {
             </span>
           </h2>
 
-          <p className="text-base sm:text-lg text-slate-400 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
+          <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
             Stop hiring for tasks AI can handle. Deploy autonomous agents that execute real work&nbsp;&mdash; from email to code to contracts.
           </p>
 
