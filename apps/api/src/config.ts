@@ -112,6 +112,11 @@ export const config = {
 
   supabaseUrl: process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim() ?? '',
   supabaseAnonKey: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim() ?? '',
+  // Service-role key — server-side only, NEVER exposed to the client.
+  // Required for Supabase Storage uploads in the tenant-documents bucket.
+  // Must be rotated whenever it appears in a log/screenshot/commit (see
+  // SECURITY.md rotation policy + the 2026-04-18 memory note).
+  supabaseServiceRoleKey: process.env['SUPABASE_SERVICE_ROLE_KEY']?.trim() ?? '',
 
   // WhatsApp control bridge (QR-based, Baileys client)
   whatsappAutoStart: (process.env['WHATSAPP_AUTO_START'] ?? (isDev ? '1' : '0')) === '1',

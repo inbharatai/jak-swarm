@@ -485,6 +485,212 @@ export function registerBuiltinTools(): void {
     },
   );
 
+  // ─── UPLOADED DOCUMENT LOOKUP (Track 2) ──────────────────────────────────
+  // find_document is the agent's canonical way to locate a file the user
+  // uploaded via the dashboard Files tab. It queries BOTH the TenantDocument
+  // metadata (fileName, tags, uploadedBy) AND the VectorDocument chunk index
+  // (semantic match on content), then ranks by a simple merge score.
+  //
+  // Why this tool instead of just reusing search_knowledge: search_knowledge
+  // returns chunk-level results without file provenance. An agent asked to
+  // "review the NDA I uploaded yesterday" needs the DOCUMENT-level handle
+  // (fileName + id) so it can fetch the full text / preview URL, not just
+  // a chunk of matching content.
+
+  toolRegistry.register(
+    {
+      name: 'find_document',
+      description:
+        'Find a document the user previously uploaded via the dashboard Files tab. Matches by file name, tags, or semantic content similarity. Returns the document id, file name, mime type, upload timestamp, and (when available) the most-relevant content chunk. Use this to answer "review the contract I uploaded" or "summarize the onboarding doc".',
+      category: ToolCategory.KNOWLEDGE,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['DATABASE_URL'],
+      liveTested: false,
+      sideEffectLevel: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Natural-language query or file name hint. Examples: "the NDA from Acme", "onboarding_handbook.pdf", "invoice 2025-04".',
+          },
+          limit: {
+            type: 'number',
+            description: 'Max documents to return (default 5, max 20).',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional tag filter — returns only documents tagged with ANY of these.',
+          },
+        },
+        required: ['query'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          results: { type: 'array' },
+          total: { type: 'number' },
+        },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { query, limit = 5, tags } = input as {
+        query: string;
+        limit?: number;
+        tags?: string[];
+      };
+      const cappedLimit = Math.min(Math.max(1, Number(limit) || 5), 20);
+
+      if (!query || query.trim().length === 0) {
+        return { error: 'Query is required.' };
+      }
+
+      try {
+        // 1. Name/tag match against TenantDocument metadata. We use ILIKE so
+        //    "NDA" matches "Mutual NDA - Acme.pdf".
+        const { prisma: prismaClient } = await import('@jak-swarm/db');
+        const prisma = prismaClient as unknown as {
+          tenantDocument: {
+            findMany: (args: Record<string, unknown>) => Promise<Array<{
+              id: string;
+              fileName: string;
+              mimeType: string;
+              tags: string[];
+              status: string;
+              createdAt: Date;
+              sizeBytes: number;
+            }>>;
+          };
+        };
+
+        const nameMatches = await prisma.tenantDocument.findMany({
+          where: {
+            tenantId: context.tenantId,
+            deletedAt: null,
+            status: { in: ['INDEXED', 'PENDING'] },
+            OR: [
+              { fileName: { contains: query, mode: 'insensitive' } },
+              ...(tags && tags.length > 0 ? [{ tags: { hasSome: tags } }] : []),
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: cappedLimit,
+        });
+
+        // 2. Semantic match via the vector adapter. Chunks carry documentId
+        //    so we can group back to the document level. Fall back to an
+        //    empty result set if the embedder or adapter isn't configured —
+        //    the name-match path is still useful.
+        let semanticMatches: Array<{
+          documentId?: string;
+          content: string;
+          score: number;
+          metadata?: Record<string, unknown>;
+          sourceKey?: string;
+        }> = [];
+
+        try {
+          const { getDocumentIngestor } = await import('../adapters/memory/document-ingestor.js');
+          const ingestor = getDocumentIngestor();
+          const chunks = await ingestor.search(context.tenantId, query, cappedLimit, 0.3);
+          semanticMatches = chunks
+            .map((c: { content: string; score: number; metadata?: Record<string, unknown>; sourceKey?: string; documentId?: string }) => ({
+              content: c.content,
+              score: c.score,
+              metadata: c.metadata,
+              sourceKey: c.sourceKey,
+              documentId:
+                c.documentId ??
+                (typeof c.metadata?.documentId === 'string' ? c.metadata.documentId : undefined),
+            }))
+            .filter((c) => c.documentId);
+        } catch {
+          // Semantic path is best-effort; name-match alone is sufficient.
+        }
+
+        // 3. Merge: for each document surfaced by either path, return the
+        //    doc-level row plus the best-matching chunk if we found one.
+        const byId = new Map<string, {
+          id: string;
+          fileName: string;
+          mimeType: string;
+          tags: string[];
+          status: string;
+          createdAt: string;
+          sizeBytes: number;
+          topMatchSnippet?: string;
+          matchScore: number;
+        }>();
+
+        for (const d of nameMatches) {
+          byId.set(d.id, {
+            id: d.id,
+            fileName: d.fileName,
+            mimeType: d.mimeType,
+            tags: d.tags,
+            status: d.status,
+            createdAt: d.createdAt.toISOString(),
+            sizeBytes: d.sizeBytes,
+            matchScore: 0.8, // name/tag match baseline
+          });
+        }
+
+        for (const chunk of semanticMatches) {
+          if (!chunk.documentId) continue;
+          const existing = byId.get(chunk.documentId);
+          if (existing) {
+            // Keep the higher of the two scores
+            existing.matchScore = Math.max(existing.matchScore, chunk.score);
+            existing.topMatchSnippet = chunk.content.slice(0, 400);
+          } else {
+            // Chunk surfaced a document that didn't match by name — fetch the doc.
+            const doc = await prisma.tenantDocument.findMany({
+              where: { id: chunk.documentId, tenantId: context.tenantId, deletedAt: null },
+              take: 1,
+            });
+            if (doc.length > 0) {
+              const d = doc[0];
+              if (!d) continue;
+              byId.set(d.id, {
+                id: d.id,
+                fileName: d.fileName,
+                mimeType: d.mimeType,
+                tags: d.tags,
+                status: d.status,
+                createdAt: d.createdAt.toISOString(),
+                sizeBytes: d.sizeBytes,
+                topMatchSnippet: chunk.content.slice(0, 400),
+                matchScore: chunk.score,
+              });
+            }
+          }
+        }
+
+        const results = [...byId.values()]
+          .sort((a, b) => b.matchScore - a.matchScore)
+          .slice(0, cappedLimit);
+
+        return {
+          results,
+          total: results.length,
+          message:
+            results.length === 0
+              ? `No documents found for "${query}". The user may not have uploaded a matching file, or the file may still be indexing.`
+              : `Found ${results.length} matching document${results.length === 1 ? '' : 's'}.`,
+        };
+      } catch (err) {
+        return {
+          error: `find_document failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    },
+  );
+
   // ─── DOCUMENT TOOLS ─────────────────────────────────────────────────────
 
   toolRegistry.register(

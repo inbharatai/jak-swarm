@@ -27,7 +27,7 @@ export interface VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType?: string,
     sourceKey?: string,
-    opts?: { scopeType?: string; scopeId?: string },
+    opts?: { scopeType?: string; scopeId?: string; documentId?: string },
   ): Promise<number>; // returns chunk count
 
   search(
@@ -35,7 +35,7 @@ export interface VectorMemoryAdapter {
     query: string,
     topK?: number,
     scoreThreshold?: number,
-    opts?: { scopeType?: string; scopeId?: string },
+    opts?: { scopeType?: string; scopeId?: string; documentId?: string },
   ): Promise<VectorSearchResult[]>;
 
   delete(tenantId: string, sourceKey: string, opts?: { scopeType?: string; scopeId?: string }): Promise<number>; // returns deleted count
@@ -111,6 +111,7 @@ interface InMemoryDoc {
   tenantId: string;
   scopeType: string;
   scopeId: string;
+  documentId?: string;
 }
 
 export class InMemoryVectorAdapter implements VectorMemoryAdapter {
@@ -127,12 +128,13 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType = 'DOCUMENT',
     sourceKey?: string,
-    opts?: { scopeType?: string; scopeId?: string },
+    opts?: { scopeType?: string; scopeId?: string; documentId?: string },
   ): Promise<number> {
     const chunks = chunkText(content);
     const embeddings = await this.embedder.embedBatch(chunks);
     const scopeType = opts?.scopeType ?? 'TENANT';
     const scopeId = opts?.scopeId ?? tenantId;
+    const documentId = opts?.documentId;
 
     if (sourceKey) {
       this.docs = this.docs.filter((d) => !(
@@ -154,7 +156,8 @@ export class InMemoryVectorAdapter implements VectorMemoryAdapter {
         tenantId,
         scopeType,
         scopeId,
-      });
+        ...(documentId ? { documentId } : {}),
+      } as InMemoryDoc);
     }
 
     return chunks.length;
@@ -226,13 +229,14 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
     metadata?: Record<string, unknown>,
     sourceType = 'DOCUMENT',
     sourceKey?: string,
-    opts?: { scopeType?: string; scopeId?: string },
+    opts?: { scopeType?: string; scopeId?: string; documentId?: string },
   ): Promise<number> {
     const chunks = chunkText(content);
     const embeddings = await this.embedder.embedBatch(chunks);
     const db = this.prisma as { $executeRawUnsafe: (query: string, ...args: unknown[]) => Promise<number> };
     const scopeType = opts?.scopeType ?? 'TENANT';
     const scopeId = opts?.scopeId ?? tenantId;
+    const documentId = opts?.documentId ?? null;
 
     for (let i = 0; i < chunks.length; i++) {
       const emb = embeddings[i] ?? [];
@@ -241,14 +245,15 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
       const contentHash = hashString(chunks[i] ?? '');
 
       await db.$executeRawUnsafe(
-        `INSERT INTO vector_documents ("id", "tenantId", "scopeType", "scopeId", content, embedding, metadata, "sourceKey", "sourceType", "chunkIndex", "contentHash", "createdAt", "updatedAt")
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector, $6::jsonb, $7, $8, $9, $10, NOW(), NOW())
+        `INSERT INTO vector_documents ("id", "tenantId", "scopeType", "scopeId", content, embedding, metadata, "sourceKey", "sourceType", "chunkIndex", "contentHash", "documentId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::vector, $6::jsonb, $7, $8, $9, $10, $11, NOW(), NOW())
          ON CONFLICT ("tenantId", "scopeType", "scopeId", "sourceKey", "chunkIndex") DO UPDATE SET
            content = EXCLUDED.content,
            embedding = EXCLUDED.embedding,
            metadata = EXCLUDED.metadata,
            "sourceType" = EXCLUDED."sourceType",
            "contentHash" = EXCLUDED."contentHash",
+           "documentId" = EXCLUDED."documentId",
            "updatedAt" = NOW()`,
         tenantId,
         scopeType,
@@ -260,6 +265,7 @@ export class PgVectorAdapter implements VectorMemoryAdapter {
         sourceType,
         i,
         contentHash,
+        documentId,
       );
     }
 

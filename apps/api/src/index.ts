@@ -11,6 +11,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -45,6 +46,7 @@ import usageRoutes from './routes/usage.routes.js';
 import paddleRoutes from './routes/paddle.routes.js';
 import slackRoutes from './routes/slack.routes.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
+import documentsRoutes from './routes/documents.routes.js';
 import { registerObservability } from './observability/index.js';
 import { validateConfigOnBoot } from './boot/validate-config.js';
 import { spawnWhatsAppClient, stopWhatsAppClient, releaseWhatsAppAutoStartLock } from './whatsapp/whatsapp-spawner.js';
@@ -136,6 +138,16 @@ async function buildApp() {
   await fastify.register(authPlugin);
   await fastify.register(swarmPlugin);
 
+  // Multipart plugin for /documents/upload. Size ceiling matches the
+  // storage-service MAX_FILE_SIZE_BYTES (25MB); the route-level body limit
+  // via fastify's bodyLimit doesn't apply to multipart streams.
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 25 * 1024 * 1024,
+      files: 1,
+    },
+  });
+
   // -------------------------------------------------------------------------
   // Boot-time config validation (before routes)
   // -------------------------------------------------------------------------
@@ -169,6 +181,7 @@ async function buildApp() {
   await fastify.register(paddleRoutes, { prefix: '/paddle' });
   await fastify.register(slackRoutes, { prefix: '/slack' });
   await fastify.register(whatsappRoutes, { prefix: '/whatsapp' });
+  await fastify.register(documentsRoutes, { prefix: '/documents' });
 
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity

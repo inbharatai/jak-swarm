@@ -116,7 +116,7 @@ function NetworkBackground({ isActive }: { isActive: boolean }) {
 
 const CTA_STATS = [
   { value: '38', label: 'Agents' },
-  { value: '119', label: 'Tools' },
+  { value: '120', label: 'Tools' },
   { value: '22', label: 'Integrations' },
   { value: '<2min', label: 'To Deploy' },
 ];

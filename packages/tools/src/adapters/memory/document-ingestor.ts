@@ -23,17 +23,31 @@ export class DocumentIngestor {
 
   /**
    * Ingest plain text into the vector store.
+   *
+   * `documentId` (optional) — soft FK to TenantDocument.id. When set, every
+   * chunk row produced for this ingest carries documentId so DELETE /documents/:id
+   * can clean up all chunks via a single `deleteMany({ where: { documentId } })`.
+   * Calls that predate TenantDocument (direct ingestion scripts) can omit it.
    */
   async ingestText(
     tenantId: string,
     text: string,
-    opts?: { title?: string; sourceType?: string; sourceKey?: string; metadata?: Record<string, unknown>; scopeType?: string; scopeId?: string },
+    opts?: {
+      title?: string;
+      sourceType?: string;
+      sourceKey?: string;
+      metadata?: Record<string, unknown>;
+      scopeType?: string;
+      scopeId?: string;
+      documentId?: string;
+    },
   ): Promise<IngestResult> {
     const sourceKey = opts?.sourceKey ?? `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const sourceType = opts?.sourceType ?? 'DOCUMENT';
     const metadata = {
       ...opts?.metadata,
       ...(opts?.title ? { title: opts.title } : {}),
+      ...(opts?.documentId ? { documentId: opts.documentId } : {}),
       ingestedAt: new Date().toISOString(),
     };
 
@@ -43,7 +57,11 @@ export class DocumentIngestor {
       metadata,
       sourceType,
       sourceKey,
-      { scopeType: opts?.scopeType, scopeId: opts?.scopeId },
+      {
+        scopeType: opts?.scopeType,
+        scopeId: opts?.scopeId,
+        documentId: opts?.documentId,
+      },
     );
 
     return { chunksCreated, sourceKey, sourceType };
@@ -55,7 +73,14 @@ export class DocumentIngestor {
   async ingestPDF(
     tenantId: string,
     buffer: Buffer,
-    opts?: { title?: string; sourceKey?: string; metadata?: Record<string, unknown>; scopeType?: string; scopeId?: string },
+    opts?: {
+      title?: string;
+      sourceKey?: string;
+      metadata?: Record<string, unknown>;
+      scopeType?: string;
+      scopeId?: string;
+      documentId?: string;
+    },
   ): Promise<IngestResult> {
     let text: string;
 

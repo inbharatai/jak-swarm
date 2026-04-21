@@ -281,7 +281,7 @@ function ToolTogglesTab({ disabledToolNames }: { disabledToolNames: string[] }) 
     const [toggling, setToggling] = useState<string | null>(null);
     const [localOverrides, setLocalOverrides] = useState<Record<string, boolean>>({});
 
-    // Pulls the real tool registry (119 classified tools with maturity + category).
+    // Pulls the real tool registry (120 classified tools with maturity + category).
     // Previously this panel rendered a hardcoded 9-tool demo list — now it reflects
     // exactly what toolRegistry.list() returns on the API.
     const { data: registryTools, isLoading, error } = useSWR<ToolMetadataResponse[]>(

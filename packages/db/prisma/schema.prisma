@@ -47,6 +47,7 @@ model Tenant {
   schedules       WorkflowSchedule[]
   projects        Project[]
   vectorDocuments VectorDocument[]
+  tenantDocuments TenantDocument[]
   subscription    Subscription?
 
   @@map("tenants")
@@ -357,6 +358,10 @@ model VectorDocument {
   scopeType  String?
   scopeId    String?
   contentHash String?
+  // Soft FK to TenantDocument.id — when a file is uploaded via POST /documents/upload,
+  // each chunk row carries the originating document id so we can list chunks by
+  // document (preview) and delete chunks when the document is removed.
+  documentId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -365,7 +370,59 @@ model VectorDocument {
   @@index([tenantId, sourceType])
   @@index([tenantId, scopeType, scopeId])
   @@index([tenantId, sourceKey])
+  @@index([documentId])
   @@map("vector_documents")
+}
+
+// Source-of-truth record for every file a tenant uploads via the dashboard.
+// The raw bytes live in Supabase Storage under `tenant-documents/<tenantId>/<id>.<ext>`;
+// this table holds the metadata + the URL the frontend uses to stream the file
+// back. Chunked + embedded content lives in VectorDocument rows joined on documentId.
+//
+// Why a dedicated model instead of reusing VectorDocument: VectorDocument is
+// chunk-level (one row per ~1k tokens). TenantDocument is document-level (one
+// row per uploaded file). Treating them as the same thing makes preview, delete,
+// and "recently uploaded files" queries awkward. Keeping them separate makes
+// the lifecycle clear: upload creates 1 TenantDocument + N VectorDocument rows.
+model TenantDocument {
+  id           String   @id @default(cuid())
+  tenantId     String
+  // Uploader — null when uploaded via API key (future: service-account uploads)
+  uploadedBy   String?
+  fileName     String
+  // MIME type from Content-Type, validated against an allowlist at upload time.
+  mimeType     String
+  sizeBytes   Int
+  // Supabase Storage key: `tenant-documents/<tenantId>/<id>.<ext>`. Frontend
+  // builds the signed URL at read-time so we never persist a URL that could
+  // outlive its signature.
+  storageKey   String   @unique
+  // Hash of the file content (sha256, hex). Lets us dedupe identical uploads
+  // across a tenant and detect silent corruption.
+  contentHash  String?
+  // Ingestion lifecycle:
+  //   PENDING   — uploaded, not yet chunked/embedded
+  //   INDEXED   — chunks live in VectorDocument, searchable
+  //   FAILED    — ingestion failed, see ingestionError for reason
+  //   DELETED   — soft-delete marker; storage object also removed
+  status       String   @default("PENDING")
+  ingestionError String?
+  // Optional scope labels set at upload — e.g., { projectId, workflowId }
+  // so the find_document tool can filter to the right context.
+  metadata     Json?
+  // Optional tags the user attaches at upload for organization in the Files tab.
+  tags         String[] @default([])
+  // Soft delete — storage object is still removed, this row stays for audit.
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("tenant_documents")
 }
 
 model AuditLog {

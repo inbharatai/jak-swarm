@@ -5,14 +5,14 @@
 ### Operator-Grade Multi-Agent Control Plane
 
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
-[![Tools](https://img.shields.io/badge/Classified_Tools-119-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
+[![Tools](https://img.shields.io/badge/Classified_Tools-120-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-448_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**Operator-grade multi-agent control plane. 38 specialist agents + 119 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
+**Operator-grade multi-agent control plane. 38 specialist agents + 120 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -150,11 +150,11 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
-| 🔧 | **119 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
+| 🔧 | **120 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
 | 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
-| 🧪 | **Tool Maturity Manifest** | All 119 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
+| 🧪 | **Tool Maturity Manifest** | All 120 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
 | 🧠 | **6 Managed AI Providers** | OpenAI (GPT-4o), Anthropic (Claude), Google (Gemini), DeepSeek, Ollama (local), OpenRouter. Dynamic routing with failover and role-aware primary selection. Provider API keys are required unless using local models |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
@@ -560,7 +560,7 @@ flowchart TD
 | **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
 | **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **119 classified tools** (CI-enforced maturity) | ✅ | ❌ | ❌ | ❌ |
+| **120 classified tools** (CI-enforced maturity) | ✅ | ❌ | ❌ | ❌ |
 | **Voice input** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
 | **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
@@ -680,7 +680,7 @@ http://localhost:3000
 
 ---
 
-## 🔧 Tool Inventory (119 Registered)
+## 🔧 Tool Inventory (120 Registered)
 
 | Category | Count | Tools | Status |
 |:---------|:-----:|:------|:------:|
@@ -695,7 +695,7 @@ http://localhost:3000
 | **Webhook** | 2 | send_webhook, deploy_to_vercel | ✅ Built-in |
 | **MCP (external)** | Dynamic | Slack, GitHub, Notion + 18 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 119 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, and Webhook categories. Additional provider tools can be loaded dynamically via MCP integrations.**
+**Total: 120 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, and Webhook categories. Additional provider tools can be loaded dynamically via MCP integrations.**
 
 ---
 
@@ -773,7 +773,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
-| Tools | **119** | 50+ | Custom | ~10 |
+| Tools | **120** | 50+ | Custom | ~10 |
 | Built-in UI | **12 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
@@ -906,7 +906,7 @@ jak-swarm/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination, memory injection
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 33 worker agents
-│   ├── tools/                  # 119 tool implementations
+│   ├── tools/                  # 120 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
 │   │       ├── builtin/        # Built-in + sandbox tools
