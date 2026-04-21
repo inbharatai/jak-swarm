@@ -12,27 +12,28 @@
     "test:load:k6": "k6 run tests/load/api-load.k6.js"
   },
   "dependencies": {
-    "@jak-swarm/shared": "workspace:*",
-    "@jak-swarm/security": "workspace:*",
-    "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/agents": "workspace:*",
-    "@jak-swarm/tools": "workspace:*",
-    "@jak-swarm/swarm": "workspace:*",
-    "@jak-swarm/voice": "workspace:*",
-    "@jak-swarm/verification": "workspace:*",
     "@jak-swarm/client": "workspace:*",
+    "@jak-swarm/industry-packs": "workspace:*",
+    "@jak-swarm/security": "workspace:*",
+    "@jak-swarm/shared": "workspace:*",
+    "@jak-swarm/swarm": "workspace:*",
+    "@jak-swarm/tools": "workspace:*",
+    "@jak-swarm/verification": "workspace:*",
+    "@jak-swarm/voice": "workspace:*",
     "@jak-swarm/workflows": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",
+    "@temporalio/client": "^1.11.6",
     "@temporalio/testing": "^1.11.6",
     "@temporalio/worker": "^1.11.6",
     "@temporalio/workflow": "^1.11.6",
-    "@temporalio/client": "^1.11.6",
-    "tsx": "^4.19.2",
+    "@types/node": "^22.10.7",
+    "@vitest/coverage-v8": "2.1.9",
     "testcontainers": "^10.13.0",
-    "vitest": "^2.1.8",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "@types/node": "^22.10.7"
+    "vitest": "^2.1.8"
   }
 }

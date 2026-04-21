@@ -25,5 +25,43 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
+    // Coverage gate. Not enabled by default (keeps local `pnpm test` fast);
+    // CI runs `pnpm vitest run --coverage` which picks up these thresholds
+    // and fails the build if either package drops below floor.
+    //
+    // The 50% floor is intentional: the codebase currently tests behavior
+    // via integration tests that hit multiple packages at once, so raw
+    // line coverage for any single package looks lower than the actual
+    // safety net. Raising the floor is a separate, quality-improving PR.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: '../coverage',
+      include: [
+        '../packages/swarm/src/**/*.ts',
+        '../packages/agents/src/**/*.ts',
+      ],
+      exclude: [
+        '../packages/*/src/index.ts',
+        '../packages/*/src/**/*.d.ts',
+      ],
+      thresholds: {
+        // Floors ratcheted from the first measured coverage run.
+        // Ratchet upward in follow-up commits as coverage improves;
+        // never ratchet downward without explicit justification.
+        'packages/swarm/src/**/*.ts': {
+          lines: 50,
+          branches: 40,
+          functions: 50,
+          statements: 50,
+        },
+        'packages/agents/src/**/*.ts': {
+          lines: 50,
+          branches: 40,
+          functions: 50,
+          statements: 50,
+        },
+      },
+    },
   },
 });

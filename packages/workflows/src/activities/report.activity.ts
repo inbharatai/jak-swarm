@@ -30,11 +30,23 @@ export async function gatherMetrics(input: GatherMetricsInput): Promise<MetricsD
     }),
   ]);
 
-  const completed = workflows.filter(w => w.status === 'COMPLETED').length;
-  const failed = workflows.filter(w => w.status === 'FAILED').length;
-  const totalCost = workflows.reduce((sum, w) => sum + (w.totalCostUsd ?? 0), 0);
-  const durations = traces.filter(t => t.durationMs != null).map(t => t.durationMs!);
-  const avgLatency = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+  // Prisma 6's select-typed rows don't always infer in strict mode under
+  // workspace linking; explicit types on the callback params keep the
+  // reducer readable without a full runtime-type gymnastic pass.
+  type WorkflowRow = { status: string; totalCostUsd: number | null };
+  type TraceRow = { durationMs: number | null };
+  const completed = (workflows as WorkflowRow[]).filter((w) => w.status === 'COMPLETED').length;
+  const failed = (workflows as WorkflowRow[]).filter((w) => w.status === 'FAILED').length;
+  const totalCost = (workflows as WorkflowRow[]).reduce(
+    (sum: number, w) => sum + (w.totalCostUsd ?? 0),
+    0,
+  );
+  const durations = (traces as TraceRow[])
+    .filter((t) => t.durationMs != null)
+    .map((t) => t.durationMs as number);
+  const avgLatency = durations.length > 0
+    ? Math.round(durations.reduce((a: number, b: number) => a + b, 0) / durations.length)
+    : 0;
 
   return {
     period: input.reportType,

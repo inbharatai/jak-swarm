@@ -112,14 +112,26 @@ jobs:
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/agents build
 
-      - name: Run tests
-        run: pnpm test
+      - name: Run tests with coverage
+        # Coverage thresholds live in tests/vitest.config.ts. Failing the
+        # threshold fails the build, so coverage floor enforcement is
+        # declarative and visible in the config, not hidden in this YAML.
+        run: pnpm --filter @jak-swarm/tests exec vitest run --coverage
         env:
           NODE_ENV: test
           AUTH_SECRET: ci-test-secret-change-me
           DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
           DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
           REDIS_URL: redis://localhost:6379
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage/
+          retention-days: 30
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
   # Security gate — blocks merge/deploy if hardened defaults are violated
@@ -252,8 +264,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate CycloneDX SBOM (JSON)
-        run: pnpm dlx @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json
+      - name: Generate CycloneDX SBOM (via syft)
+        # Syft reads pnpm-lock.yaml directly and emits a CycloneDX 1.5 JSON.
+        # Unlike @cyclonedx/cyclonedx-npm (which relies on `npm ls` and can't
+        # resolve pnpm symlink layouts) and cdxgen (which compiles native
+        # sqlite), syft is a single Go binary — no install, no native deps.
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: cyclonedx-json
+          output-file: sbom.json
+          artifact-name: sbom-${{ github.sha }}
+          upload-artifact: false
+          upload-release-assets: false
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4

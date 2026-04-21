@@ -275,8 +275,8 @@ export class VibeCodingExecutionService extends EventEmitter {
         {
           action: 'PLAN_CHANGES',
           changeRequest: message,
-          existingFiles: existingFiles.map(f => ({ path: f.path, content: f.content })),
-          conversationHistory: conversations.slice(-10).map(c => ({ role: c.role, content: c.content })),
+          existingFiles: existingFiles.map((f: { path: string; content: string }) => ({ path: f.path, content: f.content })),
+          conversationHistory: conversations.slice(-10).map((c: { role: string; content: string }) => ({ role: c.role, content: c.content })),
         },
         context,
       );
@@ -294,13 +294,13 @@ export class VibeCodingExecutionService extends EventEmitter {
       }
 
       const generatorAgent = new AppGeneratorAgent();
-      const affectedFiles = existingFiles.filter(f => filesToModify.includes(f.path));
+      const affectedFiles = existingFiles.filter((f: { path: string }) => filesToModify.includes(f.path));
 
       const genResult = await generatorAgent.execute(
         {
           action: 'MODIFY_FILE',
           modifyInstructions: message,
-          existingFiles: affectedFiles.map(f => ({ path: f.path, content: f.content })),
+          existingFiles: affectedFiles.map((f: { path: string; content: string }) => ({ path: f.path, content: f.content })),
           architecture: changePlan.architecture,
           // FIX #23: Use project's actual framework, not hardcoded
           framework: (await this.db.project.findUnique({ where: { id: projectId }, select: { framework: true } }))?.framework ?? 'nextjs',
@@ -326,7 +326,7 @@ export class VibeCodingExecutionService extends EventEmitter {
       // ─── Step 4: Rebuild in sandbox ───────────────────────────────
       if (this.sandbox?.isAvailable()) {
         const allFiles = await this.projectService.getFiles(projectId);
-        await this.buildInSandbox(projectId, allFiles.map(f => ({ path: f.path, content: f.content, language: f.language ?? 'text' })), context);
+        await this.buildInSandbox(projectId, allFiles.map((f: { path: string; content: string; language: string | null }) => ({ path: f.path, content: f.content, language: f.language ?? 'text' })), context);
       } else {
         await this.projectService.updateProjectStatus(projectId, 'READY');
         this.emitProjectEvent(projectId, 'iteration_completed', {

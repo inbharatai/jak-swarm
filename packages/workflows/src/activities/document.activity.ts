@@ -1,5 +1,5 @@
 import { Context } from '@temporalio/activity';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -43,7 +43,7 @@ export async function processDocument(input: ProcessDocumentInput): Promise<Docu
 
   if (input.options.summarize) {
     // Real extractive summary: take first meaningful paragraphs up to ~200 words
-    const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 20);
+    const paragraphs = content.split(/\n\n+/).filter((p: string) => p.trim().length > 20);
     const summaryParts: string[] = [];
     let wordsUsed = 0;
     for (const para of paragraphs) {
@@ -114,7 +114,7 @@ export async function notifyProgress(input: { tenantId: string; workflowId: stri
           percentage: Math.round((input.processed / input.total) * 100),
           updatedAt: new Date().toISOString(),
         },
-      } as unknown as Prisma.InputJsonValue,
+      },
     },
   });
 }
@@ -127,7 +127,11 @@ export async function saveDocumentResult(input: { tenantId: string; documentId: 
     data: {
       tenantId: input.tenantId,
       key: `doc_result_${input.documentId}`,
-      value: JSON.parse(JSON.stringify(input.result)) as Prisma.InputJsonValue,
+      // Prisma accepts plain-object JSON at runtime; serialize via
+      // JSON.parse(JSON.stringify(...)) to strip Date, Map, etc., then
+      // pass through. Prisma 6 removed the exported `InputJsonValue` type,
+      // but the runtime contract is unchanged.
+      value: JSON.parse(JSON.stringify(input.result)),
       source: 'temporal:batch-processing',
       memoryType: 'KNOWLEDGE',
     },
