@@ -596,6 +596,23 @@ export class SwarmGraph extends EventEmitter {
         batches.push(readyTasks.slice(i, i + MAX_CONCURRENT_TASKS));
       }
 
+      // Observability: emit the parallelization factor for this round so the
+      // Grafana dashboard can show actual concurrent throughput vs the
+      // 1-at-a-time fallback. batches.length === 1 && readyTasks.length > 1
+      // means we ran them concurrently; a large batches.length means we hit
+      // the MAX_CONCURRENT_TASKS ceiling and ran them in waves.
+      if (readyTasks.length > 1) {
+        this.emit('parallel:dispatch', {
+          workflowId: state.workflowId,
+          tenantId: state.tenantId,
+          readyTaskCount: readyTasks.length,
+          batchCount: batches.length,
+          maxConcurrent: MAX_CONCURRENT_TASKS,
+          parallelizationFactor: Math.min(readyTasks.length, MAX_CONCURRENT_TASKS),
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       // Pre-batch budget gate: if budget is already exceeded, stop before spending more
       if (state.maxCostUsd && state.accumulatedCostUsd >= state.maxCostUsd) {
         state = {
