@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { BookOpen, CheckCircle2, Key, Shield, Trash2, Users, Wrench, XCircle } from 'lucide-react';
@@ -264,59 +264,112 @@ interface ToolEntry {
   description: string;
   category: string;
   enabled: boolean;
+  maturity?: string;
+  riskClass?: string;
+}
+
+interface ToolMetadataResponse {
+  name: string;
+  description: string;
+  category: string;
+  riskClass: string;
+  maturity?: string;
 }
 
 function ToolTogglesTab({ disabledToolNames }: { disabledToolNames: string[] }) {
     const toast = useToast();
-    const [tools, setTools] = useState<ToolEntry[]>([]);
     const [toggling, setToggling] = useState<string | null>(null);
+    const [localOverrides, setLocalOverrides] = useState<Record<string, boolean>>({});
 
-    const buildMockTools = useCallback((disabled: string[]): ToolEntry[] => {
-      const knownTools: Omit<ToolEntry, 'enabled'>[] = [
-        { name: 'web_search', description: 'Search the web via configured search provider', category: 'Research' },
-        { name: 'url_fetch', description: 'Fetch and parse content from a URL', category: 'Research' },
-        { name: 'code_execute', description: 'Run sandboxed code snippets', category: 'Engineering' },
-        { name: 'file_read', description: 'Read files from the workspace', category: 'Files' },
-        { name: 'file_write', description: 'Write files to the workspace', category: 'Files' },
-        { name: 'browser_navigate', description: 'Navigate a headless browser', category: 'Browser' },
-        { name: 'browser_screenshot', description: 'Take screenshot of current browser page', category: 'Browser' },
-        { name: 'email_send', description: 'Send outbound email via configured provider', category: 'Communication' },
-        { name: 'slack_message', description: 'Post a message to a Slack channel', category: 'Communication' },
-      ];
-      return knownTools.map((t) => ({ ...t, enabled: !disabled.includes(t.name) }));
-    }, []);
+    // Pulls the real tool registry (119 classified tools with maturity + category).
+    // Previously this panel rendered a hardcoded 9-tool demo list — now it reflects
+    // exactly what toolRegistry.list() returns on the API.
+    const { data: registryTools, isLoading, error } = useSWR<ToolMetadataResponse[]>(
+      '/tools',
+      dataFetcher,
+      { revalidateOnFocus: false },
+    );
 
-    useEffect(() => {
-      setTools(buildMockTools(disabledToolNames));
-    }, [disabledToolNames, buildMockTools]);
+    const tools: ToolEntry[] = (registryTools ?? []).map((t) => {
+      const serverEnabled = !disabledToolNames.includes(t.name);
+      const override = localOverrides[t.name];
+      return {
+        name: t.name,
+        description: t.description,
+        category: t.category,
+        enabled: override ?? serverEnabled,
+        maturity: t.maturity,
+        riskClass: t.riskClass,
+      };
+    });
 
     const handleToggle = async (name: string, currentEnabled: boolean) => {
       setToggling(name);
+      // Optimistic local override so the switch flips immediately while the
+      // PATCH round-trips. Cleared once SWR refreshes tenant settings.
+      setLocalOverrides((prev) => ({ ...prev, [name]: !currentEnabled }));
       try {
         await toolToggleApi.toggle(name, !currentEnabled);
-        setTools((prev) => prev.map((t) => t.name === name ? { ...t, enabled: !currentEnabled } : t));
         toast.success(`Tool ${!currentEnabled ? 'enabled' : 'disabled'}`);
       } catch (err) {
+        // Roll back the optimistic override on failure.
+        setLocalOverrides((prev) => {
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        });
         toast.error('Failed to update tool', err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setToggling(null);
       }
     };
 
-    const categories = [...new Set(tools.map((t) => t.category))];
+    if (isLoading) return <div className="flex justify-center py-8"><Spinner /></div>;
+    if (error) {
+      return (
+        <EmptyState
+          icon={<Wrench className="h-6 w-6" />}
+          title="Couldn't load tools"
+          description="The tool registry endpoint returned an error. Refresh to retry."
+        />
+      );
+    }
+    if (!tools.length) {
+      return (
+        <EmptyState
+          icon={<Wrench className="h-6 w-6" />}
+          title="No tools registered"
+          description="Your tenant has no tools assigned. Contact an administrator."
+        />
+      );
+    }
+
+    const categories = [...new Set(tools.map((t) => t.category))].sort();
+    const enabledCount = tools.filter((t) => t.enabled).length;
 
     return (
       <div className="space-y-6">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            {enabledCount} of {tools.length} tools enabled &middot; {categories.length} categories
+          </span>
+          <span className="font-mono text-xs">live registry</span>
+        </div>
         {categories.map((cat) => (
           <Card key={cat}>
             <CardHeader>
-              <CardTitle className="text-sm">{cat}</CardTitle>
+              <CardTitle className="text-sm capitalize">{cat.toLowerCase().replace(/_/g, ' ')}</CardTitle>
             </CardHeader>
             <div className="divide-y">
               {tools.filter((t) => t.category === cat).map((tool) => (
                 <div key={tool.name} className="flex items-center gap-4 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-sm font-mono font-medium', !tool.enabled && 'text-muted-foreground line-through')}>{tool.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={cn('truncate text-sm font-mono font-medium', !tool.enabled && 'text-muted-foreground line-through')}>{tool.name}</p>
+                      {tool.maturity && tool.maturity !== 'real' && (
+                        <Badge className="text-[10px] font-mono uppercase">{tool.maturity}</Badge>
+                      )}
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">{tool.description}</p>
                   </div>
                   <button

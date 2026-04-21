@@ -1,6 +1,8 @@
 import type { ToolMetadata, ToolExecutionContext, ToolResult, ToolRiskClass } from '@jak-swarm/shared';
-import { ToolCategory } from '@jak-swarm/shared';
+import { ToolCategory, createLogger } from '@jak-swarm/shared';
 import { toolRegistry, type RegisteredTool } from '../registry/tool-registry.js';
+
+const logger = createLogger('tenant-tool-registry');
 
 /**
  * TenantToolRegistry — a tenant-scoped view over the global ToolRegistry.
@@ -105,20 +107,39 @@ export class TenantToolRegistry {
   private isAllowed(metadata: ToolMetadata): boolean {
     // Block browser tools if tenant hasn't enabled browser automation
     if (metadata.category === ToolCategory.BROWSER && !this.browserAutomationEnabled) {
+      logger.debug(
+        { tenantId: this.tenantId, tool: metadata.name, reason: 'browser_automation_disabled' },
+        'Tool blocked by tenant policy',
+      );
       return false;
     }
     // Block tools in categories restricted by the tenant's industry pack
     if (this.restrictedCategories.has(metadata.category)) {
+      logger.debug(
+        { tenantId: this.tenantId, tool: metadata.name, category: metadata.category, reason: 'restricted_category' },
+        'Tool blocked by tenant industry pack',
+      );
       return false;
     }
     // Block tools explicitly disabled by the tenant admin
     if (this.disabledToolNames.has(metadata.name)) {
+      logger.debug(
+        { tenantId: this.tenantId, tool: metadata.name, reason: 'admin_disabled' },
+        'Tool blocked by tenant admin toggle',
+      );
       return false;
     }
     // Built-in tools (no provider) are always available
     if (!metadata.provider) return true;
     // Provider-specific tools require the tenant to have that provider connected
-    return this.allowedProviders.has(metadata.provider.toLowerCase());
+    const ok = this.allowedProviders.has(metadata.provider.toLowerCase());
+    if (!ok) {
+      logger.debug(
+        { tenantId: this.tenantId, tool: metadata.name, provider: metadata.provider, reason: 'provider_not_connected' },
+        'Tool blocked — required MCP provider not connected',
+      );
+    }
+    return ok;
   }
 }
 

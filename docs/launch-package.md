@@ -339,7 +339,7 @@ Happy to go deep on any of these. Code is at https://github.com/inbharatai/jak-s
 
 Excited to share something I've been building for a while: **JAK Swarm** — an open-source autonomous multi-agent AI platform that runs your company's operations.
 
-**The elevator pitch:** 39 specialised AI agents, 119 tools, 6 LLM providers. Give it a goal in plain English. It plans the work, executes it across your real systems, verifies the results, and reports back.
+**The elevator pitch:** 38 specialised AI agents, 119 tools, 6 LLM providers. Give it a goal in plain English. It plans the work, executes it across your real systems, verifies the results, and reports back.
 
 **What "running your company" actually means:**
 
@@ -378,7 +378,7 @@ Hi [Newsletter Name] team,
 
 I wanted to pitch a story that I think fits your audience well.
 
-**What I built:** JAK Swarm — an open-source autonomous multi-agent AI platform with 39 specialised agents, 119 tools, and 6 LLM providers. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
+**What I built:** JAK Swarm — an open-source autonomous multi-agent AI platform with 38 specialised agents, 119 tools, and 6 LLM providers. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
 
 **Why it's different from what's already been covered:**
 
