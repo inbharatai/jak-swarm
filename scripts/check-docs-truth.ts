@@ -430,6 +430,115 @@ if (session7.missing.length > 0) {
   });
 }
 
+// ─── Phase 1 invariant: approval-gate default is blocking ──────────────────
+// The landing page claims "human approval on every high-risk action". That's
+// only structurally true if the approval node requires an explicit tenant
+// opt-in before auto-approving. If someone ever reverts approval-node.ts to
+// "threshold alone is enough to bypass", this guard fires.
+
+try {
+  const approvalNode = read('packages/swarm/src/graph/nodes/approval-node.ts');
+  if (!/state\.autoApproveEnabled\s*===\s*true/.test(approvalNode)) {
+    mismatches.push({
+      claim: 'Approval-node must require explicit autoApproveEnabled=true opt-in',
+      expected: 'state.autoApproveEnabled === true guard in auto-approve branch',
+      actual: 'guard missing — auto-approval silently runs on threshold alone',
+      source: 'packages/swarm/src/graph/nodes/approval-node.ts',
+    });
+  }
+} catch {
+  mismatches.push({
+    claim: 'approval-node.ts must exist',
+    expected: 'present',
+    actual: 'missing',
+    source: 'packages/swarm/src/graph/nodes/approval-node.ts',
+  });
+}
+
+// Prisma schema: new-tenant default stays at `autoApproveEnabled Boolean @default(false)`.
+// A change to `@default(true)` would re-open the honesty gap; the migration
+// back-fill is a one-time operation, NOT a new-tenant policy.
+try {
+  const prismaSchema = read('packages/db/prisma/schema.prisma');
+  if (!/autoApproveEnabled\s+Boolean\s+@default\(false\)/.test(prismaSchema)) {
+    mismatches.push({
+      claim: 'Tenant.autoApproveEnabled must default to FALSE for new tenants',
+      expected: 'autoApproveEnabled Boolean @default(false)',
+      actual: 'default missing, removed, or set to true',
+      source: 'packages/db/prisma/schema.prisma',
+    });
+  }
+  if (!/model\s+ApprovalAuditLog\s*\{/.test(prismaSchema)) {
+    mismatches.push({
+      claim: 'ApprovalAuditLog model must exist in Prisma schema',
+      expected: 'model ApprovalAuditLog defined with decision + approverId + decidedAt',
+      actual: 'model missing — every-decision audit trail was removed',
+      source: 'packages/db/prisma/schema.prisma',
+    });
+  }
+} catch {
+  // If the schema file is missing, a different failure (typecheck) will catch it
+}
+
+// ─── Phase 3 invariant: circuit-breaker threshold is 5 ────────────────────
+// The landing page claims "After 5 consecutive failures, the circuit opens".
+// If the default failureThreshold drifts away from 5 (or the comment says one
+// thing while the code does another), observability docs become lies.
+
+try {
+  const breaker = read('apps/api/src/coordination/distributed-circuit-breaker.ts');
+  if (!/failureThreshold\s*\?\?\s*5\b/.test(breaker)) {
+    mismatches.push({
+      claim: 'DistributedCircuitBreaker default failureThreshold must be 5',
+      expected: '`this.failureThreshold = options.failureThreshold ?? 5;`',
+      actual: 'default threshold changed or removed',
+      source: 'apps/api/src/coordination/distributed-circuit-breaker.ts',
+    });
+  }
+  if (!/resetTimeoutMs\s*\?\?\s*30_000\b/.test(breaker)) {
+    mismatches.push({
+      claim: 'DistributedCircuitBreaker default resetTimeoutMs must be 30_000',
+      expected: '`this.resetTimeoutMs = options.resetTimeoutMs ?? 30_000;`',
+      actual: 'default reset timeout changed or removed',
+      source: 'apps/api/src/coordination/distributed-circuit-breaker.ts',
+    });
+  }
+} catch {
+  // skip
+}
+
+// ─── Phase 2 invariant: SECURITY.md + Dependabot + dual-use notes exist ────
+try {
+  read('SECURITY.md');
+} catch {
+  mismatches.push({
+    claim: 'SECURITY.md must exist at repo root',
+    expected: 'present',
+    actual: 'missing',
+    source: 'SECURITY.md (vulnerability disclosure policy)',
+  });
+}
+try {
+  read('.github/dependabot.yml');
+} catch {
+  mismatches.push({
+    claim: '.github/dependabot.yml must exist',
+    expected: 'present',
+    actual: 'missing',
+    source: '.github/dependabot.yml (weekly dep updates)',
+  });
+}
+try {
+  read('docs/SECURITY-NOTES.md');
+} catch {
+  mismatches.push({
+    claim: 'docs/SECURITY-NOTES.md must exist',
+    expected: 'present',
+    actual: 'missing',
+    source: 'docs/SECURITY-NOTES.md (dual-use surface inventory)',
+  });
+}
+
 // ─── Report ────────────────────────────────────────────────────────────────
 
 const report = {
