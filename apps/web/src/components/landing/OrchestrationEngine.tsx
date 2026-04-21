@@ -7,15 +7,15 @@ import { useStillMode } from './useStillMode';
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
 const MODULES = [
-  { id: 'email', label: 'Email', icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75', color: '#EA4335', angle: -60 },
-  { id: 'calendar', label: 'Calendar', icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5', color: '#4285F4', angle: -20 },
-  { id: 'browser', label: 'Browser', icon: 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582', color: '#34d399', angle: 20 },
-  { id: 'research', label: 'Research', icon: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z', color: '#06B6D4', angle: 60 },
-  { id: 'code', label: 'Code', icon: 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5', color: '#c084fc', angle: 100 },
-  { id: 'docs', label: 'Documents', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z', color: '#8B5CF6', angle: 140 },
-  { id: 'crm', label: 'CRM', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z', color: '#F59E0B', angle: 180 },
-  { id: 'voice', label: 'Voice', icon: 'M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z', color: '#f472b6', angle: -100 },
-  { id: 'ops', label: 'Ops', icon: 'M11.42 15.17l-5.1-3.03m0 0l-.45 1.41m.45-1.41l1.41-.45m-.32 3.94l5.1 3.03m0 0l.45-1.41m-.45 1.41l-1.41.45m6.09-9.26l-5.1-3.03m0 0l-.45 1.41m.45-1.41l1.41-.45m-1.09 5.35l5.1 3.03m0 0l.45-1.41m-.45 1.41l-1.41.45', color: '#fb923c', angle: -140 },
+  { id: 'email', label: 'Email', icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75', color: '#EA4335' },
+  { id: 'calendar', label: 'Calendar', icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5', color: '#4285F4' },
+  { id: 'browser', label: 'Browser', icon: 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582', color: '#34d399' },
+  { id: 'research', label: 'Research', icon: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z', color: '#06B6D4' },
+  { id: 'code', label: 'Code', icon: 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5', color: '#c084fc' },
+  { id: 'docs', label: 'Documents', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z', color: '#8B5CF6' },
+  { id: 'crm', label: 'CRM', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 a4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z', color: '#F59E0B' },
+  { id: 'voice', label: 'Voice', icon: 'M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z', color: '#f472b6' },
+  { id: 'ops', label: 'Ops', icon: 'M11.42 15.17l-5.1-3.03m0 0l-.45 1.41m.45-1.41l1.41-.45m-.32 3.94l5.1 3.03m0 0l.45-1.41m-.45 1.41l-1.41.45m6.09-9.26l-5.1-3.03m0 0l-.45 1.41m.45-1.41l1.41-.45m-1.09 5.35l5.1 3.03m0 0l.45-1.41m-.45 1.41l-1.41.45', color: '#fb923c' },
 ];
 
 const ACTIVE_SEQUENCE = [
@@ -29,6 +29,12 @@ const SVG_SIZE = 720;
 const ORBIT_RADIUS = 240;
 const CENTER = SVG_SIZE / 2;
 const ORBIT_PERCENT = Number(((ORBIT_RADIUS / CENTER) * 50).toFixed(3));
+const MODULE_ANGLE_START = -90;
+const MODULE_ANGLE_STEP = 360 / MODULES.length;
+
+function getModuleAngle(index: number) {
+  return MODULE_ANGLE_START + index * MODULE_ANGLE_STEP;
+}
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
 
@@ -186,8 +192,8 @@ export default function OrchestrationEngine() {
                 identically — raw Math.cos/sin floats drift at the 14th
                 decimal in React's attribute stringifier, triggering
                 hydration warnings. */}
-            {MODULES.map((mod) => {
-              const rad = (mod.angle * Math.PI) / 180;
+            {MODULES.map((mod, index) => {
+              const rad = (getModuleAngle(index) * Math.PI) / 180;
               const endX = Number((CENTER + Math.cos(rad) * ORBIT_RADIUS).toFixed(3));
               const endY = Number((CENTER + Math.sin(rad) * ORBIT_RADIUS).toFixed(3));
               const isActive = activeModules.includes(mod.id);
@@ -270,8 +276,8 @@ export default function OrchestrationEngine() {
 
           {/* Module nodes around the perimeter. Rounded to 3 decimals so
               SSR percentage strings match client exactly. */}
-          {MODULES.map((mod) => {
-            const rad = (mod.angle * Math.PI) / 180;
+          {MODULES.map((mod, index) => {
+            const rad = (getModuleAngle(index) * Math.PI) / 180;
             const x = Number((50 + Math.cos(rad) * ORBIT_PERCENT).toFixed(3));
             const y = Number((50 + Math.sin(rad) * ORBIT_PERCENT).toFixed(3));
             const isActive = activeModules.includes(mod.id);
