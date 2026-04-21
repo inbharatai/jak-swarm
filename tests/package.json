@@ -25,15 +25,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",
-    "@temporalio/client": "^1.11.6",
+    "@temporalio/client": "^1.16.0",
     "@temporalio/testing": "^1.11.6",
-    "@temporalio/worker": "^1.11.6",
-    "@temporalio/workflow": "^1.11.6",
+    "@temporalio/worker": "^1.16.0",
+    "@temporalio/workflow": "^1.16.0",
     "@types/node": "^22.10.7",
     "@vitest/coverage-v8": "2.1.9",
     "testcontainers": "^10.13.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
+    "typescript": "^6.0.3",
     "vitest": "^2.1.8"
   }
 }
