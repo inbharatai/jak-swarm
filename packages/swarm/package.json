@@ -23,8 +23,8 @@
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/tools": "workspace:^",
     "@jak-swarm/verification": "workspace:^",
-    "pino": "^9.5.0",
-    "zod": "^3.23.8"
+    "pino": "^10.3.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

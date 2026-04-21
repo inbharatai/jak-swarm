@@ -27,10 +27,10 @@
   "dependencies": {
     "@jak-swarm/shared": "workspace:*",
     "@prisma/client": "^6.19.3",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.10.7",
     "prisma": "^6.19.3",
     "tsx": "^4.19.2",

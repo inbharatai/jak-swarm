@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@jak-swarm/shared": "workspace:*",
-    "openai": "^4.76.3"
+    "openai": "^6.34.0"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
