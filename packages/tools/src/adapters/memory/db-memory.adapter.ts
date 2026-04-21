@@ -46,7 +46,13 @@ export interface MemoryDeleteOptions {
 // ─── In-memory implementation (tests / standalone) ───────────────────────────
 
 export class InMemoryAdapter implements MemoryAdapter {
-  private store = new Map<string, { value: unknown; type?: string; source?: string; updatedAt: string }>();
+  // Shape MUST match what DbMemoryAdapter.get() returns so callers can
+  // treat both adapters interchangeably. Fields: value, type, source,
+  // confidence (undefined for mem-only entries unless provided), updatedAt.
+  private store = new Map<
+    string,
+    { value: unknown; type?: string; source?: string; confidence?: number; updatedAt: string }
+  >();
 
   private buildKey(tenantId: string, scopeType: string, scopeId: string, key: string): string {
     return `${tenantId}:${scopeType}:${scopeId}:${key}`;
@@ -58,7 +64,15 @@ export class InMemoryAdapter implements MemoryAdapter {
     const scopeId = opts?.scopeId ?? tid;
     const entry = this.store.get(this.buildKey(tid, scopeType, scopeId, key));
     if (!entry) return null;
-    return entry;
+    // Return a fresh object (shape-parity with DbMemoryAdapter) instead of
+    // the stored entry by reference, so callers can't mutate the store.
+    return {
+      value: entry.value,
+      type: entry.type,
+      source: entry.source,
+      confidence: entry.confidence,
+      updatedAt: entry.updatedAt,
+    };
   }
 
   async set(key: string, value: unknown, tenantId?: string, opts?: MemorySetOptions): Promise<void> {
@@ -69,6 +83,7 @@ export class InMemoryAdapter implements MemoryAdapter {
       value,
       type: opts?.type ?? 'KNOWLEDGE',
       source: opts?.source ?? 'agent',
+      confidence: opts?.confidence,
       updatedAt: new Date().toISOString(),
     });
   }
