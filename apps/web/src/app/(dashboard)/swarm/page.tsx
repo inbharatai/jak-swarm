@@ -166,7 +166,12 @@ function WorkflowRunCard({ workflow }: { workflow: Workflow }) {
             {workflow.startedAt
               ? formatDistanceToNow(new Date(workflow.startedAt), { addSuffix: true })
               : formatDistanceToNow(new Date(workflow.createdAt), { addSuffix: true })}
-            {' '}· {traces.length} agent traces
+            {' '}· {
+              // Prefer the server-populated traceCount (from list endpoint's
+              // Prisma _count). Falls back to the embedded traces array
+              // length for detail endpoints that ship full trace data.
+              workflow.traceCount ?? traces.length
+            } agent traces
           </p>
         </div>
 

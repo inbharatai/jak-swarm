@@ -123,6 +123,13 @@ export class WorkflowService {
         orderBy: { startedAt: 'desc' },
         skip,
         take: limit,
+        // Include trace count so the Runs inspector can show
+        // "N agent traces" without a per-workflow N+1 fetch.
+        // QA fix: the list view used to show "0 agent traces" on every
+        // row because traces weren't in the query.
+        include: {
+          _count: { select: { traces: true } },
+        },
       }),
     ]);
 
@@ -310,21 +317,28 @@ export class WorkflowService {
   // Private mapping helpers
   // ---------------------------------------------------------------------------
 
-  private mapWorkflow = (row: Record<string, unknown>): Workflow => ({
-    id: row['id'] as string,
-    tenantId: row['tenantId'] as string,
-    createdBy: (row['userId'] as string) ?? '',
-    goal: row['goal'] as string,
-    industry: (row['industry'] as string | null) ?? null,
-    status: row['status'] as WorkflowStatus,
-    result: null,
-    finalOutput: (row['finalOutput'] as string | null) ?? null,
-    error: (row['error'] as string | null) ?? null,
-    startedAt: (row['startedAt'] as Date | null) ?? null,
-    completedAt: (row['completedAt'] as Date | null) ?? null,
-    createdAt: (row['startedAt'] as Date) ?? new Date(),
-    updatedAt: row['updatedAt'] as Date,
-  });
+  private mapWorkflow = (row: Record<string, unknown>): Workflow => {
+    // `_count` is populated only when listWorkflows() is used (via the
+    // Prisma include). Detail queries currently don't populate it, so the
+    // frontend should treat `traceCount` as optional.
+    const count = row['_count'] as { traces?: number } | undefined;
+    return {
+      id: row['id'] as string,
+      tenantId: row['tenantId'] as string,
+      createdBy: (row['userId'] as string) ?? '',
+      goal: row['goal'] as string,
+      industry: (row['industry'] as string | null) ?? null,
+      status: row['status'] as WorkflowStatus,
+      result: null,
+      finalOutput: (row['finalOutput'] as string | null) ?? null,
+      error: (row['error'] as string | null) ?? null,
+      startedAt: (row['startedAt'] as Date | null) ?? null,
+      completedAt: (row['completedAt'] as Date | null) ?? null,
+      createdAt: (row['startedAt'] as Date) ?? new Date(),
+      updatedAt: row['updatedAt'] as Date,
+      traceCount: typeof count?.traces === 'number' ? count.traces : undefined,
+    };
+  };
 
   private mapTrace = (row: Record<string, unknown>): AgentTrace => ({
     id: row['id'] as string,

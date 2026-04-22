@@ -207,6 +207,11 @@ export interface Workflow {
   // Optional enrichments returned by GET /workflows/:id
   plan?: WorkflowPlan;
   traces?: AgentTraceRecord[];
+  /** Count of persisted agent traces for this workflow. Populated by
+   *  GET /workflows (list) via Prisma _count so the Runs page doesn't
+   *  have to N+1 fetch traces just to display the number. Undefined on
+   *  endpoints that don't return it. */
+  traceCount?: number;
   approvals?: ApprovalRequest[];
   /** Token usage for the entire workflow run */
   tokenUsage?: number;

@@ -97,6 +97,9 @@ export interface Workflow {
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Count of agent traces persisted against this workflow.
+   *  Optional because only list/detail queries populate it. */
+  traceCount?: number;
 }
 
 /** Agent trace step */
