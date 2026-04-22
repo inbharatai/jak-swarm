@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { OrchestrationEngine, ExecutionFlow, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection, LandingIcon, type LandingIconName } from '@/components/landing';
+import { OrchestrationEngine, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection, LandingIcon, type LandingIconName } from '@/components/landing';
 
 /* ─── Animated Counter Hook ──────────────────────────────────────────────── */
 
@@ -719,10 +719,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── 3b. Execution Flow - Animated Architecture ─────────────────── */}
-        <ExecutionFlow />
-
         {/* ── 4. Workflow Animation ────────────────────────────────────────── */}
+        {/* (ExecutionFlow removed from homepage — duplicated OrchestrationEngine's
+             architecture diagram. Component retained in `@/components/landing`
+             for future use on /docs or marketing sub-pages.) */}
         <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 diagonal-cut" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(251,191,36,0.02), transparent)' }}>
           <div ref={workflowSection.ref} className={`fade-section ${workflowSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
             <div className="text-center mb-16">
@@ -780,8 +780,12 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 4b. Vibe Coding Feature Highlight ──────────────────────────── */}
-        <section className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, rgba(251,191,36,0.03), rgba(52,211,153,0.02), transparent)' }}>
+        {/* ── 4b. Build — consolidated (was two Vibe-Coding sections) ────────
+             Audit §19/§20: merge the former 6-card grid + 5-step pipeline
+             + cost band into ONE Build section. IDE mockup removed — the
+             real builder lives at /builder. Keeps Vibe Coding as a strong
+             supporting capability without dominating the homepage. */}
+        <section className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(251,191,36,0.03), rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Build With JAK</p>
@@ -789,29 +793,50 @@ export default function HomePage() {
               <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Describe your app. JAK plans the architecture, generates every file (no stubs), runs a 3-layer build check, debugs, and deploys &mdash; with a snapshot at every stage and one-click revert.</p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* 5-step Build pipeline */}
+            <div className="grid gap-6 md:grid-cols-5 mb-12">
               {[
-                { iconName: 'architecture' as LandingIconName, title: 'App Architect', desc: 'Designs file tree, data models, API endpoints, and component hierarchy from your description', color: '#34d399' },
-                { iconName: 'bolt' as LandingIconName, title: 'Code Generator', desc: 'Generates complete Next.js, React, Tailwind CSS, and Prisma files with a no-truncation invariant — no stubs, no TODOs. Production-readiness still depends on your auth/ratelimit/DB choices', color: '#fbbf24' },
-                { iconName: 'wrench' as LandingIconName, title: 'Auto-Debugger', desc: 'Detects build errors via 3-layer check (heuristic → TS compiler → optional Docker), diagnoses root cause, applies surgical fixes — up to 3 retries', color: '#f472b6' },
-                { iconName: 'camera' as LandingIconName, title: 'Screenshot-to-Code', desc: 'Upload a Figma screenshot or UI design — AI generates matching Tailwind components', color: '#38bdf8' },
-                { iconName: 'rocket' as LandingIconName, title: 'Durable Deploy to Vercel', desc: 'Env-var preflight, build-error classification, and automatic rollback recommendation on failure. Not instant — durable, with human approval on risky steps', color: '#c084fc' },
-                { iconName: 'bookmark' as LandingIconName, title: 'Checkpoint-Revert', desc: 'Every stage auto-snapshots with a structural diff (+added ~modified -deleted). One-click restore — restores are themselves reversible.', color: '#fb923c' },
-              ].map((feature) => (
-                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
+                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', iconName: 'chat' as LandingIconName, color: '#34d399' },
+                { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', iconName: 'architecture' as LandingIconName, color: '#fbbf24' },
+                { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', iconName: 'bolt' as LandingIconName, color: '#38bdf8' },
+                { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', iconName: 'wrench' as LandingIconName, color: '#f472b6' },
+                { step: '05', title: 'Preview', desc: 'Live preview. Iterate via chat. Deploy.', iconName: 'rocket' as LandingIconName, color: '#c084fc' },
+              ].map((s) => (
+                <div key={s.step} className="text-center">
                   <div
-                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
-                    style={{ background: `${feature.color}15`, color: feature.color }}
+                    className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                    style={{ background: `${s.color}15`, border: `1px solid ${s.color}30`, color: s.color }}
                   >
-                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
+                    <LandingIcon name={s.iconName} className="h-6 w-6" />
                   </div>
-                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
+                  <div className="text-[10px] font-mono text-slate-500 mb-1 uppercase tracking-widest">Step {s.step}</div>
+                  <h3 className="font-display font-semibold text-white text-sm mb-1">{s.title}</h3>
+                  <p className="text-xs text-slate-400 font-sans">{s.desc}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-12 text-center">
+            {/* Cost band */}
+            <div className="glass-card rounded-2xl p-8 max-w-3xl mx-auto mb-12">
+              <h3 className="font-display font-semibold text-white text-center mb-6">Cost per generated app</h3>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.50</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Simple app<br />Tier 1-2 models</div>
+                </div>
+                <div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$1.50</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Medium app<br />With debug loop</div>
+                </div>
+                <div>
+                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.10</div>
+                  <div className="text-xs text-slate-400 mt-1 font-sans">Per iteration<br />Only changed files</div>
+                </div>
+              </div>
+              <p className="text-center text-[10px] text-slate-500 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug.</p>
+            </div>
+
+            <div className="text-center">
               <Link href="/builder" className="inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', touchAction: 'manipulation' }}>
                 Try the Builder
                 <ArrowRightIcon className="h-4 w-4" />
@@ -886,132 +911,9 @@ export default function HomePage() {
         {/* ── 5a. Capability Architecture Map ──────────────────────────────── */}
         <CapabilityMap />
 
-        {/* ── 5b. Vibe Coding Deep Dive ────────────────────────────────────── */}
-        <section className="px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
-          <div className="mx-auto max-w-6xl relative z-10">
-            <div className="text-center mb-16">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">Build Pipeline</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From idea to live app &mdash; in five durable steps.</h2>
-            </div>
-
-            {/* Pipeline Steps */}
-            <div className="grid gap-6 md:grid-cols-5 mb-16">
-              {[
-                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', iconName: 'chat' as LandingIconName, color: '#34d399' },
-                { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', iconName: 'architecture' as LandingIconName, color: '#fbbf24' },
-                { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', iconName: 'bolt' as LandingIconName, color: '#38bdf8' },
-                { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', iconName: 'wrench' as LandingIconName, color: '#f472b6' },
-                { step: '05', title: 'Preview', desc: 'Live preview in browser. Iterate via chat. Deploy.', iconName: 'rocket' as LandingIconName, color: '#c084fc' },
-              ].map((s, i) => (
-                <div key={s.step} className="text-center">
-                  <div
-                    className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
-                    style={{ background: `${s.color}15`, border: `1px solid ${s.color}30`, color: s.color }}
-                  >
-                    <LandingIcon name={s.iconName} className="h-6 w-6" />
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-500 mb-1 uppercase tracking-widest">Step {s.step}</div>
-                  <h3 className="font-display font-semibold text-white text-sm mb-1">{s.title}</h3>
-                  <p className="text-xs text-slate-400 font-sans">{s.desc}</p>
-                  {i < 4 && <div className="hidden md:block absolute mt-2 text-slate-600" aria-hidden="true" />}
-                </div>
-              ))}
-            </div>
-
-            {/* Cost Comparison */}
-            <div className="glass-card rounded-2xl p-8 max-w-3xl mx-auto mb-16">
-              <h3 className="font-display font-semibold text-white text-center mb-6">Cost Per Generated App</h3>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.50</div>
-                  <div className="text-xs text-slate-400 mt-1 font-sans">Simple app<br />Tier 1-2 models</div>
-                </div>
-                <div>
-                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$1.50</div>
-                  <div className="text-xs text-slate-400 mt-1 font-sans">Medium app<br />With debug loop</div>
-                </div>
-                <div>
-                  <div className="landing-gradient-text text-2xl font-display font-bold gradient-text">$0.10</div>
-                  <div className="text-xs text-slate-400 mt-1 font-sans">Per iteration<br />Only changed files</div>
-                </div>
-              </div>
-              <p className="text-center text-[10px] text-slate-500 mt-4 font-sans">3-tier LLM routing: Tier 3 for architecture, Tier 2 for code gen, Tier 1 for debug — routes each task to the cheapest model that can handle it.</p>
-            </div>
-
-            {/* Builder IDE Preview */}
-            <div className="glass-card rounded-2xl overflow-hidden max-w-4xl mx-auto">
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
-                  <div className="w-3 h-3 rounded-full bg-amber-500/60" />
-                  <div className="w-3 h-3 rounded-full bg-emerald-500/60" />
-                </div>
-                <span className="text-xs text-slate-500 font-mono ml-2">JAK Builder — My Task Manager</span>
-              </div>
-              <div className="grid grid-cols-12 min-h-[200px] sm:min-h-[300px]">
-                {/* File tree */}
-                <div className="hidden sm:block col-span-3 border-r border-white/5 p-3 text-xs text-slate-400 font-mono space-y-1">
-                  <div className="text-[10px] text-slate-600 uppercase tracking-widest mb-2">Files</div>
-                  <div className="text-emerald-400">{'>'} src/</div>
-                  <div className="pl-3">{'>'} app/</div>
-                  <div className="pl-6 text-white">page.tsx</div>
-                  <div className="pl-6">layout.tsx</div>
-                  <div className="pl-3">{'>'} components/</div>
-                  <div className="pl-6">TaskBoard.tsx</div>
-                  <div className="pl-6">TaskCard.tsx</div>
-                  <div className="pl-3">{'>'} lib/</div>
-                  <div>package.json</div>
-                  <div>tailwind.config.ts</div>
-                </div>
-                {/* Editor */}
-                <div className="col-span-7 sm:col-span-5 border-r border-white/5 p-2 sm:p-3">
-                  <div className="flex gap-2 mb-3 text-xs">
-                    <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400">Code</span>
-                    <span className="px-2 py-1 rounded text-slate-500">Preview</span>
-                  </div>
-                  <pre className="text-xs font-mono text-slate-400 leading-relaxed">
-{`export default function Home() {
-  return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold">
-        Task Manager
-      </h1>
-      <TaskBoard />
-    </main>
-  );
-}`}
-                  </pre>
-                </div>
-                {/* Chat */}
-                <div className="col-span-5 sm:col-span-4 p-2 sm:p-3 text-xs space-y-2 sm:space-y-3">
-                  <div className="text-[10px] text-slate-600 uppercase tracking-widest">Chat</div>
-                  <div className="rounded-lg bg-emerald-500/10 px-3 py-2 text-emerald-300">
-                    Build a task manager with drag-and-drop boards and dark mode
-                  </div>
-                  <div className="rounded-lg bg-white/5 px-3 py-2 text-slate-300">
-                    Generated 12 files: pages, components, API routes, Prisma schema, Tailwind config.
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <div className="flex-1 rounded-lg border border-white/10 px-3 py-2 text-slate-500">Add user authentication...</div>
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">{'>'}</div>
-                  </div>
-                </div>
-              </div>
-              {/* Progress bar */}
-              <div className="border-t border-white/5 px-4 py-2 flex items-center gap-3 text-xs">
-                <span className="text-emerald-400">{'✓'} Architect</span>
-                <span className="text-emerald-400">{'✓'} Generate</span>
-                <span className="text-emerald-400">{'✓'} Build</span>
-                <span className="text-amber-400 animate-pulse">{'◉'} Preview</span>
-                <span className="text-slate-600">{'○'} Deploy</span>
-                <div className="ml-auto flex-1 max-w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full w-3/4 bg-gradient-to-r from-emerald-400 to-amber-400 rounded-full" />
-                </div>
-                <span className="text-slate-500 font-mono">75%</span>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* (Former 5b "Vibe Coding Deep Dive" removed — pipeline + cost band
+             merged into section 4b above. IDE mockup dropped; the real
+             Builder lives at /builder.) */}
 
         {/* ── 5c. Verification & Risk Intelligence ─────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
