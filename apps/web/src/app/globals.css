@@ -206,9 +206,16 @@
     transition: transform 0.25s cubic-bezier(0.33, 1, 0.68, 1), box-shadow 0.25s cubic-bezier(0.33, 1, 0.68, 1);
   }
 
-  .card-lift:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  /* Gated to hover-capable pointers per audit §17 — on touch devices the
+     :hover state becomes sticky after tap, which produced a shifted card
+     that only cleared on the next scroll. Restricting to hover:hover
+     devices means desktops get the lift effect; iPads / phones get a
+     clean static card with no sticky :hover residue. */
+  @media (hover: hover) and (pointer: fine) {
+    .card-lift:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    }
   }
 
   /* Gradient border effect */
@@ -359,6 +366,9 @@
     animation: none !important;
   }
 
+  /* card-lift :hover is already gated to hover:hover devices above, so
+     prefers-reduced-motion users with those devices still get no transform.
+     Kept as belt-and-braces for old UA quirks. */
   .card-lift:hover {
     transform: none;
   }

@@ -462,16 +462,13 @@ export default function HomePage() {
           <div className="hero-mesh-blob" style={{ width: 500, height: 500, top: '30%', right: '-5%', background: 'radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)', animationDelay: '-7s' }} />
           <div className="hero-mesh-blob" style={{ width: 400, height: 400, bottom: '5%', left: '30%', background: 'radial-gradient(circle, rgba(244,114,182,0.1) 0%, transparent 70%)', animationDelay: '-14s' }} />
 
-          {/* Floating particles */}
+          {/* Floating particles — cut from 8 → 4 per audit §17. At 8 with the
+              mesh blobs + grid overlay the hero read as noise, not depth. */}
           {[
             { w: 4, h: 4, top: '15%', left: '10%', bg: '#34d399', opacity: 0.3, dur: '8s' },
             { w: 3, h: 3, top: '25%', left: '85%', bg: '#fbbf24', opacity: 0.25, dur: '10s' },
             { w: 5, h: 5, top: '70%', left: '15%', bg: '#f472b6', opacity: 0.2, dur: '12s' },
-            { w: 3, h: 3, top: '80%', left: '75%', bg: '#34d399', opacity: 0.3, dur: '9s' },
             { w: 6, h: 6, top: '40%', left: '90%', bg: '#fbbf24', opacity: 0.15, dur: '11s' },
-            { w: 4, h: 4, top: '55%', left: '5%', bg: '#34d399', opacity: 0.2, dur: '7s' },
-            { w: 2, h: 2, top: '10%', left: '50%', bg: '#f472b6', opacity: 0.3, dur: '13s' },
-            { w: 3, h: 3, top: '90%', left: '40%', bg: '#fbbf24', opacity: 0.2, dur: '10s' },
           ].map((p, i) => (
             <div
               key={i}
@@ -489,8 +486,8 @@ export default function HomePage() {
             />
           ))}
 
-          {/* Grid overlay */}
-          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(52,211,153,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.02) 1px, transparent 1px)', backgroundSize: '80px 80px' }} />
+          {/* (80px grid overlay removed per audit §17 — the mesh blobs +
+               grain-overlay already carry the hero's background depth.) */}
 
           {/* Asymmetric hero layout */}
           <div className="relative mx-auto max-w-7xl w-full z-10 grid lg:grid-cols-12 gap-8 items-center" style={{ opacity: heroVisible ? 1 : 0, transform: heroVisible ? 'translateY(0)' : 'translateY(40px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)' }}>
@@ -637,7 +634,7 @@ export default function HomePage() {
         <OrchestrationEngine />
 
         {/* ── 3. Agent Grid ────────────────────────────────────────────────── */}
-        <section id="agents" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay">
+        <section id="agents" className="relative px-4 py-24 sm:px-6 lg:px-8">
           <div ref={agentGrid.ref} className={`fade-section ${agentGrid.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             {/* Asymmetric header - left aligned */}
             <div className="mb-16 max-w-2xl">
@@ -996,7 +993,7 @@ export default function HomePage() {
         </section>
 
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
-        <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
+        <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Pricing</p>
