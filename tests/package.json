@@ -25,10 +25,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",
-    "@temporalio/client": "^1.11.6",
+    "@temporalio/client": "^1.16.1",
     "@temporalio/testing": "^1.11.6",
-    "@temporalio/worker": "^1.11.6",
-    "@temporalio/workflow": "^1.11.6",
+    "@temporalio/worker": "^1.16.1",
+    "@temporalio/workflow": "^1.16.1",
     "@types/node": "^22.10.7",
     "@vitest/coverage-v8": "2.1.9",
     "testcontainers": "^10.13.0",
