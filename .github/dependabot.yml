@@ -46,16 +46,46 @@ updates:
           - "eslint*"
           - "prettier"
           - "turbo"
-      # All other runtime deps flow through the default "production-deps" group.
-      production-deps:
+      # Remaining runtime deps are grouped by update-type so a single PR
+      # can't bundle 29 bumps spanning patch/minor/major — that blast radius
+      # is impossible to reason about in review. Patch bumps auto-group
+      # (low risk, quick merge); minor/major updates come as individual PRs.
+      production-deps-patch:
         dependency-type: "production"
+        update-types:
+          - "patch"
         exclude-patterns:
           - "fastify"
           - "@fastify/*"
           - "prisma"
           - "@prisma/*"
-      development-deps:
+      production-deps-minor:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+        exclude-patterns:
+          - "fastify"
+          - "@fastify/*"
+          - "prisma"
+          - "@prisma/*"
+      # Major production bumps are NOT grouped — each gets its own PR.
+      development-deps-patch:
         dependency-type: "development"
+        update-types:
+          - "patch"
+        exclude-patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "playwright"
+          - "@playwright/*"
+          - "typescript"
+          - "eslint*"
+          - "prettier"
+          - "turbo"
+      development-deps-minor:
+        dependency-type: "development"
+        update-types:
+          - "minor"
         exclude-patterns:
           - "vitest"
           - "@vitest/*"
