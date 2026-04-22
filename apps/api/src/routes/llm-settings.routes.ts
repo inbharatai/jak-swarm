@@ -58,8 +58,13 @@ const PROVIDER_ENV_KEYS: Record<ProviderName, { apiKeyEnv: string; modelEnv: str
 };
 
 function maskKey(key: string): string {
-  if (key.length <= 8) return '***';
-  return `${key.slice(0, 4)}...${key.slice(-3)}`;
+  // Defense-in-depth: even if the frontend renders keyPreview, we don't
+  // leak enough of the key for fingerprint matching against leaked-key
+  // databases. Previously returned `${first4}...${last3}` which exposed
+  // 7 chars. Now returns a length indicator only. If operators genuinely
+  // need to disambiguate, they can compare the hash in server logs.
+  if (!key) return '***';
+  return `••• (${key.length} chars)`;
 }
 
 function memoryKey(provider: ProviderName): string {

@@ -135,7 +135,19 @@ export default function SettingsPage() {
                       {isConfigured && provider?.model && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Model: <span className="font-mono text-foreground">{provider.model}</span>
-                          {provider.keyPreview && <span className="ml-2">Key: {provider.keyPreview}</span>}
+                          {/* QA security fix: key preview used to render
+                              first-4 + last-3 chars of the raw API key
+                              (e.g. "sk-p...D4A"). That's 7 of ~51 chars,
+                              enough of a fingerprint to confirm matches
+                              against leaked-key databases. The UI just
+                              shows "••••" now — users who genuinely need
+                              to verify which key is in use can still hit
+                              the API directly. */}
+                          {provider.keyPreview && (
+                            <span className="ml-2" aria-label="API key (redacted)">
+                              Key: <span className="font-mono" aria-hidden="true">••••••••</span>
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>

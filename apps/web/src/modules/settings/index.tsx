@@ -93,7 +93,10 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
 
                 {provider?.configured && !isEditing && (
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    {provider.keyPreview && <p>Key: {provider.keyPreview}</p>}
+                    {/* Security: never render the sk-p...D4A key fragment. */}
+                    {provider.keyPreview && (
+                      <p>Key: <span className="font-mono" aria-hidden="true">••••••••</span></p>
+                    )}
                     {provider.model && <p>Model: {provider.model}</p>}
                   </div>
                 )}
