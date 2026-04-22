@@ -91,6 +91,43 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
 
   const allFieldsFilled = fields.length > 0 && fields.every(f => credentials[f.key]?.trim());
 
+  // Providers that support the OAuth PKCE redirect flow instead of the
+  // paste-credentials form. Kept in the frontend as a small allowlist so
+  // we don't accidentally show a "Sign in with Google" button for a
+  // provider where the backend route doesn't exist.
+  const supportsOAuth = provider === 'GMAIL';
+
+  const handleOAuthConnect = async () => {
+    setStatus('testing');
+    setError('');
+    try {
+      const result = await integrationApi.oauthAuthorize(provider);
+      const data = (result as Record<string, unknown>)?.data ?? result;
+      const authUrl = (data as Record<string, unknown>)?.authUrl as string | undefined;
+      if (!authUrl) {
+        setError('Authorization URL not returned by server.');
+        setStatus('error');
+        return;
+      }
+      // Full-page redirect so Google consent doesn't get boxed in a popup
+      // blocker. When Google redirects back, the /dashboard route reads
+      // `?oauth=status=connected&provider=gmail` and the parent refreshes
+      // its integrations list.
+      window.location.href = authUrl;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not start OAuth flow.';
+      // The 503 case — Google OAuth env vars not set — is common in self-hosted
+      // dev deploys. Fall back gracefully to the cred-paste form.
+      if (msg.toLowerCase().includes('not configured')) {
+        setError('Google OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set GOOGLE_OAUTH_CLIENT_ID.');
+        setStatus('error');
+      } else {
+        setError(msg);
+        setStatus('error');
+      }
+    }
+  };
+
   const maturityTone =
     maturity === 'production-ready' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
     maturity === 'beta' ? 'bg-sky-100 text-sky-700 border-sky-200' :
@@ -190,6 +227,33 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* OAuth PKCE quick-connect (Gmail today) */}
+          {supportsOAuth && status !== 'connected' && status !== 'loading' && (
+            <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div>
+                <p className="text-sm font-medium">Sign in with Google</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Recommended. Authorize through Google&apos;s consent screen — no app passwords
+                  to copy, refresh tokens rotate automatically.
+                </p>
+              </div>
+              <Button
+                onClick={handleOAuthConnect}
+                disabled={status === 'testing'}
+                className="w-full"
+              >
+                {status === 'testing' ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Redirecting to Google...</>
+                ) : (
+                  <>Sign in with Google</>
+                )}
+              </Button>
+              <p className="text-[11px] text-muted-foreground text-center pt-1">
+                Or paste app-password credentials below
+              </p>
             </div>
           )}
 

@@ -107,6 +107,23 @@ export const config = {
   slackClientId: process.env['SLACK_CLIENT_ID'] ?? '',
   slackClientSecret: process.env['SLACK_CLIENT_SECRET'] ?? '',
 
+  // Google OAuth — powers the "Sign in with Google" flow for Gmail / Calendar
+  // / Drive integrations. When unset, the OAuth routes return 503 and the
+  // frontend falls back to the app-password cred form (legacy path).
+  //
+  // Setup: https://console.cloud.google.com/apis/credentials
+  //   - Application type: Web application
+  //   - Authorized redirect URI: ${API_URL}/integrations/oauth/google/callback
+  //   - Scopes requested per-integration: Gmail = gmail.send + gmail.readonly
+  googleOAuthClientId: process.env['GOOGLE_OAUTH_CLIENT_ID'] ?? '',
+  googleOAuthClientSecret: process.env['GOOGLE_OAUTH_CLIENT_SECRET'] ?? '',
+  // Explicit override so deploys behind a reverse proxy / custom domain can
+  // set the redirect URI Google is configured with. Falls back to
+  // `${API_PUBLIC_URL}/integrations/oauth/google/callback` when unset.
+  googleOAuthRedirectUri: process.env['GOOGLE_OAUTH_REDIRECT_URI'] ?? '',
+  apiPublicUrl: process.env['API_PUBLIC_URL']?.trim() ?? '',
+  webPublicUrl: process.env['WEB_PUBLIC_URL']?.trim() ?? 'http://localhost:3000',
+
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
 

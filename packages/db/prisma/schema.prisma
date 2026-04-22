@@ -42,6 +42,7 @@ model Tenant {
   memoryEvents     MemoryEvent[]
   apiKeys          ApiKey[]
   integrations    Integration[]
+  oauthStates     OAuthState[]
   whatsappLinks  WhatsappLink[]
   onboardingState OnboardingState?
   schedules       WorkflowSchedule[]
@@ -478,6 +479,30 @@ model IntegrationCredential {
   integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   @@map("integration_credentials")
+}
+
+// Short-lived row created when a tenant starts an OAuth authorization flow
+// (e.g. "Sign in with Google"). Stores the CSRF `state` token + the PKCE
+// `codeVerifier` until the provider redirects back to the callback, at which
+// point the row is read once and deleted. TTL enforced by the callback
+// handler; a background sweeper can drop rows with expiresAt < now().
+model OAuthState {
+  id           String   @id @default(cuid())
+  tenantId     String
+  userId       String
+  provider     String
+  state        String   @unique
+  codeVerifier String
+  redirectUri  String
+  scopes       String[] @default([])
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("oauth_states")
 }
 
 model WhatsappLink {

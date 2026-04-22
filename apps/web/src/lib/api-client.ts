@@ -510,6 +510,16 @@ export const integrationApi = {
       `/integrations/${id}/test`,
       { method: 'POST' },
     ),
+  // Start an OAuth PKCE authorization. Returns the Google auth URL the browser
+  // should be redirected to. The callback URL is server-side config; the
+  // frontend just follows the URL we hand back. Used by Gmail today; other
+  // Google providers (Calendar, Drive) will ride the same route once their
+  // scope sets are registered in OAUTH_PROVIDERS on the API.
+  oauthAuthorize: (provider: string) =>
+    apiDataFetch<{ authUrl: string; state: string; provider: string }>(
+      `/integrations/oauth/${provider}/authorize`,
+      { method: 'POST' },
+    ),
 };
 
 export const whatsappApi = {

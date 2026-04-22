@@ -41,16 +41,31 @@
  */
 
 import type { PrismaClient } from '@jak-swarm/db';
-import { decrypt as decryptCredentials } from '../utils/crypto.js';
+import { decrypt as decryptCredentials, encrypt as encryptCredentials } from '../utils/crypto.js';
 
 export type BYOProvider = 'GMAIL' | 'VERCEL' | 'CALDAV' | 'GITHUB';
 
 // ─── Typed credentials per provider ────────────────────────────────────────
 
-export interface GmailCredentials {
-  email: string;
-  appPassword: string;
-}
+/**
+ * Two shapes live under the GMAIL provider:
+ *
+ *   - Legacy App-Password flow: { email, appPassword } — IMAP/SMTP auth.
+ *     The user generates an app password at google.com/apppasswords and
+ *     pastes it into ConnectModal. Still supported for single-tenant
+ *     deploys / operators who prefer not to register an OAuth app.
+ *
+ *   - OAuth PKCE flow: { email, accessToken, refreshToken?, expiresAt? } —
+ *     populated by the /integrations/oauth/google/callback route. The
+ *     accessToken is short-lived (~60 min); callers get a fresh one via
+ *     `resolveCredentials` which auto-refreshes when expiresAt is past.
+ *
+ * Tool adapters should accept whichever shape comes back and branch on the
+ * presence of `accessToken` vs `appPassword`.
+ */
+export type GmailCredentials =
+  | { email: string; appPassword: string }
+  | { email: string; accessToken: string; refreshToken?: string; expiresAt?: Date };
 
 export interface VercelCredentials {
   token: string;
@@ -167,8 +182,28 @@ export async function resolveCredentials(
       include: { credentials: true },
     });
     if (integration?.credentials?.accessTokenEnc) {
+      // GMAIL via OAuth PKCE: metadata.connectedViaOAuth=true, accessTokenEnc
+      // holds the raw access_token (NOT a JSON blob). Refresh if expired.
+      const isOAuth =
+        provider === 'GMAIL' &&
+        (integration.metadata as Record<string, unknown> | null)?.['connectedViaOAuth'] === true;
+
+      if (isOAuth) {
+        const refreshed = await ensureFreshOAuthToken(db, integration.id, integration.credentials);
+        if (refreshed) {
+          return {
+            email: integration.displayName ?? '',
+            accessToken: refreshed.accessToken,
+            ...(refreshed.refreshToken ? { refreshToken: refreshed.refreshToken } : {}),
+            ...(refreshed.expiresAt ? { expiresAt: refreshed.expiresAt } : {}),
+          } as GmailCredentials;
+        }
+        // Refresh failed — fall through to legacy parse attempt so the old
+        // app-password path still resolves for tenants who haven't migrated.
+      }
+
       const decrypted = decryptCredentials(integration.credentials.accessTokenEnc);
-      const parsed = JSON.parse(decrypted) as unknown;
+      const parsed = (() => { try { return JSON.parse(decrypted) as unknown; } catch { return null; } })();
       if (parsed && typeof parsed === 'object') {
         // Map the stored fields to the typed provider shape
         const c = parsed as Record<string, string>;
@@ -214,6 +249,92 @@ export async function resolveCredentials(
   }
 
   return null;
+}
+
+// ─── OAuth token refresh ──────────────────────────────────────────────────
+// When a Gmail integration was connected via the OAuth PKCE flow, the stored
+// access_token is short-lived (~60 min). We refresh on the fly and persist
+// the new token + expiresAt so the caller always gets a fresh credential.
+
+interface IntegrationCredentialRow {
+  id: string;
+  accessTokenEnc: string;
+  refreshTokenEnc: string | null;
+  expiresAt: Date | null;
+}
+
+async function ensureFreshOAuthToken(
+  db: PrismaClient,
+  integrationId: string,
+  creds: IntegrationCredentialRow,
+): Promise<{ accessToken: string; refreshToken?: string; expiresAt: Date } | null> {
+  const accessToken = (() => {
+    try { return decryptCredentials(creds.accessTokenEnc); } catch { return null; }
+  })();
+  if (!accessToken) return null;
+
+  const now = Date.now();
+  const expiresAtMs = creds.expiresAt?.getTime() ?? 0;
+  const needsRefresh = expiresAtMs > 0 && expiresAtMs < now;
+
+  if (!needsRefresh) {
+    return {
+      accessToken,
+      expiresAt: creds.expiresAt ?? new Date(now + 55 * 60 * 1000),
+    };
+  }
+
+  if (!creds.refreshTokenEnc) return null; // no refresh possible
+
+  const refreshToken = (() => {
+    try { return decryptCredentials(creds.refreshTokenEnc!); } catch { return null; }
+  })();
+  if (!refreshToken) return null;
+
+  const clientId = process.env['GOOGLE_OAUTH_CLIENT_ID'] ?? '';
+  const clientSecret = process.env['GOOGLE_OAUTH_CLIENT_SECRET'] ?? '';
+  if (!clientId || !clientSecret) return null;
+
+  try {
+    const body = new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+    });
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as Record<string, unknown>;
+    const newAccess = typeof json['access_token'] === 'string' ? json['access_token'] : '';
+    if (!newAccess) return null;
+    const expiresInSec = typeof json['expires_in'] === 'number' ? json['expires_in'] : 3600;
+    const newRefresh = typeof json['refresh_token'] === 'string' ? json['refresh_token'] : undefined;
+    const newExpiresAt = new Date(Date.now() + (expiresInSec - 60) * 1000);
+
+    await db.integrationCredential.update({
+      where: { id: creds.id },
+      data: {
+        accessTokenEnc: encryptCredentials(newAccess),
+        ...(newRefresh ? { refreshTokenEnc: encryptCredentials(newRefresh) } : {}),
+        expiresAt: newExpiresAt,
+      },
+    });
+
+    return {
+      accessToken: newAccess,
+      ...(newRefresh ? { refreshToken: newRefresh } : { refreshToken }),
+      expiresAt: newExpiresAt,
+    };
+  } catch {
+    return null;
+  } finally {
+    // Touch lastUsedAt so admin surfaces can show a useful "last activity" row.
+    await db.integration.update({ where: { id: integrationId }, data: { lastUsedAt: new Date() } }).catch(() => {});
+  }
 }
 
 /**
