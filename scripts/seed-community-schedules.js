@@ -40,24 +40,6 @@ Be creative. Never repeat the same content. Vary between: feature highlights, us
     maxCostUsd: 0.50,
   },
   {
-    name: 'Daily LinkedIn Post',
-    description: 'Generate and post thought-leadership content on LinkedIn',
-    goal: `You are the content strategist for JAK Swarm (github.com/inbharatai/jak-swarm).
-
-Task: Create and post a LinkedIn article/post.
-
-Steps:
-1. Use web_search to research a current trend in AI agents, automation, or enterprise AI
-2. Write a 300-500 word LinkedIn post that provides genuine insight on the topic. Mention JAK Swarm naturally (not as the main focus — provide VALUE first)
-3. Use generate_image to create a professional header image (clean, minimal, tech theme)
-4. Use post_to_linkedin to post with the image
-
-Tone: Professional thought-leadership. NOT salesy. Provide real insights that make people think.
-Topics to rotate: AI agent architectures, multi-agent systems, automation ROI, future of work, LLM cost optimization, enterprise AI adoption.`,
-    cronExpression: '30 10 * * 1-5', // Weekdays at 10:30am
-    maxCostUsd: 0.50,
-  },
-  {
     name: 'Weekly Reddit Post',
     description: 'Post valuable content to AI/tech subreddits',
     goal: `You are a community member who genuinely loves AI technology and happens to have built JAK Swarm (github.com/inbharatai/jak-swarm).

@@ -333,39 +333,7 @@ Happy to go deep on any of these. Code is at https://github.com/inbharatai/jak-s
 
 ---
 
-## 5. LinkedIn Announcement Post
-
----
-
-Excited to share something I've been building for a while: **JAK Swarm** — an open-source autonomous multi-agent AI platform that runs your company's operations.
-
-**The elevator pitch:** 38 specialised AI agents, 119 tools, 6 LLM providers. Give it a goal in plain English. It plans the work, executes it across your real systems, verifies the results, and reports back.
-
-**What "running your company" actually means:**
-
-The agents cover the full operational stack — email management, calendar scheduling, CRM updates, document creation, spreadsheet operations, web research, customer support triage, internal knowledge retrieval, and browser automation. These aren't demos. They connect to Gmail, Google Calendar, Salesforce, HubSpot, Google Docs, Slack, and more.
-
-**The business value proposition is simple:** a swarm of 38 AI agents that handles the coordination, execution, and verification work that currently requires dozens of separate hires — or fragile one-off automation scripts that break when something changes.
-
-**Why this is different from other AI tools:**
-
-Most AI tools require you to define every step in advance. JAK Swarm reasons about your goal and decomposes it dynamically. It handles dependencies, parallel execution, failure recovery, and cross-system consistency checks automatically.
-
-More importantly: **it knows when to stop and ask.** High-risk actions — sending bulk emails, modifying financial records, external API calls — go through a human approval gate before executing. This is the piece that makes it trustworthy for real business use.
-
-**Industry-aware out of the box:** Healthcare, Legal, Finance, Insurance, Recruiting, Retail, Logistics, and 6 more verticals. Each comes pre-configured with the right compliance rules, tool permissions, and approval thresholds for that industry.
-
-**It's fully open-source.** Built for transparency, extensibility, and community.
-
-GitHub: github.com/inbharatai/jak-swarm
-
-I'd love to hear from operators, founders, and enterprise teams thinking about AI-native operations. What workflow would you automate first?
-
-#AI #Automation #OpenSource #MultiAgent #OperationsAI #EnterpriseAI #AIAgents
-
----
-
-## 6. Newsletter Pitch Email
+## 5. Newsletter Pitch Email
 
 ### Subject Line
 ```
@@ -416,7 +384,7 @@ Builder, JAK Swarm
 
 ### DM 1 — Swyx / swyx.io (AI Engineer, Latent Space Podcast)
 
-**Platform:** Twitter/X or LinkedIn
+**Platform:** Twitter/X
 
 Hi Swyx — longtime listener of Latent Space. Your episode on agent frameworks and the "AI Engineer" role framing shaped a lot of how I thought about what I was building.
 
@@ -474,7 +442,7 @@ Happy to set up a demo call or provide a screen recording if that's easier than 
 
 ### DM 5 — Greg Kamradt (LangChain educator, Chunking / RAG content)
 
-**Platform:** Twitter/X or LinkedIn
+**Platform:** Twitter/X
 
 Hi Greg — your LangChain tutorials and chunking research have been genuinely useful. JAK Swarm uses pgvector + semantic search for the knowledge base component, and your work on chunk sizing informed those design choices.
 
