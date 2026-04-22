@@ -510,15 +510,25 @@ export const integrationApi = {
       `/integrations/${id}/test`,
       { method: 'POST' },
     ),
-  // Start an OAuth PKCE authorization. Returns the Google auth URL the browser
+  // Start an OAuth authorization. Returns the provider's auth URL the browser
   // should be redirected to. The callback URL is server-side config; the
-  // frontend just follows the URL we hand back. Used by Gmail today; other
-  // Google providers (Calendar, Drive) will ride the same route once their
-  // scope sets are registered in OAUTH_PROVIDERS on the API.
+  // frontend just follows the URL we hand back. Supports every provider in
+  // the backend's OAUTH_PROVIDERS registry (Gmail, Slack, GitHub, Notion,
+  // Linear as of Phase A). Returns 503 NOT_CONFIGURED if the provider's
+  // client_id / client_secret env vars aren't set on the deployment.
   oauthAuthorize: (provider: string) =>
     apiDataFetch<{ authUrl: string; state: string; provider: string }>(
       `/integrations/oauth/${provider}/authorize`,
       { method: 'POST' },
+    ),
+
+  // List which providers have an OAuth implementation configured on THIS
+  // deployment (both client_id and client_secret present). Used by the
+  // ConnectModal to decide whether to render "Sign in with X" or fall back
+  // to the credential-paste form.
+  listOAuthProviders: () =>
+    apiDataFetch<Array<{ id: string; label: string; configured: boolean }>>(
+      '/integrations/oauth/providers',
     ),
 };
 

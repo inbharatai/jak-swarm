@@ -91,11 +91,37 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
 
   const allFieldsFilled = fields.length > 0 && fields.every(f => credentials[f.key]?.trim());
 
-  // Providers that support the OAuth PKCE redirect flow instead of the
-  // paste-credentials form. Kept in the frontend as a small allowlist so
-  // we don't accidentally show a "Sign in with Google" button for a
-  // provider where the backend route doesn't exist.
-  const supportsOAuth = provider === 'GMAIL';
+  // OAuth capability is now queried from the server — every provider in the
+  // backend's OAUTH_PROVIDERS registry (Gmail, Slack, GitHub, Notion, Linear)
+  // shows a "Sign in with X" button when its client_id/client_secret env vars
+  // are set on the deployment. If the provider isn't in the registry OR isn't
+  // configured, we fall back to the paste-credentials form.
+  const [oauthProviders, setOauthProviders] = useState<Array<{ id: string; label: string; configured: boolean }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await integrationApi.listOAuthProviders();
+        // apiDataFetch returns the unwrapped `.data` field directly, so
+        // `res` is already the array. Keep the defensive .data fallback for
+        // older code paths that still return the envelope.
+        const data: unknown = Array.isArray(res)
+          ? res
+          : (res as unknown as { data?: unknown })?.data;
+        if (!cancelled && Array.isArray(data)) {
+          setOauthProviders(data as Array<{ id: string; label: string; configured: boolean }>);
+        }
+      } catch {
+        // Non-fatal: without this list we just never show the OAuth button.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const oauthEntry = oauthProviders.find((p) => p.id === provider.toUpperCase());
+  const supportsOAuth = Boolean(oauthEntry);
+  const oauthConfigured = Boolean(oauthEntry?.configured);
+  const oauthLabel = oauthEntry?.label ?? providerName;
 
   const handleOAuthConnect = async () => {
     setStatus('testing');
@@ -109,17 +135,14 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
         setStatus('error');
         return;
       }
-      // Full-page redirect so Google consent doesn't get boxed in a popup
-      // blocker. When Google redirects back, the /dashboard route reads
-      // `?oauth=status=connected&provider=gmail` and the parent refreshes
-      // its integrations list.
+      // Full-page redirect so the provider's consent screen doesn't get boxed
+      // in a popup blocker. On return, /integrations/callback reads ?connected=
+      // and refreshes the integrations list.
       window.location.href = authUrl;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not start OAuth flow.';
-      // The 503 case — Google OAuth env vars not set — is common in self-hosted
-      // dev deploys. Fall back gracefully to the cred-paste form.
       if (msg.toLowerCase().includes('not configured')) {
-        setError('Google OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set GOOGLE_OAUTH_CLIENT_ID.');
+        setError(`${oauthLabel} OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set the provider's CLIENT_ID / CLIENT_SECRET env vars.`);
         setStatus('error');
       } else {
         setError(msg);
@@ -230,30 +253,38 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             </div>
           )}
 
-          {/* OAuth PKCE quick-connect (Gmail today) */}
+          {/* OAuth quick-connect — registry-driven per audit §20 + Phase A.
+              Any provider registered in the backend OAUTH_PROVIDERS map
+              renders this block. `oauthConfigured` reflects whether the
+              deployment has the provider's CLIENT_ID + CLIENT_SECRET env
+              vars set; when false we show a disabled button + explanation
+              so operators know what to configure. */}
           {supportsOAuth && status !== 'connected' && status !== 'loading' && (
             <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
               <div>
-                <p className="text-sm font-medium">Sign in with Google</p>
+                <p className="text-sm font-medium">Sign in with {oauthLabel}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Recommended. Authorize through Google&apos;s consent screen — no app passwords
-                  to copy, refresh tokens rotate automatically.
+                  {oauthConfigured
+                    ? `Recommended. Authorize through ${oauthLabel}'s consent screen — no tokens to paste, refresh handled automatically.`
+                    : `${oauthLabel} OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set the provider's CLIENT_ID / CLIENT_SECRET env vars.`}
                 </p>
               </div>
               <Button
                 onClick={handleOAuthConnect}
-                disabled={status === 'testing'}
+                disabled={status === 'testing' || !oauthConfigured}
                 className="w-full"
               >
                 {status === 'testing' ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Redirecting to Google...</>
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Redirecting to {oauthLabel}...</>
                 ) : (
-                  <>Sign in with Google</>
+                  <>Sign in with {oauthLabel}</>
                 )}
               </Button>
-              <p className="text-[11px] text-muted-foreground text-center pt-1">
-                Or paste app-password credentials below
-              </p>
+              {fields.length > 0 && (
+                <p className="text-[11px] text-muted-foreground text-center pt-1">
+                  Or paste credentials below
+                </p>
+              )}
             </div>
           )}
 

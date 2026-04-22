@@ -1,9 +1,10 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { mcpClientManager, MCP_PROVIDERS } from '@jak-swarm/tools';
 import { encrypt as encryptCredentials } from '../utils/crypto.js';
 import { generateCodeVerifier, deriveCodeChallenge, generateStateToken } from '../utils/pkce.js';
 import { config } from '../config.js';
+import { OAUTH_PROVIDERS, listOAuthProviders, type OAuthProviderDef } from '../services/oauth-providers.js';
 import { ok, err } from '../types.js';
 
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
@@ -101,106 +102,73 @@ function getIntegrationMaturity(providerUpper: string): { maturity: IntegrationM
   };
 }
 
-// ─── OAuth (PKCE) provider configuration ───────────────────────────────
-// Keeps provider-specific details (scope list, auth URL, token URL) out of
-// the route handler so the handler stays readable. Add a new provider by
-// dropping a new entry here.
-interface OAuthProvider {
-  authUrl: string;
-  tokenUrl: string;
-  scopes: string[];
-  /** Extra query params baked into the authorize redirect (e.g. access_type=offline). */
-  extraAuthParams?: Record<string, string>;
-  /** Which IntegrationProvider string this OAuth flow produces. */
-  integrationProvider: string;
-  /** Label shown back to the UI on redirect. */
-  label: string;
-}
+// ─── OAuth (generic registry-backed) ─────────────────────────────────────
+// Every OAuth-capable provider is declared in `services/oauth-providers.ts`.
+// The helpers below are provider-agnostic — they look up the target
+// provider's quirks (auth URL, token URL, PKCE on/off, token-response shape,
+// identity endpoint) from the registry and apply them uniformly.
 
-const OAUTH_PROVIDERS: Record<string, OAuthProvider> = {
-  GMAIL: {
-    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: [
-      'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/userinfo.email',
-    ],
-    extraAuthParams: {
-      access_type: 'offline',
-      // Force the consent screen so Google always returns a refresh_token
-      // on the FIRST authorize — without this, re-authorizing returns only
-      // an access_token and the refresh path breaks silently.
-      prompt: 'consent',
-      include_granted_scopes: 'true',
-    },
-    integrationProvider: 'GMAIL',
-    label: 'Gmail',
-  },
-};
-
-function resolveGoogleRedirectUri(): string {
-  if (config.googleOAuthRedirectUri) return config.googleOAuthRedirectUri;
+/**
+ * Resolve the full public callback URL for a given provider. Callers
+ * should pre-validate that the provider exists in OAUTH_PROVIDERS.
+ *
+ * For Gmail we preserve the historical override env
+ * `GOOGLE_OAUTH_REDIRECT_URI` (set on the current Google OAuth app
+ * registration). Other providers derive from `API_PUBLIC_URL` +
+ * the provider's `callbackPath`.
+ */
+function resolveRedirectUri(provider: OAuthProviderDef): string {
+  if (provider.id === 'GMAIL' && config.googleOAuthRedirectUri) {
+    return config.googleOAuthRedirectUri;
+  }
   const base = config.apiPublicUrl || `http://localhost:${config.port}`;
-  return `${base.replace(/\/$/, '')}/integrations/oauth/google/callback`;
+  return `${base.replace(/\/$/, '')}${provider.callbackPath}`;
 }
 
 /**
- * Exchange an authorization code for access + refresh tokens against the
- * provider's token endpoint. Returns the raw Google response shape; callers
- * persist the relevant fields.
+ * Provider-agnostic token exchange. Uses the provider's `buildTokenRequest`
+ * if present (Notion's basic auth, GitHub's JSON-accept header), otherwise
+ * falls back to the standard RFC 6749 form body with PKCE code_verifier.
  */
 async function exchangeAuthorizationCode(params: {
-  provider: OAuthProvider;
+  provider: OAuthProviderDef;
   code: string;
-  codeVerifier: string;
+  codeVerifier?: string;
   redirectUri: string;
-}): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scope: string }> {
-  const body = new URLSearchParams({
-    code: params.code,
-    client_id: config.googleOAuthClientId,
-    client_secret: config.googleOAuthClientSecret,
-    code_verifier: params.codeVerifier,
-    grant_type: 'authorization_code',
-    redirect_uri: params.redirectUri,
-  });
+  clientId: string;
+  clientSecret: string;
+}) {
+  const { provider, code, codeVerifier, redirectUri, clientId, clientSecret } = params;
 
-  const res = await fetch(params.provider.tokenUrl, {
+  let requestInit: { headers: Record<string, string>; body: URLSearchParams | string };
+  if (provider.buildTokenRequest) {
+    requestInit = provider.buildTokenRequest({ code, codeVerifier, redirectUri, clientId, clientSecret });
+  } else {
+    const form: Record<string, string> = {
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+    };
+    if (codeVerifier) form['code_verifier'] = codeVerifier;
+    requestInit = {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(form),
+    };
+  }
+
+  const res = await fetch(provider.tokenUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    headers: requestInit.headers,
+    body: requestInit.body,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`Token exchange failed (${res.status}): ${text.slice(0, 500)}`);
   }
-  const json = await res.json() as Record<string, unknown>;
-  const accessToken = typeof json['access_token'] === 'string' ? json['access_token'] : '';
-  if (!accessToken) throw new Error('Token exchange returned no access_token');
-  return {
-    accessToken,
-    refreshToken: typeof json['refresh_token'] === 'string' ? json['refresh_token'] : undefined,
-    expiresIn: typeof json['expires_in'] === 'number' ? json['expires_in'] : 3600,
-    scope: typeof json['scope'] === 'string' ? json['scope'] : '',
-  };
-}
-
-/**
- * Fetch the authenticated user's email from the userinfo endpoint. Used as
- * the integration's displayName so the UI can show "Connected as alice@x.com"
- * without requiring the user to type their own email during the redirect.
- */
-async function fetchGoogleUserEmail(accessToken: string): Promise<string | null> {
-  try {
-    const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return null;
-    const json = await res.json() as { email?: unknown };
-    return typeof json.email === 'string' ? json.email : null;
-  } catch {
-    return null;
-  }
+  const json = await res.json() as unknown;
+  return provider.parseTokenResponse(json);
 }
 
 export async function integrationRoutes(app: FastifyInstance) {
@@ -360,10 +328,21 @@ export async function integrationRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
-  // ─── OAuth PKCE: Authorize (auth-guarded) ────────────────────────────────
+  // ─── OAuth discovery: which providers are configured on this deployment ──
+  // Frontend calls this to decide whether to render "Sign in with X" on the
+  // ConnectModal. A provider appears as `configured: true` once both its
+  // client_id and client_secret env vars are set.
+  app.get('/integrations/oauth/providers', {
+    preHandler: [app.authenticate],
+  }, async (_request, reply) => {
+    return reply.send(ok(listOAuthProviders(config)));
+  });
+
+  // ─── OAuth: Authorize (auth-guarded, works for EVERY registered provider) ─
   // Starts the redirect dance. Persists the CSRF state + PKCE code_verifier
   // server-side for the callback to read. Returns the auth URL the frontend
-  // should redirect the browser to.
+  // should redirect the browser to. Provider-specific quirks (scope list,
+  // extra params, PKCE on/off) come from the registry.
   app.post('/integrations/oauth/:provider/authorize', {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
@@ -375,16 +354,23 @@ export async function integrationRoutes(app: FastifyInstance) {
     if (!oauthProvider) {
       return reply.code(400).send(err('VALIDATION_ERROR', `OAuth not supported for provider: ${provider}`));
     }
-    if (!config.googleOAuthClientId || !config.googleOAuthClientSecret) {
+
+    const creds = oauthProvider.getClientCreds(config);
+    if (!creds) {
       return reply.code(503).send(err('NOT_CONFIGURED',
-        'Google OAuth is not configured on this deployment. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET.',
+        `${oauthProvider.label} OAuth is not configured on this deployment. ` +
+          `Set the provider's CLIENT_ID and CLIENT_SECRET env vars.`,
       ));
     }
 
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = deriveCodeChallenge(codeVerifier);
+    // PKCE is generated only for providers that support it. For legacy-flow
+    // providers (Slack v2, Notion) we skip the verifier/challenge; the
+    // callback detects an empty codeVerifier and omits it from the token
+    // request accordingly.
+    const codeVerifier = oauthProvider.usesPkce ? generateCodeVerifier() : '';
+    const codeChallenge = oauthProvider.usesPkce ? deriveCodeChallenge(codeVerifier) : '';
     const state = generateStateToken();
-    const redirectUri = resolveGoogleRedirectUri();
+    const redirectUri = resolveRedirectUri(oauthProvider);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute TTL
 
     await app.db.oAuthState.create({
@@ -400,35 +386,39 @@ export async function integrationRoutes(app: FastifyInstance) {
       },
     });
 
-    const params = new URLSearchParams({
+    // Scope param: some providers (Notion) declare no scopes. Only set the
+    // parameter if we actually have scopes to request.
+    const authParams: Record<string, string> = {
       response_type: 'code',
-      client_id: config.googleOAuthClientId,
+      client_id: creds.clientId,
       redirect_uri: redirectUri,
-      scope: oauthProvider.scopes.join(' '),
       state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
       ...(oauthProvider.extraAuthParams ?? {}),
-    });
-    const authUrl = `${oauthProvider.authUrl}?${params.toString()}`;
+    };
+    if (oauthProvider.scopes.length > 0) {
+      authParams['scope'] = oauthProvider.scopes.join(oauthProvider.scopeSeparator);
+    }
+    if (oauthProvider.usesPkce) {
+      authParams['code_challenge'] = codeChallenge;
+      authParams['code_challenge_method'] = 'S256';
+    }
+    const authUrl = `${oauthProvider.authUrl}?${new URLSearchParams(authParams).toString()}`;
 
     await app.auditLog(request, 'OAUTH_AUTHORIZE_START', 'Integration', state, { provider: providerUpper });
 
     return reply.send(ok({ authUrl, state, provider: providerUpper }));
   });
 
-  // ─── OAuth PKCE: Callback (UNAUTH — Google redirects here) ──────────────
-  // Google's redirect lands here with ?code=&state= (or ?error=). We look
-  // up the state row to recover tenantId/userId/codeVerifier, exchange the
-  // code, persist the encrypted tokens, then 302 the browser back to the
-  // web app's integrations page with a status flag.
-  app.get('/integrations/oauth/google/callback', async (request, reply) => {
+  // ─── Generic OAuth callback handler ──────────────────────────────────────
+  // Shared by every provider. Registered below at each provider's
+  // `callbackPath`. The handler looks up `OAuthState` by `state`, picks the
+  // provider from the stored row (not the URL path) so a rogue redirect
+  // can't swap providers, runs token exchange, persists credentials +
+  // integration row, and 302s back to /integrations/callback.
+  async function handleOAuthCallback(request: FastifyRequest, reply: FastifyReply) {
     const query = request.query as { code?: string; state?: string; error?: string; error_description?: string };
     const webBase = config.webPublicUrl.replace(/\/$/, '');
 
-    // Match the contract the existing /integrations/callback page already
-    // reads: ?connected=<ProviderName> on success, ?error=<message> on fail.
-    // Short URLs so users don't see a wall of error text in their browser.
     const errRedirect = (reason: string) => {
       const short = reason.length > 120 ? reason.slice(0, 117) + '...' : reason;
       const params = new URLSearchParams({ error: short });
@@ -453,40 +443,63 @@ export async function integrationRoutes(app: FastifyInstance) {
     const oauthProvider = OAUTH_PROVIDERS[stored.provider];
     if (!oauthProvider) return errRedirect(`Unknown OAuth provider: ${stored.provider}`);
 
+    const creds = oauthProvider.getClientCreds(config);
+    if (!creds) {
+      return errRedirect(`${oauthProvider.label} OAuth credentials missing on server`);
+    }
+
     let tokens;
     try {
       tokens = await exchangeAuthorizationCode({
         provider: oauthProvider,
         code: query.code,
-        codeVerifier: stored.codeVerifier,
+        codeVerifier: stored.codeVerifier || undefined,
         redirectUri: stored.redirectUri,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return errRedirect(`Token exchange failed: ${msg}`);
     }
 
-    const userEmail = await fetchGoogleUserEmail(tokens.accessToken);
-    const expiresAt = new Date(Date.now() + (tokens.expiresIn - 60) * 1000); // refresh 60s early
+    const identity = oauthProvider.fetchIdentity
+      ? await oauthProvider.fetchIdentity(tokens.accessToken)
+      : null;
+    const displayName = identity ?? oauthProvider.label;
+
+    // expiresAt is only set when the provider actually returns expires_in.
+    // Slack bot tokens don't expire; Notion tokens don't expire. We leave
+    // the column null in those cases — the credential.service will just
+    // decrypt and use the access token directly.
+    const expiresAt = tokens.expiresIn
+      ? new Date(Date.now() + (tokens.expiresIn - 60) * 1000)
+      : null;
+
+    const metadata: Record<string, unknown> = {
+      connectedViaOAuth: true,
+      grantedScope: tokens.scope,
+      ...(tokens.extraMetadata ?? {}),
+    };
 
     const integration = await app.db.integration.upsert({
-      where: { tenantId_provider: { tenantId: stored.tenantId, provider: oauthProvider.integrationProvider } },
+      where: { tenantId_provider: { tenantId: stored.tenantId, provider: oauthProvider.id } },
       update: {
         status: 'CONNECTED',
-        displayName: userEmail ?? oauthProvider.label,
+        displayName,
         connectedBy: stored.userId,
         scopes: oauthProvider.scopes,
-        metadata: { connectedViaOAuth: true, grantedScope: tokens.scope } as unknown as object,
+        metadata: metadata as unknown as object,
         updatedAt: new Date(),
       },
       create: {
         tenantId: stored.tenantId,
-        provider: oauthProvider.integrationProvider,
+        provider: oauthProvider.id,
         status: 'CONNECTED',
-        displayName: userEmail ?? oauthProvider.label,
+        displayName,
         connectedBy: stored.userId,
         scopes: oauthProvider.scopes,
-        metadata: { connectedViaOAuth: true, grantedScope: tokens.scope } as unknown as object,
+        metadata: metadata as unknown as object,
       },
     });
 
@@ -507,13 +520,20 @@ export async function integrationRoutes(app: FastifyInstance) {
 
     await app.auditLog(request, 'OAUTH_AUTHORIZE_COMPLETE', 'Integration', integration.id, {
       provider: stored.provider,
-      email: userEmail,
+      identity,
     });
 
     const params = new URLSearchParams({
       connected: oauthProvider.label,
-      ...(userEmail ? { email: userEmail } : {}),
+      ...(identity ? { identity } : {}),
     });
     return reply.redirect(`${webBase}/integrations/callback?${params.toString()}`);
-  });
+  }
+
+  // Register a callback route per provider — providers need their exact
+  // callback path pre-registered in their OAuth app dashboard, so we mount
+  // them at the paths declared in the registry. The handler body is shared.
+  for (const provider of Object.values(OAUTH_PROVIDERS)) {
+    app.get(provider.callbackPath, handleOAuthCallback);
+  }
 }

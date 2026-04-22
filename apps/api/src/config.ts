@@ -124,6 +124,31 @@ export const config = {
   apiPublicUrl: process.env['API_PUBLIC_URL']?.trim() ?? '',
   webPublicUrl: process.env['WEB_PUBLIC_URL']?.trim() ?? 'http://localhost:3000',
 
+  // ── Additional OAuth app client credentials ───────────────────────────
+  // Each provider here requires a separate OAuth app registration in that
+  // provider's developer dashboard. Until both ID and SECRET are set,
+  // the corresponding OAuth flow returns 503 NOT_CONFIGURED and the
+  // ConnectModal falls back to its cred-paste path.
+  //
+  // Redirect URIs to register (all relative to API_PUBLIC_URL):
+  //   Slack   → /integrations/oauth/slack/callback
+  //   GitHub  → /integrations/oauth/github/callback
+  //   Notion  → /integrations/oauth/notion/callback
+  //   Linear  → /integrations/oauth/linear/callback
+
+  // GitHub (separate from slackClientId; Slack already has its own below).
+  // Setup: https://github.com/settings/developers → New OAuth App
+  githubOAuthClientId: process.env['GITHUB_OAUTH_CLIENT_ID'] ?? '',
+  githubOAuthClientSecret: process.env['GITHUB_OAUTH_CLIENT_SECRET'] ?? '',
+
+  // Notion — setup: https://www.notion.so/my-integrations → New public integration
+  notionOAuthClientId: process.env['NOTION_OAUTH_CLIENT_ID'] ?? '',
+  notionOAuthClientSecret: process.env['NOTION_OAUTH_CLIENT_SECRET'] ?? '',
+
+  // Linear — setup: https://linear.app/settings/api/applications/new
+  linearOAuthClientId: process.env['LINEAR_OAUTH_CLIENT_ID'] ?? '',
+  linearOAuthClientSecret: process.env['LINEAR_OAUTH_CLIENT_SECRET'] ?? '',
+
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
 
