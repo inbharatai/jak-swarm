@@ -30,8 +30,13 @@ import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 // ─── Nav Items ───────────────────────────────────────────────────────────────
+// `adminOnly` entries only render for users whose role is TENANT_ADMIN
+// or SYSTEM_ADMIN. The page itself still enforces the role gate server-
+// side (see /admin route) — hiding the sidebar link is purely a UX fix
+// so non-admin users don't see a tempting nav item that dead-ends in
+// "Access Restricted".
 
-const NAV_ITEMS = [
+const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean }> = [
   { href: '/swarm', label: 'Runs', icon: Network },
   { href: '/schedules', label: 'Schedules', icon: Calendar },
   { href: '/builder', label: 'Builder', icon: Hammer },
@@ -40,7 +45,7 @@ const NAV_ITEMS = [
   { href: '/files', label: 'Files', icon: FileText },
   { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
   { href: '/skills', label: 'Skills', icon: Sparkles },
-  { href: '/admin', label: 'Admin', icon: ShieldCheck },
+  { href: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
 ];
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -48,7 +53,14 @@ const NAV_ITEMS = [
 export function ChatSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  // Used to hide admin-only nav items for non-admin users. The page itself
+  // still enforces the role gate server-side — this is purely a UX cleanup.
+  // NOTE: Supabase user_metadata.role can carry legacy string literals that
+  // aren't in the UserRole enum (e.g. 'ADMIN' from older register flows),
+  // so we compare as string to accept those too without a type narrow.
+  const roleStr = String(user?.role ?? '');
+  const isAdmin = roleStr === 'TENANT_ADMIN' || roleStr === 'SYSTEM_ADMIN' || roleStr === 'ADMIN';
   const collapsed = useConversationStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const conversations = useConversationStore((s) => s.conversations);
@@ -214,7 +226,7 @@ export function ChatSidebar() {
             Navigate
           </div>
           <div className="space-y-0.5">
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
               return (
