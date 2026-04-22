@@ -75,6 +75,7 @@ import whatsappRoutes from './routes/whatsapp.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
 import { registerObservability } from './observability/index.js';
 import { validateConfigOnBoot } from './boot/validate-config.js';
+import { startMcpServersFromConfig } from './boot/mcp-autostart.js';
 import { spawnWhatsAppClient, stopWhatsAppClient, releaseWhatsAppAutoStartLock } from './whatsapp/whatsapp-spawner.js';
 
 async function buildApp() {
@@ -317,6 +318,22 @@ async function buildApp() {
       error: { code: 'NOT_FOUND', message: 'Route not found' },
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Boot-time MCP auto-launch (Phase C)
+  //
+  // Reads `mcp.config.json` from the repo root (or MCP_CONFIG_PATH) and
+  // starts any deployment-wide MCP providers declared there. Failure of
+  // an individual provider is logged but never blocks API boot — this
+  // runs fire-and-forget to avoid delaying /health readiness for an
+  // unreachable MCP server. In test mode we skip entirely so the
+  // integration suite doesn't spawn MCP processes.
+  // -------------------------------------------------------------------------
+  if (process.env['NODE_ENV'] !== 'test') {
+    void startMcpServersFromConfig(fastify.log).catch((err) => {
+      fastify.log.error({ err }, '[mcp-autostart] Boot routine threw');
+    });
+  }
 
   return fastify;
 }

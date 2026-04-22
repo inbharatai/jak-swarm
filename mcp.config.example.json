@@ -1,0 +1,29 @@
+{
+  "$schema": "https://jakswarm.io/schema/mcp.config.v1.json",
+  "version": 1,
+  "_comment_providers": "Each key is a provider in packages/tools/src/mcp/mcp-providers.ts MCP_PROVIDERS. 'env' values of the form 'env:NAME' are replaced with process.env.NAME at boot; any missing required env causes the provider to be skipped with a warning. Literal values (no 'env:' prefix) are used as-is. Rename this file to mcp.config.json to activate.",
+  "providers": {
+    "FILESYSTEM": {
+      "enabled": false,
+      "env": {}
+    },
+    "FETCH": {
+      "enabled": false,
+      "env": {}
+    },
+    "SEQUENTIAL_THINKING": {
+      "enabled": false,
+      "env": {}
+    },
+    "BRAVE_SEARCH": {
+      "enabled": false,
+      "env": {
+        "apiKey": "env:BRAVE_API_KEY"
+      }
+    },
+    "MEMORY": {
+      "enabled": false,
+      "env": {}
+    }
+  }
+}
