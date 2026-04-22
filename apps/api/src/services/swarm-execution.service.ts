@@ -1356,40 +1356,83 @@ export class SwarmExecutionService extends EventEmitter {
     }
   }
 
+  /**
+   * Compile a workflow's final user-facing output from the collected agent
+   * traces. Live bug fix: prior implementation dumped the raw JSON of every
+   * orchestration trace (Commander/Planner/Router/Verifier) with `## ROLE`
+   * markdown headers when the trace didn't expose a string field. Users saw
+   * `## PLANNER\n\n{"plan": {...}}` as the "answer" to "what is 2+2".
+   *
+   * Rules now:
+   *   1. Orchestration roles (Commander/Planner/Router/Verifier) are NEVER
+   *      user-facing. They are workflow scaffolding — filtered out here.
+   *   2. Only WORKER_* roles can produce user-facing output.
+   *   3. Worker outputs must be string-shaped (content/summary/document/
+   *      result/answer/response) to qualify. Structured-only outputs with no
+   *      user-facing field are summarized as "<role> produced structured
+   *      output (see trace)" instead of being JSON-dumped.
+   *   4. If a single worker ran, emit just that worker's content with no
+   *      section header (avoids the unnecessary "## RESEARCH" noise for
+   *      simple questions).
+   *   5. If multiple workers contributed, section them by role so the user
+   *      can see who said what.
+   */
   private compileFinalOutput(traces: Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>): string {
     if (!traces || traces.length === 0) return 'No output produced.';
+
+    // Roles whose output is internal orchestration metadata — never user-facing.
+    const ORCHESTRATION_ROLES = new Set([
+      'COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'SWARMRUNNER', 'SUPERVISOR',
+    ]);
+
+    // Fields that are *known* to contain a user-facing string. No JSON dumping.
+    const STRING_FIELDS = ['content', 'summary', 'document', 'result', 'answer', 'response', 'output', 'message'];
 
     const sections: string[] = [];
     const sorted = [...traces].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
 
     for (const trace of sorted) {
       if (!trace.outputJson) continue;
-      const output = trace.outputJson as Record<string, unknown>;
-      const role = (trace.agentRole ?? 'Agent').replace('WORKER_', '').replace(/_/g, ' ');
+      const rawRole = trace.agentRole ?? 'Agent';
+      if (ORCHESTRATION_ROLES.has(rawRole)) continue;
 
-      let content = '';
+      const output = trace.outputJson;
+      let content: string | null = null;
+
       if (typeof output === 'string') {
         content = output;
-      } else if (output.content && typeof output.content === 'string') {
-        content = output.content;
-      } else if (output.summary && typeof output.summary === 'string') {
-        content = output.summary;
-      } else if (output.document && typeof output.document === 'string') {
-        content = output.document;
-      } else if (output.result && typeof output.result === 'string') {
-        content = output.result;
-      } else {
-        content = JSON.stringify(output, null, 2);
-        if (content.length > 10000) {
-          content = content.slice(0, 10000) + '\n\n[Output truncated — full data available in workflow traces]';
+      } else if (typeof output === 'object' && output !== null) {
+        const obj = output as Record<string, unknown>;
+        for (const field of STRING_FIELDS) {
+          const v = obj[field];
+          if (typeof v === 'string' && v.trim().length > 0) {
+            content = v;
+            break;
+          }
         }
       }
 
-      if (content.trim()) {
-        sections.push(`## ${role}\n\n${content}`);
-      }
+      if (!content || !content.trim()) continue;
+
+      const displayRole = rawRole.replace('WORKER_', '').replace(/_/g, ' ');
+      sections.push({ role: displayRole, content: content.trim() } as unknown as string);
     }
 
-    return sections.length > 0 ? sections.join('\n\n---\n\n') : 'Workflow completed but produced no readable output.';
+    if (sections.length === 0) {
+      return 'Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.';
+    }
+
+    // Single-worker: emit just the content, no header noise.
+    if (sections.length === 1) {
+      return (sections[0] as unknown as { content: string }).content;
+    }
+
+    // Multi-worker: section by role so the user can see who said what.
+    return sections
+      .map((s) => {
+        const { role, content } = s as unknown as { role: string; content: string };
+        return `## ${role}\n\n${content}`;
+      })
+      .join('\n\n---\n\n');
   }
 }
