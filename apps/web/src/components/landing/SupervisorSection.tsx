@@ -129,12 +129,12 @@ export default function SupervisorSection() {
           animate={isInView || isStillMode ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: isStillMode ? 0 : 0.6 }}
         >
-          <p className="text-sm font-semibold uppercase tracking-widest text-red-400 mb-3 font-sans">System Intelligence</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400 mb-3 font-sans">The Trust Layer</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
-            Self-healing. Observable. Resilient.
+            Approvals. Audit. Recovery. By default.
           </h2>
           <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">
-            The Supervisor module is JAK&apos;s central nervous system. It monitors every workflow, prevents cascading failures, and gives you full observability into what your agents are doing.
+            Every risky action pauses for human review. Every decision is logged with who, when, and why. If execution fails, the queue reclaims the lease and resumes &mdash; or rolls back safely.
           </p>
         </motion.div>
 

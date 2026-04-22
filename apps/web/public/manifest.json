@@ -1,7 +1,7 @@
 {
-  "name": "JAK Swarm — Operator-Grade Multi-Agent Control Plane",
+  "name": "JAK Swarm — The Trusted Control Plane for Autonomous Work",
   "short_name": "JAK Swarm",
-  "description": "Operator-grade multi-agent control plane. 38 specialist agents, 122 classified tools, 22 integrations. Human approval gates on every high-risk action.",
+  "description": "The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Open-source core, self-hostable.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

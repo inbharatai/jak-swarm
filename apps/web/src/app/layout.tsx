@@ -20,10 +20,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'JAK Swarm — Operator-Grade Multi-Agent Control Plane',
+  title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
   description:
-    'Operator-grade multi-agent control plane: 38 specialist agents, 122 classified tools (honest maturity labels), 6 managed AI providers, durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, scheduled workflows, Vibe Coder durable app builder. API keys required for external providers.',
-  keywords: ['AI agents', 'multi-agent platform', 'operator control plane', 'workflow', 'enterprise AI', 'vibe coding', 'managed AI', 'durable workflows', 'approval gates'],
+    'The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Build, operate, and verify autonomous workflows on infrastructure you control. 38 specialist agents, 122 classified tools, 22 integrations. Open-source core, MIT licensed.',
+  keywords: ['autonomous AI', 'AI agents', 'multi-agent platform', 'agent control plane', 'approval gates', 'workflow automation', 'autonomous work', 'AI orchestration', 'risk intelligence', 'open source AI'],
   authors: [{ name: 'JAK Swarm' }],
   manifest: '/manifest.json',
   appleWebApp: {
@@ -40,8 +40,8 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'JAK Swarm — Autonomous Agent Platform',
-    description: 'Deploy intelligent multi-agent workflows across any industry.',
+    title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
+    description: 'One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
     type: 'website',
   },
   other: {

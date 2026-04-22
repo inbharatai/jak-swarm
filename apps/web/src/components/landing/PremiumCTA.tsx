@@ -195,7 +195,7 @@ export default function PremiumCTA() {
           transition={{ duration: 0.7, delay: 0.2 }}
         >
           <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.15]">
-            <span className="text-white/90">The AI workforce</span>
+            <span className="text-white/90">Stop stringing together tools.</span>
             <br />
             <span
               className="landing-gradient-text"
@@ -205,12 +205,12 @@ export default function PremiumCTA() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              your company deserves
+              Start operating.
             </span>
           </h2>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
-            Stop hiring for tasks AI can handle. Deploy autonomous agents that execute real work&nbsp;&mdash; from email to code to contracts.
+            JAK Swarm runs on your infrastructure, with your approvals, under your audit trail. Open-source core. Self-hostable. Production-ready.
           </p>
 
           {/* CTA buttons */}

@@ -211,7 +211,7 @@ const PRICING = [
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Try AI automation with no commitment.',
+    description: 'Run JAK on your own infrastructure. Forever.',
     features: ['200 credits / month', '30 credits / day', '5 core agents', '1 vibe coding project', 'Standard AI models', 'Community support'],
     cta: 'Start Free',
     href: '/register',
@@ -222,7 +222,7 @@ const PRICING = [
     name: 'Pro',
     price: '$29',
     period: '/mo',
-    description: 'For builders shipping with AI.',
+    description: 'Hosted runtime with approvals built in.',
     features: ['3,000 credits / month', '200 credits / day', 'All 38 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
     cta: 'Go Pro',
     href: '/register',
@@ -233,7 +233,7 @@ const PRICING = [
     name: 'Team',
     price: '$99',
     period: '/mo',
-    description: 'For teams shipping at scale.',
+    description: 'Higher limits and priority model access for teams.',
     features: ['15,000 credits / month', '600 credits / day', 'All agents + custom skills', 'Unlimited projects', '3,000 premium credits', 'BYO API keys option', 'Priority support'],
     cta: 'Start Team',
     href: '/register',
@@ -244,7 +244,7 @@ const PRICING = [
     name: 'Enterprise',
     price: '$249',
     period: '/mo',
-    description: 'For organizations that need control.',
+    description: 'SSO, audit exports, and dedicated deployment.',
     features: ['50,000 credits / month', '2,000 credits / day', '15,000 premium credits', 'SSO + RBAC', 'Audit logs', 'Custom integrations', 'Dedicated support'],
     cta: 'Contact Us',
     href: 'mailto:contact@inbharat.ai',
@@ -496,41 +496,30 @@ export default function HomePage() {
           <div className="relative mx-auto max-w-7xl w-full z-10 grid lg:grid-cols-12 gap-8 items-center" style={{ opacity: heroVisible ? 1 : 0, transform: heroVisible ? 'translateY(0)' : 'translateY(40px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)' }}>
             {/* Left: Text - offset to create asymmetry */}
             <div className="lg:col-span-7 lg:pr-8">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 mb-8">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-300 tracking-wide uppercase">38 Agents Live</span>
+              {/* Eyebrow — category + posture.
+                  Replaces the prior "38 Agents Live" count-led badge. Trust
+                  & positioning lead; counts move lower as evidence. */}
+              <div className="inline-flex items-center gap-2 mb-8">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="text-[11px] font-semibold text-emerald-300/90 tracking-[0.18em] uppercase font-sans">
+                  Operator-Grade &middot; Open-Source Core
+                </span>
               </div>
 
               {/*
-                Hero H1 design choices:
-                - Line 1 stays solid white — lets the headline read first as
-                  pure type, no color noise.
-                - Only ONE phrase carries the brand gradient (the differentiator
-                  word "That Actually Executes"), not the whole subhead.
-                  Previously both the subhead AND the Start Free CTA used the
-                  same emerald→amber gradient, creating visual collision and
-                  hierarchy flattening.
-                - leading-[1.15] on mobile + pb-3 on the gradient span gives
-                  descenders on "g"/"p" real breathing room even when the
-                  background-clip'd gradient constrains the line box.
-                - overflow-visible on the gradient span prevents any stray
-                  descender clipping from background-clip: text + background-size.
+                Hero H1 — rewritten around the category, not a defensive
+                workforce claim. One gradient span (the final line) carries
+                the brand color so the H1 still feels premium without the
+                prior "Actually Executes" apology.
               */}
-              {/* Literal non-breaking hyphen (U+2011) in "Operator-Grade"
-                  keeps the compound on one line even on 375px. JSX entity
-                  &#8209; can trip up HMR in dev, so we use the raw
-                  character directly. `break-keep` on the span reinforces
-                  that whitespace-containing-hyphen inside the span stays
-                  together as a word unit. */}
               <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15] sm:leading-[1.1]">
-                <span className="block text-white" style={{ wordBreak: 'keep-all' }}>The Operator‑Grade</span>
-                <span className="block mt-2 text-white">AI Workforce</span>
-                <span className="block mt-2 gradient-text landing-gradient-text">That Actually Executes.</span>
+                <span className="block text-white">The trusted control plane</span>
+                <span className="block mt-2 text-white">for</span>
+                <span className="block mt-2 gradient-text landing-gradient-text">autonomous work.</span>
               </h1>
 
               <p className="mb-8 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-                38 specialist agents &mdash; from CEO to Legal &mdash; decompose your intent, execute in parallel, and deliver verified results. Human approval on every high-risk action. Not a chatbot &mdash; a workforce.
+                One platform that plans, executes, verifies, and recovers &mdash; with human approvals on every high-risk action. Build, operate, and verify autonomous work on infrastructure you control.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
@@ -574,7 +563,7 @@ export default function HomePage() {
                   <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                   </svg>
-                  <span>Durable queue &amp; lease reclaim</span>
+                  <span>Durable execution &amp; recovery</span>
                 </span>
               </div>
             </div>
@@ -658,9 +647,9 @@ export default function HomePage() {
           <div ref={agentGrid.ref} className={`fade-section ${agentGrid.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             {/* Asymmetric header - left aligned */}
             <div className="mb-16 max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Agent Network</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Meet your specialist workforce</h2>
-              <p className="mt-4 text-slate-300 font-sans">Each agent is a specialist with domain knowledge, dedicated tools, and a structured output schema. High-risk actions flow through a human-in-the-loop approval gate, not straight to execution.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">The Specialists</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Specialists, not a single generalist.</h2>
+              <p className="mt-4 text-slate-300 font-sans">Each agent owns a domain, a scoped tool set, and a structured output schema. High-risk actions flow through a human approval gate &mdash; not straight to execution.</p>
             </div>
 
             {/* Agent cards - asymmetric grid with offset */}
@@ -737,8 +726,8 @@ export default function HomePage() {
         <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 diagonal-cut" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(251,191,36,0.02), transparent)' }}>
           <div ref={workflowSection.ref} className={`fade-section ${workflowSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">How It Works</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From command to result in seconds</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">How It Works</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From intent to verified result.</h2>
             </div>
 
             {/* Animated workflow pipeline */}
@@ -795,9 +784,9 @@ export default function HomePage() {
         <section className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, rgba(251,191,36,0.03), rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Vibe Coding</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Build Full-Stack Apps with AI</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Describe your app in plain English. A durable workflow runs architect → generate → 3-layer build check → debug ↻ → deploy, with auto-snapshots and diff-aware revert at every stage.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Build With JAK</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Code that ships &mdash; with snapshots, diffs, and reversible deploys.</h2>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Describe your app. JAK plans the architecture, generates every file (no stubs), runs a 3-layer build check, debugs, and deploys &mdash; with a snapshot at every stage and one-click revert.</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -835,9 +824,9 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">122 Tools · Honest Maturity Labels</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">122 Tools. Honest Maturity Labels.</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 22 connector and MCP surfaces labeled by maturity (production-ready / beta / partial / placeholder) in the integration matrix. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-pink-400 mb-3 font-sans">Integrations</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Tools that do the job &mdash; and say when they don&apos;t.</h2>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">122 classified tools and 22 integrations, each labeled by a CI-enforced maturity tier (real, heuristic, LLM passthrough, config-dependent, experimental). Gmail, Calendar, browser automation, sandboxed code, MCP, and direct APIs &mdash; so operators know exactly what they&apos;re getting.</p>
             </div>
 
             {/* Tool Categories Grid */}
@@ -901,8 +890,8 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">How Vibe Coding Works</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From Idea to Live App in 5 Steps</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">Build Pipeline</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From idea to live app &mdash; in five durable steps.</h2>
             </div>
 
             {/* Pipeline Steps */}
@@ -1028,9 +1017,9 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-red-400 mb-3 font-sans">Security</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Verify Before You Act</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Built-in risk intelligence engine. Every email, document, invoice, and credential passes through 4 layers of verification before your agents act on it.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400 mb-3 font-sans">Verify Before You Act</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Risk intelligence, built in.</h2>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Emails, invoices, documents, and identities pass through four layers of verification before your agents act. Free rules first. AI only when needed. Human review as last resort.</p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -1064,9 +1053,9 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(56,189,248,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-3 font-sans">Enterprise Intelligence</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">Agents That Remember, Integrate, and Recover.</h2>
-              <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">Persistent memory. Self-healing retries. Slack and voice bridges. A typed SDK. <span className="text-slate-400">Production depth &mdash; not demo magic.</span></p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-400 mb-3 font-sans">Operate At Scale</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">Memory, recovery, and observability &mdash; without the glue code.</h2>
+              <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">Persistent memory across runs. Self-healing retries with loop detection. Slack and voice bridges. A typed SDK. <span className="text-slate-400">Production depth &mdash; not demo magic.</span></p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -1100,9 +1089,9 @@ export default function HomePage() {
         <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400 mb-3 font-sans">Pricing</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Simple, transparent pricing</h2>
-              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Start free and scale as you grow. No hidden fees.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Pricing</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Transparent pricing. Open-source core.</h2>
+              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted ops, higher limits, and SLA.</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto items-start">
@@ -1190,9 +1179,9 @@ export default function HomePage() {
         {/* ── 7. Open Source ────────────────────────────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={testimonialSection.ref} className={`fade-section ${testimonialSection.visible ? 'visible' : ''} mx-auto max-w-4xl text-center`}>
-            <p className="text-sm font-semibold uppercase tracking-widest text-amber-400 mb-3 font-sans">Open Source</p>
-            <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-4">Built in the Open</h2>
-            <p className="text-slate-300 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, deploy on your own infrastructure.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">Open Source</p>
+            <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-4">Audit every line. Deploy on your own stack.</h2>
+            <p className="text-slate-300 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, and run it on infrastructure you control.</p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Star JAK Swarm on GitHub">
@@ -1228,7 +1217,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Operator-grade multi-agent control plane. 38 specialist agents, 122 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 22 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
+                  The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers &mdash; with human approvals on every high-risk action. Open-source core, self-hostable, MIT licensed.
                 </p>
               </div>
 
