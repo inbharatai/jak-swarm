@@ -1,4 +1,13 @@
-# Integration Test Drift — Known Pre-Existing Failures
+# Integration Test Drift — Known Pre-Existing Failures (ARCHIVED — resolved 2026-04-21)
+
+> **Status:** Closed. All 12 drifts fixed in Sprint 6. The integration CI job
+> is now blocking again. This doc is kept as historical reference only.
+>
+> See commit that removed `continue-on-error` from `.github/workflows/ci.yml`
+> for the fix diff.
+
+---
+
 
 When Phase 3.2 of the hardening plan replaced `pnpm test` (which ran via Turbo and silently swallowed `DATABASE_URL`) with a direct `vitest run --coverage` invocation, the integration test suite ran end-to-end in CI for the first time in a while. It immediately surfaced **12 failing tests** in `tests/integration/api-endpoints.test.ts`.
 
@@ -121,3 +130,14 @@ The failures are **not regressions from the Phase 1-3 commits**. Git archaeology
 ## Changelog
 
 - `2026-04-21` — Initial entry. 12 failures documented. Integration CI job set to `continue-on-error: true`.
+- `2026-04-21` — RESOLVED. All 12 drifts fixed in Sprint 6:
+  - `inject()` helper no longer sends `content-type: application/json` on empty-body
+    requests (was causing FST_ERR_CTP_EMPTY_JSON_BODY 400s on DELETE/logout).
+  - `beforeAll` re-login now hard-fails if it doesn't mint a VIEWER token, so
+    Queue admin RBAC tests can't silently run against a TENANT_ADMIN.
+  - `POST /workflows/` accepts 202 (not 201) — route is async-by-design.
+  - `GET /workflows/`, `/approvals/`, `/skills/`, `/traces/` now assert on
+    `data.items` + `data.total` instead of treating `data` as a bare array.
+  - `POST /schedules/` body uses `name` + `cronExpression` (route contract)
+    instead of `cron` + `timezone`.
+  - `.github/workflows/ci.yml` — integration job is blocking again.

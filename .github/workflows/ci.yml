@@ -145,12 +145,13 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Run integration tests (non-blocking — drift tracked in docs/TEST-DRIFT.md)
-        # DO NOT make this blocking until the 12 known-drift tests in
-        # integration/api-endpoints.test.ts are either fixed or explicitly
-        # removed. Audit these runs for NEW failures only; expected
-        # pre-existing failures are listed in docs/TEST-DRIFT.md.
-        continue-on-error: true
+      - name: Run integration tests (blocking)
+        # The 12 drifts formerly tracked in docs/TEST-DRIFT.md were fixed in
+        # Sprint 6 — the assertions now match the actual route contracts
+        # (pagination envelope, 202 for async workflow creation, schedules
+        # body shape, content-type only when body is present). If this step
+        # starts failing, assume it is a genuine regression and fix the
+        # test or the route — don't re-add continue-on-error.
         run: pnpm --filter @jak-swarm/tests exec vitest run integration --exclude '**/circuit-breaker.test.ts' --exclude '**/truth-claims.test.ts'
         env:
           NODE_ENV: test

@@ -45,11 +45,18 @@ async function inject<T>(
   body?: unknown,
   headers: Record<string, string> = {},
 ): Promise<{ status: number; body: T | null }> {
+  // Only advertise content-type: application/json when we're ACTUALLY sending
+  // a JSON body. Fastify's JSON parser rejects empty bodies with 400
+  // (FST_ERR_CTP_EMPTY_JSON_BODY) when the header is present but the payload
+  // isn't, which historically masked itself as endpoint drift.
+  const effectiveHeaders: Record<string, string> = body !== undefined
+    ? { 'content-type': 'application/json', ...headers }
+    : { ...headers };
   const res = await app.inject({
     method,
     url,
     payload: body !== undefined ? JSON.stringify(body) : undefined,
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: effectiveHeaders,
   });
   const text = res.payload;
   if (!text) return { status: res.statusCode, body: null };
@@ -116,7 +123,24 @@ beforeAll(async () => {
       password: 'UserPass123!',
       tenantSlug: `user-tenant-${suffix}`,
     });
-    userToken = relogin.body?.data.token ?? userToken;
+    // Hard-fail the setup if re-login didn't mint a fresh VIEWER token —
+    // silently falling back to the original TENANT_ADMIN token was the root
+    // cause of the "Queue admin RBAC returns 200 instead of 403" drift.
+    if (!relogin.body?.data?.token) {
+      throw new Error(
+        `[test setup] Re-login after role demotion failed (status=${relogin.status}). ` +
+          'RBAC tests below would incorrectly run against an admin token.',
+      );
+    }
+    userToken = relogin.body.data.token;
+
+    // Double-check: fetch /auth/me with the new token and assert VIEWER role.
+    const me = await inject<ApiOk<{ role?: string }>>('GET', '/auth/me', undefined, auth(userToken));
+    if (me.body?.data?.role && me.body.data.role !== 'VIEWER') {
+      throw new Error(
+        `[test setup] Expected VIEWER role on userToken, got ${me.body.data.role}. RBAC tests will be meaningless.`,
+      );
+    }
   }
 }, 40000);
 
@@ -272,15 +296,19 @@ describe.skipIf(!hasDatabaseUrl)('POST /auth/logout', () => {
 describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
   let workflowId = '';
 
-  it('GET /workflows/ returns empty array for fresh user', async () => {
-    const { status, body } = await inject<ApiOk<WorkflowData[]>>(
+  it('GET /workflows/ returns paginated list for fresh user', async () => {
+    // Route returns PaginatedResult<Workflow>: { items, total, page, limit, hasMore }.
+    // The previous `Array.isArray(body?.data)` expectation predates the
+    // pagination refactor and silently drifted.
+    const { status, body } = await inject<ApiOk<{ items: WorkflowData[]; total: number }>>(
       'GET',
       '/workflows/',
       undefined,
       auth(adminToken),
     );
     expect(status).toBe(200);
-    expect(Array.isArray(body?.data)).toBe(true);
+    expect(Array.isArray(body?.data?.items)).toBe(true);
+    expect(typeof body?.data?.total).toBe('number');
   });
 
   it('GET /workflows/ returns 401 without auth', async () => {
@@ -295,7 +323,11 @@ describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
       { goal: 'Summarise the latest AI news' },
       auth(adminToken),
     );
-    expect(status).toBe(201);
+    // Route returns 202 Accepted — the workflow is persisted synchronously
+    // but execution is enqueued for the background worker. Keep 201 in the
+    // accept-list in case a future refactor bundles persistence+enqueue
+    // into a single ack.
+    expect([201, 202]).toContain(status);
     expect(body?.data.id).toBeTruthy();
     workflowId = body?.data.id ?? '';
   });
@@ -476,15 +508,18 @@ describe.skipIf(!hasDatabaseUrl)('Projects + Checkpoints', () => {
 // ===========================================================================
 
 describe.skipIf(!hasDatabaseUrl)('GET /approvals/', () => {
-  it('returns empty array for new tenant', async () => {
-    const { status, body } = await inject<ApiOk<unknown[]>>(
+  it('returns paginated empty list for new tenant', async () => {
+    // Route returns { items, total, page, limit, hasMore } since the
+    // pagination refactor. Prior `Array.isArray(body?.data)` was drift.
+    const { status, body } = await inject<ApiOk<{ items: unknown[]; total: number }>>(
       'GET',
       '/approvals/',
       undefined,
       auth(adminToken),
     );
     expect(status).toBe(200);
-    expect(Array.isArray(body?.data)).toBe(true);
+    expect(Array.isArray(body?.data?.items)).toBe(true);
+    expect(body?.data?.total).toBe(0);
   });
 
   it('returns 401 without auth', async () => {
@@ -508,15 +543,16 @@ describe.skipIf(!hasDatabaseUrl)('GET /approvals/', () => {
 // ===========================================================================
 
 describe.skipIf(!hasDatabaseUrl)('Skills routes', () => {
-  it('GET /skills/ returns array', async () => {
-    const { status, body } = await inject<ApiOk<SkillData[]>>(
+  it('GET /skills/ returns paginated list', async () => {
+    // Route returns { items, total, page, limit, hasMore }.
+    const { status, body } = await inject<ApiOk<{ items: SkillData[]; total: number }>>(
       'GET',
       '/skills/',
       undefined,
       auth(adminToken),
     );
     expect(status).toBe(200);
-    expect(Array.isArray(body?.data)).toBe(true);
+    expect(Array.isArray(body?.data?.items)).toBe(true);
   });
 
   it('GET /skills/ returns 401 without auth', async () => {
@@ -683,25 +719,33 @@ describe.skipIf(!hasDatabaseUrl)('Memory CRUD', () => {
 describe.skipIf(!hasDatabaseUrl)('Schedule CRUD', () => {
   let scheduleId = '';
 
-  it('GET /schedules/ returns empty array for fresh tenant', async () => {
-    const { status, body } = await inject<ApiOk<ScheduleData[]>>(
+  it('GET /schedules/ returns schedule list for fresh tenant', async () => {
+    // Schedules route (unlike the paginated ones above) returns a bare
+    // array today; if that changes to { items, ... } down the line, update
+    // the assertion in lockstep.
+    const { status, body } = await inject<ApiOk<ScheduleData[] | { items: ScheduleData[] }>>(
       'GET',
       '/schedules/',
       undefined,
       auth(adminToken),
     );
     expect(status).toBe(200);
-    expect(Array.isArray(body?.data)).toBe(true);
+    const payload = body?.data;
+    const arr = Array.isArray(payload) ? payload : (payload as { items?: ScheduleData[] })?.items;
+    expect(Array.isArray(arr)).toBe(true);
   });
 
   it('POST /schedules/ creates a schedule', async () => {
+    // Route requires: name (required), goal (required), cronExpression (required).
+    // Prior payload used `cron` + `timezone` which the route's zod schema
+    // rejects with 400. `timezone` isn't part of WorkflowSchedule at all.
     const { status, body } = await inject<ApiOk<ScheduleData>>(
       'POST',
       '/schedules/',
       {
-        cron: '0 9 * * 1',
+        name: 'Weekly team status summary',
         goal: 'Weekly team status summary',
-        timezone: 'UTC',
+        cronExpression: '0 9 * * 1',
       },
       auth(adminToken),
     );
@@ -748,7 +792,7 @@ describe.skipIf(!hasDatabaseUrl)('Schedule CRUD', () => {
     const { status } = await inject(
       'POST',
       '/schedules/',
-      { cron: 'not-a-cron', goal: 'Bad schedule' },
+      { name: 'Bad schedule', goal: 'Bad schedule', cronExpression: 'not-a-cron' },
       auth(adminToken),
     );
     expect([400, 422]).toContain(status);
@@ -765,15 +809,16 @@ describe.skipIf(!hasDatabaseUrl)('Schedule CRUD', () => {
 // ===========================================================================
 
 describe.skipIf(!hasDatabaseUrl)('Traces routes', () => {
-  it('GET /traces/ returns array', async () => {
-    const { status, body } = await inject<ApiOk<TraceData[]>>(
+  it('GET /traces/ returns paginated list', async () => {
+    // Route returns { items, total, page, limit, hasMore }.
+    const { status, body } = await inject<ApiOk<{ items: TraceData[]; total: number }>>(
       'GET',
       '/traces/',
       undefined,
       auth(adminToken),
     );
     expect(status).toBe(200);
-    expect(Array.isArray(body?.data)).toBe(true);
+    expect(Array.isArray(body?.data?.items)).toBe(true);
   });
 
   it('GET /traces/ returns 401 without auth', async () => {
