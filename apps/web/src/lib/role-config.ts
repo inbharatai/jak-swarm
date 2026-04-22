@@ -5,12 +5,37 @@ import { Monitor, Megaphone, Crown, Code, Search, Palette, Workflow } from 'luci
 
 export type RoleId = 'cto' | 'cmo' | 'ceo' | 'coding' | 'research' | 'design' | 'automation';
 
+/**
+ * Canonical `AgentRole` string each UX role maps to. The dashboard role picker
+ * is a UX abstraction; the runtime executes against an `AgentRole` enum value
+ * from `packages/shared/src/types/agent.ts`. Keeping the mapping explicit here
+ * (not just a prompt prepend) lets the Commander + Planner prefer the right
+ * worker + the TenantToolRegistry gate tools by the selected role's declared
+ * tool array instead of giving every role access to every tool.
+ *
+ * This is the string value of the enum, not an import, to keep this client
+ * module free of agent-package imports. The backend resolves it to the
+ * corresponding AgentRole enum via `packages/shared/src/types/agent.ts`.
+ */
+export type CanonicalAgentRole =
+  | 'WORKER_TECHNICAL'
+  | 'WORKER_MARKETING'
+  | 'WORKER_STRATEGIST'
+  | 'WORKER_CODER'
+  | 'WORKER_RESEARCH'
+  | 'WORKER_DESIGNER'
+  | 'WORKER_OPS';
+
 export interface RoleConfig {
   id: RoleId;
+  /** Canonical runtime agent this UX role routes to. */
+  canonicalAgentRole: CanonicalAgentRole;
   label: string;
   shortLabel: string;
   icon: LucideIcon;
   description: string;
+  /** Short bullet list of the actual tools this role can call at runtime. */
+  capabilities: string[];
   domain: string;
   examplePrompts: string[];
   /** HSL values: [hue, saturation%, lightness%] */
@@ -20,52 +45,77 @@ export interface RoleConfig {
 export const ROLES: Record<RoleId, RoleConfig> = {
   cto: {
     id: 'cto',
+    canonicalAgentRole: 'WORKER_TECHNICAL',
     label: 'CTO',
     shortLabel: 'CTO',
     icon: Monitor,
-    description: 'Architecture, systems design, APIs, and debugging',
+    description: 'Architecture, code review, and technical decisions with real repo-read access',
+    capabilities: [
+      'Read public + private GitHub repos (list files + read source)',
+      'Review pull requests with full diff',
+      'Find uploaded ADRs, design docs, code files',
+      'Search the web for benchmarks and best practices',
+    ],
     domain: 'Technical',
     examplePrompts: [
-      'Audit our API for security vulnerabilities',
-      'Design a microservices architecture for payment processing',
-      'Review this codebase for performance bottlenecks',
+      'Review my repo at github.com/my-org/my-app for security issues',
+      'Walk through PR #42 on my repo and flag risky changes',
+      'Read our ADR on auth and suggest 3 improvements',
     ],
     color: { h: 220, s: 75, l: 55 },
   },
   cmo: {
     id: 'cmo',
+    canonicalAgentRole: 'WORKER_MARKETING',
     label: 'CMO',
     shortLabel: 'CMO',
     icon: Megaphone,
-    description: 'Marketing strategy, campaigns, brand, and content',
+    description: 'Marketing strategy, campaigns, and brand — with access to your uploaded briefs',
+    capabilities: [
+      'Find uploaded briefs, brand guidelines, competitor reports',
+      'Search the web for market trends and competitor moves',
+      'Generate structured campaign plans and reports',
+    ],
     domain: 'Marketing',
     examplePrompts: [
+      'Read the Q3 launch brief I uploaded and draft a GTM plan',
       'Create a go-to-market plan for our product launch',
-      'Write a LinkedIn post series about AI automation',
       'Analyze competitor positioning in our market',
     ],
     color: { h: 340, s: 70, l: 60 },
   },
   ceo: {
     id: 'ceo',
+    canonicalAgentRole: 'WORKER_STRATEGIST',
     label: 'CEO',
     shortLabel: 'CEO',
     icon: Crown,
-    description: 'Strategy, roadmap, business planning, and decisions',
+    description: 'Strategy, roadmap, and cross-functional decisions informed by your real workflow data',
+    capabilities: [
+      'Compile executive summaries from recent workflows + traces',
+      'Search internal knowledge + external market data',
+      'Generate structured strategic reports',
+    ],
     domain: 'Strategy',
     examplePrompts: [
+      'Compile an executive summary of the last 30 days of activity',
       'Build a 90-day strategic plan for Series A',
-      'Evaluate our pricing model against market data',
       'Draft a board presentation for Q3 results',
     ],
     color: { h: 42, s: 85, l: 55 },
   },
   coding: {
     id: 'coding',
+    canonicalAgentRole: 'WORKER_CODER',
     label: 'Coding',
     shortLabel: 'Code',
     icon: Code,
-    description: 'Implementation, code generation, and execution',
+    description: 'Implementation, code generation, sandboxed execution',
+    capabilities: [
+      'Generate complete files from specs (no-truncation invariant)',
+      'Execute JavaScript / Python in an E2B sandbox',
+      'Read uploaded code files for context',
+    ],
     domain: 'Engineering',
     examplePrompts: [
       'Build a REST API with authentication and rate limiting',
@@ -76,10 +126,16 @@ export const ROLES: Record<RoleId, RoleConfig> = {
   },
   research: {
     id: 'research',
+    canonicalAgentRole: 'WORKER_RESEARCH',
     label: 'Research',
     shortLabel: 'Research',
     icon: Search,
-    description: 'Analysis, evidence gathering, and market intelligence',
+    description: 'Web + internal-knowledge research with source-quality grading',
+    capabilities: [
+      'Multi-provider web search (Serper → Tavily → DuckDuckGo fallback)',
+      'Semantic search over your uploaded documents',
+      'Tiered source quality grading (Tier 1 authoritative → Tier 3 anecdotal)',
+    ],
     domain: 'Research',
     examplePrompts: [
       'Research the latest trends in AI-powered automation',
@@ -90,10 +146,16 @@ export const ROLES: Record<RoleId, RoleConfig> = {
   },
   design: {
     id: 'design',
+    canonicalAgentRole: 'WORKER_DESIGNER',
     label: 'Design',
     shortLabel: 'Design',
     icon: Palette,
-    description: 'UI/UX, product flows, wireframes, and visual structure',
+    description: 'UI/UX specs, accessibility audits, component schemas',
+    capabilities: [
+      'Generate UI component specs with accessibility notes',
+      'Produce design-system tokens (colors, typography, spacing)',
+      'Read uploaded design briefs and screenshots',
+    ],
     domain: 'Design',
     examplePrompts: [
       'Design a user onboarding flow for a SaaS product',
@@ -104,10 +166,16 @@ export const ROLES: Record<RoleId, RoleConfig> = {
   },
   automation: {
     id: 'automation',
+    canonicalAgentRole: 'WORKER_OPS',
     label: 'Automation',
     shortLabel: 'Auto',
     icon: Workflow,
-    description: 'Workflows, triggers, scheduling, and integrations',
+    description: 'Workflow orchestration, scheduling, and integration ops',
+    capabilities: [
+      'Schedule cron-based workflows',
+      'Orchestrate multi-step integration pipelines',
+      'Emit webhooks on workflow completion',
+    ],
     domain: 'Operations',
     examplePrompts: [
       'Set up a weekly report generation workflow',

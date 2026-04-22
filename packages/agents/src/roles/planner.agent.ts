@@ -55,6 +55,7 @@ Guidelines:
 - requiresApproval=true for: any SEND action, CRM writes, payments, external communications, browser form submission.
 - HIGH/CRITICAL risk tasks always set requiresApproval=true.
 - retryable=false for destructive or side-effect tasks (sends, deletes, payments).
+- If the mission brief or input contains a "PREFER these worker agents: …" line, that list is the USER'S explicit choice of specialist roles from the dashboard role picker. You MUST bias task assignment toward those workers when their declared capabilities match the task. Only route away from the preferred list when a task genuinely requires a tool or skill they lack (e.g., a preferred list of WORKER_TECHNICAL still needs WORKER_EMAIL for the "send the review summary via email" step). When you do route away, the plan's task descriptions should make the reason visible.
 - Valid agentRoles with descriptions (choose the BEST match for each task):
   WORKER_EMAIL — read/draft/send emails
   WORKER_CALENDAR — schedule events, find availability
