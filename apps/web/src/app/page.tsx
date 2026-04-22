@@ -506,12 +506,15 @@ export default function HomePage() {
               {/*
                 Hero H1 — rewritten around the category, not a defensive
                 workforce claim. One gradient span (the final line) carries
-                the brand color so the H1 still feels premium without the
-                prior "Actually Executes" apology.
+                the brand color.
+                QA Fix: prior layout put "for" on its own middle line, which
+                on 390px mobile read as a typo-fragment. Now "for" flows
+                inline with "control plane" so the H1 reads as two lines
+                on every viewport: "The trusted control plane for" /
+                "autonomous work."
               */}
               <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15] sm:leading-[1.1]">
-                <span className="block text-white">The trusted control plane</span>
-                <span className="block mt-2 text-white">for</span>
+                <span className="block text-white">The trusted control plane for</span>
                 <span className="block mt-2 gradient-text landing-gradient-text">autonomous work.</span>
               </h1>
 

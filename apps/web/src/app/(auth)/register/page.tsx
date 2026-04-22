@@ -49,6 +49,7 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState<string>('');
 
   const {
     register,
@@ -69,13 +70,33 @@ export default function RegisterPage() {
         tenantName: data.tenantName,
         industry: data.industry,
       });
-      // Supabase may require email confirmation
+      setSubmittedEmail(data.email);
       setEmailSent(true);
-      // If auto-confirm is enabled, redirect immediately
-      setTimeout(() => {
-        router.push('/workspace');
-        router.refresh();
-      }, 1000);
+      // QA finding H-1 fix: previously this had a 1s setTimeout →
+      // router.push('/workspace'). When Supabase requires email
+      // confirmation the session doesn't exist yet, so the /workspace
+      // push bounces straight back to /login — user saw a flash of
+      // "Account created!" then a bewildering login form.
+      //
+      // New behavior: Poll the Supabase session for up to 5s. If a
+      // session shows up (i.e., auto-confirm is on), redirect. Otherwise
+      // stay on the "Check your email" interstitial indefinitely so the
+      // user knows exactly what to do next.
+      let attempts = 0;
+      const checkInterval = setInterval(async () => {
+        attempts++;
+        const { createClient } = await import('@/lib/supabase');
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          clearInterval(checkInterval);
+          router.push('/workspace');
+          router.refresh();
+        } else if (attempts >= 10) {
+          // 10 × 500ms = 5s. No session — stay on interstitial.
+          clearInterval(checkInterval);
+        }
+      }, 500);
     } catch (err: unknown) {
       setServerError((err as { message?: string })?.message ?? 'Registration failed. Please try again.');
     }
@@ -90,16 +111,34 @@ export default function RegisterPage() {
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold">Account created!</h1>
+          <h1 className="text-2xl font-bold">Check your email</h1>
           <p className="mt-3 text-muted-foreground">
-            Check your email for a confirmation link, or you&apos;ll be redirected shortly.
+            We sent a confirmation link to{' '}
+            <span className="font-medium text-foreground">{submittedEmail || 'your inbox'}</span>.
+            Click the link to activate your account — then sign in.
           </p>
-          <Link
-            href="/login"
-            className="mt-6 inline-block text-sm text-primary hover:underline"
-          >
-            Go to Sign In
-          </Link>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Didn&apos;t get it? Check your spam folder, or try a different email.
+          </p>
+
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Go to Sign In
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailSent(false);
+                setSubmittedEmail('');
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Use a different email
+            </button>
+          </div>
         </div>
       </div>
     );
