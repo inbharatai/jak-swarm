@@ -61,6 +61,11 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeRoles = useConversationStore((s) => s.activeRoles);
   const [attachError, setAttachError] = useState<string | null>(null);
+  // Drag counter — the browser fires dragenter/leave for every child the
+  // cursor crosses, so a naive boolean flickers. Incrementing on enter +
+  // decrementing on leave gives us a stable "is hovering this zone" read.
+  const dragDepth = useRef(0);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // ─── Voice input ───────────────────────────────────────────────────────
   // Final transcripts flow into the textarea via onChange; the textarea
@@ -154,11 +159,13 @@ export function ChatInput({
     }
   }, [attachments, pushAttachments]);
 
-  const handleFilesSelected = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFilesSelected = useCallback((files: FileList | File[] | null) => {
+    if (!files) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
     // Upload sequentially to avoid racing the controlled `attachments` state.
     (async () => {
-      for (const file of Array.from(files)) {
+      for (const file of arr) {
         await uploadFile(file);
       }
     })();
@@ -174,6 +181,75 @@ export function ChatInput({
     pushAttachments(attachments.filter((a) => a.id !== id));
     // NOTE: we don't DELETE /documents/:id here — the doc stays in the
     // tenant's Files library for reuse. User can purge it from /files.
+  };
+
+  // ─── Drag-and-drop ───────────────────────────────────────────────────────
+  // Matches Claude Code / Cursor pattern: drag a file anywhere over the
+  // chat input region → highlights drop zone → release → uploads. Using
+  // a depth counter so nested child dragenter/leave events don't flicker
+  // the overlay.
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (disabled) return;
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (disabled) return;
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (disabled) return;
+    e.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (disabled) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragOver(false);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleFilesSelected(files);
+    }
+  };
+
+  // ─── Clipboard paste ─────────────────────────────────────────────────────
+  // Captures images pasted from the clipboard (screenshots, copy-from-browser).
+  // Claude Code / Cursor rely heavily on this — it's the fastest way to share
+  // a screenshot with an agent. Non-image clipboard data falls through to the
+  // default textarea paste (normal text).
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) return;
+    const items = e.clipboardData?.items;
+    if (!items || items.length === 0) return;
+    const imageFiles: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // Pasted screenshots often have a generic name like "image.png" —
+          // prefix with timestamp so repeated pastes produce distinct docs.
+          const renamed = new File(
+            [file],
+            `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}-${file.name || 'image.png'}`,
+            { type: file.type },
+          );
+          imageFiles.push(renamed);
+        }
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault(); // prevent the binary image bytes from being pasted as text
+      handleFilesSelected(imageFiles);
+    }
   };
 
   // Auto-resize textarea
@@ -213,7 +289,32 @@ export function ChatInput({
   const showVoiceError = voiceError && (isPermissionGranted === false || !voiceSupported);
 
   return (
-    <div className="chat-input-area p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div
+      className={cn(
+        'chat-input-area relative p-4 pb-[max(1rem,env(safe-area-inset-bottom))]',
+        isDragOver && 'bg-primary/5',
+      )}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drop-zone overlay — only visible during an active drag. Matches
+          Claude Code / Cursor visual language: dashed border + centered
+          hint text. Pointer-events:none so dragleave fires on the parent
+          when the cursor leaves the outer bounds. */}
+      {isDragOver && (
+        <div
+          className="absolute inset-2 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-card/90 backdrop-blur-sm pointer-events-none"
+          aria-hidden="true"
+        >
+          <div className="text-center">
+            <Paperclip className="h-6 w-6 mx-auto mb-2 text-primary" />
+            <p className="text-sm font-medium text-foreground">Drop files to attach</p>
+            <p className="text-xs text-muted-foreground mt-1">PDF, docs, images &middot; up to 25 MB</p>
+          </div>
+        </div>
+      )}
       {/* Attachment chips — rendered ABOVE the input row so they're visible
           while the user is still typing. On mobile this stacks nicely above
           the input; on desktop it's a single wrapped row. */}
@@ -262,6 +363,7 @@ export function ChatInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={
             isListening
               ? (partialTranscript || 'Listening… speak now')
