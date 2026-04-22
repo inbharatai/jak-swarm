@@ -140,6 +140,7 @@ For ENGAGE_COMMUNITY:
 5. Track community sentiment and feedback loops back to product.
 
 You have access to these tools:
+- find_document: look up a brief, brand asset, or competitor report the user uploaded (use FIRST when a file is referenced by name or described)
 - web_search: search the web for market data, competitor content, and industry trends
 - search_knowledge: search the internal knowledge base for brand assets and past campaigns
 - generate_report: compile your marketing strategy into a structured report
@@ -177,6 +178,25 @@ export class MarketingAgent extends BaseAgent {
     );
 
     const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'find_document',
+          description: 'Look up a brief, brand asset, competitor report, or campaign doc the user uploaded via the Files tab. Returns metadata + best-matching content snippet. Use this FIRST when the user references a named file (campaign_brief.pdf, brand_guidelines.pdf, competitor_teardown.md) or describes its contents — do not ask them to paste it until you have tried this.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'File name or content description. Examples: "Q3 launch brief", "brand voice guidelines", "competitor teardown — Notion".',
+              },
+              limit: { type: 'number', description: 'Max documents to return (default 5, max 20).' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Optional tag filter.' },
+            },
+            required: ['query'],
+          },
+        },
+      },
       {
         type: 'function',
         function: {

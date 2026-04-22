@@ -6,6 +6,32 @@ await initTracing();
 // If SENTRY_DSN is unset this is a silent no-op with zero overhead.
 await initSentry();
 
+// Unhandled promise rejections + uncaught exceptions.
+//
+// Without these handlers, a single forgotten `await` in a route handler
+// or a library internal could crash the process silently — Node exits 1
+// with only a "Warning: UnhandledPromiseRejection" on stderr, and the
+// error never reaches Sentry because Sentry's global hook only catches
+// errors in instrumented code paths.
+//
+// Policy: log + captureException + keep running. Letting the process
+// survive is preferable to a cold restart for transient async failures
+// (a half-dropped fetch, a late-resolved timer, etc.). If the error is
+// genuinely unrecoverable the next request will hit it cleanly and the
+// Fastify error handler will respond 500.
+process.on('unhandledRejection', (reason: unknown) => {
+  // eslint-disable-next-line no-console
+  console.error('[unhandledRejection]', reason instanceof Error ? reason.stack : reason);
+  captureException(reason, { handler: 'unhandledRejection' });
+});
+process.on('uncaughtException', (err: Error) => {
+  // eslint-disable-next-line no-console
+  console.error('[uncaughtException]', err.stack ?? err.message);
+  captureException(err, { handler: 'uncaughtException' });
+  // Best-effort flush; do NOT exit — Sentry may be sending. The OS will
+  // kill the process on a genuinely fatal error (SIGSEGV etc.).
+});
+
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';

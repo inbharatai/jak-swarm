@@ -117,6 +117,7 @@ For REGULATORY_RESEARCH:
 5. Provide links to official sources when available.
 
 You have access to these tools:
+- find_document: Look up a document the user uploaded via the Files tab (contract.pdf, NDA.pdf, policy.md, etc.). Returns the best-matching document's metadata + a content snippet. Use this FIRST when a user asks you to "review", "analyze", or "check" a specific file by name or by description. Do NOT ask the user to paste text when a matching upload likely exists.
 - web_search: Research regulations, case law, and legal best practices
 - memory_store: Save contract templates, legal checklists, and policy documents
 - memory_retrieve: Recall previously saved templates and compliance policies
@@ -146,6 +147,29 @@ export class LegalAgent extends BaseAgent {
     );
 
     const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'find_document',
+          description: 'Look up a document the user uploaded via the Files tab (contracts, NDAs, policies, etc.). Returns metadata + best-matching content snippet. Use this FIRST when the user asks to review/analyze/check a named or described file — do not ask them to paste text until you have tried this.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'File name, contract name, or content description. Examples: "NDA from Acme", "onboarding_handbook.pdf", "privacy policy".',
+              },
+              limit: { type: 'number', description: 'Max documents to return (default 5, max 20).' },
+              tags: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional tag filter.',
+              },
+            },
+            required: ['query'],
+          },
+        },
+      },
       {
         type: 'function',
         function: {

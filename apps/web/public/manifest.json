@@ -1,7 +1,7 @@
 {
-  "name": "JAK Swarm — Autonomous Agent Platform",
+  "name": "JAK Swarm — Operator-Grade Multi-Agent Control Plane",
   "short_name": "JAK Swarm",
-  "description": "38 AI agents, 120 tools, 22 integrations. The autonomous AI workforce platform.",
+  "description": "Operator-grade multi-agent control plane. 38 specialist agents, 120 classified tools, 22 integrations. Human approval gates on every high-risk action.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

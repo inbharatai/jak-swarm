@@ -155,6 +155,25 @@ export class HRAgent extends BaseAgent {
       {
         type: 'function',
         function: {
+          name: 'find_document',
+          description: 'Look up a resume, offer letter, handbook, or policy doc the user uploaded via the Files tab. Returns metadata + best-matching content snippet. Use this FIRST when the user asks about a named or described file (resume_john_doe.pdf, handbook.md, offer_template.docx) — do not ask them to paste contents until you have tried this.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'File name or content description. Examples: "John Doe resume", "employee handbook", "2026 compensation policy".',
+              },
+              limit: { type: 'number', description: 'Max documents to return (default 5, max 20).' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Optional tag filter.' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'search_knowledge',
           description: 'Search the internal knowledge base for existing HR documents, policies, and benchmarks',
           parameters: {

@@ -116,6 +116,7 @@ For CASH_FLOW_ANALYSIS:
 5. Recommend cash management strategies (reserves, credit facilities, payment terms).
 
 You have access to these tools:
+- find_document: Look up a spreadsheet, statement, or financial doc the user uploaded (balance_sheet.xlsx, invoice.pdf, P&L.csv). Returns metadata + best-matching content snippet. Use this FIRST when the user references a specific file by name or describes its contents — do not ask them to paste the file until you've tried this.
 - compute_statistics: compute statistical calculations, aggregations, and financial formulas
 - parse_spreadsheet: extract and parse data from spreadsheet inputs
 - search_knowledge: search the internal knowledge base for financial benchmarks and historical data
@@ -148,6 +149,25 @@ export class FinanceAgent extends BaseAgent {
     );
 
     const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'find_document',
+          description: 'Look up a spreadsheet, statement, invoice, or financial doc the user uploaded via the Files tab. Returns metadata + best-matching content snippet. Use this FIRST when the user asks about a named or described file — do not ask them to paste contents until you have tried this.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'File name or content description. Examples: "Q2 balance sheet", "vendor_invoice_march.pdf", "2026 budget".',
+              },
+              limit: { type: 'number', description: 'Max documents to return (default 5, max 20).' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Optional tag filter.' },
+            },
+            required: ['query'],
+          },
+        },
+      },
       {
         type: 'function',
         function: {
