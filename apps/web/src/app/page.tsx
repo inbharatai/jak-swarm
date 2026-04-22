@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { OrchestrationEngine, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection, LandingIcon, type LandingIconName } from '@/components/landing';
+import { OrchestrationEngine, CapabilityMap, LiveDemo, PremiumCTA, SupervisorSection, WhatJakDoes, LandingIcon, type LandingIconName } from '@/components/landing';
 
 /* ─── Animated Counter Hook ──────────────────────────────────────────────── */
 
@@ -630,14 +630,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 2. Animated Stats ─────────────────────────────────────────────── */}
-        <section className="relative border-t border-white/5 px-4 py-20 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.03), transparent)' }}>
-          <div className="mx-auto max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-10">
-            {STATS.map((stat) => (
-              <StatCard key={stat.label} {...stat} />
-            ))}
-          </div>
-        </section>
+        {/* ── 2. Trust Layer (promoted per audit §10 — was #10) ───────────── */}
+        <SupervisorSection />
 
         {/* ── 2b. Orchestration Engine Visual ────────────────────────────── */}
         <OrchestrationEngine />
@@ -662,18 +656,16 @@ export default function HomePage() {
                 <line x1="75%" y1="35%" x2="50%" y2="65%" stroke="rgba(251,191,36,0.06)" strokeWidth="1" strokeDasharray="6 4" style={{ animation: 'dash-flow 1.5s linear infinite' }} />
               </svg>
 
+              {/* Y-offset asymmetry (was: lg:translate-y-4, lg:-translate-y-2,
+                  lg:translate-y-6, lg:-translate-y-4 per card) removed per
+                  audit §16. The offsets created uneven tap targets on mobile
+                  and added visual noise without design payoff. Clean 3-col
+                  static grid reads tighter and scans in one viewport. */}
               <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-3 stagger-children" style={{ zIndex: 1 }}>
                 {AGENTS.map((agent, i) => (
                   <div
                     key={agent.label}
-                    className={`group relative rounded-2xl p-7 min-h-[210px] flex flex-col transition-all duration-300 cursor-default glass-card card-lift animate-fade-up ${
-                      i === 0 ? 'lg:translate-y-0' :
-                      i === 1 ? 'lg:translate-y-4' :
-                      i === 2 ? 'lg:-translate-y-2' :
-                      i === 3 ? 'lg:translate-y-6' :
-                      i === 4 ? 'lg:translate-y-0' :
-                      'lg:-translate-y-4'
-                    }`}
+                    className="group relative rounded-2xl p-7 min-h-[210px] flex flex-col transition-all duration-300 cursor-default glass-card card-lift animate-fade-up"
                     style={{
                       background: hoveredAgent === i
                         ? `linear-gradient(135deg, ${agent.color}12, ${agent.color}06)`
@@ -779,6 +771,42 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ── 4a. Verify Before You Act (promoted per audit §10 — was #9) ──── */}
+        <section className="px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400 mb-3 font-sans">Verify Before You Act</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Risk intelligence, built in.</h2>
+              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Emails, invoices, documents, and identities pass through four layers of verification before your agents act. Free rules first. AI only when needed. Human review as last resort.</p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { iconName: 'mail' as LandingIconName, title: 'Email Threat Detection', desc: 'Phishing, spoofing, BEC fraud, credential harvesting, social engineering. SPF/DKIM validation, sender reputation, content analysis.', color: '#ef4444' },
+                { iconName: 'document' as LandingIconName, title: 'Document Verification', desc: 'Metadata tampering, forgery indicators, font anomalies, author mismatches. Catches fake certificates and altered contracts.', color: '#f59e0b' },
+                { iconName: 'card' as LandingIconName, title: 'Transaction Risk Analysis', desc: 'Invoice fraud, duplicate detection, bank detail changes (BEC pattern), suspicious amounts, crypto payment flags.', color: '#8b5cf6' },
+                { iconName: 'academic-cap' as LandingIconName, title: 'Identity Verification', desc: 'Resume timeline validation, impossible experience claims, credential anomalies, skill inflation detection.', color: '#06b6d4' },
+                { iconName: 'link' as LandingIconName, title: 'Cross-Evidence Correlation', desc: 'Connects findings across emails + documents + transactions + identities to detect coordinated fraud that single-type analysis misses.', color: '#ec4899' },
+                { iconName: 'shield' as LandingIconName, title: '4-Layer Escalation', desc: 'Free rules first ($0). Then AI Tier 1 ($0.01). Premium AI only on ambiguity ($0.50). Human review as last resort. 70% of checks stop at Layer 1.', color: '#34d399' },
+              ].map((feature) => (
+                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
+                  <div
+                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
+                    style={{ background: `${feature.color}15`, color: feature.color }}
+                  >
+                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4aa. What JAK does — three-pillar summary (NEW, per audit §9) ─ */}
+        <WhatJakDoes />
 
         {/* ── 4b. Build — consolidated (was two Vibe-Coding sections) ────────
              Audit §19/§20: merge the former 6-card grid + 5-step pipeline
@@ -915,43 +943,11 @@ export default function HomePage() {
              merged into section 4b above. IDE mockup dropped; the real
              Builder lives at /builder.) */}
 
-        {/* ── 5c. Verification & Risk Intelligence ─────────────────────────── */}
-        <section className="px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
-            <div className="text-center mb-16">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400 mb-3 font-sans">Verify Before You Act</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Risk intelligence, built in.</h2>
-              <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Emails, invoices, documents, and identities pass through four layers of verification before your agents act. Free rules first. AI only when needed. Human review as last resort.</p>
-            </div>
+        {/* (Verification moved up to position #4 — right after How It Works —
+             per audit §10. SupervisorSection moved to #2. This section used
+             to sit at #9.) */}
 
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {[
-                { iconName: 'mail' as LandingIconName, title: 'Email Threat Detection', desc: 'Phishing, spoofing, BEC fraud, credential harvesting, social engineering. SPF/DKIM validation, sender reputation, content analysis.', color: '#ef4444' },
-                { iconName: 'document' as LandingIconName, title: 'Document Verification', desc: 'Metadata tampering, forgery indicators, font anomalies, author mismatches. Catches fake certificates and altered contracts.', color: '#f59e0b' },
-                { iconName: 'card' as LandingIconName, title: 'Transaction Risk Analysis', desc: 'Invoice fraud, duplicate detection, bank detail changes (BEC pattern), suspicious amounts, crypto payment flags.', color: '#8b5cf6' },
-                { iconName: 'academic-cap' as LandingIconName, title: 'Identity Verification', desc: 'Resume timeline validation, impossible experience claims, credential anomalies, skill inflation detection.', color: '#06b6d4' },
-                { iconName: 'link' as LandingIconName, title: 'Cross-Evidence Correlation', desc: 'Connects findings across emails + documents + transactions + identities to detect coordinated fraud that single-type analysis misses.', color: '#ec4899' },
-                { iconName: 'shield' as LandingIconName, title: '4-Layer Escalation', desc: 'Free rules first ($0). Then AI Tier 1 ($0.01). Premium AI only on ambiguity ($0.50). Human review as last resort. 70% of checks stop at Layer 1.', color: '#34d399' },
-              ].map((feature) => (
-                <div key={feature.title} className="glass-card rounded-2xl p-6 card-lift" style={{ borderLeft: `3px solid ${feature.color}` }}>
-                  <div
-                    className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg"
-                    style={{ background: `${feature.color}15`, color: feature.color }}
-                  >
-                    <LandingIcon name={feature.iconName} className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-display font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed font-sans">{feature.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── 5d. Supervisor — System Intelligence ────────────────────────── */}
-        <SupervisorSection />
-
-        {/* ── 5e. Enterprise Intelligence ──────────────────────────────────── */}
+        {/* ── 5e. Operate At Scale (was Enterprise Intelligence) ───────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(56,189,248,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl">
             <div className="text-center mb-16">
@@ -986,6 +982,18 @@ export default function HomePage() {
 
         {/* ── 5f. Live Execution Demo ─────────────────────────────────────── */}
         <LiveDemo />
+
+        {/* ── 5g. Evidence band — stats as proof, not hero hook ──────────────
+             Audit §7: counts (38 / 122 / 22) are proof, not the emotional
+             opener. Moved from the prior #2 position (right below hero) to
+             live here, alongside LiveDemo, where they're EARNED. */}
+        <section className="relative border-t border-white/5 px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-10">
+            {STATS.map((stat) => (
+              <StatCard key={stat.label} {...stat} />
+            ))}
+          </div>
+        </section>
 
         {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
         <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8 grain-overlay" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
@@ -1078,27 +1086,29 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 7. Open Source ────────────────────────────────────────────────── */}
-        <section className="px-4 py-24 sm:px-6 lg:px-8">
-          <div ref={testimonialSection.ref} className={`fade-section ${testimonialSection.visible ? 'visible' : ''} mx-auto max-w-4xl text-center`}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">Open Source</p>
-            <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight mb-4">Audit every line. Deploy on your own stack.</h2>
-            <p className="text-slate-300 max-w-xl mx-auto mb-8 font-sans">JAK Swarm is fully open source under the MIT license. Inspect every agent, customize every tool, and run it on infrastructure you control.</p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-              <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Star JAK Swarm on GitHub">
-                <GitHubIcon className="h-5 w-5" />
+        {/* ── 7. Open Source — compressed per audit §19 from a standalone
+             H2 section to a single trust band. The content (MIT license,
+             GitHub link, tech stack) is retained; only the visual weight
+             drops so it reads as a trust signal, not a headline section. */}
+        <section className="px-4 py-10 sm:px-6 lg:px-8 border-t border-white/5">
+          <div ref={testimonialSection.ref} className={`fade-section ${testimonialSection.visible ? 'visible' : ''} mx-auto max-w-5xl text-center`}>
+            <p className="text-slate-400 text-sm font-sans mb-5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400">Open Source</span>
+              <span className="mx-3 text-slate-600">&middot;</span>
+              JAK Swarm is fully open-source under the MIT license. Audit every line, deploy on infrastructure you control.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+              <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Star JAK Swarm on GitHub">
+                <GitHubIcon className="h-4 w-4" />
                 Star on GitHub
               </a>
               <a href="https://github.com/inbharatai/jak-swarm/issues" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-white transition-colors font-sans">
                 Report an issue &rarr;
               </a>
             </div>
-
-            {/* Tech stack badges */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'React Flow', 'Tailwind CSS', 'Monaco Editor', 'Realtime Voice', 'SSE Streaming'].map(tech => (
-                <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 font-sans">{tech}</span>
+              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'Realtime Voice', 'SSE Streaming'].map(tech => (
+                <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-slate-500 font-sans">{tech}</span>
               ))}
             </div>
           </div>
