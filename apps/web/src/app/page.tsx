@@ -821,7 +821,7 @@ export default function HomePage() {
             {/* 5-step Build pipeline */}
             <div className="grid gap-6 md:grid-cols-5 mb-12">
               {[
-                { step: '01', title: 'Describe', desc: 'Type your app idea or upload a screenshot', iconName: 'chat' as LandingIconName, color: '#34d399' },
+                { step: '01', title: 'Describe', desc: 'Type your app idea in plain English', iconName: 'chat' as LandingIconName, color: '#34d399' },
                 { step: '02', title: 'Architect', desc: 'AI designs file tree, data models, API contracts', iconName: 'architecture' as LandingIconName, color: '#fbbf24' },
                 { step: '03', title: 'Generate', desc: 'Code generator creates every file — complete, not stubs', iconName: 'bolt' as LandingIconName, color: '#38bdf8' },
                 { step: '04', title: 'Debug', desc: 'Auto-debugger fixes build errors (3 retries)', iconName: 'wrench' as LandingIconName, color: '#f472b6' },

@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { PanelRightOpen, PanelRightClose, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { ChatInput } from './ChatInput';
+import { ChatInput, type ChatAttachment } from './ChatInput';
 import { MessageThread } from './MessageThread';
 import { EmptyState } from './EmptyState';
 import { RolePicker } from './RolePicker';
@@ -21,6 +21,12 @@ import {
 export function ChatWorkspace() {
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
+  // Attachments are held here (not inside ChatInput) so handleSend can
+  // inject them into the workflow goal atomically and clear them after
+  // send — avoiding any race with ChatInput-owned state. Docs are uploaded
+  // on file pick (chip shows "uploading" → "ready"); only `ready` rows
+  // get referenced in the outgoing goal text.
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const conversation = useActiveConversation();
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
@@ -48,24 +54,42 @@ export function ChatWorkspace() {
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
-    if (!text || isSending) return;
+    const readyAttachments = attachments.filter((a) => a.status === 'ready');
+    // Accept an empty text body if the user is sending attachments only
+    // ("look at this file") — but if BOTH text and attachments are empty,
+    // or if we're already sending, no-op.
+    if ((!text && readyAttachments.length === 0) || isSending) return;
 
     // Capture or create conversation ID before any async work
     const convId = conversation?.id ?? createConversation(activeRoles);
+
+    // Build the user-facing message content (shows filenames in the chat
+    // thread) and the workflow goal (adds an explicit hint so the Commander
+    // knows to route to an agent with the find_document tool).
+    const displayContent = readyAttachments.length > 0
+      ? `${text}${text ? '\n\n' : ''}📎 ${readyAttachments.map((a) => a.fileName).join(', ')}`
+      : text;
+
+    const goalText = readyAttachments.length > 0
+      ? `${text || 'Analyze the attached file(s).'}\n\n` +
+        `[Attached files — resolve via the find_document tool by name or ID]\n` +
+        readyAttachments.map((a) => `  - ${a.fileName} (documentId: ${a.id})`).join('\n')
+      : text;
 
     // Add user message
     addMessage(convId, {
       role: 'user',
       agentRole: null,
-      content: text,
+      content: displayContent,
     });
 
     setInputValue('');
+    setAttachments([]);
     setIsSending(true);
 
     try {
       // Create a real workflow via the API
-      const workflow = await workflowApi.create(text, undefined, activeRoles);
+      const workflow = await workflowApi.create(goalText, undefined, activeRoles);
 
       // Add initial acknowledgement
       addMessage(convId, {
@@ -160,7 +184,7 @@ export function ChatWorkspace() {
     } finally {
       setIsSending(false);
     }
-  }, [inputValue, isSending, conversation, activeRoles, createConversation, addMessage]);
+  }, [inputValue, attachments, isSending, conversation, activeRoles, createConversation, addMessage]);
 
   const handleStartChat = useCallback(
     (prompt: string) => {
@@ -224,6 +248,8 @@ export function ChatWorkspace() {
             value={inputValue}
             onChange={setInputValue}
             onSend={handleSend}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
           />
         </div>
 
