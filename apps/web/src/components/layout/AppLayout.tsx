@@ -14,7 +14,12 @@ export function AppLayout({ children }: AppLayoutProps) {
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
         <ChatSidebar />
-        <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Bug fix: main was `overflow-hidden` which clipped every non-chat
+            page (Analytics, Files, Settings, Knowledge, etc.) at the
+            viewport edge — charts and lists below the fold were invisible
+            and unscrollable. Chat doesn't regress because it has its own
+            `overflow-hidden` + internal MessageThread scroll container. */}
+        <main className="flex flex-1 flex-col overflow-y-auto">
           {children}
         </main>
       </div>

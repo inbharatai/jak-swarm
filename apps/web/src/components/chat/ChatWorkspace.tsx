@@ -27,6 +27,14 @@ export function ChatWorkspace() {
   // on file pick (chip shows "uploading" → "ready"); only `ready` rows
   // get referenced in the outgoing goal text.
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  // Current live-workflow id, used by the "still working" fallback banner
+  // below so the user can jump to /swarm if the SSE stream stalls past the
+  // STUCK_THRESHOLD. QA finding: "Thinking..." used to hang indefinitely
+  // when the workflow emitted intermediate events but never a terminal
+  // `completed`/`failed` — leaving the user with no way out.
+  const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
+  const [isStuck, setIsStuck] = useState(false);
+  const STUCK_THRESHOLD_MS = 30_000;
   const conversation = useActiveConversation();
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
@@ -41,6 +49,17 @@ export function ChatWorkspace() {
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, []);
+
+  // "Stuck workflow" detector — QA finding from live demo: user sent "hi",
+  // Commander + Agent reported `completed`, but the final synthesis event
+  // never fired and the chat sat on "Thinking…" forever. This effect flips
+  // `isStuck` true if isSending is still true after STUCK_THRESHOLD_MS, so
+  // the UI can render a "still working" banner with a link to /swarm.
+  useEffect(() => {
+    if (!isSending) { setIsStuck(false); return; }
+    const t = setTimeout(() => setIsStuck(true), STUCK_THRESHOLD_MS);
+    return () => clearTimeout(t);
+  }, [isSending]);
 
   // Close drawer on Escape
   useEffect(() => {
@@ -86,10 +105,13 @@ export function ChatWorkspace() {
     setInputValue('');
     setAttachments([]);
     setIsSending(true);
+    setIsStuck(false);
+    setActiveWorkflowId(null);
 
     try {
       // Create a real workflow via the API
       const workflow = await workflowApi.create(goalText, undefined, activeRoles);
+      setActiveWorkflowId(workflow.id);
 
       // Add initial acknowledgement
       addMessage(convId, {
@@ -225,8 +247,13 @@ export function ChatWorkspace() {
             </div>
           )}
 
-          {/* Thinking indicator */}
-          {isSending && (
+          {/* Thinking indicator — with stuck-state fallback.
+              The basic spinner shows while the workflow runs. If it hasn't
+              produced a terminal event in STUCK_THRESHOLD_MS, we replace it
+              with a clear "still working" message + a link to /swarm so
+              the user can check the actual workflow status instead of
+              staring at an infinite spinner. */}
+          {isSending && !isStuck && (
             <div className="flex items-center gap-2 px-6 py-3">
               <div className="flex gap-1">
                 <span className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
@@ -234,6 +261,41 @@ export function ChatWorkspace() {
                 <span className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
               </div>
               <span className="text-xs text-muted-foreground">Thinking…</span>
+            </div>
+          )}
+          {isSending && isStuck && (
+            <div className="flex items-center gap-3 px-6 py-3 border-t border-border bg-muted/30">
+              <div className="flex gap-1">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse [animation-delay:200ms]" />
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse [animation-delay:400ms]" />
+              </div>
+              <div className="flex-1 text-xs">
+                <span className="text-foreground font-medium">Still running…</span>
+                <span className="text-muted-foreground ml-1">
+                  The workflow is taking longer than expected.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={activeWorkflowId ? `/swarm?workflowId=${activeWorkflowId}` : '/swarm'}
+                  className="text-xs text-primary hover:underline whitespace-nowrap"
+                >
+                  View in Runs →
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    abortRef.current?.abort();
+                    setIsSending(false);
+                    setIsStuck(false);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  aria-label="Dismiss stuck indicator"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
 

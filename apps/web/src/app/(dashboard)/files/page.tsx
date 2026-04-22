@@ -104,6 +104,14 @@ export default function FilesPage() {
 
       // Track 2 MVP: single-file upload per request, matching the server-side
       // contract (@fastify/multipart files: 1). Batch UI loops client-side.
+      //
+      // Fix F-7 (QA finding): when uploading 2+ files, the old code ran a
+      // single mutate() AFTER the loop. Any error on file #N still hid the
+      // success of files < N from the UI until the final mutate resolved,
+      // and if SWR was mid-fetch during the loop the list could render the
+      // partial state. We now `mutate()` after EACH successful upload so the
+      // list updates row-by-row, and also wrap each upload in an
+      // independent try/catch so one failure doesn't abort the rest.
       for (const file of Array.from(files)) {
         if (file.size > MAX_SIZE_MB * 1024 * 1024) {
           toast.error(
@@ -115,6 +123,10 @@ export default function FilesPage() {
         try {
           await documentApi.upload(file);
           toast.success('Uploaded', `${file.name} — indexing in background`);
+          // Incremental refresh — makes each successful upload visible in the
+          // list before the next one starts. Await so batch uploads stay in
+          // order and the final state is deterministic.
+          await mutate();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Upload failed';
           toast.error(`Failed to upload ${file.name}`, msg);
@@ -122,6 +134,7 @@ export default function FilesPage() {
       }
 
       setUploading(false);
+      // Final safety mutate in case the per-file ones were rate-limited.
       await mutate();
     },
     [toast, mutate],

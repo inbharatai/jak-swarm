@@ -17,6 +17,7 @@ import {
   Network,
   ShieldCheck,
   FileText,
+  LogOut,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -25,6 +26,8 @@ import {
   useConversationStore,
 } from '@/store/conversation-store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useAuth } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 // ─── Nav Items ───────────────────────────────────────────────────────────────
 
@@ -44,10 +47,28 @@ const NAV_ITEMS = [
 
 export function ChatSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
   const collapsed = useConversationStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const conversations = useConversationStore((s) => s.conversations);
   const activeConversationId = useConversationStore((s) => s.activeConversationId);
+
+  // Fix F-4 (QA finding): Logout was not discoverable. Place a
+  // clearly-labeled "Sign out" at the bottom of the sidebar alongside
+  // Settings + Billing. Uses the existing logout() from useAuth which
+  // calls supabase.auth.signOut() and clears local session.
+  const handleSignOut = React.useCallback(async () => {
+    try {
+      await logout();
+    } catch {
+      // Even if signOut throws, push the user to /login so the UI doesn't
+      // feel stuck. Worst case there's a stale session cookie the middleware
+      // will invalidate on the next request.
+    }
+    router.push('/login');
+    router.refresh();
+  }, [logout, router]);
   const switchConversation = useConversationStore((s) => s.switchConversation);
   const createConversation = useConversationStore((s) => s.createConversation);
   const deleteConversation = useConversationStore((s) => s.deleteConversation);
@@ -231,6 +252,18 @@ export function ChatSidebar() {
             <CreditCard className="h-3.5 w-3.5" />
             Billing
           </Link>
+          {/* Sign out — resolves QA finding F-4 (no discoverable logout control).
+              Kept visually muted like Settings/Billing so it doesn't scream,
+              but the LogOut icon + "Sign out" text make it findable in one glance. */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-left"
+            aria-label="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </button>
         </div>
       </div>
   );
