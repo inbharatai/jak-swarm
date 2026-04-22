@@ -169,6 +169,13 @@ export function ChatWorkspace() {
                 });
               }
             });
+            // QA fix: stuck-workflow banner persisted after the terminal
+            // event because isSending only cleared on SSE onError. Clear
+            // the sending flag + stuck flag on terminal events so the
+            // UI doesn't keep showing "Still running…" after the final
+            // message has arrived.
+            setIsSending(false);
+            setIsStuck(false);
           // Workflow failed
           } else if (evType === 'failed') {
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
@@ -177,6 +184,8 @@ export function ChatWorkspace() {
               agentRole: null,
               content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
             });
+            setIsSending(false);
+            setIsStuck(false);
           // Workflow paused for approval
           } else if (evType === 'paused') {
             addMessage(convId, {

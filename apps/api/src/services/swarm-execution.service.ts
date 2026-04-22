@@ -1385,10 +1385,25 @@ export class SwarmExecutionService extends EventEmitter {
       'COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'SWARMRUNNER', 'SUPERVISOR',
     ]);
 
-    // Fields that are *known* to contain a user-facing string. No JSON dumping.
-    const STRING_FIELDS = ['content', 'summary', 'document', 'result', 'answer', 'response', 'output', 'message'];
+    // Fields that are *known* to contain a user-facing string. Ordered by
+    // preference — first hit wins. Covers the output shapes across all 32
+    // worker agents: Research returns {findings}, Marketing/Content
+    // return {draft}, Finance/Legal return {analysis}, Strategist returns
+    // {recommendation}, most generic tool loops return {content}, etc.
+    const STRING_FIELDS = [
+      'content', 'answer', 'response', 'message',
+      'findings',      // ResearchAgent
+      'summary', 'document', 'result', 'output',
+      'draft',         // Content/Marketing agents
+      'analysis',      // Finance/Legal/HR
+      'recommendation', 'conclusion',  // Strategy
+      'plan',          // Planner-ish
+      'text', 'body',  // Generic
+      'report',        // Analytics/PR
+    ];
 
-    const sections: string[] = [];
+    type Section = { role: string; content: string };
+    const sections: Section[] = [];
     const sorted = [...traces].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
 
     for (const trace of sorted) {
@@ -1403,6 +1418,7 @@ export class SwarmExecutionService extends EventEmitter {
         content = output;
       } else if (typeof output === 'object' && output !== null) {
         const obj = output as Record<string, unknown>;
+        // Try known string fields first.
         for (const field of STRING_FIELDS) {
           const v = obj[field];
           if (typeof v === 'string' && v.trim().length > 0) {
@@ -1410,12 +1426,32 @@ export class SwarmExecutionService extends EventEmitter {
             break;
           }
         }
+        // Fallback: if there's a keyPoints[] array of strings, render it as a bullet list.
+        // Research, Strategy, Product agents commonly return this alongside findings.
+        if (!content && Array.isArray(obj['keyPoints'])) {
+          const bullets = (obj['keyPoints'] as unknown[])
+            .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+            .map((s) => `- ${s}`);
+          if (bullets.length > 0) content = bullets.join('\n');
+        }
+        // Last-resort fallback: find the LONGEST string field on the object
+        // and surface it. Avoids JSON-dumping but still gets *something*
+        // user-facing for unknown agent output shapes.
+        if (!content) {
+          let longest = '';
+          for (const v of Object.values(obj)) {
+            if (typeof v === 'string' && v.trim().length > longest.length) {
+              longest = v;
+            }
+          }
+          if (longest.trim().length >= 10) content = longest;
+        }
       }
 
       if (!content || !content.trim()) continue;
 
       const displayRole = rawRole.replace('WORKER_', '').replace(/_/g, ' ');
-      sections.push({ role: displayRole, content: content.trim() } as unknown as string);
+      sections.push({ role: displayRole, content: content.trim() });
     }
 
     if (sections.length === 0) {
@@ -1423,16 +1459,12 @@ export class SwarmExecutionService extends EventEmitter {
     }
 
     // Single-worker: emit just the content, no header noise.
-    if (sections.length === 1) {
-      return (sections[0] as unknown as { content: string }).content;
+    const first = sections[0];
+    if (sections.length === 1 && first) {
+      return first.content;
     }
 
     // Multi-worker: section by role so the user can see who said what.
-    return sections
-      .map((s) => {
-        const { role, content } = s as unknown as { role: string; content: string };
-        return `## ${role}\n\n${content}`;
-      })
-      .join('\n\n---\n\n');
+    return sections.map((s) => `## ${s.role}\n\n${s.content}`).join('\n\n---\n\n');
   }
 }
