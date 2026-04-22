@@ -120,9 +120,16 @@ For INFRASTRUCTURE_PLANNING:
 6. Estimate monthly infrastructure costs with growth projections.
 
 You have access to these tools:
+- find_document: look up ADRs, design docs, or source files the user uploaded via the Files tab (use FIRST when a file is referenced by name)
+- github_list_files: list files in a GitHub repo (use when the user says "review my repo at github.com/owner/repo"; returns up to 300 paths)
+- github_read_file: read a single file's contents from GitHub (use AFTER github_list_files to inspect specific files)
+- github_review_pr: fetch a pull request with its full diff for code review (use for "review PR #N on owner/repo")
+- analyze_github_repo: get repo-level stats (stars, forks, issues, last push) — NOT a substitute for reading actual code
 - search_knowledge: search the internal knowledge base for existing architecture docs and technical standards
 - generate_report: compile your technical analysis into a structured report
 - web_search: search the web for technology benchmarks, best practices, and documentation
+
+For "review my codebase" requests: use github_list_files to map the tree, then github_read_file on the 5-10 most relevant files. Do NOT stop at analyze_github_repo metadata — the user asked you to review code, not repo stats.
 
 Respond with JSON:
 {
@@ -152,6 +159,72 @@ export class TechnicalAgent extends BaseAgent {
     );
 
     const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'find_document',
+          description: 'Look up architecture docs, ADRs, design specs, or code files the user uploaded via the Files tab. Use this FIRST when the user references a named file or describes its contents — do not ask them to paste it until you have tried this.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'File name or content description. Examples: "system_design.md", "auth flow ADR", "database_schema.sql".' },
+              limit: { type: 'number', description: 'Max documents to return (default 5, max 20).' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Optional tag filter.' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'github_list_files',
+          description: 'List files in a GitHub repository (recursive). Use this when the user says "review my repo at github.com/owner/repo" or similar — returns up to 300 paths so you can pick which files to read next via github_read_file.',
+          parameters: {
+            type: 'object',
+            properties: {
+              owner: { type: 'string', description: 'GitHub repo owner/org' },
+              repo: { type: 'string', description: 'Repository name' },
+              ref: { type: 'string', description: 'Optional branch/tag/commit — default is the repo default branch' },
+              pathGlob: { type: 'string', description: 'Optional glob filter (e.g., "src/**/*.ts")' },
+            },
+            required: ['owner', 'repo'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'github_read_file',
+          description: 'Read a single file from a GitHub repository. Use AFTER github_list_files to inspect specific files for architecture, security, or debt review. Truncates at 100KB — `truncated: true` means you are reading only the head of a large file.',
+          parameters: {
+            type: 'object',
+            properties: {
+              owner: { type: 'string' },
+              repo: { type: 'string' },
+              path: { type: 'string', description: 'File path inside the repo (e.g., "src/app.ts")' },
+              ref: { type: 'string', description: 'Optional branch/tag/commit — default is the repo default branch' },
+            },
+            required: ['owner', 'repo', 'path'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'github_review_pr',
+          description: 'Fetch a GitHub pull request with its full diff. Use this when the user says "review PR #123 on owner/repo". Returns title, author, changed files count, and the first ~15KB of the diff.',
+          parameters: {
+            type: 'object',
+            properties: {
+              owner: { type: 'string' },
+              repo: { type: 'string' },
+              pullNumber: { type: 'number' },
+            },
+            required: ['owner', 'repo', 'pullNumber'],
+          },
+        },
+      },
       {
         type: 'function',
         function: {

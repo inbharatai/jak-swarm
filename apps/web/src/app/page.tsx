@@ -151,12 +151,12 @@ const AGENTS = [
 
 const STATS = [
   { value: 38, label: 'Specialist Agents', suffix: '' },
-  // 120 total tools. Every tool carries an honest maturity label — real,
+  // 122 total tools. Every tool carries an honest maturity label — real,
   // heuristic, llm_passthrough, config_dependent, or experimental — CI-enforced
   // against the live registry. The old universal-grade label was retired because
-  // only ~56 of 120 are `real` runtime integrations; the rest are honest
+  // only ~56 of 122 are `real` runtime integrations; the rest are honest
   // heuristics, LLM passthroughs, or config-gated.
-  { value: 120, label: 'Classified Tools', suffix: '' },
+  { value: 122, label: 'Classified Tools', suffix: '' },
   // 22 = 13 external SaaS connectors (incl. WhatsApp native bridge) + 9
   // infrastructure/MCP adapters surfaced in the UI. Only a subset are
   // production-ready runtime paths — see docs/integration-maturity-matrix.md.
@@ -835,8 +835,8 @@ export default function HomePage() {
         <section className="px-4 py-24 sm:px-6 lg:px-8">
           <div ref={integrationSection.ref} className={`fade-section ${integrationSection.visible ? 'visible' : ''} mx-auto max-w-6xl`}>
             <div className="text-center mb-16">
-              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">120 Tools · Honest Maturity Labels</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">120 Tools. Honest Maturity Labels.</h2>
+              <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">122 Tools · Honest Maturity Labels</p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">122 Tools. Honest Maturity Labels.</h2>
               <p className="mt-4 text-slate-300 max-w-2xl mx-auto font-sans">Gmail via IMAP, Calendar via CalDAV, Browser via Playwright, Sandbox via E2B, plus 22 connector and MCP surfaces labeled by maturity (production-ready / beta / partial / placeholder) in the integration matrix. Every tool carries a CI-enforced maturity label: real, heuristic, llm_passthrough, config_dependent, or experimental&nbsp;&mdash; so operators know what they&rsquo;re getting.</p>
             </div>
 
@@ -1228,7 +1228,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Operator-grade multi-agent control plane. 38 specialist agents, 120 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 22 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
+                  Operator-grade multi-agent control plane. 38 specialist agents, 122 classified tools (real / heuristic / llm_passthrough / config_dependent / experimental), 22 connectors, managed AI routing, memory system, Slack + WhatsApp bridges, voice-to-workflow, Vibe Coder durable workflow, and a typed SDK. Human-in-the-loop on every high-risk action.
                 </p>
               </div>
 

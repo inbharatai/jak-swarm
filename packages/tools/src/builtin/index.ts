@@ -6019,6 +6019,185 @@ Date: _______________`;
 
   toolRegistry.register(
     {
+      name: 'github_list_files',
+      description: 'List files in a GitHub repository directory (recursive). Returns up to 300 file paths so a code-reviewing agent can pick which files to read next via github_read_file. Requires GITHUB_PAT for private repos; public repos work without it.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GITHUB_PAT'],
+      liveTested: false,
+      sideEffectLevel: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string', description: 'GitHub repo owner/org' },
+          repo: { type: 'string', description: 'Repository name' },
+          ref: { type: 'string', description: 'Branch, tag, or commit SHA (default: the default branch)' },
+          pathGlob: { type: 'string', description: 'Optional path filter. Example: "src/**/*.ts" returns only .ts files under src/. Left empty = all files.' },
+        },
+        required: ['owner', 'repo'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          files: { type: 'array', items: { type: 'object' } },
+          total: { type: 'number' },
+          truncated: { type: 'boolean' },
+        },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['GITHUB_PAT'];
+      const { owner, repo, ref, pathGlob } = input as {
+        owner: string; repo: string; ref?: string; pathGlob?: string;
+      };
+      const headers: Record<string, string> = { 'User-Agent': 'JAK-Swarm', 'Accept': 'application/vnd.github.v3+json' };
+      if (token) headers['Authorization'] = `token ${token}`;
+
+      // Resolve the ref first — we need a commit SHA to fetch the tree.
+      const branch = ref ?? 'HEAD';
+      const refRes = await fetch(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`,
+        { headers },
+      ).catch(() => null);
+
+      // If the specific branch ref isn't found (e.g. "HEAD"), fall back to the repo default branch.
+      let sha: string | null = null;
+      if (refRes && refRes.ok) {
+        const j = (await refRes.json()) as { object?: { sha?: string } };
+        sha = j.object?.sha ?? null;
+      }
+      if (!sha) {
+        const metaRes = await fetch(
+          `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+          { headers },
+        );
+        if (!metaRes.ok) return { success: false, error: `Repo not found: ${metaRes.status}` };
+        const meta = (await metaRes.json()) as { default_branch?: string };
+        const defaultBranch = meta.default_branch ?? 'main';
+        const defaultRefRes = await fetch(
+          `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(defaultBranch)}`,
+          { headers },
+        );
+        if (!defaultRefRes.ok) return { success: false, error: `Default branch not found: ${defaultRefRes.status}` };
+        const j = (await defaultRefRes.json()) as { object?: { sha?: string } };
+        sha = j.object?.sha ?? null;
+      }
+      if (!sha) return { success: false, error: 'Could not resolve commit SHA' };
+
+      const treeRes = await fetch(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${sha}?recursive=1`,
+        { headers },
+      );
+      if (!treeRes.ok) return { success: false, error: `Tree fetch failed: ${treeRes.status}` };
+
+      const tree = (await treeRes.json()) as {
+        tree: Array<{ path: string; type: 'blob' | 'tree'; size?: number; sha: string }>;
+        truncated: boolean;
+      };
+
+      // Compile glob → simple regex (supports * and **)
+      let regex: RegExp | null = null;
+      if (pathGlob) {
+        const escaped = pathGlob
+          .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+          .replace(/\\\*\\\*/g, '__DOUBLESTAR__')
+          .replace(/\\\*/g, '[^/]*')
+          .replace(/__DOUBLESTAR__/g, '.*');
+        regex = new RegExp('^' + escaped + '$');
+      }
+
+      const files = tree.tree
+        .filter((e) => e.type === 'blob')
+        .filter((e) => !regex || regex.test(e.path))
+        .slice(0, 300)
+        .map((e) => ({ path: e.path, size: e.size ?? 0, sha: e.sha }));
+
+      return {
+        success: true,
+        files,
+        total: files.length,
+        truncated: tree.truncated || files.length === 300,
+      };
+    },
+  );
+
+  toolRegistry.register(
+    {
+      name: 'github_read_file',
+      description: 'Read the contents of a single file from a GitHub repository. Use this AFTER github_list_files to pick a file. Truncates at 100KB to keep the LLM context manageable — large files return with `truncated: true` and the first 100KB of content.',
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
+      requiresApproval: false,
+      maturity: 'config_dependent',
+      requiredEnvVars: ['GITHUB_PAT'],
+      liveTested: false,
+      sideEffectLevel: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string', description: 'GitHub repo owner/org' },
+          repo: { type: 'string', description: 'Repository name' },
+          path: { type: 'string', description: 'File path inside the repo (e.g., "src/app.ts")' },
+          ref: { type: 'string', description: 'Branch/tag/commit SHA (default: the default branch)' },
+        },
+        required: ['owner', 'repo', 'path'],
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          content: { type: 'string' },
+          sha: { type: 'string' },
+          size: { type: 'number' },
+          truncated: { type: 'boolean' },
+        },
+      },
+      version: '1.0.0',
+    },
+    async (input: unknown) => {
+      const token = process.env['GITHUB_PAT'];
+      const { owner, repo, path, ref } = input as {
+        owner: string; repo: string; path: string; ref?: string;
+      };
+      const headers: Record<string, string> = {
+        'User-Agent': 'JAK-Swarm',
+        'Accept': 'application/vnd.github.v3+json',
+      };
+      if (token) headers['Authorization'] = `token ${token}`;
+
+      const url = new URL(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}`,
+      );
+      if (ref) url.searchParams.set('ref', ref);
+
+      const res = await fetch(url.toString(), { headers });
+      if (!res.ok) return { success: false, error: `File not found: ${res.status}` };
+
+      const json = (await res.json()) as {
+        content?: string; encoding?: string; sha: string; size: number; type: string;
+      };
+      if (json.type !== 'file') return { success: false, error: `Not a file: ${json.type}` };
+      if (!json.content || json.encoding !== 'base64') {
+        return { success: false, error: 'Unexpected encoding — file may be too large for the contents API; use github_read_file with a specific ref via the blob API.' };
+      }
+
+      const raw = Buffer.from(json.content, 'base64').toString('utf-8');
+      const LIMIT = 100_000; // ~100KB
+      const truncated = raw.length > LIMIT;
+      return {
+        success: true,
+        content: truncated ? raw.slice(0, LIMIT) : raw,
+        sha: json.sha,
+        size: json.size,
+        truncated,
+      };
+    },
+  );
+
+  toolRegistry.register(
+    {
       name: 'github_review_pr',
       description: 'Fetch a GitHub pull request with diff for code review. Requires GITHUB_PAT.',
       category: ToolCategory.RESEARCH,

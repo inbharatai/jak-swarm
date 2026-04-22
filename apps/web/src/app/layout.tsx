@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'JAK Swarm — Operator-Grade Multi-Agent Control Plane',
   description:
-    'Operator-grade multi-agent control plane: 38 specialist agents, 120 classified tools (honest maturity labels), 6 managed AI providers, durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, scheduled workflows, Vibe Coder durable app builder. API keys required for external providers.',
+    'Operator-grade multi-agent control plane: 38 specialist agents, 122 classified tools (honest maturity labels), 6 managed AI providers, durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, scheduled workflows, Vibe Coder durable app builder. API keys required for external providers.',
   keywords: ['AI agents', 'multi-agent platform', 'operator control plane', 'workflow', 'enterprise AI', 'vibe coding', 'managed AI', 'durable workflows', 'approval gates'],
   authors: [{ name: 'JAK Swarm' }],
   manifest: '/manifest.json',

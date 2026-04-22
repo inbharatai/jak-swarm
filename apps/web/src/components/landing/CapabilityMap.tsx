@@ -149,7 +149,7 @@ export default function CapabilityMap() {
         >
           <p className="text-sm font-semibold uppercase tracking-widest text-pink-400 mb-3 font-sans">Architecture</p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight leading-[1.25] pb-2 text-balance">
-            38 agents. 120 tools. One platform.
+            38 agents. 122 tools. One platform.
           </h2>
           <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">
             Every agent wires into the exact tools it needs &mdash; no glue code, no duct tape.
