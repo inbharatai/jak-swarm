@@ -535,6 +535,93 @@ test.describe('JAK Swarm — World-Class QA', () => {
     record({ severity: 'Info', area: 'Sidebar', title: 'Past conversation click navigates correctly', detail: url });
   });
 
+  // ─── 11. Runs page — workflow list + detail view ─────────────────────────
+  test('11. /swarm — workflow list + detail view + trace content', async () => {
+    await page.goto('/swarm', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4500);
+    await snap(page, 'runs', 'runs-list');
+
+    const mainText = await page.locator('main').first().innerText();
+    if (/no workflows|empty/i.test(mainText) && !/workflow.*\d/i.test(mainText)) {
+      record({ severity: 'Info', area: 'Runs', title: '/swarm shows empty state', detail: mainText.slice(0, 200) });
+      return;
+    }
+
+    // Click the first workflow row to open its detail view
+    const firstRow = page.locator('main a[href*="/swarm/"], main button:has-text("View"), main [role="button"]').filter({ hasText: /hi|workflow|goal|test/i }).first();
+    if ((await firstRow.count()) === 0) {
+      record({ severity: 'Medium', area: 'Runs', title: 'No clickable workflow rows on /swarm', detail: mainText.slice(0, 300) });
+      return;
+    }
+
+    await firstRow.click();
+    await page.waitForTimeout(3500);
+    await snap(page, 'runs', 'runs-detail');
+
+    const detailText = await page.locator('main').first().innerText();
+    if (detailText.trim().length < 80) {
+      record({ severity: 'High', area: 'Runs', title: 'Workflow detail view empty', detail: detailText.slice(0, 300) });
+      return;
+    }
+    record({ severity: 'Info', area: 'Runs', title: 'Workflow detail view renders', detail: detailText.slice(0, 200) });
+  });
+
+  // ─── 12. Analytics — real numbers or labeled empty ───────────────────────
+  test('12. /analytics — either real numbers or honest empty state', async () => {
+    await page.goto('/analytics', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(5000);
+    await snap(page, 'analytics', 'analytics-landing');
+
+    const mainText = await page.locator('main').first().innerText();
+    const hasRealData = /\$\d|\d+\s*(workflow|run|task)|[1-9]\d*%/i.test(mainText);
+    const hasEmptyLabel = /no (data|workflows|activity|runs)|get started|empty/i.test(mainText);
+
+    if (!hasRealData && !hasEmptyLabel) {
+      record({ severity: 'High', area: 'Analytics', title: 'Analytics shows neither data nor empty state', detail: mainText.slice(0, 400) });
+      return;
+    }
+    if (hasRealData) {
+      record({ severity: 'Info', area: 'Analytics', title: 'Analytics shows real numbers', detail: mainText.slice(0, 300) });
+    } else {
+      record({ severity: 'Info', area: 'Analytics', title: 'Analytics empty state (labeled)', detail: mainText.slice(0, 200) });
+    }
+  });
+
+  // ─── 13. Integrations — all expected providers listed ────────────────────
+  test('13. /integrations — expected providers are listed', async () => {
+    await page.goto('/integrations', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4500);
+    await snap(page, 'integrations', 'integrations-landing');
+
+    const mainText = (await page.locator('main').first().innerText()).toLowerCase();
+    const expected = ['slack', 'github', 'gmail', 'notion', 'linkedin', 'google'];
+    const missing = expected.filter((p) => !mainText.includes(p));
+    if (missing.length > 2) {
+      record({ severity: 'High', area: 'Integrations', title: `Missing ${missing.length} expected providers`, detail: `Expected: ${expected.join(', ')}. Missing: ${missing.join(', ')}` });
+      return;
+    }
+    record({ severity: 'Info', area: 'Integrations', title: `${expected.length - missing.length}/${expected.length} expected providers present`, detail: missing.length > 0 ? `Missing (minor): ${missing.join(', ')}` : 'all present' });
+  });
+
+  // ─── 14. Role picker on /workspace — all expected roles ──────────────────
+  test('14. /workspace role picker has CEO/CMO/CTO/Coding/Research/Design/Auto', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+
+    const expected = ['CEO', 'CMO', 'CTO', 'Coding', 'Research', 'Design', 'Auto'];
+    const missing: string[] = [];
+    for (const role of expected) {
+      const btn = page.locator(`button:has-text("${role}")`).first();
+      const found = (await btn.count()) > 0;
+      if (!found) missing.push(role);
+    }
+    if (missing.length > 0) {
+      record({ severity: 'High', area: 'RolePicker', title: `Missing roles: ${missing.join(', ')}`, detail: `Expected all of: ${expected.join(', ')}` });
+      return;
+    }
+    record({ severity: 'Info', area: 'RolePicker', title: `All ${expected.length} roles present`, detail: expected.join(', ') });
+  });
+
   test('10. sidebar — Sign out is discoverable + works', async () => {
     await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
