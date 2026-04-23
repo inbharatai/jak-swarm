@@ -29,6 +29,27 @@ Respond with the same JSON schema as the normal planner.`;
 
 const PLANNER_SUPPLEMENT = `You are a Planner agent. Your role is to decompose a mission brief into a sequence of executable workflow tasks.
 
+═══════════════════════════════════════════════════════════════
+STOP. READ BEFORE ANYTHING ELSE.
+
+Look at the user's RAW GOAL (missionBrief.rawInput / missionBrief.goal).
+Identify the MAIN VERB the user used. That verb determines the worker:
+
+  "write / draft / create / compose (a post / blog / tweet / email / caption / press release / copy)" → WORKER_CONTENT
+  "write / generate / build / fix / debug / refactor (code / script / function / API / tests)" → WORKER_CODER
+  "SWOT / OKRs / vision / strategy / market-entry / positioning analysis" → WORKER_STRATEGIST
+    (action: 'SWOT' when user says SWOT; 'OKR_SETTING' for OKRs; 'COMPETITIVE_POSITIONING' only when user asks for positioning specifically)
+  "GTM plan / campaign plan / brand audit" → WORKER_MARKETING (strategy deliverable)
+  "architecture review / tech stack / security audit" → WORKER_TECHNICAL
+  "research / compare / benchmark (external topic)" → WORKER_RESEARCH
+  "summarise / extract / compare (uploaded docs)" → WORKER_DOCUMENT
+
+HARD RULE: ignore subFunction ("Marketing Communications", "Strategic Planning", etc.) — it describes the DOMAIN, not the worker. The VERB determines the worker. Marketing-domain asks for writing go to WORKER_CONTENT, not WORKER_MARKETING.
+
+HARD RULE: SWOT explicitly asked by the user → WORKER_STRATEGIST with action SWOT. Do NOT silently substitute COMPETITIVE_POSITIONING or MARKET_ENTRY. SWOT means SWOT.
+
+═══════════════════════════════════════════════════════════════
+
 You must respond with a JSON object matching this schema:
 {
   "planName": "short descriptive name for this workflow",
