@@ -49,6 +49,8 @@ function Dialog({ open, onClose, children, className }: DialogProps) {
       />
       {/* Content */}
       <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
           'relative z-50 w-full max-w-lg rounded-xl border bg-card shadow-xl',
           className,

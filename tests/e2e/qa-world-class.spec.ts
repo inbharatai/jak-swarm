@@ -622,6 +622,92 @@ test.describe('JAK Swarm — World-Class QA', () => {
     record({ severity: 'Info', area: 'RolePicker', title: `All ${expected.length} roles present`, detail: expected.join(', ') });
   });
 
+  // ─── 15. Settings — API key never leaked in any UI element ───────────────
+  test('15. /settings — API key fingerprints/full keys never appear', async () => {
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4500);
+    await snap(page, 'settings', 'settings-rest');
+
+    const allText = await page.locator('body').innerText();
+    // Look for patterns that would indicate a leaked API key:
+    //   - sk-... (OpenAI), sk-proj-... (OpenAI project key)
+    //   - sk-ant-... (Anthropic)
+    //   - AIzaSy... (Google AI key)
+    //   - rnd_... (Render API)
+    //   - keyPreview snippets (e.g., "sk-XXXX...XXXX")
+    const leakPatterns: Array<{ rx: RegExp; name: string }> = [
+      { rx: /sk-[a-zA-Z0-9]{20,}/, name: 'OpenAI key prefix' },
+      { rx: /sk-ant-[a-zA-Z0-9_\-]{20,}/, name: 'Anthropic key' },
+      { rx: /AIzaSy[a-zA-Z0-9_\-]{20,}/, name: 'Google AI key' },
+      { rx: /rnd_[a-zA-Z0-9]{20,}/, name: 'Render API key' },
+      // Last-N-chars preview pattern (sk-XXXX...wxyz)
+      { rx: /sk-[A-Z0-9]{2,4}\.\.\.\w{4,}/i, name: 'Key fingerprint' },
+    ];
+    const leaks = leakPatterns.filter((p) => p.rx.test(allText));
+    if (leaks.length > 0) {
+      record({
+        severity: 'Critical', area: 'Settings',
+        title: `API key leaked in Settings UI: ${leaks.map((l) => l.name).join(', ')}`,
+        detail: 'Inspect screenshot at settings/settings-rest.png',
+      });
+      return;
+    }
+    // Also confirm masked dots ARE shown (the safe representation)
+    const hasMaskedRepresentation = /•{4,}|\*{4,}|••• \(\d+ chars\)/.test(allText);
+    record({
+      severity: 'Info', area: 'Settings',
+      title: 'No API key leak detected in Settings UI',
+      detail: hasMaskedRepresentation ? 'Mask dots present (correct)' : 'No mask dots — verify keys are stored elsewhere',
+    });
+  });
+
+  // ─── 16. Knowledge — Add memory dialog opens ──────────────────────────────
+  test('16. /knowledge — Add memory button opens dialog', async () => {
+    await page.goto('/knowledge', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4500);
+
+    const addBtn = page.locator('button:has-text("Add Memory")').first();
+    if ((await addBtn.count()) === 0) {
+      record({ severity: 'High', area: 'Knowledge', title: 'No "Add Memory" button found', detail: 'Knowledge page CRUD entry-point missing' });
+      return;
+    }
+    await addBtn.click();
+    await page.waitForTimeout(800);
+    await snap(page, 'knowledge', 'add-memory-dialog');
+
+    const dialog = page.locator('[role="dialog"]').first();
+    if ((await dialog.count()) === 0) {
+      record({ severity: 'High', area: 'Knowledge', title: '"Add Memory" click did not open dialog', detail: 'Modal not rendered' });
+      return;
+    }
+    const dialogText = await dialog.innerText();
+    if (!/key|value|type/i.test(dialogText)) {
+      record({ severity: 'Medium', area: 'Knowledge', title: 'Add Memory dialog missing expected fields', detail: dialogText.slice(0, 300) });
+      return;
+    }
+
+    // Close dialog (Escape)
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    record({ severity: 'Info', area: 'Knowledge', title: 'Add Memory dialog opens with key/value/type fields', detail: dialogText.slice(0, 200) });
+  });
+
+  // ─── 17. Files — upload UI is reachable ───────────────────────────────────
+  test('17. /files — upload UI reachable', async () => {
+    await page.goto('/files', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(4500);
+    await snap(page, 'files', 'files-landing');
+
+    const uploadBtn = page.locator('button:has-text("Upload"), label:has-text("Upload"), input[type="file"]').first();
+    const hasFileInput = (await page.locator('input[type="file"]').count()) > 0;
+
+    if ((await uploadBtn.count()) === 0 && !hasFileInput) {
+      record({ severity: 'High', area: 'Files', title: 'No upload button or file input on /files', detail: 'Users have no way to upload files' });
+      return;
+    }
+    record({ severity: 'Info', area: 'Files', title: 'Files upload UI reachable', detail: hasFileInput ? 'file input present' : 'upload button present' });
+  });
+
   test('10. sidebar — Sign out is discoverable + works', async () => {
     await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
