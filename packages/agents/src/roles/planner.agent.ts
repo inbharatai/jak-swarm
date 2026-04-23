@@ -84,7 +84,23 @@ Guidelines:
   WORKER_ANALYTICS — metrics, trend analysis, A/B tests, dashboards, anomaly detection
   WORKER_PRODUCT — feature specs, user stories, roadmap, sprint planning, prioritisation
   WORKER_PROJECT — timeline estimation, resource allocation, status reports, risk registers
-- Common toolsRequired values: read_email, draft_email, send_email, list_calendar_events, create_calendar_event, lookup_crm_contact, update_crm_record, search_knowledge, summarize_document, extract_document_data, browser_navigate, browser_extract, classify_text, generate_report`;
+- Common toolsRequired values: read_email, draft_email, send_email, list_calendar_events, create_calendar_event, lookup_crm_contact, update_crm_record, search_knowledge, summarize_document, extract_document_data, browser_navigate, browser_extract, classify_text, generate_report
+
+ROUTING RULES (hard rules — follow exactly):
+- "write / draft / create a <blog|post|tweet|newsletter|caption|script|press release|email copy|ad copy>" → WORKER_CONTENT. NOT WORKER_MARKETING. Marketing plans the campaign; Content writes the actual words.
+- "write / build / fix / debug / refactor / generate <code|function|script|API|tests>" → WORKER_CODER. NOT WORKER_TECHNICAL. Technical does architecture review and tech-stack evaluation; Coder writes code.
+- "build / create / generate a <landing page|website|web app|frontend|UI>" → WORKER_CODER for code generation. For multi-step app builds, the workflow kind is 'vibe-coder' and goes through WORKER_APP_ARCHITECT → WORKER_APP_GENERATOR → WORKER_APP_DEBUGGER → WORKER_APP_DEPLOYER; do NOT produce a normal plan for those — they use the Builder flow.
+- "research / summarise / compare / analyse <public topic|competitor|market>" → WORKER_RESEARCH (prefers web_search + sources).
+- "summarise / extract / compare <uploaded documents>" → WORKER_DOCUMENT (prefers find_document + uploaded files).
+- "SWOT / OKRs / strategy / vision / market entry" → WORKER_STRATEGIST.
+- "GTM / brand / campaign / SEO audit / social strategy" → WORKER_MARKETING (strategy), paired with WORKER_CONTENT (copy) when the deliverable is actual written words.
+- "architecture / security audit / scalability / infrastructure / stack pick" → WORKER_TECHNICAL.
+- "hire / JD / resume / offer letter / onboarding plan" → WORKER_HR.
+- "lead gen / outreach / Reddit/Twitter engagement / email sequence / prospect list" → WORKER_GROWTH.
+- "P&L / forecast / budget / valuation / burn / cashflow" → WORKER_FINANCE.
+- "contract / NDA / privacy policy / compliance / regulation" → WORKER_LEGAL.
+
+Every plan MUST produce at least one task whose output is concrete and user-facing. A plan for "write a LinkedIn post" that has only a STRATEGIST or MARKETING task is wrong — it MUST include a WORKER_CONTENT task that produces the actual post text.`;
 
 export class PlannerAgent extends BaseAgent {
   constructor(apiKey?: string) {

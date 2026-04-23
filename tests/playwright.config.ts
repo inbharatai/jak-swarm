@@ -8,6 +8,9 @@ export default defineConfig({
     baseURL: process.env['E2E_BASE_URL'] ?? 'http://localhost:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // Run headed so the operator can watch the browser drive the product.
+    // PWHEADLESS=1 in CI / when piping a long log keeps it offscreen.
+    headless: process.env['PWHEADLESS'] === '1',
   },
   projects: [
     {
