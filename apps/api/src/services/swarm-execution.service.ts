@@ -1402,9 +1402,13 @@ export class SwarmExecutionService extends EventEmitter {
       'content', 'answer', 'response', 'message',
       'findings',      // ResearchAgent
       'summary', 'document', 'result', 'output',
-      'draft',         // Content/Marketing agents
+      'draft',         // Content/Marketing agents — drafted posts, emails, copy
+      'code',          // CoderAgent / AppGeneratorAgent — raw source code
+      'architecture',  // TechnicalAgent / AppArchitectAgent — system design prose
       'analysis',      // Finance/Legal/HR
+      'strategy',      // MarketingAgent / StrategistAgent
       'recommendation', 'conclusion',  // Strategy
+      'explanation',   // CoderAgent / any agent explaining its work
       'plan',          // Planner-ish
       'text', 'body',  // Generic
       'report',        // Analytics/PR
