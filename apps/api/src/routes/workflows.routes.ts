@@ -226,17 +226,21 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           workflowService.getWorkflowApprovals(request.user.tenantId, workflowId),
         ]);
 
-        // Recovery: if the worker's stale @jak-swarm/swarm dist failed to
-        // route a Commander directAnswer to __end__ (resulting in finalOutput
-        // = "Agents completed their work but did not produce a user-facing
-        // response..." even though Commander did answer), surface the
-        // directAnswer from the trace and present the workflow as completed.
-        // Safe to run on every request — it's a no-op when finalOutput is
-        // already substantive or when no Commander directAnswer exists.
+        // Recovery: if the worker's stale @jak-swarm/swarm dist resulted in
+        // a stub finalOutput, surface real content from the trace history
+        // before responding to the client. Two recovery levels:
+        //   1) Commander.directAnswer — for trivial inputs that should have
+        //      short-circuited at __end__.
+        //   2) Worker output — for non-trivial multi-agent workflows where
+        //      Commander → Planner → Worker actually ran but the swarm graph
+        //      reported FAILED for downstream reasons.
         const responseBody: Record<string, unknown> = { ...workflow, traces, approvals };
-        const stub = /Agents completed their work but did not produce/i;
+        const stub = /Agents completed their work but did not produce|No output produced/i;
         const fo = responseBody['finalOutput'];
-        if (typeof fo !== 'string' || fo.trim().length === 0 || stub.test(fo)) {
+        const isStubFinal = typeof fo !== 'string' || fo.trim().length === 0 || stub.test(fo);
+
+        if (isStubFinal && traces.length > 0) {
+          // Recovery #1: Commander directAnswer
           const cmd = traces.find((t) => t.agentRole === 'COMMANDER');
           const cmdOut = (cmd?.output ?? null) as { directAnswer?: unknown } | null;
           const da = typeof cmdOut?.directAnswer === 'string' ? cmdOut.directAnswer.trim() : '';
@@ -245,6 +249,47 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             responseBody['status'] = 'COMPLETED';
             responseBody['error'] = null;
             responseBody['recoveredFromCommanderTrace'] = true;
+          } else {
+            // Recovery #2: pull substantive content from the worker traces
+            // (skip orchestration roles).
+            const ORCH = new Set(['COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'GUARDRAIL', 'APPROVAL', 'SWARMRUNNER', 'SUPERVISOR']);
+            const FIELDS = ['content', 'answer', 'response', 'message', 'findings', 'summary', 'document',
+                            'result', 'output', 'draft', 'code', 'architecture', 'analysis', 'strategy',
+                            'recommendation', 'conclusion', 'explanation', 'plan', 'text', 'body', 'report'];
+            const sections: Array<{ role: string; content: string }> = [];
+            for (const t of traces) {
+              if (ORCH.has(t.agentRole)) continue;
+              const o = t.output as Record<string, unknown> | null;
+              if (!o) continue;
+              let content = '';
+              for (const f of FIELDS) {
+                const v = o[f];
+                if (typeof v === 'string' && v.trim().length > 30) {
+                  content = v.trim();
+                  break;
+                }
+              }
+              if (!content) {
+                // Last resort: longest string field
+                let longest = '';
+                for (const v of Object.values(o)) {
+                  if (typeof v === 'string' && v.trim().length > longest.length) longest = v.trim();
+                }
+                if (longest.length > 30) content = longest;
+              }
+              if (content) {
+                const displayRole = t.agentRole.replace(/^WORKER_/, '').replace(/_/g, ' ');
+                sections.push({ role: displayRole, content });
+              }
+            }
+            if (sections.length > 0) {
+              responseBody['finalOutput'] = sections.length === 1 && sections[0]
+                ? sections[0]!.content
+                : sections.map((s) => `## ${s.role}\n\n${s.content}`).join('\n\n---\n\n');
+              responseBody['status'] = 'COMPLETED';
+              responseBody['error'] = null;
+              responseBody['recoveredFromWorkerTraces'] = true;
+            }
           }
         }
 
