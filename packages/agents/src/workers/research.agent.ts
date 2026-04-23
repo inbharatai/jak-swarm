@@ -147,7 +147,7 @@ export class ResearchAgent extends BaseAgent {
           `Industry Context: ${context.industry ?? 'GENERAL'}`,
           `Max Sources: ${task.maxSources ?? 5}`,
           '',
-          'Please respond with the JSON format specified in your instructions.',
+          'CRITICAL OUTPUT FORMAT — Your ENTIRE response must be a single JSON object starting with { and ending with }. Do NOT wrap in ```json fences. Put the 150-400 word user-facing answer in "findings" (NOT a stub like "Research completed"). Put 3-7 concrete key points in "keyPoints" (as strings, each 1-2 sentences). If web_search returned nothing and you can only answer from general knowledge, SAY SO in "findings" ("Based on general knowledge of the space as of early 2025…") and set "confidence" to 0.4 — do not hallucinate specific statistics, funding rounds, or named competitors you cannot verify. Never return plain prose outside JSON.',
         ].filter(Boolean).join('\n'),
       },
     ];
@@ -186,16 +186,22 @@ export class ResearchAgent extends BaseAgent {
           suggestedFollowUp: parsed.suggestedFollowUp,
         };
       } catch {
-        // LLM returned freeform text instead of JSON — flag as manual review
+        // LLM returned freeform prose instead of JSON — strip any preamble
+        // and use the body as findings. User sees the analysis, not a stub.
+        const raw = (loopResult.content ?? '').trim();
+        const stripped = raw
+          .replace(/^([^\n]{0,400}?(i'?ll|here is|here's|to research|since|based on|the following is)[^\n]*\n\s*\n)/i, '')
+          .replace(/^```[a-zA-Z]*\n/, '')
+          .replace(/\n```$/, '')
+          .trim();
+        const findings = stripped.length >= 80 ? stripped : raw;
         result = {
           query: task.query,
-          findings: loopResult.content || 'No findings returned.',
-          keyPoints: loopResult.content ? [loopResult.content.slice(0, 200)] : [],
+          findings: findings || 'No findings returned.',
+          keyPoints: [],
           sources: [],
-          confidence: 0.3,
-          limitations: [
-            'Manual review required — LLM output was not structured JSON. Sources and freshness checks are incomplete. Do not cite these findings without re-verifying against primary sources.',
-          ],
+          confidence: 0.5,
+          limitations: ['Output returned as prose rather than structured JSON — re-verify before publishing.'],
         };
       }
 

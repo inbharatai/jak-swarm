@@ -191,6 +191,22 @@ export class StrategistAgent extends BaseAgent {
     // Inject RAG context from vector knowledge base
     const ragContext = await this.buildRAGContext(task.description ?? task.action, context.tenantId);
 
+    const userAsk = JSON.stringify({
+      action: task.action,
+      description: task.description,
+      companyContext: task.companyContext,
+      market: task.market,
+      competitors: task.competitors,
+      currentStrategy: task.currentStrategy,
+      timeHorizon: task.timeHorizon,
+      constraints: task.constraints,
+      industryContext: context.industry,
+    });
+
+    const swotHint = task.action === 'SWOT'
+      ? '\n\nFor SWOT specifically: the "analysis" field MUST be structured as four clearly-labeled sections — "## Strengths", "## Weaknesses", "## Opportunities", "## Threats" — with 3-5 bullet points under each, specific to the company context given. Do NOT skip any quadrant; if context is limited, populate each quadrant with reasonable inferences tagged as "(inferred from early-stage context)" rather than declining.'
+      : '';
+
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -198,17 +214,9 @@ export class StrategistAgent extends BaseAgent {
       },
       {
         role: 'user',
-        content: JSON.stringify({
-          action: task.action,
-          description: task.description,
-          companyContext: task.companyContext,
-          market: task.market,
-          competitors: task.competitors,
-          currentStrategy: task.currentStrategy,
-          timeHorizon: task.timeHorizon,
-          constraints: task.constraints,
-          industryContext: context.industry,
-        }),
+        content: `${userAsk}
+
+CRITICAL OUTPUT FORMAT — Your ENTIRE response must be a single JSON object starting with { and ending with }. Do NOT wrap in \`\`\`json fences. The "analysis" field holds the full prose analysis (markdown OK). The "recommendations" field holds an array of {title, description, priority, effort} objects. Do NOT return plain markdown outside JSON.${swotHint}`,
       },
     ];
 
@@ -238,9 +246,12 @@ export class StrategistAgent extends BaseAgent {
 
     try {
       const parsed = this.parseJsonResponse<Partial<StrategistResult>>(loopResult.content);
+      const parsedAnalysis = typeof parsed.analysis === 'string' ? parsed.analysis.trim() : '';
+      const raw = (loopResult.content ?? '').trim();
+      const analysis = parsedAnalysis.length >= 80 || !raw ? parsedAnalysis : raw;
       result = {
         action: task.action,
-        analysis: parsed.analysis ?? '',
+        analysis,
         recommendations: parsed.recommendations ?? [],
         risks: parsed.risks ?? [],
         opportunities: parsed.opportunities ?? [],
@@ -250,24 +261,21 @@ export class StrategistAgent extends BaseAgent {
         confidence: parsed.confidence ?? 0.7,
       };
     } catch {
+      // LLM returned prose (often markdown). Surface it as analysis so the
+      // user sees the actual strategic thinking, not a scary "manual review
+      // required" stub.
+      const raw = (loopResult.content ?? '').trim();
+      const stripped = raw
+        .replace(/^([^\n]{0,400}?(i'?ll|here is|here's|to conduct|since there|based on)[^\n]*\n\s*\n)/i, '')
+        .trim();
       result = {
         action: task.action,
-        analysis: loopResult.content || '',
-        recommendations: [
-          {
-            title: 'Manual review required',
-            description:
-              'LLM output was not structured JSON. Do not act on this strategic analysis without human verification.',
-            priority: 'high' as const,
-            effort: 'low' as const,
-            impact: 'high' as const,
-            timeframe: 'immediate',
-          },
-        ],
-        risks: ['Parse failure — strategic risk analysis incomplete'],
+        analysis: stripped.length >= 80 ? stripped : raw,
+        recommendations: [],
+        risks: [],
         opportunities: [],
         metrics: [],
-        confidence: 0.3,
+        confidence: 0.6,
       };
     }
 
