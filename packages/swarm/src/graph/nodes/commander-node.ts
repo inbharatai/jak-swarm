@@ -108,6 +108,19 @@ export async function commanderNode(
 
   const traces = context.getTraces();
 
+  // Short-circuit: Commander direct-answered the user (trivial input
+  // like a greeting or simple factual question). Terminate the workflow
+  // immediately — no Planner, no Workers, no Verifier. The swarm-
+  // execution service prefers state.directAnswer over compileFinalOutput.
+  if (result.directAnswer) {
+    return {
+      directAnswer: result.directAnswer,
+      clarificationNeeded: false,
+      status: WorkflowStatus.COMPLETED,
+      traces,
+    };
+  }
+
   if (result.clarificationNeeded) {
     return {
       clarificationNeeded: true,

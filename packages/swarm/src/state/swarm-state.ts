@@ -88,6 +88,14 @@ export interface SwarmState {
   error: string | undefined;
   outputs: unknown[];
   traces: AgentTrace[];
+  /**
+   * Short-circuit answer produced by the Commander for trivial inputs
+   * (greetings, simple factual questions). When set, the swarm graph
+   * routes straight to __end__ and the swarm-execution service uses
+   * this as the workflow's finalOutput — the Planner/Router/Workers
+   * never run.
+   */
+  directAnswer?: string;
 }
 
 export function createInitialSwarmState(params: {

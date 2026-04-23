@@ -22,6 +22,13 @@ export interface CommanderOutput {
   missionBrief?: MissionBrief;
   clarificationNeeded: boolean;
   clarificationQuestion?: string;
+  /**
+   * If set, the Commander answered the user's input directly without
+   * needing the full multi-agent pipeline. The workflow terminates
+   * immediately and this string becomes workflow.finalOutput.
+   * Used for greetings, trivial factual questions, small-talk, etc.
+   */
+  directAnswer?: string;
 }
 
 function detectIndustry(text: string): Industry {
@@ -40,10 +47,11 @@ function detectIndustry(text: string): Industry {
   return bestMatch;
 }
 
-const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and extract structured intelligence from raw user input (text or voice transcript).
+const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and either (a) answer trivial requests directly to avoid unnecessary orchestration, or (b) extract structured intelligence from raw user input so specialist agents can execute.
 
 You must respond with a JSON object matching this schema:
 {
+  "directAnswer": "<string or null>",
   "intent": "one sentence describing what the user wants to accomplish",
   "subFunction": "the specific business sub-function this relates to (e.g. 'Claims Processing', 'Invoice Approval', 'Customer Onboarding')",
   "urgency": <number 1-5 where 1=not urgent, 5=critical/emergency>,
@@ -53,7 +61,27 @@ You must respond with a JSON object matching this schema:
   "clarificationQuestion": "<question to ask the user if clarification is needed, or null>"
 }
 
-Guidelines:
+CRITICAL RULE — Direct-answer short-circuit:
+Set \`directAnswer\` to a non-empty string ONLY when the input can be answered from general knowledge WITHOUT needing to search the web, run tools, write code, fetch user documents, or consult other agents.
+
+Examples that MUST get a directAnswer:
+- Greetings: "hi", "hello", "how are you" → "Hello! I'm JAK Swarm. What would you like me to help you build, operate, or verify?"
+- Simple arithmetic: "what is 2+2?" → "4"
+- Capital cities, definitions, obvious facts: "capital of France" → "Paris"
+- Meta-questions about JAK: "what can you do?" → a 2-sentence summary
+- Thanks/acknowledgements: "thanks", "ok" → "You're welcome — let me know what to tackle next."
+
+Examples that MUST NOT get a directAnswer (use the structured plan path instead):
+- Anything requiring current information (prices, news, rates, recent events)
+- Document analysis ("review my NDA", "summarize this brief")
+- Code generation or app building
+- Multi-step workflows ("plan a launch", "audit competitors")
+- Tasks referencing external systems (Slack, GitHub, Gmail, CRM)
+- Anything ambiguous where clarification might help
+
+When directAnswer is set, you may leave intent/subFunction/urgency/etc at minimal sensible defaults — the workflow will terminate after you and the other fields are ignored.
+
+Guidelines for the non-shortcut path:
 - Set clarificationNeeded=true only if the request is genuinely ambiguous and you cannot proceed safely without more info.
 - urgency=5 is reserved for patient emergencies, financial crises, or compliance deadlines within hours.
 - riskIndicators should flag PII handling, external communications, data deletion, financial transactions, etc.
@@ -94,6 +122,7 @@ export class CommanderAgent extends BaseAgent {
     const rawContent = completion.choices[0]?.message?.content ?? '{}';
 
     interface LLMCommanderResponse {
+      directAnswer?: string | null;
       intent?: string;
       subFunction?: string;
       urgency?: number;
@@ -125,6 +154,22 @@ export class CommanderAgent extends BaseAgent {
           totalTokens: completion.usage.total_tokens,
         }
       : undefined;
+
+    // Direct-answer short-circuit — trivial inputs terminate the workflow
+    // here without running the Planner/Router/Workers/Verifier pipeline.
+    const directAnswer = typeof parsed.directAnswer === 'string'
+      ? parsed.directAnswer.trim()
+      : '';
+    if (directAnswer.length > 0) {
+      const output: CommanderOutput = {
+        clarificationNeeded: false,
+        directAnswer,
+      };
+      const trace = this.recordTrace(context, input, output, [], startedAt);
+      if (tokenUsage) trace.tokenUsage = tokenUsage;
+      this.logger.info({ runId: context.runId, len: directAnswer.length }, 'Commander direct-answered');
+      return output;
+    }
 
     if (parsed.clarificationNeeded) {
       const output: CommanderOutput = {

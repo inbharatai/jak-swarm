@@ -156,7 +156,18 @@ export function ChatSidebar() {
                 )}
               >
                 <button
-                  onClick={() => { switchConversation(conv.id); if (isMobile) setSidebarCollapsed(true); }}
+                  onClick={() => {
+                    switchConversation(conv.id);
+                    // Fix: clicking a past conversation on /swarm, /traces,
+                    // /analytics etc used to only toggle active state in the
+                    // store — the user stayed on the current page instead of
+                    // going back to the chat view. Navigate to /workspace so
+                    // the conversation actually renders.
+                    if (!pathname.startsWith('/workspace')) {
+                      router.push('/workspace');
+                    }
+                    if (isMobile) setSidebarCollapsed(true);
+                  }}
                   className="flex flex-1 items-center gap-2 min-w-0"
                 >
                   <MessageSquare className="h-3.5 w-3.5 shrink-0" />

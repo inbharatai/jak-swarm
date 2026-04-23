@@ -40,6 +40,10 @@ export type NodeHandler = (state: SwarmState) => Promise<Partial<SwarmState>>;
  */
 
 export function afterCommander(state: SwarmState): NodeName {
+  // Short-circuit: Commander answered the user directly (greeting, trivial
+  // factual Q). Skip Planner/Router/Workers/Verifier entirely. The swarm-
+  // execution service picks up state.directAnswer as finalOutput.
+  if (state.directAnswer) return '__end__';
   if (state.clarificationNeeded) return '__clarification__';
   return 'planner';
 }

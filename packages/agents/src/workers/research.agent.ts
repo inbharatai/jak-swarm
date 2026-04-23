@@ -82,7 +82,9 @@ Refuse to fabricate:
 - Never invent statistics, quotes, dollar amounts, dates, or names not present in your sources. If a fact isn't in the sources, say \"no credible source found\" in limitations instead of guessing.
 - If web_search returns nothing relevant, lower confidence and say so. Do not fall back to parametric knowledge without labeling it as such.
 
-Respond with STRICT JSON matching ResearchResult. No markdown fences. Keep keyPoints to 3-7 items. Keep findings under 400 words — depth belongs in sources, not prose.`;
+Findings field is mandatory and must contain the ACTUAL ANSWER to the query in complete prose — 2-4 paragraphs, 150-400 words. This is what the end user reads. It must stand alone without needing the key points. Write it as if someone asked you the question directly and you're answering them in full sentences. NEVER write placeholder text like "see key points" or "research completed" — if you can't answer, say exactly what you couldn't find and why.
+
+Respond with STRICT JSON matching ResearchResult. No markdown fences. Keep keyPoints to 3-7 items. Keep findings between 150-400 words — it is the user-facing answer, not a summary of the summary.`;
 
 export class ResearchAgent extends BaseAgent {
   constructor(apiKey?: string) {
@@ -160,10 +162,21 @@ export class ResearchAgent extends BaseAgent {
 
       try {
         const parsed = this.parseJsonResponse<Partial<ResearchResult>>(loopResult.content);
+        const rawFindings = typeof parsed.findings === 'string' ? parsed.findings.trim() : '';
+        const keyPoints = parsed.keyPoints ?? [];
+        // If the LLM skipped findings, reconstruct from keyPoints rather than
+        // returning a placeholder stub. compileFinalOutput treats findings as
+        // the primary user-visible field — a stub here means the user sees
+        // "Research completed. See key points for details." which is useless.
+        const findings = rawFindings.length > 0
+          ? rawFindings
+          : (keyPoints.length > 0
+              ? keyPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')
+              : 'No findings available — the research tools returned no usable results for this query.');
         result = {
           query: task.query,
-          findings: parsed.findings ?? 'Research completed. See key points for details.',
-          keyPoints: parsed.keyPoints ?? [],
+          findings,
+          keyPoints,
           sources: parsed.sources ?? [],
           disagreements: parsed.disagreements,
           citations: parsed.citations,

@@ -732,12 +732,20 @@ export class SwarmExecutionService extends EventEmitter {
 
       // Compile and save final output
       try {
-        const traceRecords = await this.db.agentTrace.findMany({
-          where: { workflowId },
-          orderBy: { stepIndex: 'asc' },
-          select: { agentRole: true, outputJson: true, stepIndex: true },
-        });
-        const finalOutput = this.compileFinalOutput(traceRecords as Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>);
+        // Short-circuit: Commander produced a direct answer for a trivial
+        // input. Use it as finalOutput verbatim — no synthesis needed.
+        const directAnswer = (result as { directAnswer?: string }).directAnswer;
+        let finalOutput: string;
+        if (typeof directAnswer === 'string' && directAnswer.trim().length > 0) {
+          finalOutput = directAnswer.trim();
+        } else {
+          const traceRecords = await this.db.agentTrace.findMany({
+            where: { workflowId },
+            orderBy: { stepIndex: 'asc' },
+            select: { agentRole: true, outputJson: true, stepIndex: true },
+          });
+          finalOutput = this.compileFinalOutput(traceRecords as Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>);
+        }
         await (this.db.workflow.update as any)({
           where: { id: workflowId },
           data: { finalOutput },
