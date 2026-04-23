@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type {
   Workflow,
   AgentTrace,
+  TraceStep,
   ApprovalRequest,
   WorkflowStatus,
   PaginatedResult,
@@ -340,17 +341,52 @@ export class WorkflowService {
     };
   };
 
-  private mapTrace = (row: Record<string, unknown>): AgentTrace => ({
-    id: row['id'] as string,
-    workflowId: row['workflowId'] as string,
-    tenantId: row['tenantId'] as string,
-    agentRole: row['agentRole'] as string,
-    status: 'COMPLETED',
-    steps: [],
-    startedAt: row['startedAt'] as Date,
-    completedAt: (row['completedAt'] as Date | null) ?? null,
-    createdAt: (row['startedAt'] as Date) ?? new Date(),
-  });
+  private mapTrace = (row: Record<string, unknown>): AgentTrace => {
+    const input = (row['inputJson'] ?? null) as Record<string, unknown> | null;
+    const output = (row['outputJson'] ?? null) as Record<string, unknown> | null;
+    const toolCalls = (row['toolCallsJson'] ?? null) as Record<string, unknown> | null;
+    const tokenUsage = (row['tokenUsage'] ?? null) as Record<string, unknown> | null;
+    const err = (row['error'] as string | null) ?? null;
+    const stepIndex = typeof row['stepIndex'] === 'number' ? (row['stepIndex'] as number) : 0;
+    const durationMs = typeof row['durationMs'] === 'number' ? (row['durationMs'] as number) : 0;
+    const costUsd = typeof row['costUsd'] === 'number' ? (row['costUsd'] as number) : null;
+
+    // Each DB row is one agent execution — represent as a single TraceStep
+    // for API-contract backward compatibility, but also surface the fields
+    // directly at the trace level so callers don't have to dig into steps[0].
+    const step: TraceStep = {
+      id: row['id'] as string,
+      traceId: (row['traceId'] as string) ?? (row['id'] as string),
+      seq: stepIndex,
+      agentRole: row['agentRole'] as string,
+      action: 'execute',
+      input: input ?? {},
+      output,
+      durationMs,
+      error: err,
+      createdAt: (row['startedAt'] as Date) ?? new Date(),
+    };
+
+    return {
+      id: row['id'] as string,
+      workflowId: row['workflowId'] as string,
+      tenantId: row['tenantId'] as string,
+      agentRole: row['agentRole'] as string,
+      status: err ? 'FAILED' : 'COMPLETED',
+      steps: [step],
+      startedAt: row['startedAt'] as Date,
+      completedAt: (row['completedAt'] as Date | null) ?? null,
+      createdAt: (row['startedAt'] as Date) ?? new Date(),
+      stepIndex,
+      durationMs,
+      input,
+      output,
+      toolCalls,
+      tokenUsage,
+      costUsd,
+      error: err,
+    };
+  };
 
   private mapApproval = (row: Record<string, unknown>): ApprovalRequest => ({
     id: row['id'] as string,

@@ -118,7 +118,18 @@ test('diag: send "hi" via API and inspect workflow + traces', async ({ browser }
         const traces = tobj.traces ?? tobj.data ?? tobj;
         console.log('TRACE_COUNT:', Array.isArray(traces) ? traces.length : 'not-array');
         for (const t of (Array.isArray(traces) ? traces : []).slice(0, 10)) {
-          console.log(`TRACE: ${t.agentRole} step=${t.stepIndex} err=${t.error||'-'} out=${JSON.stringify(t.outputJson || {}).slice(0, 200)}`);
+          console.log(`TRACE: ${t.agentRole} status=${t.status} err=${t.error||'-'}`);
+          console.log(`  TRACE_KEYS: ${Object.keys(t).join(',')}`);
+          const steps = t.steps;
+          if (Array.isArray(steps)) {
+            console.log(`  STEPS_COUNT: ${steps.length}`);
+            for (const s of steps.slice(0, 5)) {
+              console.log(`    STEP_KEYS: ${Object.keys(s).join(',')}`);
+              console.log(`    STEP_DUMP: ${JSON.stringify(s).slice(0, 800)}`);
+            }
+          } else {
+            console.log(`  STEPS: ${JSON.stringify(steps).slice(0, 400)}`);
+          }
         }
       }
       break;

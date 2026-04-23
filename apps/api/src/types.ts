@@ -127,6 +127,17 @@ export interface AgentTrace {
   startedAt: Date;
   completedAt: Date | null;
   createdAt: Date;
+  /** Surface the persisted trace content directly — otherwise `steps` is the only
+   *  window into what the agent actually produced, and the Runs page / debugger
+   *  workflow can't see Commander/Planner/Worker inputs and outputs. */
+  stepIndex?: number;
+  durationMs?: number;
+  input?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  toolCalls?: Record<string, unknown> | null;
+  tokenUsage?: Record<string, unknown> | null;
+  costUsd?: number | null;
+  error?: string | null;
 }
 
 /** Approval request */
