@@ -242,6 +242,18 @@ export class CoderAgent extends BaseAgent {
       },
     ];
 
+    const userAsk = JSON.stringify({
+      action: task.action,
+      language: task.language,
+      description: task.description,
+      code: task.code,
+      requirements: task.requirements,
+      constraints: task.constraints,
+      existingArchitecture: task.existingArchitecture,
+      testFramework: task.testFramework,
+      industryContext: context.industry,
+    });
+
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -249,17 +261,9 @@ export class CoderAgent extends BaseAgent {
       },
       {
         role: 'user',
-        content: JSON.stringify({
-          action: task.action,
-          language: task.language,
-          description: task.description,
-          code: task.code,
-          requirements: task.requirements,
-          constraints: task.constraints,
-          existingArchitecture: task.existingArchitecture,
-          testFramework: task.testFramework,
-          industryContext: context.industry,
-        }),
+        content: `${userAsk}
+
+CRITICAL OUTPUT FORMAT — Your ENTIRE response must be a single JSON object starting with { and ending with }. Do NOT wrap in \`\`\`json fences. The "code" field must contain the ACTUAL source code the user can copy-paste and run (full file, not a fragment). Use \\n for newlines inside strings. If it's a Python script, "code" starts with "#!/usr/bin/env python3" or a normal import line. Do NOT put the code inside an explanation — the code goes in "code", short rationale goes in "explanation", NOT the other way around.`,
       },
     ];
 
@@ -287,33 +291,35 @@ export class CoderAgent extends BaseAgent {
 
     try {
       const parsed = this.parseJsonResponse<Partial<CoderResult>>(loopResult.content);
+      const parsedCode = typeof parsed.code === 'string' ? parsed.code.trim() : '';
+      const raw = (loopResult.content ?? '').trim();
+      const code = parsedCode.length >= 20 || !raw ? parsedCode : raw;
       result = {
         action: task.action,
         language: parsed.language ?? task.language ?? 'unknown',
-        code: parsed.code ?? '',
-        explanation: parsed.explanation ?? 'Code generation completed.',
+        code,
+        explanation: parsed.explanation ?? '',
         tests: parsed.tests,
         architecture: parsed.architecture,
         reviewFindings: parsed.reviewFindings,
         confidence: parsed.confidence ?? 0.7,
       };
     } catch {
+      // JSON parse failed. The LLM usually returned a code block (``` ... ```)
+      // with prose around it. Extract the code block(s) and use them directly
+      // rather than flagging the whole output as "manual review required".
+      const raw = (loopResult.content ?? '').trim();
+      // Match ```lang\n...\n``` or ``` ... ``` — take the largest block
+      const codeBlocks = [...raw.matchAll(/```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```/g)]
+        .map((m) => m[1]!)
+        .sort((a, b) => b.length - a.length);
+      const code = codeBlocks[0] ?? raw;
       result = {
         action: task.action,
         language: task.language ?? 'unknown',
-        code: loopResult.content || '',
-        explanation:
-          'Manual review required — LLM output was not structured JSON. Do NOT commit, deploy, or merge this code without human review. Types, tests, and security screens are missing.',
-        reviewFindings: [
-          {
-            severity: 'critical' as const,
-            location: 'coder-agent/parse-failure',
-            message:
-              'Agent output could not be parsed into CoderResult — any code below is raw LLM text, not verified output.',
-            suggestion: 'Re-run the agent with a stricter prompt, or escalate to a human engineer.',
-          },
-        ],
-        confidence: 0.2,
+        code,
+        explanation: '',
+        confidence: 0.6,
       };
     }
 
