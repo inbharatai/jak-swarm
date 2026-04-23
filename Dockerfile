@@ -30,6 +30,15 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY packages/ packages/
 COPY apps/api/ apps/api/
 
+# Nuke any stale dist/ + .tsbuildinfo that could have snuck into the source
+# checkout. Without this, Render's builder-layer cache can serve a previous
+# build's compiled output even after we push fresh source — we've seen this
+# cause @jak-swarm/swarm to keep old graph routing while @jak-swarm/agents
+# rebuilds fine, producing workflow-level bugs that look like "the deploy
+# didn't happen" but are actually "the build picked up stale dist/".
+RUN find packages apps -type d -name dist -exec rm -rf {} + 2>/dev/null || true
+RUN find packages apps -name "*.tsbuildinfo" -delete 2>/dev/null || true
+
 # Generate Prisma client
 RUN pnpm --filter @jak-swarm/db exec prisma generate
 
