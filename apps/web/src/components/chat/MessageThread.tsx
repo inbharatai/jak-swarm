@@ -27,7 +27,7 @@ export function MessageThread({ messages }: MessageThreadProps) {
   }, [messages.length]);
 
   return (
-    <div ref={scrollRef} className="message-scroll flex-1 overflow-y-auto px-4 py-6">
+    <div ref={scrollRef} className="message-scroll flex-1 overflow-y-auto px-4 py-6" data-testid="message-thread">
       <div className="mx-auto max-w-3xl space-y-4">
         {messages.map((msg, i) => {
           const isNew = i >= prevLength;
@@ -57,7 +57,7 @@ export function MessageThread({ messages }: MessageThreadProps) {
 
 function UserMessage({ content }: { content: string }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-end" data-testid="user-message">
       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 text-sm leading-relaxed text-foreground">
         {content}
       </div>
@@ -79,7 +79,7 @@ function AssistantMessage({
   const Icon = role?.icon;
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3" data-testid="assistant-message" data-agent-role={agentRole ?? ''}>
       {/* Role avatar */}
       <div
         className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"

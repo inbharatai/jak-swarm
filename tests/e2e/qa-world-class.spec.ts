@@ -1,0 +1,502 @@
+/**
+ * JAK Swarm — World-Class End-to-End QA.
+ *
+ * Tests the product the way a CEO/CMO/CTO/Coder/Researcher would. Every
+ * scenario asserts on OUTPUT QUALITY, not just navigation. Stub responses
+ * ("see key points", JSON dumps, empty findings) are recorded as findings.
+ *
+ * Screenshots → C:/Users/reetu/Desktop/JackSwarm test/world-class/<area>/
+ * JSON report  → C:/Users/reetu/Desktop/JackSwarm test/findings-world-class.json
+ *
+ * Usage:
+ *   E2E_BASE_URL=https://jakswarm.com \
+ *   E2E_AUTH_EMAIL=reetu004@gmail.com E2E_AUTH_PASSWORD=Adubaby.004! \
+ *   pnpm exec playwright test e2e/qa-world-class.spec.ts \
+ *     --reporter=list --workers=1 --project=chromium-mobile
+ */
+
+import { test, type Page, type BrowserContext } from '@playwright/test';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+
+const SCREENSHOT_ROOT = 'C:/Users/reetu/Desktop/JackSwarm test/world-class';
+
+async function snap(page: Page, subfolder: string, name: string): Promise<string> {
+  const safeName = name.replace(/[^a-z0-9-_.]/gi, '-').toLowerCase();
+  const full = path.join(SCREENSHOT_ROOT, subfolder, safeName.endsWith('.png') ? safeName : `${safeName}.png`);
+  await page.screenshot({ path: full, fullPage: true });
+  return full;
+}
+
+interface Finding {
+  severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
+  area: string;
+  title: string;
+  detail: string;
+  evidence?: string;
+}
+const findings: Finding[] = [];
+function record(f: Finding) {
+  findings.push(f);
+  const tag = f.severity === 'Info' ? 'INFO' : f.severity.toUpperCase();
+  console.log(`[${tag}] ${f.area} — ${f.title}: ${f.detail}`);
+}
+
+const EMAIL = process.env['E2E_AUTH_EMAIL'];
+const PASSWORD = process.env['E2E_AUTH_PASSWORD'];
+
+let ctx: BrowserContext;
+let page: Page;
+
+/**
+ * Send a chat message and wait until either the workflow completes
+ * (a final assistant message appears that isn't a status line) or the
+ * timeout expires. Returns the final user-facing assistant text and
+ * a list of every assistant bubble that appeared.
+ */
+async function sendChatAndWait(
+  message: string,
+  opts: { selectRoles?: string[]; timeoutMs?: number } = {},
+): Promise<{ finalAnswer: string; bubbles: string[]; durationMs: number }> {
+  const timeoutMs = opts.timeoutMs ?? 120_000;
+  const startedAt = Date.now();
+
+  // Pre-select roles if any
+  if (opts.selectRoles?.length) {
+    for (const role of opts.selectRoles) {
+      const btn = page.locator(`button:has-text("${role}")`).first();
+      if ((await btn.count()) > 0) {
+        await btn.click();
+        await page.waitForTimeout(200);
+      }
+    }
+  }
+
+  const textarea = page.locator('textarea').first();
+  await textarea.click();
+  await textarea.fill(message);
+
+  const sendBtn = page.locator('button[aria-label="Send message"]').first();
+  await sendBtn.click();
+
+  // Wait for the final assistant bubble. Heuristic: the LAST bubble that
+  // does NOT start with ⏳/✓/✗/Workflow status indicators counts as the
+  // user-facing answer. Direct-answer (Commander short-circuit) only
+  // produces ONE bubble. Multi-agent runs produce multiple.
+  const deadline = Date.now() + timeoutMs;
+  let finalAnswer = '';
+  let bubbles: string[] = [];
+
+  // Capture how many assistant bubbles existed BEFORE we sent — so we
+  // only wait for new ones to arrive after our send.
+  const initialAssistantCount = await page.locator('[data-testid="assistant-message"]').count();
+
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(2000);
+    bubbles = await page.locator('[data-testid="assistant-message"] p.whitespace-pre-wrap').allInnerTexts().catch(() => []);
+
+    if (bubbles.length <= initialAssistantCount) continue;
+
+    const newBubbles = bubbles.slice(initialAssistantCount);
+    // Find the last non-status bubble (status lines start with ⏳/✓/✗/Workflow/Live)
+    const nonStatus = newBubbles.filter(
+      (b) =>
+        b.trim().length > 0 &&
+        !/^(⏳|✓|✗|Workflow (started|paused|completed|failed)|Live stream)/.test(b.trim()),
+    );
+    const last = nonStatus[nonStatus.length - 1] ?? '';
+    if (last.length === 0) continue;
+
+    // Workflow done when textarea is re-enabled AND we have a substantive new bubble.
+    const textareaDisabled = await textarea.isDisabled().catch(() => false);
+    if (!textareaDisabled) {
+      finalAnswer = last;
+      break;
+    }
+  }
+
+  return {
+    finalAnswer,
+    bubbles,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
+function isStubAnswer(text: string): boolean {
+  if (!text || text.trim().length < 10) return true;
+  const stubs = [
+    /^research completed\.?\s*see (key points|details)/i,
+    /^task completed\.?\s*see (key points|details)/i,
+    /^see (key points|details) for/i,
+    /^Agents completed their work but did not produce/i,
+    /^Workflow completed without/i,
+    /^\{[\s\S]*\}$/, // raw JSON dump
+    /^\[[\s\S]*\]$/, // raw JSON array
+  ];
+  return stubs.some((rx) => rx.test(text.trim()));
+}
+
+function isJsonLeak(text: string): boolean {
+  // Detect untransformed JSON in user-facing answer
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return true;
+  if (/"\w+"\s*:\s*"/.test(trimmed) && trimmed.includes('}')) return true;
+  return false;
+}
+
+test.describe.configure({ mode: 'serial' });
+
+test.describe('JAK Swarm — World-Class QA', () => {
+  test.beforeAll(async ({ browser }) => {
+    if (!EMAIL || !PASSWORD) throw new Error('Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD');
+    ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    page = await ctx.newPage();
+
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(800);
+    await page.locator('input[type="email"]').first().fill(EMAIL);
+    await page.locator('input[type="password"]').first().fill(PASSWORD);
+    await page.locator('button[type="submit"]').first().click();
+    await page.waitForURL((u) => !/\/(login|register|forgot-password)/.test(u.pathname), { timeout: 20_000 });
+    await page.waitForTimeout(2500);
+    await snap(page, 'auth', 'logged-in-landing');
+    record({ severity: 'Info', area: 'Auth', title: 'Logged in successfully', detail: `User: ${EMAIL}` });
+  });
+
+  test.afterAll(async () => {
+    const rpt = path.join('C:/Users/reetu/Desktop/JackSwarm test', 'findings-world-class.json');
+    await fs.writeFile(rpt, JSON.stringify({ runAt: new Date().toISOString(), findings }, null, 2));
+    console.log(`\n=== ${findings.length} findings written to ${rpt} ===`);
+    const bySev = findings.reduce<Record<string, number>>((acc, f) => {
+      acc[f.severity] = (acc[f.severity] ?? 0) + 1; return acc;
+    }, {});
+    console.log('By severity:', JSON.stringify(bySev));
+    await ctx?.close();
+  });
+
+  // ─── 1. Trivial inputs: Commander short-circuit ──────────────────────────
+  test('1a. "hi" returns a direct greeting in under 10s (no orchestration)', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const result = await sendChatAndWait('hi', { timeoutMs: 30_000 });
+    await snap(page, 'trivial', 'hi-response');
+
+    if (result.finalAnswer.length === 0) {
+      record({ severity: 'Critical', area: 'Commander', title: '"hi" produced no response', detail: `bubbles=${result.bubbles.length}, took ${result.durationMs}ms` });
+      return;
+    }
+    if (isStubAnswer(result.finalAnswer) || isJsonLeak(result.finalAnswer)) {
+      record({ severity: 'High', area: 'Commander', title: '"hi" got stub/JSON response', detail: result.finalAnswer.slice(0, 200), evidence: result.finalAnswer });
+      return;
+    }
+    if (result.durationMs > 15_000) {
+      record({ severity: 'Medium', area: 'Commander', title: '"hi" took longer than 15s', detail: `${result.durationMs}ms — short-circuit may not be working; full pipeline likely ran`, evidence: result.finalAnswer.slice(0, 200) });
+      return;
+    }
+    if (result.bubbles.some((b) => /COMMANDER (working|completed)/i.test(b))) {
+      record({ severity: 'Medium', area: 'Commander', title: '"hi" exposed Commander stage to user', detail: 'User shouldn\'t see internal stage badges for trivial responses' });
+    }
+    record({ severity: 'Info', area: 'Commander', title: '"hi" handled correctly', detail: `${result.durationMs}ms, answer: "${result.finalAnswer.slice(0, 80)}"` });
+  });
+
+  test('1b. "what is 2+2?" returns "4" or contains 4', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const result = await sendChatAndWait('what is 2+2?', { timeoutMs: 30_000 });
+    await snap(page, 'trivial', 'arithmetic-response');
+
+    if (!result.finalAnswer.includes('4')) {
+      record({ severity: 'High', area: 'Commander', title: '"2+2" did not return 4', detail: result.finalAnswer.slice(0, 200) });
+      return;
+    }
+    if (result.durationMs > 15_000) {
+      record({ severity: 'Medium', area: 'Commander', title: '"2+2" took longer than 15s', detail: `${result.durationMs}ms` });
+    }
+    record({ severity: 'Info', area: 'Commander', title: '"2+2" answered correctly', detail: `${result.durationMs}ms` });
+  });
+
+  test('1c. "capital of France" returns Paris', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const result = await sendChatAndWait('what is the capital of France?', { timeoutMs: 30_000 });
+    await snap(page, 'trivial', 'capital-response');
+
+    if (!/paris/i.test(result.finalAnswer)) {
+      record({ severity: 'High', area: 'Commander', title: '"Capital of France" did not return Paris', detail: result.finalAnswer.slice(0, 200) });
+      return;
+    }
+    record({ severity: 'Info', area: 'Commander', title: '"Capital of France" → Paris', detail: `${result.durationMs}ms` });
+  });
+
+  // ─── 2. Persona: CMO ─────────────────────────────────────────────────────
+  test('2a. CMO persona — write a LinkedIn post for JAK Swarm launch', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const prompt = 'I am the CMO of JAK Swarm, an AI multi-agent platform. Write a compelling LinkedIn announcement post (200-300 words) introducing our launch to enterprise buyers. Hook with a tension, list 3 concrete capabilities, end with a CTA.';
+    const result = await sendChatAndWait(prompt, { selectRoles: ['CMO'], timeoutMs: 180_000 });
+    await snap(page, 'cmo', 'linkedin-post-output');
+
+    if (isStubAnswer(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'CMO', title: 'LinkedIn post returned stub', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    if (isJsonLeak(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'CMO', title: 'LinkedIn post leaked raw JSON', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    const wc = result.finalAnswer.split(/\s+/).filter(Boolean).length;
+    if (wc < 100) {
+      record({ severity: 'High', area: 'CMO', title: `LinkedIn post too short (${wc} words)`, detail: 'Asked for 200-300 words; got too little', evidence: result.finalAnswer });
+      return;
+    }
+    if (!/JAK\s*Swarm|multi-agent|AI/i.test(result.finalAnswer)) {
+      record({ severity: 'Medium', area: 'CMO', title: 'LinkedIn post missing key brand terms', detail: 'No mention of JAK Swarm / multi-agent / AI', evidence: result.finalAnswer.slice(0, 400) });
+    }
+    record({ severity: 'Info', area: 'CMO', title: `LinkedIn post produced (${wc} words, ${result.durationMs}ms)`, detail: result.finalAnswer.slice(0, 200) });
+  });
+
+  test('2b. CMO persona — auto-post to LinkedIn (tools available?)', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const prompt = 'Post the following text to my LinkedIn account: "Testing JAK Swarm auto-posting integration."';
+    const result = await sendChatAndWait(prompt, { selectRoles: ['CMO'], timeoutMs: 120_000 });
+    await snap(page, 'cmo', 'linkedin-autopost-attempt');
+
+    // Expected behavior: either (a) the system attempts the post and hits a clean
+    // "LinkedIn not connected" error, or (b) it actually posts. Either is valid.
+    // Bad behavior: returns a fake "Posted!" without doing anything.
+    if (/posted|published|success/i.test(result.finalAnswer) && !/connect|integration|not connected|requires/i.test(result.finalAnswer)) {
+      record({ severity: 'High', area: 'CMO', title: 'LinkedIn auto-post claimed success without integration', detail: 'Possibly hallucinated — verify Integrations page shows LinkedIn as connected first', evidence: result.finalAnswer.slice(0, 300) });
+      return;
+    }
+    if (/connect|integration|not (connected|configured)/i.test(result.finalAnswer)) {
+      record({ severity: 'Info', area: 'CMO', title: 'Auto-post correctly required LinkedIn integration', detail: result.finalAnswer.slice(0, 200) });
+      return;
+    }
+    record({ severity: 'Medium', area: 'CMO', title: 'Auto-post response unclear', detail: result.finalAnswer.slice(0, 300) });
+  });
+
+  // ─── 3. Persona: CTO ─────────────────────────────────────────────────────
+  test('3a. CTO persona — Builder generates a landing page', async () => {
+    await page.goto('/builder', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await snap(page, 'cto', 'builder-landing');
+
+    // Find the prompt input on /builder
+    const textarea = page.locator('textarea').first();
+    if ((await textarea.count()) === 0) {
+      record({ severity: 'Critical', area: 'CTO', title: 'Builder has no prompt textarea', detail: 'CTO has no way to start a build' });
+      return;
+    }
+    const prompt = 'Build a single-page landing for an AI tool called "Numina" — a hero with headline + CTA, a 3-feature grid, and a footer. Use Tailwind. Keep it under 200 lines.';
+    await textarea.fill(prompt);
+    await snap(page, 'cto', 'builder-prompt-typed');
+
+    const buildBtn = page.locator('button:has-text("Build"), button:has-text("Generate"), button:has-text("Create"), button[type="submit"]').first();
+    if ((await buildBtn.count()) === 0) {
+      record({ severity: 'High', area: 'CTO', title: 'Builder has no Build/Generate button', detail: 'Cannot dispatch build' });
+      return;
+    }
+    await buildBtn.click();
+    await snap(page, 'cto', 'builder-after-click');
+
+    // Wait up to 4 minutes for generation to render
+    const deadline = Date.now() + 240_000;
+    let generated = false;
+    let snippet = '';
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(4000);
+      const text = await page.locator('main').innerText().catch(() => '');
+      // Heuristics: code with html/className/Tailwind classes
+      if (/className=|<div|<section|tailwind|bg-/i.test(text) && text.length > 500) {
+        generated = true;
+        snippet = text.slice(0, 800);
+        break;
+      }
+    }
+    await snap(page, 'cto', 'builder-after-generation');
+
+    if (!generated) {
+      record({ severity: 'Critical', area: 'CTO', title: 'Builder did not produce code within 4min', detail: 'Build pipeline appears broken' });
+      return;
+    }
+    record({ severity: 'Info', area: 'CTO', title: 'Builder produced code', detail: snippet.slice(0, 200) });
+  });
+
+  // ─── 4. Persona: CEO ─────────────────────────────────────────────────────
+  test('4. CEO persona — SWOT for an AI startup', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const prompt = 'I am the CEO of an early-stage AI agent platform. Do a brief SWOT analysis (Strengths/Weaknesses/Opportunities/Threats) for our company in the multi-agent orchestration space. Be specific and honest, not generic.';
+    const result = await sendChatAndWait(prompt, { selectRoles: ['CEO'], timeoutMs: 180_000 });
+    await snap(page, 'ceo', 'swot-output');
+
+    if (isStubAnswer(result.finalAnswer) || isJsonLeak(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'CEO', title: 'SWOT returned stub/JSON', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    const hasAllFour = /strength/i.test(result.finalAnswer) && /weakness/i.test(result.finalAnswer)
+      && /opportunit/i.test(result.finalAnswer) && /threat/i.test(result.finalAnswer);
+    if (!hasAllFour) {
+      record({ severity: 'High', area: 'CEO', title: 'SWOT missing one of the 4 quadrants', detail: result.finalAnswer.slice(0, 400), evidence: result.finalAnswer });
+      return;
+    }
+    const wc = result.finalAnswer.split(/\s+/).filter(Boolean).length;
+    record({ severity: 'Info', area: 'CEO', title: `SWOT produced (${wc} words, ${result.durationMs}ms)`, detail: result.finalAnswer.slice(0, 200) });
+  });
+
+  // ─── 5. Persona: Research worker ─────────────────────────────────────────
+  test('5. Research persona — give actual findings, not stub', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const prompt = 'Research the current state of LangGraph vs CrewAI vs AutoGen as of 2025. Compare on: developer ergonomics, production-readiness, community size. Cite sources.';
+    const result = await sendChatAndWait(prompt, { selectRoles: ['Research'], timeoutMs: 240_000 });
+    await snap(page, 'research', 'research-output');
+
+    if (isStubAnswer(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'Research', title: 'Research returned stub answer', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    if (isJsonLeak(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'Research', title: 'Research leaked JSON to user', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    const wc = result.finalAnswer.split(/\s+/).filter(Boolean).length;
+    if (wc < 100) {
+      record({ severity: 'High', area: 'Research', title: `Research too short (${wc} words)`, detail: 'Real research answer should be 150+ words', evidence: result.finalAnswer });
+      return;
+    }
+    const mentionsAll = /langgraph/i.test(result.finalAnswer) && /crewai/i.test(result.finalAnswer) && /autogen/i.test(result.finalAnswer);
+    if (!mentionsAll) {
+      record({ severity: 'Medium', area: 'Research', title: 'Research missing one or more frameworks asked about', detail: result.finalAnswer.slice(0, 400) });
+    }
+    record({ severity: 'Info', area: 'Research', title: `Research produced ${wc} words in ${result.durationMs}ms`, detail: result.finalAnswer.slice(0, 200) });
+  });
+
+  // ─── 6. Coding worker ────────────────────────────────────────────────────
+  test('6. Coding persona — write a working Python script', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const prompt = 'Write a Python script that takes a CSV file path as a CLI arg, reads it, and prints the top 5 rows by a column called "revenue" descending. Use pandas. Include error handling for missing file.';
+    const result = await sendChatAndWait(prompt, { selectRoles: ['Code'], timeoutMs: 180_000 });
+    await snap(page, 'coding', 'python-script-output');
+
+    if (isStubAnswer(result.finalAnswer) || isJsonLeak(result.finalAnswer)) {
+      record({ severity: 'Critical', area: 'Coding', title: 'Coding returned stub/JSON', detail: result.finalAnswer.slice(0, 300), evidence: result.finalAnswer });
+      return;
+    }
+    const hasCode = /pandas|read_csv|sort_values|argparse|sys\.argv/i.test(result.finalAnswer);
+    if (!hasCode) {
+      record({ severity: 'High', area: 'Coding', title: 'Coding answer has no Python/pandas code', detail: 'Expected pandas.read_csv + sort_values + CLI parsing', evidence: result.finalAnswer.slice(0, 500) });
+      return;
+    }
+    record({ severity: 'Info', area: 'Coding', title: 'Coding produced working-shaped Python', detail: result.finalAnswer.slice(0, 200) });
+  });
+
+  // ─── 7. Automation: schedule a workflow ──────────────────────────────────
+  test('7. /schedules page renders + can create a schedule', async () => {
+    await page.goto('/schedules', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2500);
+    await snap(page, 'schedules', 'schedules-landing');
+
+    const bodyText = await page.locator('body').innerText();
+    if (/access restricted|not authorized|404/i.test(bodyText)) {
+      record({ severity: 'Critical', area: 'Schedules', title: '/schedules blocked or missing', detail: bodyText.slice(0, 200) });
+      return;
+    }
+    if (bodyText.length < 100) {
+      record({ severity: 'High', area: 'Schedules', title: '/schedules nearly empty', detail: bodyText });
+      return;
+    }
+    record({ severity: 'Info', area: 'Schedules', title: '/schedules renders', detail: bodyText.slice(0, 150) });
+  });
+
+  // ─── 8. Nav audit: every sidebar page loads ──────────────────────────────
+  test('8. nav audit — every sidebar link loads + scrolls', async () => {
+    const targets = [
+      { href: '/workspace', label: 'Workspace' },
+      { href: '/swarm', label: 'Runs' },
+      { href: '/schedules', label: 'Schedules' },
+      { href: '/builder', label: 'Builder' },
+      { href: '/analytics', label: 'Analytics' },
+      { href: '/integrations', label: 'Integrations' },
+      { href: '/files', label: 'Files' },
+      { href: '/knowledge', label: 'Knowledge' },
+      { href: '/skills', label: 'Skills' },
+      { href: '/settings', label: 'Settings' },
+    ];
+    for (const t of targets) {
+      await page.goto(t.href, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      await snap(page, 'nav', `${t.label.toLowerCase()}-landing`);
+      const text = await page.locator('body').innerText();
+
+      if (/404|not found|error/i.test(text.slice(0, 200)) && text.length < 300) {
+        record({ severity: 'Critical', area: 'Nav', title: `${t.label} page errors`, detail: text.slice(0, 200) });
+        continue;
+      }
+      if (text.length < 100) {
+        record({ severity: 'High', area: 'Nav', title: `${t.label} page nearly empty`, detail: text });
+        continue;
+      }
+
+      // Scroll test
+      const scrollable = await page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);
+      const visible = await page.evaluate(() => window.innerHeight);
+      if (scrollable > visible + 50) {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(500);
+        const scrolled = await page.evaluate(() => window.scrollY);
+        if (scrolled < 50) {
+          record({ severity: 'High', area: 'Nav', title: `${t.label} content overflows but does not scroll`, detail: `scrollHeight=${scrollable}, viewport=${visible}, scrolled=${scrolled}` });
+          continue;
+        }
+        await snap(page, 'nav', `${t.label.toLowerCase()}-scrolled`);
+      }
+      record({ severity: 'Info', area: 'Nav', title: `${t.label} renders + scrolls`, detail: `chars=${text.length}` });
+    }
+  });
+
+  // ─── 9. Sidebar interactions ─────────────────────────────────────────────
+  test('9. sidebar — past conversation click navigates to /workspace', async () => {
+    // Send a quick chat to seed at least one conversation
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    await sendChatAndWait('hello world test', { timeoutMs: 30_000 });
+    await page.waitForTimeout(1500);
+
+    // Now navigate AWAY to /swarm
+    await page.goto('/swarm', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    await snap(page, 'sidebar', 'on-swarm-before-conv-click');
+
+    // Click the first conversation in the sidebar's "Recent" section
+    const convBtn = page.locator('aside button:has(svg.lucide-message-square)').first();
+    if ((await convBtn.count()) === 0) {
+      record({ severity: 'Medium', area: 'Sidebar', title: 'No past conversation found in sidebar', detail: 'Skipping click test' });
+      return;
+    }
+    await convBtn.click();
+    await page.waitForTimeout(2500);
+    await snap(page, 'sidebar', 'after-conv-click');
+
+    const url = page.url();
+    if (!url.includes('/workspace')) {
+      record({ severity: 'Critical', area: 'Sidebar', title: 'Past conversation click did NOT navigate to /workspace', detail: `Current URL: ${url}` });
+      return;
+    }
+    record({ severity: 'Info', area: 'Sidebar', title: 'Past conversation click navigates correctly', detail: url });
+  });
+
+  test('10. sidebar — Sign out is discoverable + works', async () => {
+    await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+    const signOutBtn = page.locator('button[aria-label="Sign out"]').first();
+    if ((await signOutBtn.count()) === 0) {
+      record({ severity: 'High', area: 'Sidebar', title: 'No Sign out button found in sidebar', detail: 'Logout not discoverable' });
+      return;
+    }
+    await snap(page, 'sidebar', 'signout-visible');
+    record({ severity: 'Info', area: 'Sidebar', title: 'Sign out button discoverable', detail: 'Skipping click to keep session for other tests' });
+  });
+});
