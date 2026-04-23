@@ -85,6 +85,8 @@ async function main(): Promise<void> {
       leaseTtlMs,
       nodeEnv: config.nodeEnv,
       redisConfigured: Boolean(config.redisUrl),
+      gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
+      gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
     },
     '[Worker] Starting',
   );
@@ -207,6 +209,17 @@ async function main(): Promise<void> {
     if (req.method === 'GET' && url.startsWith('/healthz')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: shuttingDown ? 'draining' : 'ok', instanceId }));
+      return;
+    }
+    if (req.method === 'GET' && url.startsWith('/version')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
+        gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
+        buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
+        uptimeSeconds: Math.round(process.uptime()),
+        instanceId,
+      }));
       return;
     }
     if (req.method === 'GET' && url.startsWith('/ready')) {
