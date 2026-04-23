@@ -731,20 +731,41 @@ export class SwarmExecutionService extends EventEmitter {
       await this.persistApprovals(result, tenantId, workflowId);
 
       // Compile and save final output
+      let directAnswerOverride: string | undefined;
       try {
-        // Short-circuit: Commander produced a direct answer for a trivial
-        // input. Use it as finalOutput verbatim — no synthesis needed.
+        // Short-circuit #1: result.directAnswer set by commander-node when
+        // the graph routes to __end__ on a trivial input. Use verbatim.
         const directAnswer = (result as { directAnswer?: string }).directAnswer;
         let finalOutput: string;
         if (typeof directAnswer === 'string' && directAnswer.trim().length > 0) {
           finalOutput = directAnswer.trim();
+          directAnswerOverride = finalOutput;
         } else {
           const traceRecords = await this.db.agentTrace.findMany({
             where: { workflowId },
             orderBy: { stepIndex: 'asc' },
             select: { agentRole: true, outputJson: true, stepIndex: true },
           });
-          finalOutput = this.compileFinalOutput(traceRecords as Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>);
+
+          // Short-circuit #2 (defensive): even when the graph DIDN'T route
+          // to __end__ — e.g. because a stale @jak-swarm/swarm dist on the
+          // worker is missing the directAnswer routing in commander-node.ts
+          // — the Commander's persisted trace will still contain
+          // outputJson.directAnswer. Surface it here so a perfectly-good
+          // greeting/factual answer isn't lost to a deploy-cache hiccup.
+          // This also makes the API resilient to any future graph-routing
+          // regression around Commander short-circuit semantics.
+          const commanderTrace = traceRecords.find((t) => t.agentRole === 'COMMANDER');
+          const commanderOut = commanderTrace?.outputJson as { directAnswer?: unknown } | null | undefined;
+          const traceDirectAnswer = typeof commanderOut?.directAnswer === 'string'
+            ? (commanderOut.directAnswer as string).trim()
+            : '';
+          if (traceDirectAnswer.length > 0) {
+            finalOutput = traceDirectAnswer;
+            directAnswerOverride = finalOutput;
+          } else {
+            finalOutput = this.compileFinalOutput(traceRecords as Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>);
+          }
         }
         await (this.db.workflow.update as any)({
           where: { id: workflowId },
@@ -755,7 +776,9 @@ export class SwarmExecutionService extends EventEmitter {
           '[Swarm] Failed to persist final output');
       }
 
-      const dbStatus = mapSwarmStatusToDb(result.status);
+      const dbStatus = directAnswerOverride
+        ? 'COMPLETED' // a recovered direct answer means the workflow is effectively done
+        : mapSwarmStatusToDb(result.status);
       const traceError = result.traces.find((t: { error?: string }) => t.error)?.error;
       const errorMessage = result.error
         ?? traceError
