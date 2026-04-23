@@ -297,38 +297,76 @@ test.describe('JAK Swarm — World-Class QA', () => {
   });
 
   // ─── 3. Persona: CTO ─────────────────────────────────────────────────────
-  test('3a. CTO persona — Builder generates a landing page', async () => {
+  // Builder is a project-list page; the prompt textarea lives inside a
+  // specific project (/builder/:projectId), so the CTO scenario must
+  // create a project first, then drive the prompt + build flow.
+  test('3a. CTO persona — Builder creates project + generates a landing page', async () => {
     await page.goto('/builder', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
-    await snap(page, 'cto', 'builder-landing');
+    await page.waitForTimeout(4500);
+    await snap(page, 'cto', 'builder-list');
 
-    // Find the prompt input on /builder
-    const textarea = page.locator('textarea').first();
-    if ((await textarea.count()) === 0) {
-      record({ severity: 'Critical', area: 'CTO', title: 'Builder has no prompt textarea', detail: 'CTO has no way to start a build' });
+    // Click "New Project" CTA (could be the empty-state action or top-bar button)
+    const newProjectBtn = page.locator('button:has-text("New Project"), button:has-text("Create Project")').first();
+    if ((await newProjectBtn.count()) === 0) {
+      record({ severity: 'Critical', area: 'CTO', title: 'Builder has no "New Project" button', detail: 'CTO has no way to start a build' });
       return;
     }
+    await newProjectBtn.click();
+    await page.waitForTimeout(800);
+    await snap(page, 'cto', 'builder-new-project-modal');
+
+    // Fill the project name input inside the modal
+    const nameInput = page.locator('input[placeholder*="name" i], input[name="name"], [role="dialog"] input').first();
+    if ((await nameInput.count()) === 0) {
+      record({ severity: 'High', area: 'CTO', title: 'New Project modal missing name input', detail: 'No name input found in dialog' });
+      return;
+    }
+    const projectName = `qa-numina-${Date.now()}`;
+    await nameInput.fill(projectName);
+    await snap(page, 'cto', 'builder-name-filled');
+
+    // Confirm create — usually a "Create" button inside the dialog
+    const confirmBtn = page.locator('[role="dialog"] button:has-text("Create"), button:has-text("Create Project")').last();
+    await confirmBtn.click();
+    // Navigation to /builder/:projectId may take a moment
+    try {
+      await page.waitForURL(/\/builder\/[a-z0-9]+/, { timeout: 15_000 });
+    } catch {
+      record({ severity: 'High', area: 'CTO', title: 'Project create did not navigate to /builder/:projectId', detail: `Still on ${page.url()}` });
+      return;
+    }
+    await page.waitForTimeout(3000);
+    await snap(page, 'cto', 'builder-project-detail');
+
+    // Find the prompt textarea on the project detail page
+    const textarea = page.locator('textarea').first();
+    if ((await textarea.count()) === 0) {
+      record({ severity: 'Critical', area: 'CTO', title: 'Project detail page has no prompt textarea', detail: `URL: ${page.url()}` });
+      return;
+    }
+
     const prompt = 'Build a single-page landing for an AI tool called "Numina" — a hero with headline + CTA, a 3-feature grid, and a footer. Use Tailwind. Keep it under 200 lines.';
     await textarea.fill(prompt);
     await snap(page, 'cto', 'builder-prompt-typed');
 
-    const buildBtn = page.locator('button:has-text("Build"), button:has-text("Generate"), button:has-text("Create"), button[type="submit"]').first();
-    if ((await buildBtn.count()) === 0) {
-      record({ severity: 'High', area: 'CTO', title: 'Builder has no Build/Generate button', detail: 'Cannot dispatch build' });
+    // Send the prompt — Builder uses a paper-airplane Send button
+    const sendBtn = page.locator('button[aria-label*="send" i], button:has(svg.lucide-send), button[type="submit"]').first();
+    if ((await sendBtn.count()) === 0) {
+      record({ severity: 'High', area: 'CTO', title: 'No Send button on Builder project page', detail: 'Cannot dispatch build prompt' });
       return;
     }
-    await buildBtn.click();
-    await snap(page, 'cto', 'builder-after-click');
+    await sendBtn.click();
+    await snap(page, 'cto', 'builder-after-send');
 
-    // Wait up to 4 minutes for generation to render
+    // Wait up to 4 minutes for code to appear in the file tree / editor
     const deadline = Date.now() + 240_000;
     let generated = false;
     let snippet = '';
     while (Date.now() < deadline) {
-      await page.waitForTimeout(4000);
+      await page.waitForTimeout(5000);
       const text = await page.locator('main').innerText().catch(() => '');
-      // Heuristics: code with html/className/Tailwind classes
-      if (/className=|<div|<section|tailwind|bg-/i.test(text) && text.length > 500) {
+      // Heuristics: tree shows a file like "page.tsx" or editor shows code
+      if (/page\.tsx|index\.html|app\.tsx|className=|<section|<div|tailwind/i.test(text) && text.length > 600) {
         generated = true;
         snippet = text.slice(0, 800);
         break;
@@ -337,10 +375,10 @@ test.describe('JAK Swarm — World-Class QA', () => {
     await snap(page, 'cto', 'builder-after-generation');
 
     if (!generated) {
-      record({ severity: 'Critical', area: 'CTO', title: 'Builder did not produce code within 4min', detail: 'Build pipeline appears broken' });
+      record({ severity: 'Critical', area: 'CTO', title: 'Builder did not produce code within 4min', detail: 'Build pipeline appears broken — check vibe-coder workflow trace' });
       return;
     }
-    record({ severity: 'Info', area: 'CTO', title: 'Builder produced code', detail: snippet.slice(0, 200) });
+    record({ severity: 'Info', area: 'CTO', title: 'Builder created project + produced code', detail: snippet.slice(0, 200) });
   });
 
   // ─── 4. Persona: CEO ─────────────────────────────────────────────────────
@@ -441,7 +479,9 @@ test.describe('JAK Swarm — World-Class QA', () => {
       markers: Array<string | RegExp>;
       minMainChars?: number;
     }> = [
-      { href: '/workspace', label: 'Workspace', markers: [/message|chat|ask|type/i], minMainChars: 50 },
+      // /workspace placeholder ("Message CTO…") is an attribute not innerText,
+      // so we match on persona role labels + the disclaimer that always renders.
+      { href: '/workspace', label: 'Workspace', markers: [/CEO|CMO|CTO|Coding|Research|Design|Auto|JAK Swarm may produce|verify important/i], minMainChars: 50 },
       { href: '/swarm', label: 'Runs', markers: [/workflow|run|status|history|no workflows/i], minMainChars: 100 },
       { href: '/schedules', label: 'Schedules', markers: [/schedule|cron|recurring|no schedules|upcoming/i], minMainChars: 100 },
       { href: '/builder', label: 'Builder', markers: [/build|project|generate|prompt|create/i], minMainChars: 100 },
