@@ -226,6 +226,25 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           workflowService.getWorkflowApprovals(request.user.tenantId, workflowId),
         ]);
 
+        // Recovery: if the worker's stale @jak-swarm/swarm dist failed to
+        // route a Commander directAnswer to __end__ (resulting in finalOutput
+        // = "Agents completed their work but did not produce a user-facing
+        // response..." even though Commander did answer), surface the
+        // directAnswer from the trace and present the workflow as completed.
+        // Safe to run on every request — it's a no-op when finalOutput is
+        // already substantive or when no Commander directAnswer exists.
+        const stub = /Agents completed their work but did not produce/i;
+        if (workflow && (typeof workflow.finalOutput !== 'string' || workflow.finalOutput.trim().length === 0 || stub.test(workflow.finalOutput))) {
+          const cmd = traces.find((t) => t.agentRole === 'COMMANDER');
+          const out = (cmd?.output ?? null) as { directAnswer?: unknown } | null;
+          const da = typeof out?.directAnswer === 'string' ? out.directAnswer.trim() : '';
+          if (da.length > 0) {
+            (workflow as unknown as { finalOutput: string; status: string; error: null }).finalOutput = da;
+            (workflow as unknown as { finalOutput: string; status: string; error: null }).status = 'COMPLETED';
+            (workflow as unknown as { finalOutput: string; status: string; error: null }).error = null;
+          }
+        }
+
         return reply.status(200).send(ok({ ...workflow, traces, approvals }));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
