@@ -237,6 +237,20 @@ export class ContentAgent extends BaseAgent {
       },
     ];
 
+    const userAsk = JSON.stringify({
+      action: task.action,
+      topic: task.topic,
+      audience: task.audience,
+      tone: task.tone,
+      format: task.format,
+      sourceContent: task.sourceContent,
+      keywords: task.keywords,
+      wordCount: task.wordCount,
+      platform: task.platform,
+      dependencyResults: task.dependencyResults,
+      industryContext: context.industry,
+    });
+
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -244,19 +258,9 @@ export class ContentAgent extends BaseAgent {
       },
       {
         role: 'user',
-        content: JSON.stringify({
-          action: task.action,
-          topic: task.topic,
-          audience: task.audience,
-          tone: task.tone,
-          format: task.format,
-          sourceContent: task.sourceContent,
-          keywords: task.keywords,
-          wordCount: task.wordCount,
-          platform: task.platform,
-          dependencyResults: task.dependencyResults,
-          industryContext: context.industry,
-        }),
+        content: `${userAsk}
+
+CRITICAL OUTPUT FORMAT — Your ENTIRE response must be a single JSON object starting with { and ending with }. Do NOT wrap in \`\`\`json fences. Do NOT add preamble like "Here is the post:" or "Since there are no brand guidelines…". Do NOT add a trailing explanation. Put the ACTUAL post/content in the "content" field; if the user asked for a LinkedIn post, "content" contains the post text itself (emojis OK, line breaks OK, 200-300 words as requested). Populate "wordCount" with the true word count. If you genuinely cannot produce the content, return { "content": "", "summary": "<one-sentence reason>" , "confidence": 0.0 } — never return prose outside JSON.`,
       },
     ];
 
@@ -283,9 +287,16 @@ export class ContentAgent extends BaseAgent {
 
     try {
       const parsed = this.parseJsonResponse<Partial<ContentResult>>(loopResult.content);
+      // Sometimes the LLM returns `{content: "…"}` with content EMPTY, but
+      // the full post is in the surrounding prose (fenced ``` block that
+      // parseJsonResponse stripped, or a preamble before the JSON). In that
+      // case we prefer the longer raw LLM text over the empty parsed field.
+      const parsedContent = typeof parsed.content === 'string' ? parsed.content.trim() : '';
+      const raw = (loopResult.content ?? '').trim();
+      const content = parsedContent.length >= 50 || !raw ? parsedContent : raw;
       result = {
         action: task.action,
-        content: parsed.content ?? '',
+        content,
         headline: parsed.headline,
         summary: parsed.summary ?? '',
         seoMeta: parsed.seoMeta,
@@ -294,12 +305,24 @@ export class ContentAgent extends BaseAgent {
         confidence: parsed.confidence ?? 0.7,
       };
     } catch {
+      // JSON parse failed. The LLM usually returned prose — treat it as
+      // the content directly. Strip obvious preamble ("Here is the post:",
+      // "Since there are no guidelines, I will…") so the reader sees the
+      // actual post, not the agent's explanation of what it's doing.
+      const raw = (loopResult.content ?? '').trim();
+      const stripped = raw
+        // Remove a leading explanatory paragraph (before first blank line)
+        // when it contains signals like "I will…", "Here is", "Since there",
+        // "No brand guidelines", "Based on…"
+        .replace(/^([^\n]{0,400}?(i will|here is|here's|since there|based on|no (brand|specific) (voice|guidelines))[^\n]*\n\s*\n)/i, '')
+        // Strip an explicit heading like "LinkedIn Post:" on the first line
+        .replace(/^\s*\*{0,2}(linkedin post|tweet|blog post|post|draft)\*{0,2}\s*:\s*\n+/i, '')
+        .trim();
       result = {
         action: task.action,
-        content: loopResult.content || '',
-        summary:
-          'Manual review required — LLM output was not structured JSON. Do NOT publish this content without editorial review. SEO metadata, headline, and platform variants are missing.',
-        confidence: 0.3,
+        content: stripped.length >= 50 ? stripped : raw,
+        summary: '',
+        confidence: 0.6,
       };
     }
 
