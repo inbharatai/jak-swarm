@@ -233,19 +233,22 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         // directAnswer from the trace and present the workflow as completed.
         // Safe to run on every request — it's a no-op when finalOutput is
         // already substantive or when no Commander directAnswer exists.
+        const responseBody: Record<string, unknown> = { ...workflow, traces, approvals };
         const stub = /Agents completed their work but did not produce/i;
-        if (workflow && (typeof workflow.finalOutput !== 'string' || workflow.finalOutput.trim().length === 0 || stub.test(workflow.finalOutput))) {
+        const fo = responseBody['finalOutput'];
+        if (typeof fo !== 'string' || fo.trim().length === 0 || stub.test(fo)) {
           const cmd = traces.find((t) => t.agentRole === 'COMMANDER');
-          const out = (cmd?.output ?? null) as { directAnswer?: unknown } | null;
-          const da = typeof out?.directAnswer === 'string' ? out.directAnswer.trim() : '';
+          const cmdOut = (cmd?.output ?? null) as { directAnswer?: unknown } | null;
+          const da = typeof cmdOut?.directAnswer === 'string' ? cmdOut.directAnswer.trim() : '';
           if (da.length > 0) {
-            (workflow as unknown as { finalOutput: string; status: string; error: null }).finalOutput = da;
-            (workflow as unknown as { finalOutput: string; status: string; error: null }).status = 'COMPLETED';
-            (workflow as unknown as { finalOutput: string; status: string; error: null }).error = null;
+            responseBody['finalOutput'] = da;
+            responseBody['status'] = 'COMPLETED';
+            responseBody['error'] = null;
+            responseBody['recoveredFromCommanderTrace'] = true;
           }
         }
 
-        return reply.status(200).send(ok({ ...workflow, traces, approvals }));
+        return reply.status(200).send(ok(responseBody));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;
