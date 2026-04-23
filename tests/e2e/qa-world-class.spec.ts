@@ -431,49 +431,76 @@ test.describe('JAK Swarm — World-Class QA', () => {
     record({ severity: 'Info', area: 'Schedules', title: '/schedules renders', detail: bodyText.slice(0, 150) });
   });
 
-  // ─── 8. Nav audit: every sidebar page loads ──────────────────────────────
-  test('8. nav audit — every sidebar link loads + scrolls', async () => {
-    const targets = [
-      { href: '/workspace', label: 'Workspace' },
-      { href: '/swarm', label: 'Runs' },
-      { href: '/schedules', label: 'Schedules' },
-      { href: '/builder', label: 'Builder' },
-      { href: '/analytics', label: 'Analytics' },
-      { href: '/integrations', label: 'Integrations' },
-      { href: '/files', label: 'Files' },
-      { href: '/knowledge', label: 'Knowledge' },
-      { href: '/skills', label: 'Skills' },
-      { href: '/settings', label: 'Settings' },
+  // ─── 8. Nav audit: every sidebar page loads + has real content ──────────
+  test('8. nav audit — every sidebar page loads + has real page content', async () => {
+    // Each target declares at least one marker — a string (or regex) that MUST
+    // appear on the page for the test to consider it genuinely rendered. Without
+    // this, "sidebar chrome only" passes the length check and hides real bugs.
+    const targets: Array<{
+      href: string; label: string;
+      markers: Array<string | RegExp>;
+      minMainChars?: number;
+    }> = [
+      { href: '/workspace', label: 'Workspace', markers: [/message|chat|ask|type/i], minMainChars: 50 },
+      { href: '/swarm', label: 'Runs', markers: [/workflow|run|status|history|no workflows/i], minMainChars: 100 },
+      { href: '/schedules', label: 'Schedules', markers: [/schedule|cron|recurring|no schedules|upcoming/i], minMainChars: 100 },
+      { href: '/builder', label: 'Builder', markers: [/build|project|generate|prompt|create/i], minMainChars: 100 },
+      { href: '/analytics', label: 'Analytics', markers: [/workflow|cost|usage|success|metric|period/i], minMainChars: 150 },
+      { href: '/integrations', label: 'Integrations', markers: [/slack|github|gmail|notion|connect/i], minMainChars: 200 },
+      { href: '/files', label: 'Files', markers: [/file|upload|no files|document/i], minMainChars: 100 },
+      { href: '/knowledge', label: 'Knowledge', markers: [/knowledge|memory|fact|preference|add memory/i], minMainChars: 100 },
+      { href: '/skills', label: 'Skills', markers: [/skill|capability|tool|agent/i], minMainChars: 100 },
+      { href: '/settings', label: 'Settings', markers: [/backend|provider|model|account|profile|api key|billing/i], minMainChars: 150 },
     ];
     for (const t of targets) {
       await page.goto(t.href, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      // 4500ms — pages with SWR data fetching need 3-4s to render content
+      // after domcontentloaded; 2500ms captures loading-spinner state and
+      // mis-reports pages as blank.
+      await page.waitForTimeout(4500);
       await snap(page, 'nav', `${t.label.toLowerCase()}-landing`);
-      const text = await page.locator('body').innerText();
 
-      if (/404|not found|error/i.test(text.slice(0, 200)) && text.length < 300) {
-        record({ severity: 'Critical', area: 'Nav', title: `${t.label} page errors`, detail: text.slice(0, 200) });
+      const fullText = await page.locator('body').innerText();
+      // <main> selector captures the page body (excluding sidebar + top nav)
+      const mainText = await page.locator('main').first().innerText().catch(() => fullText);
+
+      if (/access restricted|404|not found/i.test(mainText.slice(0, 300))) {
+        record({ severity: 'Critical', area: 'Nav', title: `${t.label} page blocked or 404'd`, detail: mainText.slice(0, 200) });
         continue;
       }
-      if (text.length < 100) {
-        record({ severity: 'High', area: 'Nav', title: `${t.label} page nearly empty`, detail: text });
+
+      const minChars = t.minMainChars ?? 80;
+      if (mainText.trim().length < minChars) {
+        record({ severity: 'High', area: 'Nav', title: `${t.label} main area too small (${mainText.length} chars, expected ≥${minChars})`, detail: mainText.slice(0, 300) });
+        continue;
+      }
+
+      const matchedMarkers = t.markers.filter((m) => typeof m === 'string' ? mainText.toLowerCase().includes(m.toLowerCase()) : m.test(mainText));
+      if (matchedMarkers.length === 0) {
+        record({
+          severity: 'High', area: 'Nav',
+          title: `${t.label} page renders but missing all expected markers`,
+          detail: `expected one of: ${t.markers.map(String).join(' | ')}; got: ${mainText.slice(0, 300).replace(/\n+/g, ' | ')}`,
+        });
         continue;
       }
 
       // Scroll test
-      const scrollable = await page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);
-      const visible = await page.evaluate(() => window.innerHeight);
-      if (scrollable > visible + 50) {
+      const scrollInfo = await page.evaluate(() => ({
+        scrollHeight: document.scrollingElement?.scrollHeight ?? 0,
+        viewport: window.innerHeight,
+      }));
+      if (scrollInfo.scrollHeight > scrollInfo.viewport + 50) {
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await page.waitForTimeout(500);
         const scrolled = await page.evaluate(() => window.scrollY);
         if (scrolled < 50) {
-          record({ severity: 'High', area: 'Nav', title: `${t.label} content overflows but does not scroll`, detail: `scrollHeight=${scrollable}, viewport=${visible}, scrolled=${scrolled}` });
+          record({ severity: 'High', area: 'Nav', title: `${t.label} content overflows but does not scroll`, detail: `scrollHeight=${scrollInfo.scrollHeight}, viewport=${scrollInfo.viewport}, scrolled=${scrolled}` });
           continue;
         }
         await snap(page, 'nav', `${t.label.toLowerCase()}-scrolled`);
       }
-      record({ severity: 'Info', area: 'Nav', title: `${t.label} renders + scrolls`, detail: `chars=${text.length}` });
+      record({ severity: 'Info', area: 'Nav', title: `${t.label} renders + has content + scrolls`, detail: `main=${mainText.length}chars, markers=[${matchedMarkers.map(String).join(',')}]` });
     }
   });
 
