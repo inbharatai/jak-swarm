@@ -547,23 +547,27 @@ test.describe('JAK Swarm — World-Class QA', () => {
       return;
     }
 
-    // Click the first workflow row to open its detail view
-    const firstRow = page.locator('main a[href*="/swarm/"], main button:has-text("View"), main [role="button"]').filter({ hasText: /hi|workflow|goal|test/i }).first();
-    if ((await firstRow.count()) === 0) {
-      record({ severity: 'Medium', area: 'Runs', title: 'No clickable workflow rows on /swarm', detail: mainText.slice(0, 300) });
+    // Click the first workflow row to expand it — on /swarm these are
+    // <button> elements wrapping the status/id/goal summary.
+    const rows = page.locator('main button').filter({ hasText: /Failed|Completed|Pending|Running|Paused/i });
+    const rowCount = await rows.count();
+    if (rowCount === 0) {
+      record({ severity: 'Medium', area: 'Runs', title: 'No workflow rows matched status-badge pattern', detail: mainText.slice(0, 300) });
       return;
     }
 
-    await firstRow.click();
+    await rows.first().click();
     await page.waitForTimeout(3500);
-    await snap(page, 'runs', 'runs-detail');
+    await snap(page, 'runs', 'runs-detail-expanded');
 
     const detailText = await page.locator('main').first().innerText();
-    if (detailText.trim().length < 80) {
-      record({ severity: 'High', area: 'Runs', title: 'Workflow detail view empty', detail: detailText.slice(0, 300) });
+    // Expanded row should surface agent timeline OR trace list OR empty-state text
+    const hasDetail = /timeline|trace|agent|no traces|completed|planner|commander/i.test(detailText);
+    if (!hasDetail) {
+      record({ severity: 'High', area: 'Runs', title: 'Workflow row expanded but no detail content visible', detail: detailText.slice(0, 400) });
       return;
     }
-    record({ severity: 'Info', area: 'Runs', title: 'Workflow detail view renders', detail: detailText.slice(0, 200) });
+    record({ severity: 'Info', area: 'Runs', title: `Workflow detail view renders (${rowCount} rows found)`, detail: detailText.slice(0, 200) });
   });
 
   // ─── 12. Analytics — real numbers or labeled empty ───────────────────────
