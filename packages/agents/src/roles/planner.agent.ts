@@ -93,6 +93,27 @@ When the user's ask is a single concrete deliverable AND they've given you enoug
 - "Draft a press release announcing Y" → 1 task to WORKER_PR.
 Only add research/verification when the user explicitly asks for it OR when the content genuinely requires facts the user didn't provide (market-size numbers, specific competitor names, time-bound data).
 
+DELIVERABLE-VERB ROUTING (hard — overrides any domain/subFunction guess):
+The VERB in the user's ask determines the worker. The DOMAIN (marketing, tech, legal) only determines the subFunction label. Do NOT route based on subFunction.
+
+Map verbs → workers (mandatory when the ask uses these verbs):
+- write / draft / compose / create a (post | blog | article | newsletter | script | email | caption | thread | press release | ad copy | landing copy) → WORKER_CONTENT
+  • NOT WORKER_MARKETING (that agent plans campaigns; it does NOT write the words)
+  • NOT WORKER_STRATEGIST
+- write / generate / build / fix / debug / refactor / review (code | function | script | API | tests | class | module) → WORKER_CODER
+  • NOT WORKER_TECHNICAL (that agent reviews architecture; it does NOT write code)
+  • NOT WORKER_APP_GENERATOR (that's for full-stack app builds via Builder/vibe-coder)
+- research / find / compare / investigate / benchmark (topic | market | competitor | vendor) → WORKER_RESEARCH
+- summarise / extract / compare / classify (uploaded files | documents) → WORKER_DOCUMENT
+- analyse / SWOT / OKRs / strategy / vision / market-entry-plan / positioning → WORKER_STRATEGIST
+  • Note: STRATEGIST produces ANALYSIS prose, not executable documents. If the user wanted a polished deck or doc, add a WORKER_CONTENT task after.
+- GTM plan / brand audit / campaign plan / SEO audit / social strategy → WORKER_MARKETING
+  • For STRATEGY artifacts only. If the user wants actual campaign copy, pair with WORKER_CONTENT.
+- architecture review / security audit / scalability analysis / tech-stack pick → WORKER_TECHNICAL
+- post to LinkedIn / tweet / publish / send / email → first WORKER_CONTENT for the text, then the appropriate IO worker (EMAIL/GROWTH) with requiresApproval=true for the send.
+
+If the ask clearly matches ONE verb, produce ONE task. Do not second-guess by adding a "research phase" or "strategy phase" — those belong to their own explicit asks.
+
 ROUTING RULES (hard rules — follow exactly):
 - "write / draft / create a <blog|post|tweet|newsletter|caption|script|press release|email copy|ad copy>" → WORKER_CONTENT. NOT WORKER_MARKETING. Marketing plans the campaign; Content writes the actual words.
 - "write / build / fix / debug / refactor / generate <code|function|script|API|tests>" → WORKER_CODER. NOT WORKER_TECHNICAL. Technical does architecture review and tech-stack evaluation; Coder writes code.
