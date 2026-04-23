@@ -248,16 +248,46 @@ export class PlannerAgent extends BaseAgent {
       };
     }
 
+    // Deterministic routing override: the Planner LLM intermittently routes
+    // "write a LinkedIn post" to WORKER_MARKETING (strategy) and "write code"
+    // to WORKER_TECHNICAL (architect), despite the prompt. Post-process based
+    // on keywords in the user's ORIGINAL goal. Keyword match wins over LLM
+    // pick when there's a conflict.
+    const goalLower = (missionBrief.goal ?? '').toLowerCase();
+    const wantsContent = /\b(write|draft|compose|create|generate|produce|rewrite)\b.*\b(post|blog|article|tweet|linkedin|caption|thread|newsletter|press release|ad copy|landing copy|email copy|headline)/i.test(goalLower);
+    const wantsCode = /\b(write|generate|build|create|fix|debug|refactor|review)\b.*\b(code|script|function|api|test|class|module|component)/i.test(goalLower)
+      || /\bpython\s+script|\bnode\.?js\s+|\b(react|vue|svelte)\s+(component|app)/i.test(goalLower);
+    const wantsSwot = /\bswot\b/i.test(goalLower);
+    const wantsOkr = /\bokr[s]?\b/i.test(goalLower);
+    const overridden: string[] = [];
+
     const rawTasks = parsed.tasks ?? [];
     const tasks: WorkflowTask[] = rawTasks.map((t, idx) => {
       const riskLevel = this.parseRiskLevel(t.riskLevel ?? 'LOW');
       const requiresApproval = t.requiresApproval ?? (riskLevel === RiskLevel.HIGH || riskLevel === RiskLevel.CRITICAL);
 
+      let agentRole = t.agentRole ?? 'WORKER_OPS';
+      // Hard override: "write a post" must go to WORKER_CONTENT, not MARKETING/STRATEGIST
+      if (wantsContent && (agentRole === 'WORKER_MARKETING' || agentRole === 'WORKER_STRATEGIST' || agentRole === 'WORKER_PR')) {
+        overridden.push(`${t.id}: ${agentRole}→WORKER_CONTENT (goal wants content)`);
+        agentRole = 'WORKER_CONTENT';
+      }
+      // Hard override: "write code" must go to WORKER_CODER, not TECHNICAL
+      if (wantsCode && (agentRole === 'WORKER_TECHNICAL' || agentRole === 'WORKER_DESIGNER' || agentRole === 'WORKER_APP_ARCHITECT')) {
+        overridden.push(`${t.id}: ${agentRole}→WORKER_CODER (goal wants code)`);
+        agentRole = 'WORKER_CODER';
+      }
+      // Hard override: "SWOT" must go to WORKER_STRATEGIST (not MARKETING)
+      if ((wantsSwot || wantsOkr) && agentRole === 'WORKER_MARKETING') {
+        overridden.push(`${t.id}: WORKER_MARKETING→WORKER_STRATEGIST (goal wants ${wantsSwot ? 'SWOT' : 'OKRs'})`);
+        agentRole = 'WORKER_STRATEGIST';
+      }
+
       return {
         id: t.id ?? `task_${idx + 1}`,
         name: t.name ?? `Task ${idx + 1}`,
         description: t.description ?? '',
-        agentRole: this.parseAgentRole(t.agentRole ?? 'WORKER_OPS'),
+        agentRole: this.parseAgentRole(agentRole),
         toolsRequired: t.toolsRequired ?? [],
         riskLevel,
         requiresApproval,
@@ -267,6 +297,13 @@ export class PlannerAgent extends BaseAgent {
         maxRetries: t.maxRetries ?? 2,
       };
     });
+
+    if (overridden.length > 0) {
+      this.logger.info(
+        { runId: context.runId, overrides: overridden },
+        'Planner: deterministic routing overrides applied to LLM plan',
+      );
+    }
 
     const plan: WorkflowPlan = {
       id: this.generateId('plan_'),
