@@ -710,7 +710,15 @@ test.describe('JAK Swarm — World-Class QA', () => {
     await page.goto('/knowledge', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4500);
 
+    // SWR-backed pages sometimes defer the header button until the first
+    // data fetch resolves. Explicit wait-for so the spec doesn't race SWR.
     const addBtn = page.locator('button:has-text("Add Memory")').first();
+    try {
+      await addBtn.waitFor({ state: 'visible', timeout: 8000 });
+    } catch {
+      record({ severity: 'High', area: 'Knowledge', title: 'No "Add Memory" button found after 12.5s', detail: 'Knowledge page CRUD entry-point missing or SWR fetch never resolved' });
+      return;
+    }
     if ((await addBtn.count()) === 0) {
       record({ severity: 'High', area: 'Knowledge', title: 'No "Add Memory" button found', detail: 'Knowledge page CRUD entry-point missing' });
       return;

@@ -154,6 +154,9 @@ export default function CapabilityMap() {
           <p className="mt-5 text-slate-300 max-w-2xl mx-auto font-sans text-base sm:text-lg leading-relaxed">
             Every agent wires into the exact tools it needs &mdash; no glue code, no duct tape.
             <span className="block mt-1 text-xs sm:text-sm text-slate-400">Tap or hover any node to trace the graph.</span>
+            <span className="block mt-3 text-xs text-slate-500 max-w-xl mx-auto">
+              Maturity breakdown: 56 production&#8209;grade, 33 config&#8209;dependent (OAuth / env keys), 19 LLM&#8209;native, 13 heuristic, 1 experimental. Every tool is labeled in the registry so callers know exactly what they&rsquo;re invoking.
+            </span>
           </p>
         </motion.div>
 
