@@ -176,13 +176,33 @@ export function ChatWorkspace() {
             // message has arrived.
             setIsSending(false);
             setIsStuck(false);
-          // Workflow failed
+          // Workflow failed — but the API's GET /workflows/:id may still
+          // surface a recovered finalOutput (e.g. Commander directAnswer
+          // recovered from the trace when the graph routing failed). Fetch
+          // it before showing the user a "failed" message.
           } else if (evType === 'failed') {
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
-            addMessage(convId, {
-              role: 'assistant',
-              agentRole: null,
-              content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
+            void workflowApi.get(workflow.id).then((w) => {
+              if (w.finalOutput && typeof w.finalOutput === 'string' && w.finalOutput.trim().length > 0) {
+                addMessage(convId, {
+                  role: 'assistant',
+                  agentRole: activeRoles[0] ?? null,
+                  content: w.finalOutput as string,
+                  executionTrace: { workflowId: workflow.id },
+                });
+              } else {
+                addMessage(convId, {
+                  role: 'assistant',
+                  agentRole: null,
+                  content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
+                });
+              }
+            }).catch(() => {
+              addMessage(convId, {
+                role: 'assistant',
+                agentRole: null,
+                content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
+              });
             });
             setIsSending(false);
             setIsStuck(false);
