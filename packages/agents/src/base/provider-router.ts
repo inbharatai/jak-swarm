@@ -29,6 +29,7 @@ export type ProviderErrorKind =
   | 'auth_error'
   | 'config_error'
   | 'model_not_found'
+  | 'billing_error'
   | 'bad_request'
   | 'unknown';
 
@@ -36,6 +37,7 @@ const FAILOVER_POLICY: Record<ProviderErrorKind, boolean> = {
   rate_limit: true,
   server_error: true,
   timeout: true,
+  billing_error: true, // credit-balance/quota depleted on one provider → try next
   auth_error: false,
   config_error: false,
   model_not_found: false,
@@ -103,6 +105,30 @@ export function classifyProviderError(err: unknown): ProviderErrorKind {
   // Any other 404 → config error (wrong endpoint / wrong path).
   if (status === 404 || message.includes('404')) {
     return 'config_error';
+  }
+
+  // Billing / quota exhaustion — must be checked BEFORE the generic bad_request
+  // branch because most providers return these as 400s with a distinctive message.
+  // Known patterns:
+  //   Anthropic: "Your credit balance is too low to access the Anthropic API..."
+  //   OpenAI:    "You exceeded your current quota, please check your plan and billing"
+  //              "insufficient_quota"
+  //   OpenAI:    402 Payment Required
+  //   Gemini:    "RESOURCE_EXHAUSTED" / "billing account"
+  if (
+    status === 402 ||
+    message.includes('credit balance') ||
+    message.includes('insufficient_quota') ||
+    message.includes('insufficient quota') ||
+    message.includes('exceeded your current quota') ||
+    message.includes('billing account') ||
+    message.includes('payment required') ||
+    message.includes('purchase credits') ||
+    message.includes('plans & billing') ||
+    message.includes('resource_exhausted') ||
+    message.includes('quota exceeded')
+  ) {
+    return 'billing_error';
   }
 
   if (
@@ -467,6 +493,7 @@ export class ProviderRouter implements LLMProvider {
     tools?: unknown[];
     maxTokens?: number;
     temperature?: number;
+    jsonMode?: boolean;
   }): Promise<LLMResponse> {
     let lastError: unknown;
 
@@ -482,6 +509,12 @@ export class ProviderRouter implements LLMProvider {
           (err as Error & { providerErrorKind?: ProviderErrorKind }).providerErrorKind = kind;
         }
         if (i < this.chain.length - 1 && shouldFailover(kind)) {
+          const next = this.chain[i + 1]!;
+          // eslint-disable-next-line no-console -- intentional info log for operators
+          console.warn(
+            `[ProviderRouter] ${provider.name} failed with ${kind}; failing over to ${next.name}. ` +
+            `Message: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`,
+          );
           continue;
         }
         throw err;
