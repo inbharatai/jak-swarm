@@ -61,6 +61,13 @@ async function sendChatAndWait(
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const startedAt = Date.now();
 
+  // Always start with a fresh conversation so initialAssistantCount = 0
+  const newChatBtn = page.locator('button:has-text("New chat")').first();
+  if ((await newChatBtn.count()) > 0) {
+    await newChatBtn.click();
+    await page.waitForTimeout(800);
+  }
+
   // Pre-select roles if any
   if (opts.selectRoles?.length) {
     for (const role of opts.selectRoles) {
@@ -159,6 +166,19 @@ test.describe('JAK Swarm — World-Class QA', () => {
     await page.locator('button[type="submit"]').first().click();
     await page.waitForURL((u) => !/\/(login|register|forgot-password)/.test(u.pathname), { timeout: 20_000 });
     await page.waitForTimeout(2500);
+    // Clear conversation localStorage so prior test runs don't pollute the
+    // assistant-message count baseline. We keep auth tokens (sb-*).
+    await page.evaluate(() => {
+      const keep = new Map<string, string>();
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && /^sb-/.test(k)) keep.set(k, localStorage.getItem(k) ?? '');
+      }
+      localStorage.clear();
+      keep.forEach((v, k) => localStorage.setItem(k, v));
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
     await snap(page, 'auth', 'logged-in-landing');
     record({ severity: 'Info', area: 'Auth', title: 'Logged in successfully', detail: `User: ${EMAIL}` });
   });

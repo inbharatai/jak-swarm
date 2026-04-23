@@ -249,6 +249,18 @@ async function buildApp() {
     });
   });
 
+  // /version — exposes git commit SHA so deploys can be verified end-to-end.
+  // Render injects RENDER_GIT_COMMIT during build; falls back to env var or 'unknown'.
+  fastify.get('/version', async (_request, reply) => {
+    return reply.status(200).send({
+      gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
+      gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
+      buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
+      startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Global error handler
   // -------------------------------------------------------------------------

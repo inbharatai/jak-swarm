@@ -130,6 +130,19 @@ export async function commanderNode(
     };
   }
 
+  // Defensive: if Commander.execute somehow returned without missionBrief
+  // AND without directAnswer/clarification, terminate the workflow with a
+  // clear error instead of letting Planner choke on undefined missionBrief
+  // (the historical "Planner node received no mission brief" failure mode).
+  if (!result.missionBrief) {
+    return {
+      directAnswer: 'I had trouble understanding that request. Could you rephrase it with a bit more detail about what you want me to do?',
+      clarificationNeeded: false,
+      status: WorkflowStatus.COMPLETED,
+      traces,
+    };
+  }
+
   return {
     missionBrief: result.missionBrief,
     clarificationNeeded: false,
