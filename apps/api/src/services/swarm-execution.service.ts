@@ -1414,39 +1414,70 @@ export class SwarmExecutionService extends EventEmitter {
       const output = trace.outputJson;
       let content: string | null = null;
 
+      // Common generic stub strings some workers return when they have
+      // no substantive response. Detecting these means we skip them and
+      // fall through to render keyPoints (which usually contain the
+      // actual substance) instead of showing the user a hollow sentence.
+      const STUB_PATTERNS = [
+        /research completed\.?\s*see key points/i,
+        /task completed\.?\s*see (details|key points)/i,
+        /^analysis complete\.?\s*$/i,
+        /^completed\.?\s*$/i,
+        /no (detailed|specific) (findings|response)/i,
+      ];
+      const isStub = (s: string) => STUB_PATTERNS.some((p) => p.test(s.trim()));
+
+      // A worker can contribute multiple pieces that we render together:
+      //   1. the primary string field (findings/summary/content/...)
+      //   2. a keyPoints bullet list, if present
+      // Stub strings are dropped so they don't mask the real content.
+      const pieces: string[] = [];
+
       if (typeof output === 'string') {
-        content = output;
+        if (!isStub(output)) pieces.push(output);
       } else if (typeof output === 'object' && output !== null) {
         const obj = output as Record<string, unknown>;
         // Try known string fields first.
         for (const field of STRING_FIELDS) {
           const v = obj[field];
-          if (typeof v === 'string' && v.trim().length > 0) {
-            content = v;
+          if (typeof v === 'string' && v.trim().length > 0 && !isStub(v)) {
+            pieces.push(v.trim());
             break;
           }
         }
-        // Fallback: if there's a keyPoints[] array of strings, render it as a bullet list.
-        // Research, Strategy, Product agents commonly return this alongside findings.
-        if (!content && Array.isArray(obj['keyPoints'])) {
+        // Always also render keyPoints if present — they frequently carry
+        // the actual substance even when findings/summary is a stub.
+        if (Array.isArray(obj['keyPoints'])) {
           const bullets = (obj['keyPoints'] as unknown[])
-            .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-            .map((s) => `- ${s}`);
-          if (bullets.length > 0) content = bullets.join('\n');
+            .map((kp) => {
+              if (typeof kp === 'string') return kp;
+              if (kp && typeof kp === 'object') {
+                const o = kp as Record<string, unknown>;
+                // Common keyPoint shapes: {point, source}, {text}, {content}
+                if (typeof o['point'] === 'string') return o['point'] as string;
+                if (typeof o['text'] === 'string') return o['text'] as string;
+                if (typeof o['content'] === 'string') return o['content'] as string;
+              }
+              return null;
+            })
+            .filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+          if (bullets.length > 0) pieces.push(bullets.map((b) => `- ${b}`).join('\n'));
         }
         // Last-resort fallback: find the LONGEST string field on the object
         // and surface it. Avoids JSON-dumping but still gets *something*
         // user-facing for unknown agent output shapes.
-        if (!content) {
+        if (pieces.length === 0) {
           let longest = '';
           for (const v of Object.values(obj)) {
-            if (typeof v === 'string' && v.trim().length > longest.length) {
+            if (typeof v === 'string' && v.trim().length > longest.length && !isStub(v)) {
               longest = v;
             }
           }
-          if (longest.trim().length >= 10) content = longest;
+          if (longest.trim().length >= 10) pieces.push(longest);
         }
       }
+
+      content = pieces.length > 0 ? pieces.join('\n\n') : null;
 
       if (!content || !content.trim()) continue;
 
