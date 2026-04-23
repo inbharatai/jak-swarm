@@ -139,17 +139,20 @@ export class RouterAgent extends BaseAgent {
 
   private inferToolCategory(toolName: string): string {
     const lower = toolName.toLowerCase();
+    // Most-specific matches first — some tool names contain multiple patterns
+    // (e.g. "web_search" contains both "web" and "search").
+    if (lower === 'web_search' || lower === 'search_web' || lower === 'tavily_search' || lower === 'serper_search') return 'research';
     if (lower.includes('email')) return 'email';
     if (lower.includes('calendar')) return 'calendar';
     if (lower.includes('crm') || lower.includes('contact') || lower.includes('deal')) return 'crm';
     if (lower.includes('document') || lower.includes('doc') || lower.includes('extract')) return 'document';
-    if (lower.includes('browser') || lower.includes('navigate') || lower.includes('web')) return 'browser';
+    if (lower.includes('browser_') || lower.startsWith('browser') || lower.includes('navigate') || lower.includes('playwright')) return 'browser';
     if (lower.includes('webhook')) return 'webhook';
-    if (lower.includes('knowledge') || lower.includes('search')) return 'knowledge';
+    if (lower.includes('research') || lower.includes('classify')) return 'research';
+    if (lower.includes('knowledge') || lower.includes('memory') || (lower.includes('search') && !lower.includes('web'))) return 'knowledge';
     if (lower.includes('storage') || lower.includes('file')) return 'storage';
     if (lower.includes('spreadsheet') || lower.includes('report') || lower.includes('excel')) return 'spreadsheet';
     if (lower.includes('message') || lower.includes('slack') || lower.includes('sms')) return 'messaging';
-    if (lower.includes('research') || lower.includes('classify')) return 'research';
     return 'unknown';
   }
 
