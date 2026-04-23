@@ -84,7 +84,11 @@ Examples that MUST NOT get a directAnswer (use the structured plan path instead)
 When directAnswer is set, you may leave intent/subFunction/urgency/etc at minimal sensible defaults — the workflow will terminate after you and the other fields are ignored.
 
 Guidelines for the non-shortcut path:
-- Set clarificationNeeded=true only if the request is genuinely ambiguous and you cannot proceed safely without more info.
+- Bias STRONGLY toward proceeding without clarification. The specialist agents downstream are smart enough to fill gaps with reasonable defaults and flag assumptions in their output. A user who asked "do a SWOT for our early-stage AI platform" has given enough to START — do not hold them up with a questionnaire. Only set clarificationNeeded=true when ONE of these is true:
+  (a) the request could cause an external side-effect (send, post, publish, charge, delete) and a critical parameter is missing (e.g. recipient, amount, destination).
+  (b) the request names a file/doc/project/person that you have zero way to identify without more info.
+  (c) the request is one or two words with no context AND isn't a trivial greeting/factual Q you can direct-answer.
+  In all other cases, proceed and let the specialists work from the user's prompt as given.
 - urgency=5 is reserved for patient emergencies, financial crises, or compliance deadlines within hours.
 - riskIndicators should flag PII handling, external communications, data deletion, financial transactions, etc.
 - requiredOutputs should be concrete: 'summarized email draft', 'updated CRM record', 'classification label', etc.

@@ -240,15 +240,24 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         const isStubFinal = typeof fo !== 'string' || fo.trim().length === 0 || stub.test(fo);
 
         if (isStubFinal && traces.length > 0) {
-          // Recovery #1: Commander directAnswer
+          // Recovery #1: Commander directAnswer (trivial inputs)
           const cmd = traces.find((t) => t.agentRole === 'COMMANDER');
-          const cmdOut = (cmd?.output ?? null) as { directAnswer?: unknown } | null;
+          const cmdOut = (cmd?.output ?? null) as { directAnswer?: unknown; clarificationNeeded?: unknown; clarificationQuestion?: unknown } | null;
           const da = typeof cmdOut?.directAnswer === 'string' ? cmdOut.directAnswer.trim() : '';
+          const clarQ = typeof cmdOut?.clarificationQuestion === 'string' ? cmdOut.clarificationQuestion.trim() : '';
           if (da.length > 0) {
             responseBody['finalOutput'] = da;
             responseBody['status'] = 'COMPLETED';
             responseBody['error'] = null;
             responseBody['recoveredFromCommanderTrace'] = true;
+          } else if (cmdOut?.clarificationNeeded === true && clarQ.length > 0) {
+            // Recovery #1b: Commander requested clarification — surface the
+            // question as the final answer so the user sees it in chat
+            // instead of the generic "did not produce" stub.
+            responseBody['finalOutput'] = clarQ;
+            responseBody['status'] = 'COMPLETED';
+            responseBody['error'] = null;
+            responseBody['recoveredAsClarification'] = true;
           } else {
             // Recovery #2: pull substantive content from the worker traces
             // (skip orchestration roles).
