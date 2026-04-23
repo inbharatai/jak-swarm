@@ -37,5 +37,12 @@ export interface LLMProvider {
     tools?: unknown[];
     maxTokens?: number;
     temperature?: number;
+    /**
+     * When true, instruct the provider to return a strict JSON object.
+     * OpenAI uses `response_format: { type: 'json_object' }`. Gemini's
+     * OpenAI-compatible endpoint supports the same. Providers that don't
+     * support it may ignore it — agents always re-parse defensively.
+     */
+    jsonMode?: boolean;
   }): Promise<LLMResponse>;
 }

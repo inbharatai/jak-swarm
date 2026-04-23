@@ -325,7 +325,7 @@ ${lines.join('\n')}
   private async callLLMViaProvider(
     messages: OpenAI.ChatCompletionMessageParam[],
     tools?: OpenAI.ChatCompletionTool[],
-    options?: { maxTokens?: number; temperature?: number },
+    options?: { maxTokens?: number; temperature?: number; jsonMode?: boolean },
   ): Promise<OpenAI.ChatCompletion> {
     this.logger.debug(
       { messageCount: messages.length, provider: this.provider!.name },
@@ -340,6 +340,7 @@ ${lines.join('\n')}
           tools: tools as unknown[],
           maxTokens: options?.maxTokens,
           temperature: options?.temperature,
+          jsonMode: options?.jsonMode,
         });
 
         // Convert LLMResponse to OpenAI ChatCompletion shape

@@ -35,16 +35,27 @@ export class GeminiProvider implements LLMProvider {
     tools?: unknown[];
     maxTokens?: number;
     temperature?: number;
+    jsonMode?: boolean;
   }): Promise<LLMResponse> {
     const messages = params.messages as OpenAI.ChatCompletionMessageParam[];
     const tools = params.tools as OpenAI.ChatCompletionTool[] | undefined;
+    const hasTools = tools && tools.length > 0;
+
+    // Detect JSON intent from the system prompt if not explicitly requested.
+    // The OpenAI path does the same heuristic; doing it here too means
+    // Gemini agents get the same JSON reliability guarantees.
+    const systemMsg = messages.find((m) => m.role === 'system');
+    const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+    const wantsJson = params.jsonMode ??
+      (!hasTools && /respond with (strict )?json|output.*json|return.*json|respond.*matching.*schema/i.test(systemContent));
 
     const requestParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
       model: this.model,
       messages,
       max_tokens: params.maxTokens ?? 4096,
       temperature: params.temperature ?? 0.2,
-      ...(tools && tools.length > 0 ? { tools, tool_choice: 'auto' as const } : {}),
+      ...(hasTools ? { tools, tool_choice: 'auto' as const } : {}),
+      ...(wantsJson && !hasTools ? { response_format: { type: 'json_object' as const } } : {}),
     };
 
     const completion = await this.client.chat.completions.create(requestParams);

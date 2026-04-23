@@ -49,6 +49,8 @@ function detectIndustry(text: string): Industry {
 
 const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and either (a) answer trivial requests directly to avoid unnecessary orchestration, or (b) extract structured intelligence from raw user input so specialist agents can execute.
 
+Respond with strict JSON only — no markdown fences, no prose prefix, no explanation.
+
 You must respond with a JSON object matching this schema:
 {
   "directAnswer": "<string or null>",
