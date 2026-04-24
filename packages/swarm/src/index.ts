@@ -35,6 +35,15 @@ export {
 export type { SwarmState } from './state/swarm-state.js';
 export { InMemoryStateStore } from './state/workflow-state-store.js';
 export type { WorkflowStateStore } from './state/workflow-state-store.js';
+// Phase 5 — run-lifecycle state machine
+export {
+  isLegalTransition,
+  isTerminalStatus,
+  assertTransition,
+  transition as transitionStatus,
+  TERMINAL,
+} from './state/run-lifecycle.js';
+export type { MinimalLogger } from './state/run-lifecycle.js';
 
 // Runner
 export { SwarmRunner } from './runner/swarm-runner.js';

@@ -10,6 +10,8 @@ export enum WorkflowStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
+  /** Phase 5 — terminal state for workflows that ran a compensation/undo flow. */
+  ROLLED_BACK = 'ROLLED_BACK',
 }
 
 export enum RiskLevel {
