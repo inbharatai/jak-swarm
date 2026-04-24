@@ -1,5 +1,5 @@
 import type { EmailAdapter, EmailMessage, EmailFilter, EmailDraft } from './email.interface.js';
-import { generateId } from '@jak-swarm/shared';
+// generateId removed — draftReply/createDraft/sendDraft throw, no IDs needed
 
 // Seeded mock emails for different industry contexts
 const MOCK_EMAILS_BY_INDUSTRY: Record<string, EmailMessage[]> = {
@@ -241,58 +241,30 @@ export class MockEmailAdapter implements EmailAdapter {
     return { ...email, _mock: true } as EmailMessage;
   }
 
-  async draftReply(messageId: string, body: string): Promise<EmailDraft> {
-    const original = await this.getMessage(messageId);
-    const draft: EmailDraft = {
-      id: generateId('draft_'),
-      to: [original.from],
-      subject: `RE: ${original.subject}`,
-      body,
-      createdAt: new Date().toISOString(),
-    };
-    mockDrafts.set(draft.id, draft);
-    return {
-      ...draft,
-      _mock: true,
-      _notice: 'Email integration not connected. Connect Gmail in Settings > Integrations.',
-    } as EmailDraft;
-  }
+  // Stage 1 honesty fix: all write operations THROW instead of silently
+  // embedding `_notice` metadata in success-shaped responses. The mock
+  // adapter previously let callers receive what looked like a successful
+  // draft/send, then relied on them inspecting the `_notice` field —
+  // which nothing downstream (tool handlers, LLM, UI) actually did.
+  // Now these methods throw a typed error the tool layer translates to
+  // a clear "Email not connected — please connect Gmail" message in chat.
 
-  async createDraft(to: string[], subject: string, body: string, cc?: string[]): Promise<EmailDraft> {
-    const draft: EmailDraft = {
-      id: generateId('draft_'),
-      to,
-      ...(cc !== undefined && { cc }),
-      subject,
-      body,
-      createdAt: new Date().toISOString(),
-    };
-    mockDrafts.set(draft.id, draft);
-    return {
-      ...draft,
-      _mock: true,
-      _notice: 'Email integration not connected. Connect Gmail in Settings > Integrations.',
-    } as EmailDraft;
-  }
-
-  async sendDraft(draftId: string): Promise<void> {
-    const draft = mockDrafts.get(draftId);
-    if (!draft) {
-      throw new Error(`Draft '${draftId}' not found`);
-    }
-    // Mock mode — email is NOT actually sent. Log a warning.
-    mockDrafts.delete(draftId);
-    console.warn(
-      `[MockEmailAdapter] Email NOT sent — email integration not connected. Draft '${draftId}' to: ${draft.to.join(', ')}. Connect Gmail in Settings > Integrations.`,
+  async draftReply(_messageId: string, _body: string): Promise<EmailDraft> {
+    throw new Error(
+      'Email integration not connected — cannot draft reply. Connect Gmail in Settings > Integrations.',
     );
-    // Return a mock result so callers/LLM can see the send did not really happen.
-    // The interface declares Promise<void>, so we cast to satisfy the contract
-    // while still embedding metadata for tool-output inspection.
-    return {
-      success: false,
-      _mock: true,
-      _notice: 'Email NOT sent — email integration not connected. Connect Gmail in Settings > Integrations.',
-    } as unknown as void;
+  }
+
+  async createDraft(_to: string[], _subject: string, _body: string, _cc?: string[]): Promise<EmailDraft> {
+    throw new Error(
+      'Email integration not connected — cannot create draft. Connect Gmail in Settings > Integrations.',
+    );
+  }
+
+  async sendDraft(_draftId: string): Promise<void> {
+    throw new Error(
+      'Email integration not connected — email NOT sent. Connect Gmail in Settings > Integrations.',
+    );
   }
 
   async searchMessages(query: string): Promise<EmailMessage[]> {

@@ -49,7 +49,12 @@ export class TwitterApiAdapter implements SocialMediaAdapter {
 
     if (!response.ok) {
       const err = await response.text().catch(() => '');
-      return { success: false, error: `Twitter API error ${response.status}: ${err}` };
+      return {
+        success: false,
+        posted: false,
+        draftCreated: false,
+        error: `Twitter API error ${response.status}: ${err}`,
+      };
     }
 
     const data = await response.json() as { data?: { id: string } };
@@ -57,6 +62,8 @@ export class TwitterApiAdapter implements SocialMediaAdapter {
 
     return {
       success: true,
+      posted: true,
+      draftCreated: false,
       postId: tweetId,
       url: tweetId ? `https://twitter.com/i/web/status/${tweetId}` : undefined,
     };

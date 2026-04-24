@@ -6,7 +6,8 @@ import type {
   UpdateEventParams,
   AvailabilitySlot,
 } from './calendar.interface.js';
-import { generateId } from '@jak-swarm/shared';
+// generateId removed with the write-path removal — mock adapter no longer
+// invents new IDs now that create/update/delete throw NotConfigured.
 
 const now = new Date();
 const tomorrow = new Date(now.getTime() + 86400000);
@@ -148,75 +149,29 @@ export class MockCalendarAdapter implements CalendarAdapter {
     return event;
   }
 
-  async createEvent(params: CreateEventParams): Promise<CalendarEvent> {
-    const event: CalendarEvent = {
-      id: generateId('cal_'),
-      title: params.title,
-      ...(params.description !== undefined && { description: params.description }),
-      ...(params.location !== undefined && { location: params.location }),
-      startTime: params.startTime,
-      endTime: params.endTime,
-      allDay: params.allDay ?? false,
-      attendees: (params.attendees ?? []).map((email) => ({ email, status: 'pending' as const })),
-      organizer: 'user@company.com',
-      calendarId: params.calendarId ?? 'primary',
-      ...(params.recurrence !== undefined && { recurrence: params.recurrence }),
-      ...(params.conferenceLink && { conferenceLink: 'https://meet.google.com/mock-link' }),
-      status: 'confirmed',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    eventStore.set(event.id, event);
-    return {
-      ...event,
-      _mock: true,
-      _notice: 'Calendar not connected. Event NOT actually created. Connect Google Calendar in Settings > Integrations.',
-    } as CalendarEvent;
-  }
+  // Stage 1 honesty fix: write operations THROW instead of pretending
+  // to succeed while embedding _mock/_notice metadata in the return. The
+  // previous pattern let callers see what looked like a real event + then
+  // relied on them checking `_notice` — which nothing did. Now the tool
+  // layer gets a clear error that propagates straight to chat:
+  // "Calendar not connected — please connect Google Calendar".
 
-  async updateEvent(eventId: string, updates: UpdateEventParams): Promise<CalendarEvent> {
-    const existing = await this.getEvent(eventId);
-    const updated: CalendarEvent = {
-      ...existing,
-      ...(updates.title !== undefined ? { title: updates.title } : {}),
-      ...(updates.description !== undefined ? { description: updates.description } : {}),
-      ...(updates.location !== undefined ? { location: updates.location } : {}),
-      ...(updates.startTime !== undefined ? { startTime: updates.startTime } : {}),
-      ...(updates.endTime !== undefined ? { endTime: updates.endTime } : {}),
-      ...(updates.status !== undefined ? { status: updates.status } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (updates.addAttendees) {
-      updated.attendees = [
-        ...updated.attendees,
-        ...updates.addAttendees.map((email) => ({ email, status: 'pending' as const })),
-      ];
-    }
-    if (updates.removeAttendees) {
-      const removeSet = new Set(updates.removeAttendees);
-      updated.attendees = updated.attendees.filter((a) => !removeSet.has(a.email));
-    }
-
-    eventStore.set(eventId, updated);
-    return {
-      ...updated,
-      _mock: true,
-      _notice: 'Calendar not connected. Event NOT actually updated. Connect Google Calendar in Settings > Integrations.',
-    } as CalendarEvent;
-  }
-
-  async deleteEvent(eventId: string, _notify = true): Promise<void> {
-    const existing = await this.getEvent(eventId);
-    const cancelled: CalendarEvent = { ...existing, status: 'cancelled', updatedAt: new Date().toISOString() };
-    eventStore.set(eventId, cancelled);
-    console.warn(
-      `[MockCalendarAdapter] Event NOT actually deleted — calendar integration not connected. Connect Google Calendar in Settings > Integrations.`,
+  async createEvent(_params: CreateEventParams): Promise<CalendarEvent> {
+    throw new Error(
+      'Calendar integration not connected — event NOT created. Connect Google Calendar in Settings > Integrations.',
     );
-    return {
-      _mock: true,
-      _notice: 'Calendar not connected. Event NOT actually deleted. Connect Google Calendar in Settings > Integrations.',
-    } as unknown as void;
+  }
+
+  async updateEvent(_eventId: string, _updates: UpdateEventParams): Promise<CalendarEvent> {
+    throw new Error(
+      'Calendar integration not connected — event NOT updated. Connect Google Calendar in Settings > Integrations.',
+    );
+  }
+
+  async deleteEvent(_eventId: string, _notify = true): Promise<void> {
+    throw new Error(
+      'Calendar integration not connected — event NOT deleted. Connect Google Calendar in Settings > Integrations.',
+    );
   }
 
   async findAvailability(

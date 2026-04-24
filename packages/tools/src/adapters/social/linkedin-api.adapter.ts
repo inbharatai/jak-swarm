@@ -63,12 +63,19 @@ export class LinkedInApiAdapter implements SocialMediaAdapter {
 
     if (!response.ok) {
       const err = await response.text().catch(() => '');
-      return { success: false, error: `LinkedIn API error ${response.status}: ${err}` };
+      return {
+        success: false,
+        posted: false,
+        draftCreated: false,
+        error: `LinkedIn API error ${response.status}: ${err}`,
+      };
     }
 
     const postId = response.headers.get('x-restli-id') ?? undefined;
     return {
       success: true,
+      posted: true,
+      draftCreated: false,
       postId,
       url: postId ? `https://www.linkedin.com/feed/update/${postId}` : undefined,
     };

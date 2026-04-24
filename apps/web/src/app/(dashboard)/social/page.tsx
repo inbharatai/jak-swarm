@@ -58,6 +58,13 @@ interface NetworkCardDef {
   requiredProvider?: IntegrationProvider;
   /** Prompt prefix the workflow sees — primes the worker to produce the right length/tone. */
   workflowGoalPrefix: string;
+  /**
+   * Stage 1.5 honesty flag. When true, this card produces a draft that
+   * the user must manually publish elsewhere — there is no OAuth / API
+   * write path from JAK for this network yet. Card renders with a clear
+   * "Draft only" badge + no Publish button.
+   */
+  draftOnly?: boolean;
 }
 
 const NETWORKS: NetworkCardDef[] = [
@@ -97,6 +104,7 @@ const NETWORKS: NetworkCardDef[] = [
     charLimit: 10000,
     prompt: 'What are you responding to? Paste a subreddit link or describe the thread.',
     agentRole: 'research',
+    draftOnly: true, // No OAuth write path today — honest label
     workflowGoalPrefix:
       'Draft a Reddit reply that is helpful, not promotional, cites our experience without name-dropping ' +
       'the company more than once. Thread/context: ',
@@ -110,6 +118,7 @@ const NETWORKS: NetworkCardDef[] = [
     charLimit: 8000,
     prompt: 'Paste an HN URL or describe what you want to comment on.',
     agentRole: 'research',
+    draftOnly: true, // HN has no API write — always copy + paste
     workflowGoalPrefix:
       'Draft a Hacker News comment that adds technical substance, avoids marketing speak, stays under 1500 chars, ' +
       'and ends with a concrete question or claim. Context: ',
@@ -301,7 +310,14 @@ export default function SocialHubPage() {
                       <h2 className="text-sm font-semibold">{def.label}</h2>
                       <p className="text-xs text-muted-foreground">{def.tagline}</p>
                     </div>
-                    {def.requiredProvider && (
+                    {def.draftOnly ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[10px] font-medium"
+                        title="Draft only — JAK will write the content; you copy + paste it into the platform to publish."
+                      >
+                        Draft only
+                      </span>
+                    ) : def.requiredProvider && (
                       <span
                         className={
                           'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ' +
@@ -389,7 +405,7 @@ export default function SocialHubPage() {
                         <Copy className="h-3.5 w-3.5" /> Copy
                       </Button>
                     )}
-                    {state.draft && def.requiredProvider && (
+                    {state.draft && def.requiredProvider && !def.draftOnly && (
                       <Button
                         variant={connected ? 'default' : 'outline'}
                         onClick={() => handlePublish(def)}
@@ -405,6 +421,14 @@ export default function SocialHubPage() {
                           <><Send className="h-3.5 w-3.5" /> Publish</>
                         )}
                       </Button>
+                    )}
+                    {state.draft && def.draftOnly && (
+                      <p
+                        className="basis-full mt-1 text-[10px] text-muted-foreground"
+                        data-testid={`social-draftonly-note-${def.id}`}
+                      >
+                        This network has no direct publish API in JAK yet. Copy the draft and paste it into {def.label}.
+                      </p>
                     )}
                   </div>
                 </CardContent>

@@ -27,8 +27,15 @@ export class DraftSocialAdapter implements SocialMediaAdapter {
       text = `${text}\n\n${content.link}`;
     }
 
+    // Stage 1.4 honesty fix: explicit `posted: false` + `draftCreated:
+    // true`. The legacy `success: true` is kept for backward compat, but
+    // any caller inspecting the result can now immediately see whether
+    // the content actually went live. Previously callers who only
+    // checked `success` silently treated drafts as published posts.
     return {
       success: true,
+      posted: false,
+      draftCreated: true,
       draft: {
         text,
         platform: this.platform,

@@ -34,9 +34,16 @@ export class VoicePipeline {
   private readonly sessions = new Map<string, ActiveSession>();
 
   constructor(config: VoicePipelineConfig) {
+    // Stage 1.2 honesty fix: removed `VoiceProvider.MOCK` from the default
+    // fallback chain. Previously, when the preferred provider (e.g.
+    // Deepgram) failed, the pipeline silently swapped in the mock
+    // provider and returned hardcoded test transcripts — the user thought
+    // voice was working. Now a failure of the preferred provider is
+    // surfaced instead of masked. MOCK can still be opted into by the
+    // caller explicitly for tests / local dev.
     this.config = {
       enableFallback: true,
-      fallbackProviders: [VoiceProvider.DEEPGRAM, VoiceProvider.MOCK],
+      fallbackProviders: [VoiceProvider.DEEPGRAM],
       ...config,
     };
   }
