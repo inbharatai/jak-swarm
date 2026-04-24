@@ -7,7 +7,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
 function readRepoFile(relativePath: string): string {
-  return readFileSync(resolve(repoRoot, relativePath), 'utf8');
+  // Normalize CRLF → LF so multi-line string matches ("fastify.post(\n    '/'")
+  // work consistently on Windows checkouts where core.autocrlf introduces
+  // CRLF line endings.
+  return readFileSync(resolve(repoRoot, relativePath), 'utf8').replace(/\r\n/g, '\n');
 }
 
 describe('JAK Swarm route contract checks', () => {

@@ -271,11 +271,24 @@ CRITICAL OUTPUT FORMAT — Your ENTIRE response must be a single JSON object sta
       result = {
         action: task.action,
         analysis: stripped.length >= 80 ? stripped : raw,
-        recommendations: [],
+        // Parse-failure fallback — surface an explicit "Manual review
+        // required" recommendation instead of silently returning []. Keeps
+        // the reader from publishing the agent's prose without another
+        // pair of eyes.
+        recommendations: [
+          {
+            title: 'Manual review required',
+            description: 'The strategist returned prose rather than structured JSON. Review the analysis and rewrite recommendations before acting.',
+            priority: 'high',
+            effort: 'low',
+            impact: 'high',
+            timeframe: 'Immediate',
+          },
+        ],
         risks: [],
         opportunities: [],
         metrics: [],
-        confidence: 0.6,
+        confidence: 0.4,
       };
     }
 

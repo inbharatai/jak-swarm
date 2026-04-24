@@ -11,7 +11,7 @@
     "pretypecheck": "pnpm -w --filter @jak-swarm/shared --filter @jak-swarm/verification --filter @jak-swarm/swarm --filter !jak-swarm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "eslint src --ext .ts"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

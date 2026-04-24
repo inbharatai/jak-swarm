@@ -201,7 +201,7 @@ export class ResearchAgent extends BaseAgent {
           keyPoints: [],
           sources: [],
           confidence: 0.5,
-          limitations: ['Output returned as prose rather than structured JSON — re-verify before publishing.'],
+          limitations: ['Output returned as prose rather than structured JSON — manual review required before publishing.'],
         };
       }
 

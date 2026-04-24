@@ -49,8 +49,17 @@ function fakeCompletion(content: string): OpenAI.Chat.Completions.ChatCompletion
 }
 
 function stubLLM<T>(agent: T, payload: unknown): void {
+  // Legacy path: patch callLLM to return a canned ChatCompletion.
   (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM =
     vi.fn(async () => fakeCompletion(JSON.stringify(payload)));
+  // New path (Phase 4 onwards): Commander + future structured-output agents
+  // route through `runtime.respondStructured` which bypasses callLLM. The
+  // runtime lives on a protected field; intercept it on the instance so the
+  // stub payload is returned as the already-parsed object the caller expects.
+  const anyAgent = agent as unknown as { runtime?: { respondStructured?: (...a: unknown[]) => Promise<unknown> } };
+  if (anyAgent.runtime) {
+    anyAgent.runtime.respondStructured = vi.fn(async () => payload);
+  }
 }
 
 // ─── Commander ─────────────────────────────────────────────────────────────
