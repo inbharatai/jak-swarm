@@ -13,6 +13,7 @@ import {
   withLock,
 } from './coordination/index.js';
 import { metricsRegistry, metrics } from './observability/metrics.js';
+import { ensureModelMap } from '@jak-swarm/agents';
 
 /**
  * Validate worker-specific env vars. Fail fast with a clear, actionable
@@ -96,6 +97,19 @@ async function main(): Promise<void> {
   try {
     metrics.postgresConnectivityStatus.set(1);
   } catch { /* swallow */ }
+
+  // Warm the OpenAI ModelResolver cache at worker boot. Non-blocking: if
+  // the /v1/models check fails (network blip, auth) the resolver falls
+  // back to the failsafe gpt-4o map and agents still execute. Mirrors
+  // the web server's boot warmup at apps/api/src/index.ts so the worker
+  // never burns extra 404s before the cache is populated. Stage 0.2 from
+  // qa/openai-api-optimization-audit.md.
+  void ensureModelMap().catch((err) => {
+    log.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      '[Worker] ensureModelMap() at boot failed; resolver will use failsafe map (gpt-4o family)',
+    );
+  });
 
   let redis: Redis | null = null;
   let signalsRedis: Redis | null = null;

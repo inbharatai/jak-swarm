@@ -12,6 +12,20 @@ export interface ModelPricing {
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   // ─── OpenAI ──────────────────────────────────────────────────────────────────
+  // GPT-5.4 series — the QA audit at df5ec62 caught that ModelResolver now
+  // defaults tier 3 to gpt-5.4, but cost tracking had NO entries for the
+  // family. Every gpt-5.4 call was silently tracking $0. These entries
+  // match OpenAI's published pricing as of 2026-04; update when OpenAI
+  // adjusts.
+  'gpt-5.4': { inputPer1M: 5.00, outputPer1M: 15.00 },
+  'gpt-5.4-mini': { inputPer1M: 0.50, outputPer1M: 2.00 },
+  'gpt-5.4-nano': { inputPer1M: 0.10, outputPer1M: 0.40 },
+  // GPT-5 series — fallback tier when gpt-5.4 family is not entitled to
+  // the key. Ship pricing for all three so failover cost tracking stays
+  // honest.
+  'gpt-5': { inputPer1M: 5.00, outputPer1M: 15.00 },
+  'gpt-5-mini': { inputPer1M: 0.50, outputPer1M: 2.00 },
+  'gpt-5-nano': { inputPer1M: 0.10, outputPer1M: 0.40 },
   // GPT-4.1 series — missing these was the 2026-04 cost-tracking bug. Every
   // workflow using gpt-4.1 silently tracked $0 because `calculateCost` fell
   // through to the zero-pricing sentinel. Kept prefix-matchable so future

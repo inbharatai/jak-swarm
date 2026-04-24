@@ -262,17 +262,38 @@ async function buildApp() {
 
   // /version — exposes git commit SHA so deploys can be verified end-to-end.
   // Render injects RENDER_GIT_COMMIT during build; falls back to env var or 'unknown'.
+  //
+  // Stage 0.3 fix: surface both the raw env AND the effective runtime. Since
+  // the Phase 7 commit `662e02c`, the runtime factory defaults to
+  // openai-first when OPENAI_API_KEY is set + JAK_EXECUTION_ENGINE is not
+  // explicitly 'legacy'. The prior /version only echoed the raw env value,
+  // which said `legacy` even though the code was running `openai-first` in
+  // practice — misleading to operators trying to verify deploys. Now both
+  // values are shown so the UI and admin tooling see the truth.
   fastify.get('/version', async (_request, reply) => {
+    const hasOpenAIKey = Boolean(process.env['OPENAI_API_KEY']);
+    const engineRaw = config.executionEngine;
+    const explicitLegacy = engineRaw === 'legacy';
+    // Mirror runtime/index.ts getRuntime() logic so /version can't drift
+    // from what the agents actually do at call time.
+    const effectiveEngine =
+      engineRaw === 'openai-first' || (!explicitLegacy && hasOpenAIKey)
+        ? 'openai-first'
+        : 'legacy';
     return reply.status(200).send({
       gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
       gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
       buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
       startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
-      // Migration flags surfaced for ops verification (Phase 1).
-      executionEngine: config.executionEngine,
+      // Migration flags — raw env values (what operator explicitly set).
+      executionEngine: engineRaw,
       workflowRuntime: config.workflowRuntime,
       openaiRuntimeAgents: config.openaiRuntimeAgents,
+      // Effective runtime — what agents ACTUALLY use. This is what matters
+      // for verifying "is OpenAI-first actually active right now."
+      effectiveExecutionEngine: effectiveEngine,
+      openaiApiKeySet: hasOpenAIKey,
     });
   });
 
