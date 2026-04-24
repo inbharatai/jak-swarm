@@ -225,3 +225,30 @@ export type {
 
 export { ScreenshotToCodeAgent } from './workers/screenshot-to-code.agent.js';
 export type { ScreenshotToCodeAction, ScreenshotToCodeTask, ScreenshotToCodeResult } from './workers/screenshot-to-code.agent.js';
+
+// ─── Phase 2-7 — Runtime layer ──────────────────────────────────────────────
+export {
+  getRuntime,
+  LegacyRuntime,
+  OpenAIRuntime,
+} from './runtime/index.js';
+export type {
+  LLMRuntime,
+  LLMCallOptions,
+  ToolLoopOptions,
+  // ToolLoopResult is also re-exported from BaseAgent at top of this file —
+  // both interfaces are structurally identical so callers see one type.
+  HostedToolsConfig,
+  LegacyAgentBackend,
+} from './runtime/index.js';
+
+// ─── Phase 8 — Benchmark harness ────────────────────────────────────────────
+export {
+  runHarness,
+  PERSONA_CORE_SCENARIOS,
+} from './benchmarks/index.js';
+export type {
+  BenchmarkScenario,
+  BenchmarkResult,
+  BenchmarkReport,
+} from './benchmarks/index.js';
