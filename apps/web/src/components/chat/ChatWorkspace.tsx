@@ -35,6 +35,12 @@ export function ChatWorkspace() {
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
   const [isStuck, setIsStuck] = useState(false);
   const STUCK_THRESHOLD_MS = 30_000;
+  // Stage 2.6: per-workflow cost accumulator. Updated on every
+  // cost_updated SSE event (one per LLM call) and surfaced on the
+  // completion message so the user sees a single honest "$0.0123 · 4 calls"
+  // footer instead of 20 mid-run cost noise bubbles. Keyed by workflowId
+  // so concurrent workflows don't mix numbers.
+  const costRef = useRef<Map<string, { costUsd: number; calls: number; promptTokens: number; completionTokens: number }>>(new Map());
   const conversation = useActiveConversation();
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
@@ -208,13 +214,19 @@ export function ChatWorkspace() {
                 : `${icon} **${toolName}** done${duration}${honestyTag}`,
               executionTrace: { workflowId: workflow.id },
             });
-          // Stage 2.3: cost_updated — silent aggregation (chat stays clean);
-          // full cost breakdown is surfaced once at the end via the /swarm
-          // Inspector + /traces cost badges. Keeping mid-run cost out of
-          // chat avoids spamming the thread with 20+ "cost $0.003" lines.
+          // Stage 2.3 + 2.6: accumulate cost_updated events locally so
+          // we can append a single truthful "$X.XXXX · N calls · Mk tokens"
+          // footer to the final completion message. Keeps the mid-run
+          // chat clean while still showing the user exactly what the
+          // workflow cost them.
           } else if (evType === 'cost_updated') {
-            // no-op in chat UI — cost is aggregated server-side and shown
-            // via the Inspector. Intentional: prevents chat-spam.
+            const wfid = (ev.workflowId as string) ?? workflow.id;
+            const cur = costRef.current.get(wfid) ?? { costUsd: 0, calls: 0, promptTokens: 0, completionTokens: 0 };
+            cur.costUsd += (ev.costUsd as number) ?? 0;
+            cur.calls += 1;
+            cur.promptTokens += (ev.promptTokens as number) ?? 0;
+            cur.completionTokens += (ev.completionTokens as number) ?? 0;
+            costRef.current.set(wfid, cur);
           // Workflow completed — fetch and display final output.
           // QA H2 defence-in-depth: if the server's recovery layer missed
           // and `finalOutput` still matches the internal stub string, we
@@ -228,14 +240,28 @@ export function ChatWorkspace() {
               const display = raw.trim().length === 0 || STUB_RE.test(raw)
                 ? 'JAK completed the run, but no final response was generated. You can view the detailed trace in [Run Inspector](/swarm).'
                 : raw;
+
+              // Stage 2.6: append a single honest cost footer to the
+              // final message — accumulated from all cost_updated SSE
+              // events during the run. Formatted as "$0.0042 · 6 calls ·
+              // 12k tokens" so the user sees exactly what the workflow
+              // cost.
+              const cost = costRef.current.get(workflow.id);
+              const costFooter = cost && cost.calls > 0
+                ? `\n\n---\n_${formatCostFooter(cost)}_`
+                : '';
+
               if (display.length > 0) {
                 addMessage(convId, {
                   role: 'assistant',
                   agentRole: activeRoles[0] ?? null,
-                  content: display,
+                  content: display + costFooter,
                   executionTrace: { workflowId: workflow.id },
                 });
               }
+              // Free the per-workflow cost slot so a second workflow on
+              // the same page starts fresh.
+              costRef.current.delete(workflow.id);
             });
             // QA fix: stuck-workflow banner persisted after the terminal
             // event because isSending only cleared on SSE onError. Clear
@@ -503,4 +529,32 @@ function DetailDrawer({ onClose }: { onClose: () => void }) {
       )}
     </div>
   );
+}
+
+// Stage 2.6 helper — format an honest per-workflow cost footer.
+// Shape: "$0.0042 · 6 calls · 12k tokens". Keep values human-readable;
+// $0 falls through to "Tracked: 6 calls · 12k tokens" so the user knows
+// cost tracking happened even when all calls were on free-tier models.
+function formatCostFooter(cost: {
+  costUsd: number;
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+}): string {
+  const totalTokens = cost.promptTokens + cost.completionTokens;
+  const tokenLabel =
+    totalTokens >= 1_000_000
+      ? `${(totalTokens / 1_000_000).toFixed(1)}M tokens`
+      : totalTokens >= 1_000
+        ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
+        : `${totalTokens} tokens`;
+  const callsLabel = `${cost.calls} call${cost.calls === 1 ? '' : 's'}`;
+  if (cost.costUsd > 0) {
+    const costLabel =
+      cost.costUsd >= 0.01
+        ? `$${cost.costUsd.toFixed(4)}`
+        : `$${cost.costUsd.toFixed(6)}`;
+    return `${costLabel} · ${callsLabel} · ${tokenLabel}`;
+  }
+  return `Tracked: ${callsLabel} · ${tokenLabel}`;
 }
