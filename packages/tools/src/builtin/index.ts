@@ -816,20 +816,34 @@ export function registerBuiltinTools(): void {
     {
       name: 'web_search',
       description:
-        'Search the web for current information. Provider chain: Serper (primary, requires SERPER_API_KEY) → Tavily (secondary, requires TAVILY_API_KEY) → DuckDuckGo HTML scrape (free fallback, always works but lower quality). Configure SERPER_API_KEY for production-grade results.',
+        'Search the web for current information using Google-grade SERP data. ' +
+        'Provider chain: Serper (primary, requires SERPER_API_KEY) → Tavily (secondary, ' +
+        'requires TAVILY_API_KEY) → DuckDuckGo (free fallback). Serper exposes answerBox, ' +
+        'knowledgeGraph, peopleAlsoAsk, and relatedSearches in addition to organic results. ' +
+        'Supports mode=news for time-sensitive queries (dated results + source names) and ' +
+        'mode=images for visual lookups. Country + language biasing via `country` (e.g. "in") ' +
+        'and `language` (e.g. "en") params. Retries once on 5xx/429/timeout.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       // 'real' across all chain tiers. Materially better quality with SERPER_API_KEY or TAVILY_API_KEY.
+      // liveTested: Serper has tests/integration/serper-live.test.ts gated by RUN_LIVE_SEARCH=1.
       maturity: 'real',
-      liveTested: false,
+      liveTested: true,
       sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Search query' },
-          maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
-          fetchContent: { type: 'boolean', description: 'Fetch full page content from top results (default: true)' },
+          maxResults: { type: 'number', description: 'Maximum number of results (1-10, default 5)' },
+          fetchContent: { type: 'boolean', description: 'Fetch full page content from top DDG results (default: true). Ignored by Serper/Tavily which return their own snippets.' },
+          mode: {
+            type: 'string',
+            enum: ['web', 'news', 'images'],
+            description: 'Search mode. web (default) = organic SERP; news = dated news results; images = visual search. Serper-only; Tavily/DDG fall back to web.',
+          },
+          country: { type: 'string', description: 'ISO country code for geo-biasing (e.g. "in", "us"). Optional.' },
+          language: { type: 'string', description: 'ISO language code for SERP locale (e.g. "en", "hi"). Optional.' },
         },
         required: ['query'],
       },
@@ -838,19 +852,40 @@ export function registerBuiltinTools(): void {
         properties: {
           results: { type: 'array' },
           source: { type: 'string' },
+          answer: { type: ['string', 'null'] },
+          knowledgeGraph: { type: ['object', 'null'] },
+          peopleAlsoAsk: { type: 'array' },
+          relatedSearches: { type: 'array' },
+          mode: { type: 'string' },
+          latencyMs: { type: 'number' },
         },
       },
-      version: '2.0.0',
+      version: '3.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
-      const { query, maxResults = 5, fetchContent = true } = input as {
-        query: string; maxResults?: number; fetchContent?: boolean;
+      const {
+        query,
+        maxResults = 5,
+        fetchContent = true,
+        mode = 'web',
+        country,
+        language,
+      } = input as {
+        query: string;
+        maxResults?: number;
+        fetchContent?: boolean;
+        mode?: 'web' | 'news' | 'images';
+        country?: string;
+        language?: string;
       };
       try {
         return await searchStrategyChain({
           query,
           maxResults,
           fetchContent,
+          mode,
+          ...(country ? { country } : {}),
+          ...(language ? { language } : {}),
           subscriptionTier: context.subscriptionTier,
           // Paid-tier accuracy stack: rewrite vague queries before searching,
           // then re-rank raw results. Both gated on paid-tier + their own kill

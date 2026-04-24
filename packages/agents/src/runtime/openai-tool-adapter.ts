@@ -6,9 +6,25 @@
  * name, description, parameters }` instead of Chat's nested
  * `{ type: 'function', function: { name, description, parameters } }`.
  *
- * Hosted tools (web_search, file_search, code_interpreter, computer_use) are
- * Responses-API-only. Phase 3 supports opt-in via a parallel `hostedTools`
- * argument so callers don't have to touch their existing tool declarations.
+ * Production hosted tools we support (STABLE only — no preview surfaces):
+ *   - file_search       — OpenAI-hosted RAG over caller-supplied vector stores
+ *   - code_interpreter  — sandboxed Python execution
+ *
+ * Notable exclusions and WHY:
+ *   - web_search_preview — PREVIEW API. JAK Swarm's production web search is
+ *     the Serper-primary strategy chain in `packages/tools/src/adapters/search/`
+ *     (Serper → Tavily → DuckDuckGo). That path gives Google-grade SERP data
+ *     (answerBox, knowledgeGraph, peopleAlsoAsk) the OpenAI hosted tool does
+ *     not surface, plus an explicit fallback chain and a paid/free tier gate.
+ *     Route every agent web-search call through `web_search` in the tool
+ *     registry, not through this hosted surface.
+ *   - computer-preview — PREVIEW API. Not wired; browser automation goes
+ *     through the Playwright adapter in `packages/tools/src/adapters/browser/`
+ *     which is stable and observable.
+ *
+ * If OpenAI promotes web_search or computer-use to stable, re-evaluate.
+ * Until then, keep this surface preview-free so we never ship an agent that
+ * silently depends on an un-SLA'd API.
  */
 
 import type OpenAI from 'openai';
@@ -16,25 +32,19 @@ import type OpenAI from 'openai';
 /**
  * Hosted tools the OpenAIRuntime can expose. Opt-in per call site.
  * These tools execute server-side at OpenAI — no client-side execution.
+ *
+ * Every option here must be a STABLE (non-preview) Responses API feature.
  */
 export interface HostedToolsConfig {
-  webSearch?: boolean | { searchContextSize?: 'low' | 'medium' | 'high' };
   fileSearch?: { vectorStoreIds: string[]; maxNumResults?: number };
   codeInterpreter?: boolean | { container?: { type: 'auto' } };
-  computerUse?:
-    | boolean
-    | {
-        environment: 'browser' | 'mac' | 'windows' | 'ubuntu';
-        displayWidth: number;
-        displayHeight: number;
-      };
 }
 
 /**
  * Combined Responses-API tool input. The OpenAI SDK accepts `Tool[]` which
- * is a union of FunctionTool, FileSearchTool, WebSearchTool, ComputerTool,
- * CodeInterpreterTool. We build that union from the Chat-style functions
- * the caller already has plus any hosted tools they've opted into.
+ * is a union of FunctionTool, FileSearchTool, CodeInterpreterTool, etc.
+ * We build that union from the Chat-style functions the caller already has
+ * plus any hosted tools they've opted into.
  */
 export type ResponsesTool = OpenAI.Responses.Tool;
 
@@ -58,14 +68,7 @@ export function adaptChatToolsToResponses(
     }
   }
 
-  // Hosted tools — only included when caller explicitly opts in
-  if (hosted?.webSearch) {
-    const cfg = typeof hosted.webSearch === 'object' ? hosted.webSearch : {};
-    out.push({
-      type: 'web_search_preview',
-      ...(cfg.searchContextSize ? { search_context_size: cfg.searchContextSize } : {}),
-    } as ResponsesTool);
-  }
+  // Hosted tools — stable surfaces only, included when caller explicitly opts in
   if (hosted?.fileSearch) {
     out.push({
       type: 'file_search',
@@ -81,14 +84,6 @@ export function adaptChatToolsToResponses(
       type: 'code_interpreter',
       container: cfg.container ?? { type: 'auto' },
     } as ResponsesTool);
-  }
-  if (hosted?.computerUse && typeof hosted.computerUse === 'object') {
-    out.push({
-      type: 'computer-preview',
-      environment: hosted.computerUse.environment,
-      display_width: hosted.computerUse.displayWidth,
-      display_height: hosted.computerUse.displayHeight,
-    } as unknown as ResponsesTool);
   }
 
   return out;

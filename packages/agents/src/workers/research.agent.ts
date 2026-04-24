@@ -105,12 +105,24 @@ export class ResearchAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'web_search',
-          description: 'Search the web for information on a topic',
+          description:
+            'Search the web via Serper (Google-grade SERP). Returns organic results plus answerBox, ' +
+            'knowledgeGraph (structured entity cards), peopleAlsoAsk (related questions), and ' +
+            'relatedSearches. Use mode=news for time-sensitive queries (returns dated results with ' +
+            'source names) and mode=images for visual searches. Set country (e.g. "in" for India) ' +
+            'and language when the query is geo-specific.',
           parameters: {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              maxResults: { type: 'number', description: 'Maximum number of results to return' },
+              maxResults: { type: 'number', description: 'Maximum number of results (1-10, default 5)' },
+              mode: {
+                type: 'string',
+                enum: ['web', 'news', 'images'],
+                description: 'web (default), news (dated time-sensitive results), images (visual)',
+              },
+              country: { type: 'string', description: 'ISO country code for geo-biasing (e.g. "in", "us")' },
+              language: { type: 'string', description: 'ISO language code (e.g. "en", "hi")' },
             },
             required: ['query'],
           },

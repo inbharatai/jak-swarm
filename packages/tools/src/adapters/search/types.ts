@@ -18,6 +18,48 @@ export interface SearchResult {
   relevanceScore: number;
 }
 
+/**
+ * Structured knowledge-graph card. Populated only when the provider returns
+ * one (Serper for Google-KG, Tavily does not expose this). Surface directly
+ * to agents so they can answer factual questions without re-searching.
+ */
+export interface SearchKnowledgeGraph {
+  /** Entity name, e.g. "Apollo 11". */
+  title: string;
+  /** Schema.org-ish type, e.g. "Space mission", "Company", "Person". */
+  type?: string;
+  /** Short description. Usually 1-3 sentences. */
+  description?: string;
+  /** Canonical website for the entity, if any. */
+  website?: string;
+  /** Freeform attribute pairs — e.g. {"Launch date": "July 16, 1969"}. */
+  attributes?: Record<string, string>;
+  /** Image URL, if the provider returned one. */
+  imageUrl?: string;
+}
+
+/**
+ * A "People Also Ask" block — related questions Google inferred from the
+ * query. High-signal for agents deciding follow-up research directions.
+ */
+export interface RelatedQuestion {
+  question: string;
+  /** Snippet of the answer, if the provider returned one. */
+  snippet?: string;
+  /** Source URL of the snippet, if provided. */
+  url?: string;
+}
+
+/**
+ * Filter-mode for specialised Serper endpoints. The default search endpoint
+ * returns organic web results; news-mode biases toward fresh reporting with
+ * publication dates; images-mode returns visual results.
+ *
+ * Only Serper supports the non-default modes today — Tavily + DDG fall back
+ * to their standard web search and ignore the hint.
+ */
+export type SearchMode = 'web' | 'news' | 'images';
+
 export interface SearchResponse {
   results: SearchResult[];
   source: SearchProviderSource;
@@ -31,9 +73,19 @@ export interface SearchResponse {
   rewrittenFrom?: string;
   /** Optional direct-answer string (Serper "answerBox", Tavily "answer"). */
   answer?: string | null;
+  /** Structured knowledge-graph card (Serper only). */
+  knowledgeGraph?: SearchKnowledgeGraph;
+  /** People Also Ask block (Serper only). */
+  peopleAlsoAsk?: RelatedQuestion[];
+  /** Related searches surfaced by the provider (Serper only). */
+  relatedSearches?: string[];
   resultCount: number;
+  /** Which search mode was requested. Defaults to 'web'. */
+  mode?: SearchMode;
   /** Human-readable note on what happened; surfaces to the LLM in error cases. */
   message?: string;
+  /** Provider wall-clock latency for telemetry. */
+  latencyMs?: number;
 }
 
 export interface SearchOptions {
@@ -41,6 +93,21 @@ export interface SearchOptions {
   maxResults?: number;
   /** If true, adapters that only return snippets (DDG) may fetch full page text. */
   fetchContent?: boolean;
+  /**
+   * Which search mode to run: plain web (default), news, or images. Only
+   * Serper supports the non-default modes; Tavily + DDG fall back to web.
+   */
+  mode?: SearchMode;
+  /**
+   * Optional ISO country code for result geo-biasing (Serper `gl` param).
+   * Example: 'in' biases toward India, 'us' toward US. Absent = global.
+   */
+  country?: string;
+  /**
+   * Optional UI language hint (Serper `hl` param). Example: 'en' for English
+   * SERP strings, 'hi' for Hindi. Defaults to the provider's locale.
+   */
+  language?: string;
   /**
    * Subscription tier for gating paid providers (Serper, Tavily). When 'free',
    * the strategy chain skips paid providers regardless of whether their keys
