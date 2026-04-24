@@ -258,6 +258,10 @@ async function buildApp() {
       buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
       startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
+      // Migration flags surfaced for ops verification (Phase 1).
+      executionEngine: config.executionEngine,
+      workflowRuntime: config.workflowRuntime,
+      openaiRuntimeAgents: config.openaiRuntimeAgents,
     });
   });
 

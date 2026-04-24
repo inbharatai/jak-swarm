@@ -11,6 +11,7 @@ import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
 import type { SwarmResult } from '@jak-swarm/swarm';
+import { config } from '../config.js';
 import { Industry, ToolRiskClass } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
@@ -589,7 +590,29 @@ export class SwarmExecutionService extends EventEmitter {
       }
     }
 
-    this.log.info({ workflowId, tenantId }, '[Swarm] Starting async execution');
+    this.log.info(
+      {
+        workflowId,
+        tenantId,
+        executionEngine: config.executionEngine,
+        workflowRuntime: config.workflowRuntime,
+      },
+      '[Swarm] Starting async execution',
+    );
+
+    // Phase 1 guardrail: openai-first runtime not yet implemented. Fail loud
+    // if a deploy somehow flips the flag before Phase 3 lands. Keeps the
+    // scaffold a true no-op.
+    if (config.executionEngine === 'openai-first') {
+      throw new Error(
+        '[Swarm] JAK_EXECUTION_ENGINE=openai-first is not implemented in this build (Phase 3 pending). Set JAK_EXECUTION_ENGINE=legacy or unset.',
+      );
+    }
+    if (config.workflowRuntime === 'langgraph') {
+      throw new Error(
+        '[Swarm] JAK_WORKFLOW_RUNTIME=langgraph is not implemented in this build (Phase 6 pending). Set JAK_WORKFLOW_RUNTIME=swarmgraph or unset.',
+      );
+    }
 
     // ── Guardrail: injection detection ───────────────────────────────────
     const injectionResult = detectInjection(goal);

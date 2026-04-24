@@ -74,6 +74,41 @@ export const config = {
     | 'embedded'
     | 'standalone',
 
+  // ─── Migration flags (Phase 1 of OpenAI-first + LangGraph migration) ─────
+  // JAK_EXECUTION_ENGINE: 'legacy' (default) routes through the existing
+  //   ProviderRouter + AGENT_TIER_MAP path with all 6 LLM providers.
+  //   'openai-first' will (in later phases) route through OpenAIRuntime that
+  //   uses Responses API + hosted tools. Phase 1 is a no-op: only the flag
+  //   value is read + logged + surfaced in /version. Any agent that branches
+  //   on 'openai-first' before Phase 2 throws "not implemented".
+  // JAK_WORKFLOW_RUNTIME: 'swarmgraph' (default) runs the existing custom
+  //   SwarmGraph loop. 'langgraph' will (in Phase 6) route through a
+  //   JAK-owned WorkflowRuntime wrapper around @langchain/langgraph.
+  // Defaults preserve all current behavior. Boot fails loud if the value is
+  // not one of the two strings, to catch typos at deploy time.
+  executionEngine: (function () {
+    const raw = (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase();
+    if (raw !== 'legacy' && raw !== 'openai-first') {
+      throw new Error(`JAK_EXECUTION_ENGINE must be 'legacy' or 'openai-first' (got '${raw}')`);
+    }
+    return raw as 'legacy' | 'openai-first';
+  })(),
+  workflowRuntime: (function () {
+    const raw = (process.env['JAK_WORKFLOW_RUNTIME'] ?? 'swarmgraph').trim().toLowerCase();
+    if (raw !== 'swarmgraph' && raw !== 'langgraph') {
+      throw new Error(`JAK_WORKFLOW_RUNTIME must be 'swarmgraph' or 'langgraph' (got '${raw}')`);
+    }
+    return raw as 'swarmgraph' | 'langgraph';
+  })(),
+  // Phase-4 per-agent allowlist for OpenAIRuntime. CSV of agent role names
+  // (e.g. "PLANNER,COMMANDER,WORKER_RESEARCH"). Empty = all agents stay on
+  // LegacyRuntime even when JAK_EXECUTION_ENGINE=openai-first. Phase 1 reads
+  // but does not act on this.
+  openaiRuntimeAgents: (process.env['JAK_OPENAI_RUNTIME_AGENTS'] ?? '')
+    .split(',')
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean),
+
   // LLM provider API keys. At least one is required. Agents log a warning if all are missing.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',
   openaiRealtimeModel: process.env['OPENAI_REALTIME_MODEL'] ?? 'gpt-4o-realtime-preview',
