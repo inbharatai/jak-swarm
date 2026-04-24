@@ -235,6 +235,7 @@ export {
   ensureModelMap,
   getModelMapSync,
   modelForTier,
+  smokeResponsesApi,
 } from './runtime/index.js';
 export type {
   LLMRuntime,
@@ -246,6 +247,7 @@ export type {
   LegacyAgentBackend,
   ModelTier,
   ResolvedModelMap,
+  ResponsesSmokeResult,
 } from './runtime/index.js';
 
 // ─── Phase 8 — Benchmark harness ────────────────────────────────────────────

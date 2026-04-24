@@ -92,6 +92,8 @@ export {
   _resetModelMapCacheForTests,
 } from './model-resolver.js';
 export type { ModelTier, ResolvedModelMap } from './model-resolver.js';
+export { smokeResponsesApi } from './smoke-test.js';
+export type { ResponsesSmokeResult } from './smoke-test.js';
 
 export type { LLMRuntime, LLMCallOptions, ToolLoopOptions, ToolLoopResult } from './llm-runtime.js';
 export { LegacyRuntime } from './legacy-runtime.js';
