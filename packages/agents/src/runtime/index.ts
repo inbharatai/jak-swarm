@@ -45,13 +45,11 @@ export function getRuntime(
     (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase() === 'openai-first';
 
   if (useOpenAI) {
-    // Phase 3 will replace this throw with an OpenAIRuntime construction.
-    // Phase 1's swarm-execution boot guard already throws earlier when
-    // JAK_EXECUTION_ENGINE=openai-first, so this is a defense-in-depth
-    // belt-and-suspenders for direct test paths that bypass the API.
-    throw new Error(
-      `[runtime] OpenAIRuntime requested for role '${role}' but not implemented in this build (Phase 3 pending).`,
-    );
+    // Phase 3: real OpenAIRuntime. Lazily imported so test paths that don't
+    // need it never pay the cost of constructing an OpenAI client.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { OpenAIRuntime } = require('./openai-runtime.js') as typeof import('./openai-runtime.js');
+    return new OpenAIRuntime();
   }
 
   return new LegacyRuntime(backend);
@@ -60,3 +58,5 @@ export function getRuntime(
 export type { LLMRuntime, LLMCallOptions, ToolLoopOptions, ToolLoopResult } from './llm-runtime.js';
 export { LegacyRuntime } from './legacy-runtime.js';
 export type { LegacyAgentBackend } from './legacy-runtime.js';
+export { OpenAIRuntime } from './openai-runtime.js';
+export type { HostedToolsConfig } from './openai-tool-adapter.js';
