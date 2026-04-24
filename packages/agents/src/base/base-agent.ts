@@ -537,7 +537,20 @@ ${lines.join('\n')}
         totalTokens.total += completion.usage.total_tokens ?? 0;
 
         const iterModel = completion.model || this.provider?.name || 'gpt-4o';
-        totalCostUsd += calculateCost(iterModel, iterPrompt, iterCompletion);
+        const iterCost = calculateCost(iterModel, iterPrompt, iterCompletion);
+        totalCostUsd += iterCost;
+
+        // Stage 2.3: surface cost in real-time to the client SSE stream.
+        // Fires once per LLM call; the UI cockpit aggregates across a run.
+        context.emitActivity({
+          type: 'cost_updated',
+          agentRole: this.role,
+          model: iterModel,
+          promptTokens: iterPrompt,
+          completionTokens: iterCompletion,
+          costUsd: iterCost,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       const choice = completion.choices[0];
@@ -613,6 +626,18 @@ ${lines.join('\n')}
         let resultStr: string;
         let toolError: string | undefined;
 
+        // Stage 2.2: emit tool_called BEFORE execution so the client
+        // cockpit renders a live "running" row. inputSummary is capped
+        // at 500 chars to keep SSE payloads small.
+        const inputSummary = JSON.stringify(parsedArgs).slice(0, 500);
+        context.emitActivity({
+          type: 'tool_called',
+          agentRole: this.role,
+          toolName,
+          inputSummary,
+          timestamp: toolStartedAt.toISOString(),
+        });
+
         try {
           if (!declaredToolNames.has(toolName)) {
             resultStr = JSON.stringify({
@@ -673,11 +698,43 @@ ${lines.join('\n')}
           error: toolError,
         });
 
+        // Stage 2.2: emit tool_completed AFTER execution so the cockpit
+        // flips the row from running → success/failure. outputSummary
+        // is capped at 500 chars; if the tool returned an `_mock` /
+        // `_warning` / `_notice` flag we surface it honestly so the UI
+        // can render the "draft only" / "mock data" state correctly.
+        context.emitActivity({
+          type: 'tool_completed',
+          agentRole: this.role,
+          toolName,
+          success: !toolError,
+          durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
+          outputSummary: resultStr.slice(0, 500),
+          ...(toolError ? { error: toolError } : {}),
+          timestamp: toolCompletedAt.toISOString(),
+        });
+
+        // Stage 3.2 cost fix: truncate large tool outputs before
+        // re-injection into the next LLM call. Tools like web_search +
+        // web_fetch commonly return 20-100KB of content, which gets
+        // resent in full on EVERY subsequent tool-loop iteration.
+        // Truncating at 8KB (~2000 tokens) cuts per-iteration costs by
+        // 40-80% on research-heavy workflows while preserving enough
+        // context for the LLM to continue. Override via
+        // JAK_TOOL_OUTPUT_MAX_CHARS if a caller genuinely needs full
+        // context (e.g. VibeCoder reading a specific file).
+        const maxChars = Number(process.env['JAK_TOOL_OUTPUT_MAX_CHARS'] ?? '8000');
+        const truncatedResultStr =
+          resultStr.length > maxChars
+            ? resultStr.slice(0, maxChars) +
+              `\n\n[… tool output truncated at ${maxChars} chars. Full output in trace; ${resultStr.length} chars original.]`
+            : resultStr;
+
         // Append tool result to conversation so LLM can use it
         conversation.push({
           role: 'tool' as const,
           tool_call_id: tc.id,
-          content: resultStr,
+          content: truncatedResultStr,
         });
       }
 

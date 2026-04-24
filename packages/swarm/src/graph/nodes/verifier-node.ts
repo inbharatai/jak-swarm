@@ -14,6 +14,48 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
   }
 
   const taskOutput = state.taskResults[task.id];
+
+  // Stage 3.1 cost optimization: skip the Verifier for low-risk routine
+  // tasks. Previously every workflow — including trivial "hi" chats —
+  // ran through a tier-3 Verifier call costing ~$0.02 per. We only
+  // verify when the task is HIGH risk, a task the user must approve
+  // before anything ships, or when the task output is missing (which is
+  // itself a failure signal worth re-examining). LOW-risk routine work
+  // (summary queries, lookups, trivial drafts) returns auto-passed.
+  // Operators can force the verifier back on via
+  // JAK_VERIFIER_ALWAYS_ON=1 for debugging.
+  const forceVerifier =
+    process.env['JAK_VERIFIER_ALWAYS_ON'] === '1' ||
+    process.env['JAK_VERIFIER_ALWAYS_ON'] === 'true';
+  const needsVerifier =
+    forceVerifier ||
+    task.riskLevel === 'HIGH' ||
+    task.requiresApproval === true ||
+    taskOutput === undefined ||
+    taskOutput === null;
+
+  if (!needsVerifier) {
+    // Auto-pass — persist a light-weight verification result so the
+    // trace still shows a Verifier decision for audit, but with zero
+    // LLM call. Uses the existing VerificationResult shape; the
+    // retryReason field carries the skip reason for trace clarity.
+    return {
+      verificationResults: {
+        [task.id]: {
+          passed: true,
+          issues: [],
+          confidence: 1,
+          needsRetry: false,
+          retryReason: `Auto-verified: ${task.riskLevel ?? 'LOW'} risk, no approval required — Verifier skipped per JAK_VERIFIER gating`,
+        },
+      },
+      completedTaskIds: [...(state.completedTaskIds ?? []), task.id],
+      taskResults: {
+        [`${task.id}_status`]: TaskStatus.COMPLETED,
+      },
+    };
+  }
+
   const agent = new VerifierAgent();
 
   const context = new AgentContext({

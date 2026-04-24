@@ -147,3 +147,12 @@ export {
   ExecutionError,
 } from './coordination/execute-guarded.js';
 export type { ExecutionErrorClass, ExecuteGuardedOptions } from './coordination/execute-guarded.js';
+
+// Agent-run cockpit — activity emitter side-channel (Stage 2 of
+// qa/client-agent-visibility-audit.md). Workflow runtime registers an
+// emitter per run; worker nodes look it up when building AgentContext.
+export {
+  registerActivityEmitter,
+  getActivityEmitter,
+  clearActivityEmitter,
+} from './supervisor/activity-registry.js';

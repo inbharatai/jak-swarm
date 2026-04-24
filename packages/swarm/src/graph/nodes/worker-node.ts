@@ -4,6 +4,7 @@ import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
 import { getBreakerFactory } from '../../supervisor/breaker-registry.js';
+import { getActivityEmitter } from '../../supervisor/activity-registry.js';
 import { createWorkerAgent } from './worker/agent-factory.js';
 import { buildTaskInput } from './worker/task-input-builders.js';
 
@@ -41,6 +42,12 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     };
   }
 
+  // Stage 2: wire the per-workflow activity emitter so BaseAgent's live
+  // tool_called / tool_completed / cost_updated events flow through to
+  // the SSE stream the chat cockpit subscribes to. Side-channel lookup
+  // because SwarmState cannot carry Function values (persistence).
+  const onActivity = getActivityEmitter(state.workflowId);
+
   const context = new AgentContext({
     tenantId: state.tenantId,
     userId: state.userId,
@@ -53,6 +60,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     disabledToolNames: state.disabledToolNames,
     connectedProviders: state.connectedProviders,
     subscriptionTier: state.subscriptionTier,
+    ...(onActivity ? { onActivity } : {}),
   });
 
   let output: unknown;

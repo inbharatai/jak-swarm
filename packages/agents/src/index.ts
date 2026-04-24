@@ -1,5 +1,6 @@
 // Base
 export { AgentContext } from './base/agent-context.js';
+export type { AgentActivityEvent, AgentActivityEmitter } from './base/agent-context.js';
 export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent, extractFirstJsonBlob } from './base/base-agent.js';
 export type { ToolLoopResult, MemoryProvider } from './base/base-agent.js';

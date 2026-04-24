@@ -13,6 +13,11 @@ import {
   registerBreakerFactory,
   unregisterBreakerFactory,
 } from '../supervisor/breaker-registry.js';
+import {
+  registerActivityEmitter,
+  clearActivityEmitter,
+} from '../supervisor/activity-registry.js';
+import type { AgentActivityEvent } from '@jak-swarm/agents';
 
 export interface RunParams {
   goal: string;
@@ -176,6 +181,16 @@ export class SwarmRunner {
       registerBreakerFactory(workflowId, params.circuitBreakerFactory);
     }
 
+    // Stage 2: register an activity emitter in the same side-channel so
+    // BaseAgent can emit live tool_called / tool_completed / cost_updated
+    // events during execution. The emitter relays straight into the
+    // SwarmGraph's own `agent:activity` event stream — which the workflow
+    // route already consumes and publishes to SSE + Redis pub/sub for
+    // cross-instance visibility. Cleaned up in the finally below.
+    registerActivityEmitter(workflowId, (ev: AgentActivityEvent) => {
+      this.graph.emit('agent:activity', { workflowId, ...ev });
+    });
+
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
     // Track listeners so we can remove them after workflow completes
@@ -232,6 +247,7 @@ export class SwarmRunner {
       }
       this.activeWorkflows.delete(workflowId);
       unregisterBreakerFactory(workflowId);
+      clearActivityEmitter(workflowId);
 
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.error({ workflowId, err: errorMessage }, 'Swarm workflow failed');
@@ -257,6 +273,7 @@ export class SwarmRunner {
     }
     this.activeWorkflows.delete(workflowId);
     unregisterBreakerFactory(workflowId);
+    clearActivityEmitter(workflowId);
 
     // Persist state for resume/cancel
     try {

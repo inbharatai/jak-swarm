@@ -157,6 +157,64 @@ export function ChatWorkspace() {
               content: `${success ? '✓' : '✗'} ${(ev.agentRole as string) ?? 'Agent'}: ${(ev.taskName as string) ?? 'task'} ${success ? 'completed' : 'failed'}${duration}`,
               executionTrace: { workflowId: workflow.id },
             });
+          // Stage 2.1: planner emitted a structured plan — render as a
+          // compact task-list in chat so the user sees what JAK will do.
+          } else if (evType === 'plan_created') {
+            const plan = ev.plan as { goal?: string; tasks?: Array<{ id: string; name?: string; description?: string; agentRole?: string; requiresApproval?: boolean }> } | undefined;
+            if (plan?.tasks?.length) {
+              const lines = plan.tasks.map((t, i) => {
+                const role = (t.agentRole ?? '').replace(/^WORKER_/, '');
+                const approvalTag = t.requiresApproval ? ' 🔏 approval required' : '';
+                return `${i + 1}. **${t.name ?? t.description ?? `Task ${i + 1}`}** — ${role || 'agent'}${approvalTag}`;
+              }).join('\n');
+              addMessage(convId, {
+                role: 'assistant',
+                agentRole: 'planner' as RoleId,
+                content: `📋 **Plan**\n\n${lines}`,
+                executionTrace: { workflowId: workflow.id },
+              });
+            }
+          // Stage 2.2: tool call starting — compact live status row
+          } else if (evType === 'tool_called') {
+            const toolName = (ev.toolName as string) ?? 'tool';
+            const inputPreview = (ev.inputSummary as string) ?? '';
+            const shortInput = inputPreview.length > 80 ? inputPreview.slice(0, 77) + '…' : inputPreview;
+            addMessage(convId, {
+              role: 'assistant',
+              agentRole: (ev.agentRole as RoleId) ?? null,
+              content: `🔧 Calling **${toolName}**${shortInput ? ` — \`${shortInput}\`` : ''}`,
+              executionTrace: { workflowId: workflow.id },
+            });
+          // Stage 2.2: tool call completed — honest success/failure + duration
+          } else if (evType === 'tool_completed') {
+            const toolName = (ev.toolName as string) ?? 'tool';
+            const success = ev.success !== false;
+            const duration = ev.durationMs ? ` (${((ev.durationMs as number) / 1000).toFixed(1)}s)` : '';
+            const err = ev.error as string | undefined;
+            const icon = success ? '✓' : '✗';
+            // Surface the outputSummary when it contains honest flags
+            // (_mock, _notice, _warning) or an error — so the user sees
+            // "draft only" / "mock data" / "email NOT sent" instead of
+            // a generic "completed".
+            const output = (ev.outputSummary as string) ?? '';
+            const honesty =
+              /_mock|_notice|_warning|NOT sent|NOT created|NOT updated|draft only|not connected/i.exec(output);
+            const honestyTag = honesty ? ` — ⚠ ${honesty[0].replace(/^_/, '')}` : '';
+            addMessage(convId, {
+              role: 'assistant',
+              agentRole: (ev.agentRole as RoleId) ?? null,
+              content: err
+                ? `${icon} **${toolName}** failed${duration} — ${err}`
+                : `${icon} **${toolName}** done${duration}${honestyTag}`,
+              executionTrace: { workflowId: workflow.id },
+            });
+          // Stage 2.3: cost_updated — silent aggregation (chat stays clean);
+          // full cost breakdown is surfaced once at the end via the /swarm
+          // Inspector + /traces cost badges. Keeping mid-run cost out of
+          // chat avoids spamming the thread with 20+ "cost $0.003" lines.
+          } else if (evType === 'cost_updated') {
+            // no-op in chat UI — cost is aggregated server-side and shown
+            // via the Inspector. Intentional: prevents chat-spam.
           // Workflow completed — fetch and display final output.
           // QA H2 defence-in-depth: if the server's recovery layer missed
           // and `finalOutput` still matches the internal stub string, we
@@ -218,12 +276,20 @@ export function ChatWorkspace() {
             });
             setIsSending(false);
             setIsStuck(false);
-          // Workflow paused for approval
+          // Workflow paused for approval — Stage 2.5 fix: surface a
+          // direct link inline so the user doesn't have to hunt for the
+          // Runs page. The full approve/reject UX lives at /workspace
+          // (ApprovalsInbox); we link straight there with the workflow
+          // pre-selected. Previously the message just said "Check the
+          // Runs page" which was a dead-end on a busy chat thread.
           } else if (evType === 'paused') {
+            const reason = (ev.reason as string) ?? (ev.taskName as string) ?? 'a high-risk action';
             addMessage(convId, {
               role: 'assistant',
               agentRole: null,
-              content: `Workflow paused — awaiting approval. Check the Runs page to approve or reject.`,
+              content:
+                `🔏 **Approval needed** — workflow paused before \`${reason}\`. ` +
+                `[Review and approve in the Approvals inbox →](/workspace?tab=approvals&workflow=${workflow.id})`,
               executionTrace: { workflowId: workflow.id },
             });
           }

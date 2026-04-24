@@ -2,6 +2,50 @@ import type { AgentTrace, SubscriptionTier } from '@jak-swarm/shared';
 import { generateId, generateTraceId } from '@jak-swarm/shared';
 import type { ToolCategory } from '@jak-swarm/shared';
 
+/**
+ * Real-time activity events BaseAgent emits during tool loops + LLM calls.
+ * Wired by the workflow runtime (swarm-graph / LangGraph) so the client
+ * SSE stream can show live tool-call + cost events in the chat cockpit.
+ *
+ * Stage 2 of the agent-run-cockpit audit (qa/client-agent-visibility-audit.md).
+ */
+export type AgentActivityEvent =
+  | {
+      type: 'tool_called';
+      agentRole: string;
+      toolName: string;
+      /** Truncated, serializable input summary (<= 500 chars). */
+      inputSummary: string;
+      timestamp: string;
+    }
+  | {
+      type: 'tool_completed';
+      agentRole: string;
+      toolName: string;
+      success: boolean;
+      durationMs: number;
+      /** Truncated output summary; `_notice` / `_warning` / mock flags surfaced honestly. */
+      outputSummary: string;
+      error?: string;
+      timestamp: string;
+    }
+  | {
+      type: 'cost_updated';
+      agentRole: string;
+      model: string;
+      promptTokens: number;
+      completionTokens: number;
+      costUsd: number;
+      timestamp: string;
+    };
+
+/**
+ * Callback the runtime can wire to route activity events to the client
+ * SSE stream. Optional — if unset, BaseAgent silently skips emission
+ * (no extra cost, no behavior change for legacy callers).
+ */
+export type AgentActivityEmitter = (event: AgentActivityEvent) => void;
+
 export interface AgentContextParams {
   traceId?: string;
   runId?: string;
@@ -22,6 +66,13 @@ export interface AgentContextParams {
    * between the paid Serper/Tavily chain vs the free DDG fallback.
    */
   subscriptionTier?: SubscriptionTier;
+  /**
+   * Real-time event emitter wired by the workflow runtime. When set,
+   * BaseAgent calls it on every tool start/end + LLM cost event so the
+   * client SSE feed shows live activity. Optional — legacy callers who
+   * don't set it get identical behavior to before.
+   */
+  onActivity?: AgentActivityEmitter;
 }
 
 export class AgentContext {
@@ -39,6 +90,7 @@ export class AgentContext {
   readonly restrictedCategories: ToolCategory[];
   readonly disabledToolNames: string[];
   readonly subscriptionTier: SubscriptionTier | undefined;
+  readonly onActivity: AgentActivityEmitter | undefined;
   private steps: AgentTrace[] = [];
 
   constructor(params: AgentContextParams) {
@@ -56,6 +108,15 @@ export class AgentContext {
     this.restrictedCategories = params.restrictedCategories ?? [];
     this.disabledToolNames = params.disabledToolNames ?? [];
     this.subscriptionTier = params.subscriptionTier;
+    this.onActivity = params.onActivity;
+  }
+
+  /** Safe activity-emit helper — swallows errors so emission never breaks agent execution. */
+  emitActivity(event: AgentActivityEvent): void {
+    if (!this.onActivity) return;
+    try {
+      this.onActivity(event);
+    } catch { /* emission failure must never break the agent */ }
   }
 
   addTrace(trace: AgentTrace): void {
@@ -82,6 +143,7 @@ export class AgentContext {
       restrictedCategories: this.restrictedCategories,
       disabledToolNames: this.disabledToolNames,
       subscriptionTier: this.subscriptionTier,
+      ...(this.onActivity ? { onActivity: this.onActivity } : {}),
       ...overrides,
     });
   }

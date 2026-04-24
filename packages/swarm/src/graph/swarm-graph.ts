@@ -546,6 +546,33 @@ export class SwarmGraph extends EventEmitter {
           durationMs: Date.now() - planNodeStart,
           timestamp: new Date().toISOString(),
         });
+
+        // Stage 2.1: when the planner just produced a structured plan,
+        // broadcast it to the client so the chat can render a live
+        // task checklist (TaskList.tsx). Previously the plan was only
+        // visible via /swarm Inspector or /traces after the fact.
+        if (nodeName === 'planner' && state.plan && state.plan.tasks?.length) {
+          this.emit('agent:activity', {
+            workflowId: state.workflowId,
+            agentRole: 'PLANNER',
+            taskName: 'plan',
+            type: 'plan_created',
+            plan: {
+              goal: state.plan.goal ?? state.goal ?? null,
+              tasks: state.plan.tasks.map((t) => ({
+                id: t.id,
+                name: t.name,
+                description: t.description,
+                agentRole: t.agentRole,
+                dependsOn: t.dependsOn ?? [],
+                status: t.status,
+                riskLevel: t.riskLevel,
+                requiresApproval: t.requiresApproval,
+              })),
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         return {
