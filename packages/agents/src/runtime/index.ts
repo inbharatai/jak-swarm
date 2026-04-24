@@ -19,30 +19,35 @@ import { LegacyRuntime, type LegacyAgentBackend } from './legacy-runtime.js';
 
 /**
  * Read the per-agent allowlist from env. Returns uppercase role names so
- * the comparison is case-insensitive.
+ * the comparison is case-insensitive. The literal "*" is treated as a
+ * wildcard meaning "every agent".
  */
-function getOpenaiRuntimeAgents(): Set<string> {
+function getOpenaiRuntimeAgents(): { wildcard: boolean; roles: Set<string> } {
   const raw = process.env['JAK_OPENAI_RUNTIME_AGENTS'] ?? '';
-  return new Set(
-    raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
-  );
+  const tokens = raw.split(',').map(s => s.trim()).filter(Boolean);
+  if (tokens.includes('*')) return { wildcard: true, roles: new Set() };
+  return {
+    wildcard: false,
+    roles: new Set(tokens.map(s => s.toUpperCase())),
+  };
 }
 
 /**
  * Returns the runtime an agent should use based on its role + current flags.
  *
- * In Phase 2 every call returns LegacyRuntime regardless of flags — the
- * scaffold is there so Phase 4 can flip individual agents without the
- * factory shape changing.
+ * Selection order:
+ *   1. JAK_OPENAI_RUNTIME_AGENTS=* → OpenAIRuntime for every agent.
+ *   2. JAK_OPENAI_RUNTIME_AGENTS contains the role name → OpenAIRuntime.
+ *   3. JAK_EXECUTION_ENGINE=openai-first → OpenAIRuntime for every agent.
+ *   4. Default → LegacyRuntime (which now itself prefers OpenAI per Phase 7).
  */
 export function getRuntime(
   role: string,
   backend: LegacyAgentBackend,
 ): LLMRuntime {
-  const allowlist = getOpenaiRuntimeAgents();
-  const useOpenAI =
-    allowlist.has(role.toUpperCase()) ||
-    (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase() === 'openai-first';
+  const { wildcard, roles } = getOpenaiRuntimeAgents();
+  const engineFlag = (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase();
+  const useOpenAI = wildcard || roles.has(role.toUpperCase()) || engineFlag === 'openai-first';
 
   if (useOpenAI) {
     // Phase 3: real OpenAIRuntime. Lazily imported so test paths that don't

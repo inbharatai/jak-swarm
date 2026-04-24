@@ -267,11 +267,35 @@ function tryCreate(factory: () => LLMProvider): LLMProvider | null {
  *
  * Falls back through adjacent tiers if the preferred tier has no providers.
  */
+/**
+ * Phase 7 of the OpenAI-first migration: OpenAI is now the preferred
+ * provider at EVERY tier when available. Gemini and Anthropic move to
+ * fallback positions (kept compiling for break-glass via PARITY-PENDING
+ * note, but not the default routing target). DeepSeek / OpenRouter /
+ * Ollama remain as cost-optimization options that operators opt into
+ * by setting their respective env keys without OPENAI_API_KEY.
+ *
+ * Rationale: the persona-output drift we shipped 30 commits to paper
+ * over (this session) was caused by Gemini's inconsistent JSON output.
+ * Forcing OpenAI as the default every tier eliminates that drift even
+ * for agents that haven't migrated to runtime.respondStructured yet.
+ *
+ * To restore the legacy multi-provider routing temporarily for
+ * break-glass: set JAK_LEGACY_PROVIDER_CHAIN=true.
+ */
 export function getProviderForTier(tier: ProviderTier): LLMProvider {
   const available = detectAvailableProviders();
+  const legacyChain = (process.env['JAK_LEGACY_PROVIDER_CHAIN'] ?? 'false').toLowerCase() === 'true';
+
+  // Phase 7 default: OpenAI-first at every tier when key is present.
+  if (!legacyChain && available.openai) {
+    const p = tryCreate(() => new OpenAIProvider());
+    if (p) return p;
+  }
 
   if (tier === 1) {
-    // Prefer cheap/local providers
+    // Tier 1 fallbacks: cheap providers (preserves cost-optimization for
+    // operators who didn't set OPENAI_API_KEY)
     if (available.ollama) {
       const p = tryCreate(() => new OllamaProvider());
       if (p) return p;
@@ -285,29 +309,24 @@ export function getProviderForTier(tier: ProviderTier): LLMProvider {
       if (p) return p;
     }
     if (available.gemini) {
+      // PARITY-PENDING: kept compiling for Phase 8 benchmark, do not register in default router unless above all fail
       const p = tryCreate(() => new GeminiProvider());
       if (p) return p;
     }
-    // Fall through to tier 2
     return getProviderForTier(2);
   }
 
   if (tier === 2) {
-    // Balanced — OpenAI gpt-4o-mini / Gemini Flash
-    if (available.openai) {
-      const p = tryCreate(() => new OpenAIProvider());
-      if (p) return p;
-    }
+    // Tier 2 fallbacks (no OpenAI available): Gemini → Anthropic → cheap
     if (available.gemini) {
       const p = tryCreate(() => new GeminiProvider());
       if (p) return p;
     }
-    // Fall through to tier 3 or tier 1
     if (available.anthropic) {
+      // PARITY-PENDING
       const p = tryCreate(() => new AnthropicProvider());
       if (p) return p;
     }
-    // Try cheap providers as last resort
     if (available.deepseek) {
       const p = tryCreate(() => new DeepSeekProvider());
       if (p) return p;
@@ -324,20 +343,16 @@ export function getProviderForTier(tier: ProviderTier): LLMProvider {
     return new OpenAIProvider();
   }
 
-  // Tier 3 — premium (GPT-4o / Claude / Gemini Pro)
+  // Tier 3 fallbacks (no OpenAI available): Anthropic → Gemini
   if (available.anthropic) {
+    // PARITY-PENDING
     const p = tryCreate(() => new AnthropicProvider());
-    if (p) return p;
-  }
-  if (available.openai) {
-    const p = tryCreate(() => new OpenAIProvider());
     if (p) return p;
   }
   if (available.gemini) {
     const p = tryCreate(() => new GeminiProvider());
     if (p) return p;
   }
-  // Fall through to tier 2
   return getProviderForTier(2);
 }
 

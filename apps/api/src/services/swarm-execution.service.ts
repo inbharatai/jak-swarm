@@ -600,18 +600,10 @@ export class SwarmExecutionService extends EventEmitter {
       '[Swarm] Starting async execution',
     );
 
-    // Phase 1 guardrail: openai-first runtime not yet implemented. Fail loud
-    // if a deploy somehow flips the flag before Phase 3 lands. Keeps the
-    // scaffold a true no-op.
-    if (config.executionEngine === 'openai-first') {
-      throw new Error(
-        '[Swarm] JAK_EXECUTION_ENGINE=openai-first is not implemented in this build (Phase 3 pending). Set JAK_EXECUTION_ENGINE=legacy or unset.',
-      );
-    }
-    // Phase 6: JAK_WORKFLOW_RUNTIME=langgraph is now implemented via
-    // LangGraphRuntime adapter. The runtime is selected per-call by the
-    // SwarmRunner-level wiring (Phase 7 will add per-template selection).
-    // No boot guard needed any longer.
+    // Phase 7: JAK_EXECUTION_ENGINE=openai-first is now implemented via
+    // OpenAIRuntime in the agent runtime factory. Boot guard removed.
+    // Phase 6: JAK_WORKFLOW_RUNTIME=langgraph is implemented via
+    // LangGraphRuntime adapter. Both flags now route to real impls.
 
     // ── Guardrail: injection detection ───────────────────────────────────
     const injectionResult = detectInjection(goal);
