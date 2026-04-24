@@ -10,6 +10,7 @@ import {
   getProviderForTier,
   getTierForAgent,
 } from './provider-router.js';
+import { getRuntime, type LLMRuntime } from '../runtime/index.js';
 
 /** Memory provider interface — injected by the API layer at boot */
 export interface MemoryProvider {
@@ -142,7 +143,22 @@ export abstract class BaseAgent {
     }
 
     this.openai = new OpenAI({ apiKey: resolvedKey });
+
+    // Phase 2: every agent gets an LLMRuntime. In Phase 2 this is always
+    // LegacyRuntime that delegates back to BaseAgent's existing private
+    // callLLM/executeWithTools. Future phases (4, 7) start returning
+    // OpenAIRuntime instead, agent-by-agent. Callers that want the new
+    // surface use `this.runtime.respond(...)` / `this.runtime.callTools(...)`
+    // — existing `this.callLLM(...)` and `this.executeWithTools(...)` calls
+    // continue to work unchanged.
+    this.runtime = getRuntime(role, {
+      callLLMPublic: (m, t, o) => this.callLLM(m, t, o),
+      executeWithToolsPublic: (m, t, c, o) => this.executeWithTools(m, t, c, o),
+    });
   }
+
+  /** Phase 2 — JAK-owned LLM runtime (LegacyRuntime by default). */
+  protected readonly runtime!: LLMRuntime;
 
   /**
    * Global hook called after every LLM call with cost information.
