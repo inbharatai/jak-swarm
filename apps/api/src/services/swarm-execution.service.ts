@@ -608,11 +608,10 @@ export class SwarmExecutionService extends EventEmitter {
         '[Swarm] JAK_EXECUTION_ENGINE=openai-first is not implemented in this build (Phase 3 pending). Set JAK_EXECUTION_ENGINE=legacy or unset.',
       );
     }
-    if (config.workflowRuntime === 'langgraph') {
-      throw new Error(
-        '[Swarm] JAK_WORKFLOW_RUNTIME=langgraph is not implemented in this build (Phase 6 pending). Set JAK_WORKFLOW_RUNTIME=swarmgraph or unset.',
-      );
-    }
+    // Phase 6: JAK_WORKFLOW_RUNTIME=langgraph is now implemented via
+    // LangGraphRuntime adapter. The runtime is selected per-call by the
+    // SwarmRunner-level wiring (Phase 7 will add per-template selection).
+    // No boot guard needed any longer.
 
     // ── Guardrail: injection detection ───────────────────────────────────
     const injectionResult = detectInjection(goal);

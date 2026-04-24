@@ -45,6 +45,19 @@ export {
 } from './state/run-lifecycle.js';
 export type { MinimalLogger } from './state/run-lifecycle.js';
 
+// Phase 6 — workflow runtime interface (orchestration engine abstraction)
+export {
+  getWorkflowRuntime,
+  SwarmGraphRuntime,
+  WorkflowPausedError,
+} from './workflow-runtime/index.js';
+export type {
+  WorkflowRuntime,
+  StartContext,
+  ResumeDecision,
+  WorkflowSnapshot,
+} from './workflow-runtime/index.js';
+
 // Runner
 export { SwarmRunner } from './runner/swarm-runner.js';
 
