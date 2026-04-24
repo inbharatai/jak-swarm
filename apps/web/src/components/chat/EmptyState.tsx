@@ -16,13 +16,16 @@ export function EmptyState({ onStartChat }: EmptyStateProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
       <div className="mx-auto max-w-2xl text-center">
-        {/* Hero */}
+        {/* Hero — primary command framing.
+            QA H1 fix: copy now points the user at the chat input below
+            (which is always visible) rather than the function tiles
+            (which used to gate the input). */}
         <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          What would you like to build?
+          What do you want JAK to do?
         </h1>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-          Select one or more functions below, then describe your task.
-          Each function brings specialized AI expertise to your conversation.
+          Type your request in the box below — JAK will plan, execute, and verify.
+          Pick a role to focus the work, or leave it on Auto and JAK will route for you.
         </p>
 
         {/* Quick Combos */}
@@ -59,8 +62,9 @@ export function EmptyState({ onStartChat }: EmptyStateProps) {
           </div>
         </div>
 
-        {/* Starter Prompts */}
-        <div className="mt-10 grid gap-2 sm:grid-cols-2">
+        {/* Starter Prompts — clicking one drops the example text into the
+            (always-visible) chat input below. */}
+        <div className="mt-10 grid gap-2 sm:grid-cols-2" data-testid="starter-prompts">
           {getStarterPrompts(activeRoles).map((prompt) => (
             <button
               key={prompt}
@@ -87,9 +91,17 @@ function getStarterPrompts(roles: RoleId[]): string[] {
     const role = ROLE_LIST.find((r) => r.id === roleId);
     if (role) pool.push(...role.examplePrompts);
   }
-  // If nothing selected, show a mix
+  // If nothing selected, show the cross-functional examples the QA pass
+  // identified as the highest-clarity first prompts. These are concrete
+  // and match the user-requested set ("Act as CMO and …", etc.) so a
+  // first-time visitor sees a working menu of real things to try.
   if (pool.length === 0) {
-    return ROLE_LIST.flatMap((r) => r.examplePrompts.slice(0, 1)).slice(0, 4);
+    return [
+      'Act as CMO and create 5 LinkedIn posts about our launch.',
+      'Act as CTO and review github.com/my-org/my-app for security issues.',
+      'Generate 10 leads for stock broker companies in India.',
+      'Create a landing page for my product.',
+    ];
   }
   // Return up to 4 unique prompts
   return pool.slice(0, 4);

@@ -19,6 +19,9 @@ import {
   FileText,
   LogOut,
   X,
+  Megaphone,
+  Mail,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ROLE_LIST, getRoleColor, type RoleId } from '@/lib/role-config';
@@ -38,6 +41,9 @@ import { useRouter } from 'next/navigation';
 
 const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean }> = [
   { href: '/swarm', label: 'Runs', icon: Network },
+  { href: '/inbox', label: 'Inbox', icon: Mail },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/social', label: 'Social', icon: Megaphone },
   { href: '/schedules', label: 'Schedules', icon: Calendar },
   { href: '/builder', label: 'Builder', icon: Hammer },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },

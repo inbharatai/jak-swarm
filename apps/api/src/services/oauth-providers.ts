@@ -400,6 +400,154 @@ const LINEAR: OAuthProviderDef = {
   fetchIdentity: fetchLinearOrgName,
 };
 
+// ─── Provider: LinkedIn ───────────────────────────────────────────────────
+//
+// LinkedIn moved off OAuth1 long ago. The current flow uses OAuth2 + OIDC
+// for member sign-in. To POST member content via the existing
+// `linkedin-api.adapter.ts` we need:
+//   - openid + profile + email (so we can resolve the person URN)
+//   - w_member_social (so the access token can write a UGC post)
+// The token response is RFC 6749 standard. The display name comes from the
+// /v2/userinfo OIDC endpoint (`sub` is the member ID, `name` is the
+// display name we surface in the integrations row).
+
+interface LinkedInIdentity {
+  displayName: string | null;
+  personUrn: string | null;
+  email: string | null;
+}
+
+async function fetchLinkedInIdentity(accessToken: string): Promise<LinkedInIdentity> {
+  try {
+    const res = await fetch('https://api.linkedin.com/v2/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return { displayName: null, personUrn: null, email: null };
+    const json = await res.json() as { sub?: unknown; name?: unknown; email?: unknown };
+    const sub = typeof json.sub === 'string' ? json.sub : null;
+    return {
+      displayName: typeof json.name === 'string' ? json.name : null,
+      personUrn: sub ? `urn:li:person:${sub}` : null,
+      email: typeof json.email === 'string' ? json.email : null,
+    };
+  } catch {
+    return { displayName: null, personUrn: null, email: null };
+  }
+}
+
+const LINKEDIN: OAuthProviderDef = {
+  id: 'LINKEDIN',
+  label: 'LinkedIn',
+  authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+  tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+  // OIDC scopes give us the member ID we need to construct the person URN
+  // for posting. w_member_social is the gate for writing UGC posts.
+  scopes: ['openid', 'profile', 'email', 'w_member_social'],
+  scopeSeparator: ' ',
+  usesPkce: true,
+  callbackPath: '/integrations/oauth/linkedin/callback',
+  getClientCreds: (cfg) =>
+    cfg.linkedinOAuthClientId && cfg.linkedinOAuthClientSecret
+      ? { clientId: cfg.linkedinOAuthClientId, clientSecret: cfg.linkedinOAuthClientSecret }
+      : null,
+  parseTokenResponse: (raw) => {
+    const base = parseStandardTokenResponse(raw);
+    const json = raw as Record<string, unknown>;
+    return {
+      ...base,
+      extraMetadata: {
+        linkedinIdToken: typeof json['id_token'] === 'string' ? json['id_token'] : undefined,
+      },
+    };
+  },
+  fetchIdentity: async (accessToken: string) => {
+    const ident = await fetchLinkedInIdentity(accessToken);
+    return ident.displayName ?? ident.email;
+  },
+};
+
+// ─── Provider: Salesforce ─────────────────────────────────────────────────
+//
+// Salesforce returns its REST API base in the token response (`instance_url`)
+// because each org has its own subdomain (e.g. acme.my.salesforce.com).
+// We capture it in metadata so the adapter knows which host to call without
+// requiring the user to type their org URL.
+//
+// Sandbox orgs auth at test.salesforce.com — switch via the
+// SALESFORCE_OAUTH_DOMAIN env var without code changes.
+
+async function fetchSalesforceIdentity(accessToken: string, instanceUrl: string): Promise<string | null> {
+  try {
+    // Use OAuth identity URL — returned alongside instance_url. We just call
+    // the well-known /services/oauth2/userinfo endpoint on the instance URL.
+    const res = await fetch(`${instanceUrl}/services/oauth2/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { name?: unknown; preferred_username?: unknown; email?: unknown };
+    if (typeof json.name === 'string') return json.name;
+    if (typeof json.preferred_username === 'string') return json.preferred_username;
+    if (typeof json.email === 'string') return json.email;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const SALESFORCE: OAuthProviderDef = {
+  id: 'SALESFORCE',
+  label: 'Salesforce',
+  // Auth + token URLs live on whatever domain the user's org uses
+  // (login.salesforce.com or test.salesforce.com). Built dynamically by
+  // overriding authUrl/tokenUrl per-cfg in the registry getter below.
+  authUrl: 'https://login.salesforce.com/services/oauth2/authorize',
+  tokenUrl: 'https://login.salesforce.com/services/oauth2/token',
+  scopes: ['api', 'refresh_token', 'offline_access', 'openid'],
+  scopeSeparator: ' ',
+  // Salesforce supports PKCE on the web-server flow.
+  usesPkce: true,
+  callbackPath: '/integrations/oauth/salesforce/callback',
+  getClientCreds: (cfg) =>
+    cfg.salesforceOAuthClientId && cfg.salesforceOAuthClientSecret
+      ? { clientId: cfg.salesforceOAuthClientId, clientSecret: cfg.salesforceOAuthClientSecret }
+      : null,
+  parseTokenResponse: (raw) => {
+    const json = raw as Record<string, unknown>;
+    const accessToken = typeof json['access_token'] === 'string' ? json['access_token'] : '';
+    if (!accessToken) throw new Error('Salesforce OAuth returned no access_token');
+    const instanceUrl = typeof json['instance_url'] === 'string' ? json['instance_url'] : '';
+    return {
+      accessToken,
+      refreshToken: typeof json['refresh_token'] === 'string' ? json['refresh_token'] : undefined,
+      scope: typeof json['scope'] === 'string' ? json['scope'] : undefined,
+      extraMetadata: {
+        salesforceInstanceUrl: instanceUrl || undefined,
+        salesforceIssuedAt: typeof json['issued_at'] === 'string' ? json['issued_at'] : undefined,
+        salesforceSignature: typeof json['signature'] === 'string' ? json['signature'] : undefined,
+        salesforceIdUrl: typeof json['id'] === 'string' ? json['id'] : undefined,
+      },
+    };
+  },
+  // We can't call userinfo without the instance_url — it's in extraMetadata
+  // captured above. The integrations route reads metadata.salesforceInstanceUrl
+  // and calls fetchSalesforceIdentity directly with both args. The
+  // OAuthProviderDef.fetchIdentity signature only gets the token, so we
+  // return a static label here and rely on the metadata-aware path in the
+  // route handler for the friendly displayName.
+  fetchIdentity: async (_accessToken: string) => null,
+};
+
+// Override the auth/token URLs at runtime when the operator has pointed
+// SALESFORCE_OAUTH_DOMAIN at a sandbox or My-Domain org. We mutate the
+// const object so all downstream consumers (frontend list, route handler)
+// see the right URL without an additional indirection.
+function applySalesforceDomain(cfg: RuntimeConfig): void {
+  const dom = (cfg.salesforceOAuthDomain ?? 'login.salesforce.com').trim();
+  if (!dom) return;
+  SALESFORCE.authUrl = `https://${dom}/services/oauth2/authorize`;
+  SALESFORCE.tokenUrl = `https://${dom}/services/oauth2/token`;
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 export const OAUTH_PROVIDERS: Record<string, OAuthProviderDef> = {
@@ -408,7 +556,14 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderDef> = {
   GITHUB,
   NOTION,
   LINEAR,
+  LINKEDIN,
+  SALESFORCE,
 };
+
+// Convenience export so the integrations route can resolve the LinkedIn
+// person URN after token exchange (it's not on the standard fetchIdentity
+// signature).
+export { fetchLinkedInIdentity, fetchSalesforceIdentity, applySalesforceDomain };
 
 /**
  * List of provider IDs that have an OAuth implementation registered.

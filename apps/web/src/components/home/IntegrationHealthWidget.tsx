@@ -16,6 +16,8 @@ const PROVIDER_EMOJI: Record<IntegrationProvider, string> = {
   NOTION: '\uD83D\uDCD3',
   HUBSPOT: '\uD83E\uDDF2',
   DRIVE: '\uD83D\uDCC1',
+  LINKEDIN: '\uD83D\uDCBC',
+  SALESFORCE: '\u2601\uFE0F',
 };
 
 export function IntegrationHealthWidget() {

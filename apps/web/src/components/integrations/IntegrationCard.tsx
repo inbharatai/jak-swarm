@@ -55,6 +55,18 @@ export const PROVIDER_META: Record<IntegrationProvider, ProviderMeta> = {
     description: 'Access and manage files in Google Drive',
     agents: ['Document Agent', 'Research Agent'],
   },
+  LINKEDIN: {
+    name: 'LinkedIn',
+    emoji: '\uD83D\uDCBC',
+    description: 'Post updates, fetch profile data, and enrich contacts',
+    agents: ['CMO Agent', 'Marketing Agent', 'CRM Agent'],
+  },
+  SALESFORCE: {
+    name: 'Salesforce',
+    emoji: '\u2601\uFE0F',
+    description: 'Sync leads, contacts, opportunities, and pipeline activity',
+    agents: ['CRM Agent', 'Sales Agent'],
+  },
 };
 
 interface IntegrationCardProps {

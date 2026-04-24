@@ -184,6 +184,22 @@ export const config = {
   linearOAuthClientId: process.env['LINEAR_OAUTH_CLIENT_ID'] ?? '',
   linearOAuthClientSecret: process.env['LINEAR_OAUTH_CLIENT_SECRET'] ?? '',
 
+  // LinkedIn — setup: https://www.linkedin.com/developers/apps → Auth tab
+  // Required scopes: openid, profile, email, w_member_social (for posting)
+  // Redirect URI to register: ${API_PUBLIC_URL}/integrations/oauth/linkedin/callback
+  linkedinOAuthClientId: process.env['LINKEDIN_OAUTH_CLIENT_ID'] ?? '',
+  linkedinOAuthClientSecret: process.env['LINKEDIN_OAUTH_CLIENT_SECRET'] ?? '',
+
+  // Salesforce — setup: https://help.salesforce.com/articleView?id=connected_app_create.htm
+  //   - Connected App with OAuth 2.0 enabled
+  //   - Required scopes: api, refresh_token, offline_access
+  //   - Redirect URI to register: ${API_PUBLIC_URL}/integrations/oauth/salesforce/callback
+  // SALESFORCE_OAUTH_DOMAIN defaults to login.salesforce.com (production).
+  // Use test.salesforce.com for sandbox orgs.
+  salesforceOAuthClientId: process.env['SALESFORCE_OAUTH_CLIENT_ID'] ?? '',
+  salesforceOAuthClientSecret: process.env['SALESFORCE_OAUTH_CLIENT_SECRET'] ?? '',
+  salesforceOAuthDomain: (process.env['SALESFORCE_OAUTH_DOMAIN'] ?? 'login.salesforce.com').trim(),
+
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
   corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
 

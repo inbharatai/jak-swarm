@@ -181,15 +181,24 @@ export default function SkillsPage() {
 
       {/* Content */}
       {activeTab === 'installed' && (
-        <div>
+        <div data-testid="skills-installed-tab">
           {isLoading ? (
             <div className="flex items-center justify-center min-h-[200px]"><Spinner /></div>
           ) : filteredSkills.length === 0 ? (
             <EmptyState
               icon={<Package className="h-12 w-12" />}
-              title="No skills installed"
-              description="Browse the marketplace to add skills, or create your own."
-              action={<Button onClick={() => setActiveTab('marketplace')} className="gap-2"><Download className="h-4 w-4" /> Browse Marketplace</Button>}
+              title="No skills installed yet"
+              description={`Skills package groups of tools your agents use (PDF extraction, SEO audits, contract comparison, browser automation, and more). Browse ${SKILL_MARKETPLACE.length} ready-to-install skills in the Marketplace, or define your own.`}
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={() => setActiveTab('marketplace')} className="gap-2">
+                    <Download className="h-4 w-4" /> Browse {SKILL_MARKETPLACE.length} Marketplace skills
+                  </Button>
+                  <Button variant="outline" onClick={() => setActiveTab('create')} className="gap-2">
+                    <Plus className="h-4 w-4" /> Create custom skill
+                  </Button>
+                </div>
+              }
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

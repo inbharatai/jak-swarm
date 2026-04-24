@@ -260,33 +260,71 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             responseBody['recoveredAsClarification'] = true;
           } else {
             // Recovery #2: pull substantive content from the worker traces
-            // (skip orchestration roles).
+            // (skip orchestration roles). Walks nested objects + parses
+            // stringified JSON so we catch outputs the legacy SwarmGraph
+            // stores under arbitrary nested shapes (`output.result.content`,
+            // `output.data.answer`, JSON-stringified payloads, etc.).
             const ORCH = new Set(['COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'GUARDRAIL', 'APPROVAL', 'SWARMRUNNER', 'SUPERVISOR']);
             const FIELDS = ['content', 'answer', 'response', 'message', 'findings', 'summary', 'document',
                             'result', 'output', 'draft', 'code', 'architecture', 'analysis', 'strategy',
-                            'recommendation', 'conclusion', 'explanation', 'plan', 'text', 'body', 'report'];
+                            'recommendation', 'conclusion', 'explanation', 'plan', 'text', 'body', 'report',
+                            'markdown', 'reply', 'finalOutput', 'directAnswer'];
+            const MIN_CONTENT_LEN = 30;
+            const MAX_DEPTH = 4;
+
+            // Recursively walk an unknown value and return the best
+            // substantive string it contains. Tries known field names first,
+            // then any string > MIN_CONTENT_LEN. Parses JSON-string fields
+            // up to MAX_DEPTH so worker outputs serialized as strings still
+            // get unwrapped.
+            const extractContent = (val: unknown, depth: number): string => {
+              if (depth > MAX_DEPTH) return '';
+              if (typeof val === 'string') {
+                const trimmed = val.trim();
+                if (trimmed.length === 0) return '';
+                // Try to unwrap JSON-stringified payloads
+                if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 64_000) {
+                  try {
+                    const parsed = JSON.parse(trimmed);
+                    const inner = extractContent(parsed, depth + 1);
+                    if (inner.length >= MIN_CONTENT_LEN) return inner;
+                  } catch { /* not JSON, treat as plain text */ }
+                }
+                return trimmed.length >= MIN_CONTENT_LEN ? trimmed : '';
+              }
+              if (Array.isArray(val)) {
+                let best = '';
+                for (const item of val) {
+                  const c = extractContent(item, depth + 1);
+                  if (c.length > best.length) best = c;
+                }
+                return best;
+              }
+              if (val && typeof val === 'object') {
+                const obj = val as Record<string, unknown>;
+                // Pass 1: known field names
+                for (const f of FIELDS) {
+                  const c = extractContent(obj[f], depth + 1);
+                  if (c.length >= MIN_CONTENT_LEN) return c;
+                }
+                // Pass 2: any string field
+                let best = '';
+                for (const v of Object.values(obj)) {
+                  const c = extractContent(v, depth + 1);
+                  if (c.length > best.length) best = c;
+                }
+                return best;
+              }
+              return '';
+            };
+
             const sections: Array<{ role: string; content: string }> = [];
             for (const t of traces) {
               if (ORCH.has(t.agentRole)) continue;
-              const o = t.output as Record<string, unknown> | null;
+              const o = t.output as unknown;
               if (!o) continue;
-              let content = '';
-              for (const f of FIELDS) {
-                const v = o[f];
-                if (typeof v === 'string' && v.trim().length > 30) {
-                  content = v.trim();
-                  break;
-                }
-              }
-              if (!content) {
-                // Last resort: longest string field
-                let longest = '';
-                for (const v of Object.values(o)) {
-                  if (typeof v === 'string' && v.trim().length > longest.length) longest = v.trim();
-                }
-                if (longest.length > 30) content = longest;
-              }
-              if (content) {
+              const content = extractContent(o, 0);
+              if (content.length >= MIN_CONTENT_LEN) {
                 const displayRole = t.agentRole.replace(/^WORKER_/, '').replace(/_/g, ' ');
                 sections.push({ role: displayRole, content });
               }
@@ -298,6 +336,16 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
               responseBody['status'] = 'COMPLETED';
               responseBody['error'] = null;
               responseBody['recoveredFromWorkerTraces'] = true;
+            } else {
+              // Recovery #3: when no worker output is recoverable, replace
+              // the internal stub with a human-readable fallback that
+              // points the user at the Inspector. The literal "did not
+              // produce a user-facing response" string must NEVER reach
+              // the chat UI per the QA brief.
+              responseBody['finalOutput'] =
+                `JAK completed the run, but no final response was generated. ` +
+                `You can view the detailed trace in [Run Inspector](/swarm).`;
+              responseBody['recoveryFallback'] = true;
             }
           }
         }

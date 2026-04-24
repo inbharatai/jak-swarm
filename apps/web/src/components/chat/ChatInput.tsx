@@ -360,6 +360,7 @@ export function ChatInput({
       )}>
         <textarea
           ref={textareaRef}
+          data-testid="chat-input-textarea"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -367,9 +368,11 @@ export function ChatInput({
           placeholder={
             isListening
               ? (partialTranscript || 'Listening… speak now')
-              : activeRoles.length === 1
-                ? `Message ${activeRoles[0].toUpperCase()}...`
-                : `Message ${activeRoles.length} roles...`
+              : activeRoles.length === 0
+                ? 'What do you want JAK to do? (Auto mode — JAK picks the right specialist)'
+                : activeRoles.length === 1
+                  ? `Message ${activeRoles[0].toUpperCase()}...`
+                  : `Message ${activeRoles.length} roles...`
           }
           disabled={disabled}
           rows={1}

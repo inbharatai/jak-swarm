@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
-import { Monitor, Megaphone, Crown, Code, Search, Palette, Workflow } from 'lucide-react';
+import { Monitor, Megaphone, Crown, Code, Search, Palette, Workflow, Scale } from 'lucide-react';
 
 // ─── Role Definitions ────────────────────────────────────────────────────────
 
-export type RoleId = 'cto' | 'cmo' | 'ceo' | 'coding' | 'research' | 'design' | 'automation';
+export type RoleId = 'cto' | 'cmo' | 'ceo' | 'coding' | 'research' | 'design' | 'automation' | 'legal';
 
 /**
  * Canonical `AgentRole` string each UX role maps to. The dashboard role picker
@@ -24,7 +24,8 @@ export type CanonicalAgentRole =
   | 'WORKER_CODER'
   | 'WORKER_RESEARCH'
   | 'WORKER_DESIGNER'
-  | 'WORKER_OPS';
+  | 'WORKER_OPS'
+  | 'WORKER_LEGAL';
 
 export interface RoleConfig {
   id: RoleId;
@@ -183,6 +184,27 @@ export const ROLES: Record<RoleId, RoleConfig> = {
       'Build a monitoring alert system for our APIs',
     ],
     color: { h: 25, s: 80, l: 55 },
+  },
+  legal: {
+    id: 'legal',
+    canonicalAgentRole: 'WORKER_LEGAL',
+    label: 'Legal',
+    shortLabel: 'Legal',
+    icon: Scale,
+    description: 'Contract review, NDA/policy drafting, and risk flagging — backed by the WORKER_LEGAL worker',
+    capabilities: [
+      'Review contracts and identify risk clauses',
+      'Compare two contracts and extract key obligations',
+      'Draft NDAs, policies, and standard legal templates',
+      'Flag compliance concerns in business communications',
+    ],
+    domain: 'Legal',
+    examplePrompts: [
+      'Review this contract text and identify risks',
+      'Compare these two NDAs and flag the differences',
+      'Draft a basic mutual NDA between two startups',
+    ],
+    color: { h: 245, s: 60, l: 55 },
   },
 };
 

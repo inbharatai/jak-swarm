@@ -4,7 +4,14 @@ import { mcpClientManager, MCP_PROVIDERS } from '@jak-swarm/tools';
 import { encrypt as encryptCredentials } from '../utils/crypto.js';
 import { generateCodeVerifier, deriveCodeChallenge, generateStateToken } from '../utils/pkce.js';
 import { config } from '../config.js';
-import { OAUTH_PROVIDERS, listOAuthProviders, type OAuthProviderDef } from '../services/oauth-providers.js';
+import {
+  OAUTH_PROVIDERS,
+  listOAuthProviders,
+  type OAuthProviderDef,
+  fetchLinkedInIdentity,
+  fetchSalesforceIdentity,
+  applySalesforceDomain,
+} from '../services/oauth-providers.js';
 import { ok, err } from '../types.js';
 
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
@@ -172,6 +179,11 @@ async function exchangeAuthorizationCode(params: {
 }
 
 export async function integrationRoutes(app: FastifyInstance) {
+  // Apply provider-specific runtime overrides before any route lookups.
+  // Salesforce auth/token URLs depend on whether the operator is targeting
+  // production (login.salesforce.com) or sandbox (test.salesforce.com).
+  applySalesforceDomain(config);
+
   // List connected integrations for tenant
   app.get('/integrations', {
     preHandler: [app.authenticate],
@@ -187,6 +199,118 @@ export async function integrationRoutes(app: FastifyInstance) {
         ...getIntegrationMaturity(integration.provider),
       })),
     ));
+  });
+
+  // ─── /integrations/gmail/inbox ───────────────────────────────────────────
+  // Minimal read-only inbox endpoint backing the Inbox page. Not tagged as a
+  // tool surface — it's a per-tenant convenience wrapper around whichever
+  // Gmail adapter the tenant has connected. WRITES still go through the
+  // workflow engine so audit + approval policy applies consistently.
+  //
+  // Returns `[]` with a hint when Gmail isn't configured so the UI gate can
+  // render the connect prompt without additional round-trips.
+  app.get('/integrations/gmail/inbox', {
+    preHandler: [app.authenticate],
+  }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const q = request.query as { days?: string; limit?: string };
+    const days = Math.min(Math.max(parseInt(q.days ?? '7', 10) || 7, 1), 90);
+    const limit = Math.min(Math.max(parseInt(q.limit ?? '50', 10) || 50, 1), 100);
+
+    const integration = await app.db.integration.findFirst({
+      where: { tenantId, provider: 'GMAIL', status: 'CONNECTED' },
+    });
+    if (!integration) return reply.send(ok([]));
+
+    const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const { getEmailAdapter } = await import('@jak-swarm/tools');
+      const adapter = getEmailAdapter();
+      if (!adapter) return reply.send(ok([]));
+      const msgs = await adapter.listMessages({ after: since, limit });
+      const mapped = msgs.map((m) => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        snippet: m.snippet ?? m.body.slice(0, 180),
+        receivedAt: m.date,
+      }));
+      return reply.send(ok(mapped));
+    } catch (e) {
+      request.log.warn({ err: e }, 'Gmail inbox fetch failed');
+      return reply.send(ok([]));
+    }
+  });
+
+  // Single-message body fetch for the Inbox "read" view.
+  app.get('/integrations/gmail/message/:id', {
+    preHandler: [app.authenticate],
+  }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { id } = request.params as { id: string };
+    const integration = await app.db.integration.findFirst({
+      where: { tenantId, provider: 'GMAIL', status: 'CONNECTED' },
+    });
+    if (!integration) return reply.code(404).send(err('NOT_CONNECTED', 'Gmail not connected'));
+    try {
+      const { getEmailAdapter } = await import('@jak-swarm/tools');
+      const adapter = getEmailAdapter();
+      if (!adapter) return reply.code(404).send(err('NO_ADAPTER', 'Gmail adapter unavailable'));
+      const m = await adapter.getMessage(id);
+      return reply.send(ok({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        snippet: m.snippet ?? '',
+        body: m.body,
+        receivedAt: m.date,
+      }));
+    } catch (e) {
+      request.log.warn({ err: e }, 'Gmail message fetch failed');
+      return reply.code(500).send(err('FETCH_FAILED', 'Could not fetch message'));
+    }
+  });
+
+  // ─── /integrations/gcal/events ───────────────────────────────────────────
+  // Upcoming-events list for the Calendar page. Same pattern as the inbox
+  // route — per-tenant CONNECTED check first, then delegate to whichever
+  // calendar adapter is configured. Writes go through the workflow engine.
+  app.get('/integrations/gcal/events', {
+    preHandler: [app.authenticate],
+  }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const q = request.query as { days?: string };
+    const days = Math.min(Math.max(parseInt(q.days ?? '30', 10) || 30, 1), 365);
+
+    const integration = await app.db.integration.findFirst({
+      where: { tenantId, provider: 'GCAL', status: 'CONNECTED' },
+    });
+    if (!integration) return reply.send(ok([]));
+
+    try {
+      const { getCalendarAdapter } = await import('@jak-swarm/tools');
+      const adapter = getCalendarAdapter();
+      if (!adapter) return reply.send(ok([]));
+      const start = new Date();
+      const end = new Date(Date.now() + days * 86_400_000);
+      const events = await adapter.listEvents({
+        after: start.toISOString(),
+        before: end.toISOString(),
+        maxResults: 100,
+      });
+      const mapped = events.map((e) => ({
+        id: e.id,
+        title: e.title,
+        start: e.startTime,
+        end: e.endTime,
+        description: e.description ?? undefined,
+        location: e.location ?? undefined,
+      }));
+      return reply.send(ok(mapped));
+    } catch (e) {
+      request.log.warn({ err: e }, 'Calendar events fetch failed');
+      return reply.send(ok([]));
+    }
   });
 
   // Get provider setup info (credential fields, instructions)
@@ -463,9 +587,26 @@ export async function integrationRoutes(app: FastifyInstance) {
       return errRedirect(`Token exchange failed: ${msg}`);
     }
 
-    const identity = oauthProvider.fetchIdentity
-      ? await oauthProvider.fetchIdentity(tokens.accessToken)
-      : null;
+    // Provider-specific identity + metadata enrichment that can't be
+    // expressed through the generic fetchIdentity signature (needs either
+    // secondary endpoints, or values from extraMetadata like Salesforce's
+    // instance_url). Falls back to the generic path for every other
+    // provider.
+    let identity: string | null = null;
+    const enrichedMeta: Record<string, unknown> = {};
+    if (oauthProvider.id === 'LINKEDIN') {
+      const li = await fetchLinkedInIdentity(tokens.accessToken);
+      identity = li.displayName ?? li.email;
+      if (li.personUrn) enrichedMeta['linkedinPersonUrn'] = li.personUrn;
+      if (li.email) enrichedMeta['linkedinEmail'] = li.email;
+    } else if (oauthProvider.id === 'SALESFORCE') {
+      const instanceUrl = (tokens.extraMetadata?.['salesforceInstanceUrl'] as string | undefined) ?? '';
+      if (instanceUrl) {
+        identity = await fetchSalesforceIdentity(tokens.accessToken, instanceUrl);
+      }
+    } else if (oauthProvider.fetchIdentity) {
+      identity = await oauthProvider.fetchIdentity(tokens.accessToken);
+    }
     const displayName = identity ?? oauthProvider.label;
 
     // expiresAt is only set when the provider actually returns expires_in.
@@ -480,6 +621,7 @@ export async function integrationRoutes(app: FastifyInstance) {
       connectedViaOAuth: true,
       grantedScope: tokens.scope,
       ...(tokens.extraMetadata ?? {}),
+      ...enrichedMeta,
     };
 
     const integration = await app.db.integration.upsert({

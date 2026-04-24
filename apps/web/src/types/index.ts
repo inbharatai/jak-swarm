@@ -69,7 +69,16 @@ export interface AuthUser {
   jobFunction?: JobFunction;
 }
 
-export type IntegrationProvider = 'GMAIL' | 'GCAL' | 'SLACK' | 'GITHUB' | 'NOTION' | 'HUBSPOT' | 'DRIVE';
+export type IntegrationProvider =
+  | 'GMAIL'
+  | 'GCAL'
+  | 'SLACK'
+  | 'GITHUB'
+  | 'NOTION'
+  | 'HUBSPOT'
+  | 'DRIVE'
+  | 'LINKEDIN'
+  | 'SALESFORCE';
 export type IntegrationStatus = 'CONNECTED' | 'DISCONNECTED' | 'NEEDS_REAUTH' | 'ERROR';
 export type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
 

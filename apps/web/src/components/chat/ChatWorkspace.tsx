@@ -157,14 +157,24 @@ export function ChatWorkspace() {
               content: `${success ? '✓' : '✗'} ${(ev.agentRole as string) ?? 'Agent'}: ${(ev.taskName as string) ?? 'task'} ${success ? 'completed' : 'failed'}${duration}`,
               executionTrace: { workflowId: workflow.id },
             });
-          // Workflow completed — fetch and display final output
+          // Workflow completed — fetch and display final output.
+          // QA H2 defence-in-depth: if the server's recovery layer missed
+          // and `finalOutput` still matches the internal stub string, we
+          // swap in a human-readable fallback here before rendering. The
+          // literal "did not produce a user-facing response" must never
+          // be shown to the user per the QA brief.
           } else if (evType === 'completed') {
             void workflowApi.get(workflow.id).then((w) => {
-              if (w.finalOutput) {
+              const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
+              const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
+              const display = raw.trim().length === 0 || STUB_RE.test(raw)
+                ? 'JAK completed the run, but no final response was generated. You can view the detailed trace in [Run Inspector](/swarm).'
+                : raw;
+              if (display.length > 0) {
                 addMessage(convId, {
                   role: 'assistant',
                   agentRole: activeRoles[0] ?? null,
-                  content: w.finalOutput as string,
+                  content: display,
                   executionTrace: { workflowId: workflow.id },
                 });
               }
@@ -182,19 +192,21 @@ export function ChatWorkspace() {
           // it before showing the user a "failed" message.
           } else if (evType === 'failed') {
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
+            const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
             void workflowApi.get(workflow.id).then((w) => {
-              if (w.finalOutput && typeof w.finalOutput === 'string' && w.finalOutput.trim().length > 0) {
+              const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
+              if (raw.trim().length > 0 && !STUB_RE.test(raw)) {
                 addMessage(convId, {
                   role: 'assistant',
                   agentRole: activeRoles[0] ?? null,
-                  content: w.finalOutput as string,
+                  content: raw,
                   executionTrace: { workflowId: workflow.id },
                 });
               } else {
                 addMessage(convId, {
                   role: 'assistant',
                   agentRole: null,
-                  content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
+                  content: `Workflow failed: ${fallbackError ?? 'Unknown error'}. You can view the detailed trace in [Run Inspector](/swarm).`,
                 });
               }
             }).catch(() => {
@@ -271,7 +283,11 @@ export function ChatWorkspace() {
           {hasMessages ? (
             <MessageThread messages={messages} />
           ) : (
-            <div className="flex-1 overflow-y-auto">
+            // QA H1 fix: render the EmptyState above the input (not as a
+            // gate). The input is always visible at the bottom of the
+            // workspace; EmptyState is now a discoverability hint, not a
+            // conditional that hides the textarea.
+            <div className="flex-1 overflow-y-auto" data-testid="workspace-empty-state">
               <EmptyState onStartChat={handleStartChat} />
             </div>
           )}
@@ -328,12 +344,15 @@ export function ChatWorkspace() {
             </div>
           )}
 
-          {/* Role picker above input when messages exist */}
-          {hasMessages && (
-            <div className="border-t border-border px-4 pt-2">
-              <RolePicker compact />
-            </div>
-          )}
+          {/* Role picker above input — ALWAYS visible (QA H1 fix).
+              Previously this was gated on `hasMessages`, which meant a
+              first-time user landed on the function-picker tile screen
+              with no chat input visible. Now the picker rides above the
+              input on every load so the user can both type and switch
+              roles without an extra click. */}
+          <div className="border-t border-border px-4 pt-2" data-testid="role-picker-bar">
+            <RolePicker compact />
+          </div>
 
           <ChatInput
             value={inputValue}

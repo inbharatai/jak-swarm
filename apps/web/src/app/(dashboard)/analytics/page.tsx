@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BarChart3, DollarSign, Zap, Activity, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner, EmptyState } from '@/components/ui';
+import { BarChart3, DollarSign, Zap, Activity, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, Badge, EmptyState, Button } from '@/components/ui';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 
@@ -157,20 +157,72 @@ function ProviderStackedBar({ data }: { data: Record<string, number> }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
+// ─── Skeleton (QA H4 fix) ────────────────────────────────────────────────────
+// Chart-shaped placeholder shown while SWR is fetching. Replaces the
+// centered spinner that made /analytics look broken for 4–5s on cold load.
+
+function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-6" data-testid="analytics-skeleton">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-6 w-16 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <CardHeader>
+          <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-40 w-full rounded bg-muted/50 animate-pulse" />
+        </CardContent>
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((i) => (
+          <Card key={i}>
+            <CardHeader>
+              <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-24 w-full rounded bg-muted/50 animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>('30d');
   const { from, to } = getPeriodDates(period);
 
-  const { data: response, isLoading } = useSWR<ApiResponse<TenantUsageSummary>>(
+  const { data: response, isLoading, error, mutate } = useSWR<ApiResponse<TenantUsageSummary>>(
     `/analytics/usage?from=${from}&to=${to}`,
     fetcher,
-    { refreshInterval: 60_000 },
+    {
+      refreshInterval: 60_000,
+      // QA H4 fix: 15s hard timeout; don't leave the user staring at a
+      // cold-load spinner indefinitely when the backend is slow.
+      loadingTimeout: 15_000,
+      errorRetryCount: 2,
+    },
   );
 
   const summary = response?.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="analytics-page">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -201,15 +253,38 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+      {error ? (
+        // QA H4 fix: explicit error state with retry. Previously SWR
+        // errors left the body blank.
+        <div data-testid="analytics-error">
+          <Card className="border-destructive/40">
+            <CardContent className="p-6 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold">Analytics failed to load</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {error instanceof Error ? error.message : 'The analytics service is temporarily unavailable. Your workflows and data are unaffected.'}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 gap-1.5"
+                  onClick={() => void mutate()}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      ) : isLoading ? (
+        <AnalyticsSkeleton />
       ) : !summary ? (
         <EmptyState
           icon={<BarChart3 className="h-6 w-6" />}
-          title="No analytics data"
-          description="Analytics data will appear here once workflows start running."
+          title="No analytics data yet"
+          description="Analytics data will appear here once workflows start running. Head to Workspace to kick off your first run."
         />
       ) : (
         <>
