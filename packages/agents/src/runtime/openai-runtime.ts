@@ -16,6 +16,7 @@
  */
 
 import OpenAI from 'openai';
+import type { ZodType } from 'zod';
 import { calculateCost } from '@jak-swarm/shared';
 import type { AgentContext } from '../base/agent-context.js';
 import type {
@@ -23,6 +24,7 @@ import type {
   LLMCallOptions,
   ToolLoopOptions,
   ToolLoopResult,
+  StructuredRespondOptions,
 } from './llm-runtime.js';
 import {
   adaptChatToolsToResponses,
@@ -63,6 +65,62 @@ export class OpenAIRuntime implements LLMRuntime {
     }
     this.client = new OpenAI({ apiKey });
     this.model = opts.model ?? DEFAULT_MODEL;
+  }
+
+  /**
+   * Strict structured output via Responses API json_schema format.
+   * Schema is enforced at the model layer — no prose drift, no
+   * parseJsonResponse fallback path. Validated with zod on top for
+   * type-safety + runtime guarantees.
+   */
+  async respondStructured<T>(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    schema: ZodType<T>,
+    options: StructuredRespondOptions,
+    _context: AgentContext,
+  ): Promise<T> {
+    const opts = options as OpenAIRuntimeCallOptions & StructuredRespondOptions;
+    // Convert zod → JSON Schema lazily to avoid hard dep at module load.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { zodToJsonSchema } = require('zod-to-json-schema') as typeof import('zod-to-json-schema');
+    const jsonSchema = zodToJsonSchema(schema, {
+      name: opts.schemaName ?? 'response',
+      target: 'jsonSchema7',
+    }) as Record<string, unknown> & { definitions?: Record<string, unknown> };
+    // zod-to-json-schema wraps the schema under definitions[name] when name
+    // is provided. Unwrap for direct OpenAI consumption.
+    const def = jsonSchema.definitions?.[opts.schemaName ?? 'response'] ?? jsonSchema;
+
+    const resp = await this.client.responses.create({
+      model: opts.model ?? this.model,
+      input: chatMessagesToResponsesInput(messages),
+      text: {
+        format: {
+          type: 'json_schema',
+          name: (opts.schemaName ?? 'response').replace(/[^a-zA-Z0-9_]/g, '_'),
+          ...(opts.schemaDescription ? { description: opts.schemaDescription } : {}),
+          schema: def as Record<string, unknown>,
+          strict: true,
+        },
+      },
+      ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    });
+
+    const text = (resp as { output_text?: string }).output_text
+      ?? extractTextFromOutputItems(resp.output ?? []);
+    if (!text) {
+      throw new Error('[OpenAIRuntime.respondStructured] empty response text');
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch (err) {
+      throw new Error(
+        `[OpenAIRuntime.respondStructured] response was not valid JSON despite strict json_schema format. Preview: ${text.slice(0, 200)}. Cause: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    return schema.parse(raw);
   }
 
   async respond(
@@ -232,6 +290,20 @@ export class OpenAIRuntime implements LLMRuntime {
  * an EasyInputMessage with the same role + content. Tool messages become
  * `function_call_output` items.
  */
+/** Reused by respondStructured when output_text helper is missing. */
+function extractTextFromOutputItems(items: OpenAI.Responses.ResponseOutputItem[]): string {
+  const parts: string[] = [];
+  for (const item of items) {
+    if (item.type !== 'message') continue;
+    for (const c of item.content ?? []) {
+      if (c.type === 'output_text' && typeof c.text === 'string') {
+        parts.push(c.text);
+      }
+    }
+  }
+  return parts.join('').trim();
+}
+
 function chatMessagesToResponsesInput(
   messages: OpenAI.ChatCompletionMessageParam[],
 ): OpenAI.Responses.ResponseInput {

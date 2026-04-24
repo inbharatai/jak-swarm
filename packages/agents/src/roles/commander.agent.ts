@@ -1,7 +1,29 @@
 import type OpenAI from 'openai';
+import { z } from 'zod';
 import { AgentRole, Industry, INDUSTRY_KEYWORDS } from '@jak-swarm/shared';
 import { BaseAgent } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
+
+/**
+ * Structured-output schema for Commander's LLM response. Used by both
+ * runtimes — LegacyRuntime parses+validates after JSON-mode, OpenAIRuntime
+ * enforces at the model layer via Responses API json_schema format.
+ *
+ * Fields are nullable (not optional) because OpenAI's strict json_schema
+ * mode requires all properties to be present and explicitly nullable for
+ * "absent" semantics.
+ */
+const CommanderResponseSchema = z.object({
+  directAnswer: z.string().nullable(),
+  intent: z.string().nullable(),
+  subFunction: z.string().nullable(),
+  urgency: z.number().int().min(1).max(5).nullable(),
+  riskIndicators: z.array(z.string()),
+  requiredOutputs: z.array(z.string()),
+  clarificationNeeded: z.boolean(),
+  clarificationQuestion: z.string().nullable(),
+});
+type CommanderResponseT = z.infer<typeof CommanderResponseSchema>;
 
 export interface MissionBrief {
   id: string;
@@ -120,46 +142,43 @@ export class CommanderAgent extends BaseAgent {
       },
     ];
 
-    const completion = await this.callLLM(messages, undefined, {
-      maxTokens: 1024,
-      temperature: 0.1,
-    });
-
-    const rawContent = completion.choices[0]?.message?.content ?? '{}';
-
-    interface LLMCommanderResponse {
-      directAnswer?: string | null;
-      intent?: string;
-      subFunction?: string;
-      urgency?: number;
-      riskIndicators?: string[];
-      requiredOutputs?: string[];
-      clarificationNeeded?: boolean;
-      clarificationQuestion?: string;
-    }
-
-    let parsed: LLMCommanderResponse;
+    // Phase 4: route via the LLMRuntime structured-output helper. Both
+    // runtimes validate against the zod schema; OpenAIRuntime enforces
+    // schema compliance at the model layer (no prose drift). On parse
+    // failure we fall back to the same defaults the legacy path used.
+    let parsed: CommanderResponseT;
     try {
-      parsed = this.parseJsonResponse<LLMCommanderResponse>(rawContent);
+      parsed = await this.runtime.respondStructured(
+        messages,
+        CommanderResponseSchema,
+        {
+          maxTokens: 1024,
+          temperature: 0.1,
+          schemaName: 'CommanderResponse',
+          schemaDescription: 'Structured intent decomposition for the JAK Swarm Commander agent',
+        },
+        context,
+      );
     } catch (err) {
-      this.logger.error({ err, rawContent }, 'Failed to parse Commander LLM response');
+      this.logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Commander structured response failed; using fallback');
       parsed = {
+        directAnswer: null,
         intent: rawInput,
         subFunction: 'General Task',
         urgency: 3,
         riskIndicators: [],
         requiredOutputs: ['task completion'],
         clarificationNeeded: false,
+        clarificationQuestion: null,
       };
     }
 
-    const tokenUsage = completion.usage
-      ? {
-          promptTokens: completion.usage.prompt_tokens,
-          completionTokens: completion.usage.completion_tokens,
-          totalTokens: completion.usage.total_tokens,
-        }
-      : undefined;
+    // Token usage is no longer surfaced through respondStructured (Phase 6
+    // will add a callbacks interface to the runtime for usage telemetry).
+    // For Phase 4 we rely on the runtime's internal cost tracking
+    // (BaseAgent.onLLMCallComplete still fires from LegacyRuntime; OpenAI
+    // tracks cost in callTools but not respondStructured yet).
+    const tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined = undefined;
 
     // Direct-answer short-circuit — trivial inputs terminate the workflow
     // here without running the Planner/Router/Workers/Verifier pipeline.
@@ -180,7 +199,7 @@ export class CommanderAgent extends BaseAgent {
     if (parsed.clarificationNeeded) {
       const output: CommanderOutput = {
         clarificationNeeded: true,
-        clarificationQuestion: parsed.clarificationQuestion,
+        clarificationQuestion: parsed.clarificationQuestion ?? undefined,
       };
 
       const trace = this.recordTrace(context, input, output, [], startedAt);

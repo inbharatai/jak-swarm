@@ -98,6 +98,30 @@ export interface LLMRuntime {
     options: ToolLoopOptions,
     context: AgentContext,
   ): Promise<ToolLoopResult>;
+
+  /**
+   * Strict structured output. Returns a value parsed and validated against
+   * the supplied zod schema.
+   *
+   * - LegacyRuntime: uses JSON-mode + parseJsonResponse + schema parse.
+   * - OpenAIRuntime: uses Responses API `text.format: json_schema` for
+   *   guaranteed schema compliance at the model level (no prose drift).
+   *
+   * Phase 4 introduces this; Phase 7 migrates the remaining agents to it.
+   */
+  respondStructured<T>(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    schema: import('zod').ZodType<T>,
+    options: StructuredRespondOptions,
+    context: AgentContext,
+  ): Promise<T>;
+}
+
+export interface StructuredRespondOptions extends LLMCallOptions {
+  /** Name to identify the schema in OpenAI's json_schema mode. Defaults to 'response'. */
+  schemaName?: string;
+  /** Optional plain-language description of the expected output shape. */
+  schemaDescription?: string;
 }
 
 export class NotImplementedError extends Error {
