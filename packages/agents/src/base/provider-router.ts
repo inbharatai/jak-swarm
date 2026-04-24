@@ -288,8 +288,10 @@ export function getProviderForTier(tier: ProviderTier): LLMProvider {
   const legacyChain = (process.env['JAK_LEGACY_PROVIDER_CHAIN'] ?? 'false').toLowerCase() === 'true';
 
   // Phase 7 default: OpenAI-first at every tier when key is present.
+  // Pass the tier so the OpenAIProvider can ask the ModelResolver for
+  // the right model (GPT-5.4 family by default, with safe fallbacks).
   if (!legacyChain && available.openai) {
-    const p = tryCreate(() => new OpenAIProvider());
+    const p = tryCreate(() => new OpenAIProvider(undefined, undefined, { tier }));
     if (p) return p;
   }
 

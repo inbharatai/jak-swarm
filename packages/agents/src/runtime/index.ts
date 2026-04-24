@@ -39,26 +39,59 @@ function getOpenaiRuntimeAgents(): { wildcard: boolean; roles: Set<string> } {
  *   1. JAK_OPENAI_RUNTIME_AGENTS=* → OpenAIRuntime for every agent.
  *   2. JAK_OPENAI_RUNTIME_AGENTS contains the role name → OpenAIRuntime.
  *   3. JAK_EXECUTION_ENGINE=openai-first → OpenAIRuntime for every agent.
- *   4. Default → LegacyRuntime (which now itself prefers OpenAI per Phase 7).
+ *   4. JAK_EXECUTION_ENGINE explicitly set to 'legacy' → LegacyRuntime.
+ *   5. Default when OPENAI_API_KEY is set → OpenAIRuntime (Responses API).
+ *   6. Fallback → LegacyRuntime (Chat Completions via OpenAIProvider).
+ *
+ * The default changed in the GPT-5.4 migration: if a caller has an
+ * OPENAI_API_KEY set and has NOT explicitly chosen legacy, we use the
+ * Responses API because GPT-5.4 strongly prefers it. Legacy Chat
+ * Completions still works for existing callers who set
+ * JAK_EXECUTION_ENGINE=legacy.
  */
 export function getRuntime(
   role: string,
   backend: LegacyAgentBackend,
 ): LLMRuntime {
   const { wildcard, roles } = getOpenaiRuntimeAgents();
-  const engineFlag = (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase();
-  const useOpenAI = wildcard || roles.has(role.toUpperCase()) || engineFlag === 'openai-first';
+  const engineFlag = (process.env['JAK_EXECUTION_ENGINE'] ?? '').trim().toLowerCase();
+  const hasKey = Boolean(process.env['OPENAI_API_KEY']);
+
+  const explicitOpenAI =
+    wildcard || roles.has(role.toUpperCase()) || engineFlag === 'openai-first';
+  const explicitLegacy = engineFlag === 'legacy';
+  // Default: OpenAI-first when we have a key and the operator has NOT
+  // explicitly opted into legacy.
+  const useOpenAI = explicitOpenAI || (!explicitLegacy && hasKey);
 
   if (useOpenAI) {
-    // Phase 3: real OpenAIRuntime. Lazily imported so test paths that don't
-    // need it never pay the cost of constructing an OpenAI client.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { OpenAIRuntime } = require('./openai-runtime.js') as typeof import('./openai-runtime.js');
-    return new OpenAIRuntime();
+    try {
+      // Phase 3: real OpenAIRuntime. Lazily imported so test paths that don't
+      // need it never pay the cost of constructing an OpenAI client.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { OpenAIRuntime } = require('./openai-runtime.js') as typeof import('./openai-runtime.js');
+      return new OpenAIRuntime();
+    } catch (err) {
+      // If OpenAIRuntime construction fails (missing key edge case, SDK
+      // mismatch), fall back to LegacyRuntime so the agent still works.
+      // Never throw here — agent construction must not fail during boot.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[getRuntime] OpenAIRuntime unavailable (${err instanceof Error ? err.message : String(err)}), falling back to LegacyRuntime for role ${role}.`,
+      );
+    }
   }
 
   return new LegacyRuntime(backend);
 }
+
+export {
+  ensureModelMap,
+  getModelMapSync,
+  modelForTier,
+  _resetModelMapCacheForTests,
+} from './model-resolver.js';
+export type { ModelTier, ResolvedModelMap } from './model-resolver.js';
 
 export type { LLMRuntime, LLMCallOptions, ToolLoopOptions, ToolLoopResult } from './llm-runtime.js';
 export { LegacyRuntime } from './legacy-runtime.js';

@@ -73,6 +73,8 @@ import paddleRoutes from './routes/paddle.routes.js';
 import slackRoutes from './routes/slack.routes.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
+import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
+import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
 import { validateConfigOnBoot } from './boot/validate-config.js';
 import { startMcpServersFromConfig } from './boot/mcp-autostart.js';
@@ -209,6 +211,15 @@ async function buildApp() {
   await fastify.register(slackRoutes, { prefix: '/slack' });
   await fastify.register(whatsappRoutes, { prefix: '/whatsapp' });
   await fastify.register(documentsRoutes, { prefix: '/documents' });
+  await fastify.register(adminDiagnosticsRoutes);
+
+  // ─── Model capability check ────────────────────────────────────────────
+  // Warm the ModelResolver cache at boot so the first real LLM call hits
+  // a pre-verified model. Non-blocking: if the check fails, the resolver
+  // transparently falls back to the gpt-4o family and the app still boots.
+  void ensureModelMap().catch((err) => {
+    fastify.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'ensureModelMap() at boot failed; resolver will use failsafe map (gpt-4o family)');
+  });
 
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity

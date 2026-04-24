@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { LLMProvider, LLMResponse, MessageContent } from '../llm-provider.js';
+import { modelForTier, type ModelTier } from '../../runtime/model-resolver.js';
 
 /**
  * OpenAI-backed LLM provider. Wraps the OpenAI SDK chat completions API.
@@ -18,18 +19,34 @@ import type { LLMProvider, LLMResponse, MessageContent } from '../llm-provider.j
 export class OpenAIProvider implements LLMProvider {
   readonly name = 'openai';
   private readonly client: OpenAI;
-  private readonly model: string;
+  /**
+   * Either an explicit model passed by caller / OPENAI_MODEL env, OR
+   * undefined — meaning "ask the ModelResolver per-call so capability
+   * changes pick up without a restart". The fallback chain in
+   * chatCompletion() uses this as the FIRST attempt; even if it is
+   * resolver-derived, we still gracefully fall through to the broader
+   * chain on a 404.
+   */
+  private readonly explicitModel: string | undefined;
+  private readonly defaultTier: ModelTier;
   private readonly baseURL: string;
 
-  constructor(apiKey?: string, model?: string) {
+  constructor(apiKey?: string, model?: string, opts: { tier?: ModelTier } = {}) {
     const resolvedKey = apiKey ?? process.env['OPENAI_API_KEY'];
     const resolvedBase = process.env['OPENAI_BASE_URL']?.trim() || undefined;
     this.client = new OpenAI({
       apiKey: resolvedKey,
       ...(resolvedBase ? { baseURL: resolvedBase } : {}),
     });
-    this.model = model ?? process.env['OPENAI_MODEL'] ?? 'gpt-4o';
+    // Caller-explicit model wins, then env, then resolver-per-call (lazy).
+    this.explicitModel = model ?? (process.env['OPENAI_MODEL']?.trim() || undefined);
+    this.defaultTier = opts.tier ?? 3;
     this.baseURL = resolvedBase ?? 'https://api.openai.com/v1';
+  }
+
+  /** First-attempt model: explicit override OR resolver pick for this tier. */
+  private get firstAttemptModel(): string {
+    return this.explicitModel ?? modelForTier(this.defaultTier);
   }
 
   private isModelNotFound(err: unknown): boolean {
@@ -89,15 +106,21 @@ export class OpenAIProvider implements LLMProvider {
     const wantsJson = params.jsonMode ??
       (!hasTools && /respond with (strict )?json|output.*json|return.*json|respond.*matching.*schema/i.test(systemContent));
 
-    // Reliability fix: extended fallback chain. If the user's configured
-    // model OR the env-default returns 404 (deprecated, restricted, wrong
-    // base URL), we cycle through known-good models before giving up. This
-    // is what makes a wrong OPENAI_MODEL setting recoverable rather than
-    // taking down every workflow.
+    // Reliability fix: extended fallback chain. The first attempt is
+    // either an explicit override OR what the ModelResolver picked for
+    // this provider's tier. If that returns 404 (deprecated, restricted,
+    // wrong base URL), we cycle through the rest of the GPT-5.4 family
+    // and then GPT-5 / GPT-4o family before giving up. Resolver-cached
+    // model picks mean the first attempt almost always succeeds, but the
+    // chain remains as defence-in-depth for capability drift mid-process.
     const fallbackModel = process.env['OPENAI_FALLBACK_MODEL'] ?? 'gpt-4o-mini';
     const modelsToTry = [
-      this.model,
+      this.firstAttemptModel,
       fallbackModel,
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5',
+      'gpt-5-mini',
       'gpt-4o',
       'gpt-4o-mini',
       'gpt-4-turbo',
@@ -143,6 +166,6 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
-    throw this.formatError(lastError ?? 'Unknown error', this.model, modelsToTry);
+    throw this.formatError(lastError ?? 'Unknown error', this.firstAttemptModel, modelsToTry);
   }
 }

@@ -31,9 +31,10 @@ import {
   type HostedToolsConfig,
 } from './openai-tool-adapter.js';
 import { responsesToChatCompletion } from './openai-response-parser.js';
+import { modelForTier, type ModelTier } from './model-resolver.js';
 
-const DEFAULT_MODEL = process.env['OPENAI_MODEL'] ?? 'gpt-4o';
 const MAX_TOOL_LOOP_ITERATIONS_DEFAULT = 5;
+const DEFAULT_TIER: ModelTier = 3;
 
 /**
  * Per-call hosted-tool opt-in. Pass through `options.hostedTools` on
@@ -44,27 +45,52 @@ export interface OpenAIRuntimeCallOptions extends LLMCallOptions {
   hostedTools?: HostedToolsConfig;
   /** Override the default OpenAI model for this call. */
   model?: string;
+  /** Tier hint used by the ModelResolver when `model` is not provided. */
+  tier?: ModelTier;
 }
 
 export interface OpenAIRuntimeToolLoopOptions extends ToolLoopOptions {
   hostedTools?: HostedToolsConfig;
   model?: string;
+  tier?: ModelTier;
 }
 
 export class OpenAIRuntime implements LLMRuntime {
   readonly name = 'openai-responses';
   private readonly client: OpenAI;
-  private readonly model: string;
+  private readonly explicitModel: string | undefined;
+  private readonly defaultTier: ModelTier;
 
-  constructor(opts: { apiKey?: string; model?: string } = {}) {
+  constructor(opts: { apiKey?: string; model?: string; tier?: ModelTier } = {}) {
     const apiKey = opts.apiKey ?? process.env['OPENAI_API_KEY'];
     if (!apiKey) {
       throw new Error(
         '[OpenAIRuntime] OPENAI_API_KEY is required. Set it in env or pass to constructor.',
       );
     }
-    this.client = new OpenAI({ apiKey });
-    this.model = opts.model ?? DEFAULT_MODEL;
+    this.client = new OpenAI({
+      apiKey,
+      ...(process.env['OPENAI_BASE_URL']?.trim()
+        ? { baseURL: process.env['OPENAI_BASE_URL']!.trim() }
+        : {}),
+    });
+    // If the caller passes an explicit model OR sets OPENAI_MODEL, use it.
+    // Otherwise resolve via ModelResolver per tier on every call so
+    // capability changes pick up without restarting the agent.
+    this.explicitModel = opts.model ?? (process.env['OPENAI_MODEL']?.trim() || undefined);
+    this.defaultTier = opts.tier ?? DEFAULT_TIER;
+  }
+
+  /**
+   * Resolve the model name for a given call. Precedence:
+   *   1. Explicit `model` arg on the call
+   *   2. Constructor / OPENAI_MODEL override
+   *   3. Resolver-picked model for the call's tier (or constructor's default tier)
+   */
+  private resolveModel(opts: { model?: string; tier?: ModelTier }): string {
+    if (opts.model) return opts.model;
+    if (this.explicitModel) return this.explicitModel;
+    return modelForTier(opts.tier ?? this.defaultTier);
   }
 
   /**
@@ -92,7 +118,7 @@ export class OpenAIRuntime implements LLMRuntime {
     const def = jsonSchema.definitions?.[opts.schemaName ?? 'response'] ?? jsonSchema;
 
     const resp = await this.client.responses.create({
-      model: opts.model ?? this.model,
+      model: this.resolveModel(opts),
       input: chatMessagesToResponsesInput(messages),
       text: {
         format: {
@@ -131,7 +157,7 @@ export class OpenAIRuntime implements LLMRuntime {
     const opts = options as OpenAIRuntimeCallOptions;
     const tools = adaptChatToolsToResponses(undefined, opts.hostedTools);
     const resp = await this.client.responses.create({
-      model: opts.model ?? this.model,
+      model: this.resolveModel(opts),
       input: chatMessagesToResponsesInput(messages),
       ...(tools.length > 0 ? { tools } : {}),
       ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
@@ -193,7 +219,7 @@ export class OpenAIRuntime implements LLMRuntime {
 
     for (let iter = 0; iter < maxIter; iter++) {
       const resp = await this.client.responses.create({
-        model: opts.model ?? this.model,
+        model: this.resolveModel(opts),
         input: chatMessagesToResponsesInput(messages),
         ...(responsesTools.length > 0 ? { tools: responsesTools } : {}),
         ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),

@@ -231,6 +231,9 @@ export {
   getRuntime,
   LegacyRuntime,
   OpenAIRuntime,
+  ensureModelMap,
+  getModelMapSync,
+  modelForTier,
 } from './runtime/index.js';
 export type {
   LLMRuntime,
@@ -240,6 +243,8 @@ export type {
   // both interfaces are structurally identical so callers see one type.
   HostedToolsConfig,
   LegacyAgentBackend,
+  ModelTier,
+  ResolvedModelMap,
 } from './runtime/index.js';
 
 // ─── Phase 8 — Benchmark harness ────────────────────────────────────────────

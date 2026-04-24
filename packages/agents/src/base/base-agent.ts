@@ -11,6 +11,7 @@ import {
   getTierForAgent,
 } from './provider-router.js';
 import { getRuntime, type LLMRuntime } from '../runtime/index.js';
+import { modelForTier } from '../runtime/model-resolver.js';
 
 /** Memory provider interface — injected by the API layer at boot */
 export interface MemoryProvider {
@@ -263,9 +264,16 @@ ${lines.join('\n')}
     const wantsJson = options?.jsonMode ??
       (!hasTools && /respond with json|output.*json|return.*json/i.test(systemContent));
 
-    // Direct OpenAI SDK path with retry logic
-    // Per-agent model override: check AGENT_MODEL_MAP first, then env, then default
-    const agentModel = getModelOverride(this.role) ?? process.env['OPENAI_MODEL'] ?? 'gpt-4o';
+    // Direct OpenAI SDK path with retry logic.
+    // Per-agent model resolution order:
+    //   1. AGENT_MODEL_MAP override for this exact role (if any)
+    //   2. OPENAI_MODEL env (operator-wide override)
+    //   3. ModelResolver pick for this role's tier (GPT-5.4 family default,
+    //      with falsafe to gpt-4o family if capability check failed)
+    const agentModel =
+      getModelOverride(this.role) ??
+      process.env['OPENAI_MODEL']?.trim() ??
+      modelForTier(getTierForAgent(this.role));
 
     const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
       model: agentModel,
