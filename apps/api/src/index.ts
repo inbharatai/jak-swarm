@@ -272,12 +272,26 @@ async function buildApp() {
   // values are shown so the UI and admin tooling see the truth.
   fastify.get('/version', async (_request, reply) => {
     const hasOpenAIKey = Boolean(process.env['OPENAI_API_KEY']);
-    const engineRaw = config.executionEngine;
-    const explicitLegacy = engineRaw === 'legacy';
-    // Mirror runtime/index.ts getRuntime() logic so /version can't drift
-    // from what the agents actually do at call time.
+    // Read the RAW env — not config.executionEngine — because config
+    // defaults to 'legacy' when unset, which doesn't distinguish
+    // "operator explicitly opted into legacy" from "operator set
+    // nothing and runtime defaults to openai-first when key is present."
+    // The runtime factory at runtime/index.ts uses the raw env, so
+    // /version mirrors it here to stay honest.
+    const engineEnvRaw = (process.env['JAK_EXECUTION_ENGINE'] ?? '').trim().toLowerCase();
+    const runtimeAgentsRaw = (process.env['JAK_OPENAI_RUNTIME_AGENTS'] ?? '').trim();
+    const hasRuntimeAgents = runtimeAgentsRaw.length > 0;
+    const explicitLegacy = engineEnvRaw === 'legacy';
+    // Mirrors getRuntime() resolution order:
+    //   - JAK_OPENAI_RUNTIME_AGENTS=* or role-specific → openai-first
+    //   - JAK_EXECUTION_ENGINE=openai-first → openai-first
+    //   - JAK_EXECUTION_ENGINE=legacy (explicit opt-out) → legacy
+    //   - Otherwise, OPENAI_API_KEY present → openai-first (the default)
+    //   - No key → legacy
     const effectiveEngine =
-      engineRaw === 'openai-first' || (!explicitLegacy && hasOpenAIKey)
+      hasRuntimeAgents ||
+      engineEnvRaw === 'openai-first' ||
+      (!explicitLegacy && hasOpenAIKey)
         ? 'openai-first'
         : 'legacy';
     return reply.status(200).send({
@@ -286,12 +300,14 @@ async function buildApp() {
       buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
       startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
-      // Migration flags — raw env values (what operator explicitly set).
-      executionEngine: engineRaw,
+      // Migration flags — raw env (what operator explicitly set). Empty
+      // string means "unset" so the client can distinguish "legacy by
+      // default" from "legacy explicitly chosen".
+      executionEngine: engineEnvRaw || '(unset — defaults to openai-first when OPENAI_API_KEY is set)',
       workflowRuntime: config.workflowRuntime,
-      openaiRuntimeAgents: config.openaiRuntimeAgents,
-      // Effective runtime — what agents ACTUALLY use. This is what matters
-      // for verifying "is OpenAI-first actually active right now."
+      openaiRuntimeAgents: runtimeAgentsRaw ? runtimeAgentsRaw.split(',').map((s) => s.trim()).filter(Boolean) : [],
+      // Effective runtime — what agents ACTUALLY use RIGHT NOW. This is
+      // the value to check when verifying "is OpenAI-first live?".
       effectiveExecutionEngine: effectiveEngine,
       openaiApiKeySet: hasOpenAIKey,
     });
