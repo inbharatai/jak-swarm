@@ -14,8 +14,36 @@ import {
   WorkflowStateError,
   ForbiddenError,
 } from '../errors.js';
+import { assertTransition } from '@jak-swarm/swarm';
+import { WorkflowStatus as SharedWorkflowStatus } from '@jak-swarm/shared';
 
 const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
+
+/**
+ * Phase 5 — local API status strings ↔ shared enum mapping.
+ * Two of the API-local strings don't have a direct shared-enum twin:
+ *   - 'RUNNING' is the API's umbrella for the executing phase (maps to EXECUTING).
+ *   - 'PAUSED' covers anything in approval/wait (maps to AWAITING_APPROVAL).
+ * Any unknown string falls back to PENDING and triggers a log-only warning
+ * in assertTransition (since PENDING → unknown isn't in the table).
+ */
+function toSharedStatus(s: string | null | undefined): SharedWorkflowStatus {
+  switch ((s ?? '').toUpperCase()) {
+    case 'PENDING': return SharedWorkflowStatus.PENDING;
+    case 'PLANNING': return SharedWorkflowStatus.PLANNING;
+    case 'ROUTING': return SharedWorkflowStatus.ROUTING;
+    case 'EXECUTING':
+    case 'RUNNING': return SharedWorkflowStatus.EXECUTING;
+    case 'PAUSED':
+    case 'AWAITING_APPROVAL': return SharedWorkflowStatus.AWAITING_APPROVAL;
+    case 'VERIFYING': return SharedWorkflowStatus.VERIFYING;
+    case 'COMPLETED': return SharedWorkflowStatus.COMPLETED;
+    case 'FAILED': return SharedWorkflowStatus.FAILED;
+    case 'CANCELLED': return SharedWorkflowStatus.CANCELLED;
+    case 'ROLLED_BACK': return SharedWorkflowStatus.ROLLED_BACK;
+    default: return SharedWorkflowStatus.PENDING;
+  }
+}
 
 export interface ListWorkflowsOptions {
   page: number;
@@ -172,6 +200,36 @@ export class WorkflowService {
     status: WorkflowStatus,
     error?: string,
   ): Promise<Workflow> {
+    // Phase 5 — single chokepoint for workflow status writes. Read the
+    // current status first, validate the transition against the canonical
+    // run-lifecycle state machine, then write. assertTransition is
+    // log-only in Phase 5 (does NOT throw) so any drift surfaces in
+    // production logs without breaking in-flight workflows.
+    try {
+      const current = await this.db.workflow.findUnique({
+        where: { id: workflowId },
+        select: { status: true },
+      });
+      if (current?.status) {
+        assertTransition(
+          toSharedStatus(current.status),
+          toSharedStatus(status),
+          {
+            workflowId,
+            logger: this.log,
+            reason: error ? `error: ${error.slice(0, 80)}` : 'updateWorkflowStatus',
+          },
+        );
+      }
+    } catch (lifecycleErr) {
+      // Lifecycle assertion must NEVER prevent a status write — we'd risk
+      // leaving workflows orphaned on the slightest enum drift.
+      this.log.warn(
+        { workflowId, err: lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr) },
+        '[run-lifecycle] assertion threw unexpectedly — proceeding with status write',
+      );
+    }
+
     const data: Record<string, unknown> = { status };
 
     if (status === 'RUNNING') {
