@@ -1,29 +1,11 @@
 import type OpenAI from 'openai';
-import { z } from 'zod';
 import { AgentRole, Industry, INDUSTRY_KEYWORDS } from '@jak-swarm/shared';
 import { BaseAgent } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
-
-/**
- * Structured-output schema for Commander's LLM response. Used by both
- * runtimes — LegacyRuntime parses+validates after JSON-mode, OpenAIRuntime
- * enforces at the model layer via Responses API json_schema format.
- *
- * Fields are nullable (not optional) because OpenAI's strict json_schema
- * mode requires all properties to be present and explicitly nullable for
- * "absent" semantics.
- */
-const CommanderResponseSchema = z.object({
-  directAnswer: z.string().nullable(),
-  intent: z.string().nullable(),
-  subFunction: z.string().nullable(),
-  urgency: z.number().int().min(1).max(5).nullable(),
-  riskIndicators: z.array(z.string()),
-  requiredOutputs: z.array(z.string()),
-  clarificationNeeded: z.boolean(),
-  clarificationQuestion: z.string().nullable(),
-});
-type CommanderResponseT = z.infer<typeof CommanderResponseSchema>;
+import {
+  CommanderResponseSchema,
+  type CommanderResponseT,
+} from '../runtime/schemas/index.js';
 
 export interface MissionBrief {
   id: string;

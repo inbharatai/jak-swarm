@@ -5,6 +5,10 @@ import type { WorkflowTask, WorkflowPlan } from '@jak-swarm/shared';
 import { BaseAgent } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
 import type { MissionBrief } from './commander.agent.js';
+import {
+  PlannerResponseSchema,
+  type PlannerResponseT,
+} from '../runtime/schemas/index.js';
 
 export interface PlannerOutput {
   plan: WorkflowPlan;
@@ -199,35 +203,29 @@ export class PlannerAgent extends BaseAgent {
       },
     ];
 
-    const completion = await this.callLLM(messages, undefined, {
-      maxTokens: 2048,
-      temperature: 0.2,
-    });
-
-    const rawContent = completion.choices[0]?.message?.content ?? '{}';
-
-    interface LLMPlanResponse {
-      planName?: string;
-      tasks?: Array<{
-        id?: string;
-        name?: string;
-        description?: string;
-        agentRole?: string;
-        toolsRequired?: string[];
-        riskLevel?: string;
-        requiresApproval?: boolean;
-        dependsOn?: string[];
-        retryable?: boolean;
-        maxRetries?: number;
-      }>;
-      estimatedDurationMinutes?: number;
-    }
-
-    let parsed: LLMPlanResponse;
+    // Phase 4: structured output via the LLMRuntime.
+    //   - OpenAIRuntime enforces the schema at the Responses API model layer
+    //     (no prose drift, no fence-stripping).
+    //   - LegacyRuntime turns on JSON mode and validates against the same
+    //     schema after parse. ZodError on malformed output → fallback below.
+    let parsed: PlannerResponseT;
     try {
-      parsed = this.parseJsonResponse<LLMPlanResponse>(rawContent);
+      parsed = await this.runtime.respondStructured(
+        messages,
+        PlannerResponseSchema,
+        {
+          maxTokens: 2048,
+          temperature: 0.2,
+          schemaName: 'PlannerResponse',
+          schemaDescription: 'JAK Swarm Planner: structured workflow decomposition',
+        },
+        context,
+      );
     } catch (err) {
-      this.logger.error({ err }, 'Failed to parse Planner LLM response, using fallback plan');
+      this.logger.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        'Planner structured response failed; using fallback plan',
+      );
       parsed = {
         planName: 'Fallback Plan',
         tasks: [
@@ -318,14 +316,12 @@ export class PlannerAgent extends BaseAgent {
 
     const output: PlannerOutput = { plan };
 
-    const trace = this.recordTrace(context, input, output, [], startedAt);
-    if (completion.usage) {
-      trace.tokenUsage = {
-        promptTokens: completion.usage.prompt_tokens,
-        completionTokens: completion.usage.completion_tokens,
-        totalTokens: completion.usage.total_tokens,
-      };
-    }
+    // respondStructured does not yet surface token usage through the
+    // LLMRuntime interface (Phase 6 will add a usage callback). Cost
+    // tracking still flows via BaseAgent.onLLMCallComplete inside
+    // LegacyRuntime; OpenAIRuntime emits cost_updated activity events
+    // through the agent context, so the cockpit still shows live cost.
+    this.recordTrace(context, input, output, [], startedAt);
 
     this.logger.info(
       { planId: plan.id, taskCount: tasks.length },

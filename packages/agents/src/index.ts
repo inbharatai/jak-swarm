@@ -237,6 +237,20 @@ export {
   modelForTier,
   smokeResponsesApi,
 } from './runtime/index.js';
+
+// Phase 4 schemas — strict zod schemas for Planner / Commander / Research
+// outputs. Both runtimes validate; OpenAIRuntime enforces at the model layer.
+export {
+  CommanderResponseSchema,
+  PlannerResponseSchema,
+  ResearchResponseSchema,
+} from './runtime/schemas/index.js';
+export type {
+  CommanderResponseT,
+  PlannerResponseT,
+  PlannerTaskT,
+  ResearchResponseT,
+} from './runtime/schemas/index.js';
 export type {
   LLMRuntime,
   LLMCallOptions,

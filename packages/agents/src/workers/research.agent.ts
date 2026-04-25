@@ -3,6 +3,7 @@ import { AgentRole } from '@jak-swarm/shared';
 import { BaseAgent } from '../base/base-agent.js';
 import type { ToolLoopResult } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
+import { ResearchResponseSchema } from '../runtime/schemas/index.js';
 
 export interface ResearchTask {
   query: string;
@@ -173,28 +174,39 @@ export class ResearchAgent extends BaseAgent {
       });
 
       try {
-        const parsed = this.parseJsonResponse<Partial<ResearchResult>>(loopResult.content);
-        const rawFindings = typeof parsed.findings === 'string' ? parsed.findings.trim() : '';
-        const keyPoints = parsed.keyPoints ?? [];
-        // If the LLM skipped findings, reconstruct from keyPoints rather than
-        // returning a placeholder stub. compileFinalOutput treats findings as
-        // the primary user-visible field — a stub here means the user sees
-        // "Research completed. See key points for details." which is useless.
-        const findings = rawFindings.length > 0
-          ? rawFindings
-          : (keyPoints.length > 0
-              ? keyPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')
-              : 'No findings available — the research tools returned no usable results for this query.');
+        // Phase 4: validate the tool-loop output against the strict zod
+        // schema. Research can't use respondStructured directly (it needs
+        // tool-loop with web_search), so we validate post-loop. safeParse
+        // gives us a structured failure path that drops into the prose
+        // recovery branch below instead of throwing.
+        const rawParsed = this.parseJsonResponse<Partial<ResearchResult>>(loopResult.content);
+        const validation = ResearchResponseSchema.safeParse(rawParsed);
+        if (!validation.success) {
+          this.logger.warn(
+            { issues: validation.error.issues.slice(0, 3) },
+            'Research output failed schema validation; using prose recovery',
+          );
+          throw new Error('schema_validation_failed');
+        }
+        const parsed = validation.data;
         result = {
           query: task.query,
-          findings,
-          keyPoints,
-          sources: parsed.sources ?? [],
+          findings: parsed.findings,
+          keyPoints: parsed.keyPoints,
+          sources: parsed.sources.map((s) => ({
+            title: s.title,
+            url: s.url ?? undefined,
+            excerpt: s.excerpt,
+            relevanceScore: s.relevanceScore,
+            publishedDate: s.publishedDate ?? undefined,
+            qualityTier: s.qualityTier,
+            freshness: s.freshness,
+          })),
           disagreements: parsed.disagreements,
           citations: parsed.citations,
           overallFreshness: parsed.overallFreshness,
-          confidence: parsed.confidence ?? 0.7,
-          limitations: parsed.limitations ?? ['Results based on available knowledge base only'],
+          confidence: parsed.confidence,
+          limitations: parsed.limitations,
           suggestedFollowUp: parsed.suggestedFollowUp,
         };
       } catch {
