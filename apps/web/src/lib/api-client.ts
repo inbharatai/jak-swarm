@@ -688,6 +688,12 @@ export interface ComplianceFramework {
   version: string;
 }
 
+export interface ComplianceSubControl {
+  code: string;
+  title: string;
+  description: string;
+}
+
 export interface ComplianceControl {
   id: string;
   code: string;
@@ -696,6 +702,7 @@ export interface ComplianceControl {
   title: string;
   description: string;
   autoRuleKey: string | null;
+  subControls: ComplianceSubControl[] | null;
   evidenceCount: number;
 }
 

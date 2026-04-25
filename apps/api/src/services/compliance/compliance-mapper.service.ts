@@ -211,6 +211,7 @@ export class ComplianceMapperService {
       title: string;
       description: string;
       autoRuleKey: string | null;
+      subControls: Array<{ code: string; title: string; description: string }> | null;
       evidenceCount: number;
     }>;
     coverageCounts: { total: number; covered: number; uncovered: number; coveragePercent: number };
@@ -250,6 +251,7 @@ export class ComplianceMapperService {
       title: c.title,
       description: c.description,
       autoRuleKey: c.autoRuleKey,
+      subControls: c.subControls as Array<{ code: string; title: string; description: string }> | null,
       evidenceCount: countByControl.get(c.id) ?? 0,
     }));
 

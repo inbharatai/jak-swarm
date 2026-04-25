@@ -18,6 +18,12 @@
  * idempotent — re-runs upsert by (frameworkSlug, controlCode).
  */
 
+export interface SubControl {
+  code: string;          // e.g. "CC6.1.1"
+  title: string;
+  description: string;
+}
+
 export interface SeedControl {
   code: string;
   series: string;        // 'CC1', 'CC6', 'P1', etc.
@@ -26,6 +32,14 @@ export interface SeedControl {
   description: string;
   autoRuleKey?: string;
   sortOrder: number;
+  /**
+   * Optional sub-control breakdown. When present, the UI renders the
+   * sub-points in the control drill-in panel; the auto-mapping engine
+   * still maps to the parent control today (sub-point routing is
+   * Phase 4 roadmap). Only seeded for the highest-traffic SOC 2
+   * controls in v1.6 — others can be added incrementally.
+   */
+  subControls?: SubControl[];
 }
 
 export interface SeedFramework {
@@ -68,18 +82,36 @@ const SOC2_TYPE2_CONTROLS: SeedControl[] = [
   { code: 'CC5.3', series: 'CC5', category: 'Common Criteria', sortOrder: 503, title: 'Deploys policies and procedures', description: 'The entity deploys control activities through policies that establish what is expected and procedures that put policies into action.' },
 
   // ─── CC6 — Logical & Physical Access ────────────────────────────────
-  { code: 'CC6.1', series: 'CC6', category: 'Common Criteria', sortOrder: 601, title: 'Implements logical access security', description: 'The entity implements logical access security software, infrastructure, and architectures over protected information assets.', autoRuleKey: 'tool-blocked-and-policy' },
+  { code: 'CC6.1', series: 'CC6', category: 'Common Criteria', sortOrder: 601, title: 'Implements logical access security', description: 'The entity implements logical access security software, infrastructure, and architectures over protected information assets.', autoRuleKey: 'tool-blocked-and-policy', subControls: [
+    { code: 'CC6.1.1', title: 'Identifies and manages the inventory of information assets', description: 'The entity identifies and manages the inventory of information assets, including physical devices and systems, virtual devices, software, data and data flows, external information systems, and organisational roles.' },
+    { code: 'CC6.1.2', title: 'Restricts logical access', description: 'The entity restricts logical access to information assets, including hardware, data (at-rest, during processing, or in transmission), software, administrative authorities, mobile devices, and removable media.' },
+    { code: 'CC6.1.3', title: 'Identifies and authenticates users', description: 'The entity identifies and authenticates users, infrastructure, and other IT components prior to accessing information assets.' },
+    { code: 'CC6.1.4', title: 'Considers network segmentation', description: 'The entity considers network segmentation to permit unrelated portions of the entity\'s information system to be isolated from each other.' },
+    { code: 'CC6.1.5', title: 'Manages credentials for infrastructure and software', description: 'The entity manages credentials for infrastructure and software, including identifying access credentials, restricting access through approval, configuring access according to least privilege, and revoking credentials when no longer needed.' },
+    { code: 'CC6.1.6', title: 'Uses encryption to protect data', description: 'The entity uses encryption to protect data at rest, in transmission, and in storage, with key management procedures appropriate to the level of protection required.' },
+    { code: 'CC6.1.7', title: 'Protects encryption keys', description: 'The entity protects encryption keys during generation, storage, use, and destruction.' },
+  ] },
   { code: 'CC6.2', series: 'CC6', category: 'Common Criteria', sortOrder: 602, title: 'Authorises and modifies access registrations', description: 'Prior to issuing system credentials, the entity registers and authorises new internal and external users.', autoRuleKey: 'tenant-rbac-changes' },
   { code: 'CC6.3', series: 'CC6', category: 'Common Criteria', sortOrder: 603, title: 'Authorises, modifies, removes access', description: 'The entity authorises, modifies, or removes access to data, software, functions based on roles and responsibilities.', autoRuleKey: 'approval-decisions' },
   { code: 'CC6.4', series: 'CC6', category: 'Common Criteria', sortOrder: 604, title: 'Restricts physical access', description: 'The entity restricts physical access to facilities and protected information assets.' },
   { code: 'CC6.5', series: 'CC6', category: 'Common Criteria', sortOrder: 605, title: 'Discontinues logical and physical protections', description: 'The entity discontinues logical and physical protections over physical assets only after the ability to read or recover data and software has been diminished and is no longer required.' },
-  { code: 'CC6.6', series: 'CC6', category: 'Common Criteria', sortOrder: 606, title: 'Implements logical access security measures against external threats', description: 'The entity implements logical access security measures to protect against threats from sources outside its system boundaries.', autoRuleKey: 'guardrail-and-injection-events' },
+  { code: 'CC6.6', series: 'CC6', category: 'Common Criteria', sortOrder: 606, title: 'Implements logical access security measures against external threats', description: 'The entity implements logical access security measures to protect against threats from sources outside its system boundaries.', autoRuleKey: 'guardrail-and-injection-events', subControls: [
+    { code: 'CC6.6.1', title: 'Restricts access to the information assets', description: 'The entity restricts access to the information assets to authorised users, processes, devices, or systems by implementing logical access security measures.' },
+    { code: 'CC6.6.2', title: 'Protects identification and authentication credentials', description: 'The entity protects identification and authentication credentials from unauthorised disclosure during transmission and at rest.' },
+    { code: 'CC6.6.3', title: 'Requires additional authentication or credentials', description: 'The entity requires additional authentication or credentials when access is from an outside source or compromised credentials are suspected.' },
+    { code: 'CC6.6.4', title: 'Implements boundary protection systems', description: 'The entity implements boundary protection systems (firewalls, intrusion detection systems, etc.) to monitor and control communications at the external boundary of the system.' },
+  ] },
   { code: 'CC6.7', series: 'CC6', category: 'Common Criteria', sortOrder: 607, title: 'Restricts and protects information transmission', description: 'The entity restricts the transmission, movement, and removal of information to authorised internal and external users and processes.', autoRuleKey: 'artifact-approval-gates' },
   { code: 'CC6.8', series: 'CC6', category: 'Common Criteria', sortOrder: 608, title: 'Implements controls to prevent or detect unauthorised software', description: 'The entity implements controls to prevent or detect and act upon the introduction of unauthorised or malicious software.', autoRuleKey: 'tool-blocked-and-policy' },
 
   // ─── CC7 — System Operations ────────────────────────────────────────
   { code: 'CC7.1', series: 'CC7', category: 'Common Criteria', sortOrder: 701, title: 'Detects and monitors changes to configurations', description: 'To meet its objectives, the entity uses detection and monitoring procedures to identify changes to configurations.', autoRuleKey: 'tenant-rbac-changes' },
-  { code: 'CC7.2', series: 'CC7', category: 'Common Criteria', sortOrder: 702, title: 'Monitors system components for anomalies', description: 'The entity monitors system components and the operation of those components for anomalies that are indicative of malicious acts, natural disasters, and errors.', autoRuleKey: 'guardrail-and-injection-events' },
+  { code: 'CC7.2', series: 'CC7', category: 'Common Criteria', sortOrder: 702, title: 'Monitors system components for anomalies', description: 'The entity monitors system components and the operation of those components for anomalies that are indicative of malicious acts, natural disasters, and errors.', autoRuleKey: 'guardrail-and-injection-events', subControls: [
+    { code: 'CC7.2.1', title: 'Implements detection policies, procedures, and tools', description: 'The entity implements detection policies, procedures, and tools that are designed to detect security events.' },
+    { code: 'CC7.2.2', title: 'Designs detection measures', description: 'The entity designs detection measures to identify anomalies that could result from actual or attempted (1) compromise of physical barriers, (2) unauthorised actions of personnel, vendors, contractors, or business partners, (3) the use of compromised identification and authentication credentials, (4) unauthorised access from outside the system boundaries, (5) compromise of authorised user identification and authentication credentials, and (6) malicious software introduction.' },
+    { code: 'CC7.2.3', title: 'Implements filters to detect anomalies', description: 'The entity implements filters to detect anomalies in the operation of, or unusual activity on, system components.' },
+    { code: 'CC7.2.4', title: 'Monitors detection tools for effectiveness', description: 'The entity monitors detection tools for effective operation, the analysis of anomalies, and follow-up activities.' },
+  ] },
   { code: 'CC7.3', series: 'CC7', category: 'Common Criteria', sortOrder: 703, title: 'Evaluates security events', description: 'The entity evaluates security events to determine whether they could or have resulted in a failure of the entity to meet its objectives.', autoRuleKey: 'guardrail-and-injection-events' },
   { code: 'CC7.4', series: 'CC7', category: 'Common Criteria', sortOrder: 704, title: 'Responds to identified security incidents', description: 'The entity responds to identified security incidents by executing a defined incident response programme to understand, contain, remediate, and communicate.', autoRuleKey: 'workflow-failures' },
   { code: 'CC7.5', series: 'CC7', category: 'Common Criteria', sortOrder: 705, title: 'Identifies, develops, and implements activities to recover', description: 'The entity identifies, develops, and implements activities to recover from identified security incidents.', autoRuleKey: 'workflow-resumed-or-rolled-back' },

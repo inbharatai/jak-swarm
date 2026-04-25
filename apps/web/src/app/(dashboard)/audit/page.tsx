@@ -791,7 +791,7 @@ function FrameworkSummary({ slug }: { slug: string }) {
                     </Badge>
                   </button>
                   {expandedControlId === c.id && (
-                    <ControlEvidenceDrillIn slug={slug} controlId={c.id} description={c.description} autoRuleKey={c.autoRuleKey} period={period} />
+                    <ControlEvidenceDrillIn slug={slug} controlId={c.id} description={c.description} autoRuleKey={c.autoRuleKey} subControls={c.subControls} period={period} />
                   )}
                 </li>
               ))}
@@ -803,7 +803,7 @@ function FrameworkSummary({ slug }: { slug: string }) {
   );
 }
 
-function ControlEvidenceDrillIn({ slug, controlId, description, autoRuleKey, period }: { slug: string; controlId: string; description: string; autoRuleKey: string | null; period: { from?: string; to?: string } }) {
+function ControlEvidenceDrillIn({ slug, controlId, description, autoRuleKey, subControls, period }: { slug: string; controlId: string; description: string; autoRuleKey: string | null; subControls: Array<{ code: string; title: string; description: string }> | null; period: { from?: string; to?: string } }) {
   const { data, error, isLoading, mutate } = useSWR<{ items: ControlEvidenceItem[]; total: number }>(
     ['compliance:control-evidence', slug, controlId, JSON.stringify(period)],
     () => complianceApi.controlEvidence(slug, controlId, period),
@@ -852,6 +852,23 @@ function ControlEvidenceDrillIn({ slug, controlId, description, autoRuleKey, per
     <div className="px-3 py-2 bg-muted/30 border-t text-xs space-y-2">
       <p className="text-muted-foreground italic">{description}</p>
       <p className="text-[10px]">Auto-mapping rule: {autoRuleKey ? <code>{autoRuleKey}</code> : <span className="italic">none — human-mapped only</span>}</p>
+
+      {/* Sub-controls (when published in the catalog) */}
+      {subControls && subControls.length > 0 && (
+        <div className="border-l-2 border-blue-500/40 pl-2 space-y-1">
+          <span className="text-[10px] uppercase tracking-wider font-medium">Sub-controls ({subControls.length})</span>
+          <ul className="space-y-1">
+            {subControls.map((sc) => (
+              <li key={sc.code} className="border-b last:border-b-0 pb-1">
+                <span className="font-mono text-[10px] mr-1">{sc.code}</span>
+                <span className="font-medium text-[11px]">{sc.title}</span>
+                <p className="text-[10px] text-muted-foreground italic">{sc.description}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[9px] text-muted-foreground italic">Sub-point evidence routing is Phase 4 roadmap; today all evidence maps to the parent control.</p>
+        </div>
+      )}
 
       {/* Manual evidence section */}
       <div className="border-l-2 border-primary/40 pl-2 space-y-1">

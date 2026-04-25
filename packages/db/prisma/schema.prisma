@@ -947,6 +947,13 @@ model ComplianceControl {
   // that decides which evidence rows belong to this control. Null when
   // the control is human-mapped only (no automation).
   autoRuleKey   String?
+  // Sub-control breakdown — JSON array of `{code, title, description}`.
+  // E.g. SOC 2 CC6.1 has 11 sub-points (CC6.1.1 ... CC6.1.11). NULL
+  // when the control has no published sub-points or the catalog hasn't
+  // seeded them yet. Auditors use these to write attestation narratives
+  // at sub-point granularity. The auto-mapping engine still maps
+  // evidence to the parent control today; sub-point routing is roadmap.
+  subControls   Json?
   // Display order within its category.
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())

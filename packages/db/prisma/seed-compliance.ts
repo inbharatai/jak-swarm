@@ -55,6 +55,7 @@ async function main(): Promise<void> {
             title: c.title,
             description: c.description,
             ...(c.autoRuleKey ? { autoRuleKey: c.autoRuleKey } : {}),
+            ...(c.subControls && c.subControls.length > 0 ? { subControls: c.subControls as object } : {}),
             sortOrder: c.sortOrder,
           },
           update: {
@@ -63,6 +64,7 @@ async function main(): Promise<void> {
             title: c.title,
             description: c.description,
             autoRuleKey: c.autoRuleKey ?? null,
+            subControls: c.subControls && c.subControls.length > 0 ? (c.subControls as object) : null,
             sortOrder: c.sortOrder,
           },
         });
