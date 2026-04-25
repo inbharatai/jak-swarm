@@ -29,6 +29,7 @@ import useSWR from 'swr';
 import {
   BarChart3,
   Clock,
+  FileCheck,
   FileSearch,
   ListChecks,
   RefreshCw,
@@ -38,10 +39,15 @@ import {
 import {
   auditApi,
   approvalApi,
+  complianceApi,
   type AuditDashboard,
   type AuditLogPage,
   type ReviewerQueue,
   type WorkflowTrail,
+  type ComplianceFramework,
+  type ComplianceFrameworkSummary,
+  type ControlEvidenceItem,
+  type AttestationListItem,
 } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import {
@@ -64,7 +70,7 @@ import { useToast } from '@/components/ui/toast';
 
 const PAGE_SIZE = 50;
 
-type TabId = 'dashboard' | 'log' | 'queue' | 'trail';
+type TabId = 'dashboard' | 'log' | 'queue' | 'trail' | 'compliance';
 
 export default function AuditPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -116,6 +122,12 @@ export default function AuditPage() {
             <Clock className="h-4 w-4 mr-2" />
             Workflow Trail
           </TabsTrigger>
+          {canSeeReviewerSurfaces && (
+            <TabsTrigger value="compliance">
+              <FileCheck className="h-4 w-4 mr-2" />
+              Compliance
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="dashboard">
@@ -132,6 +144,11 @@ export default function AuditPage() {
         <TabsContent value="trail">
           <WorkflowTrailTab />
         </TabsContent>
+        {canSeeReviewerSurfaces && (
+          <TabsContent value="compliance">
+            <ComplianceTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -585,5 +602,328 @@ function WorkflowTrailTab() {
         </Card>
       )}
     </div>
+  );
+}
+
+// ─── Compliance tab ────────────────────────────────────────────────────
+
+function ComplianceTab() {
+  const { data: frameworks, error: fwError, isLoading: fwLoading } = useSWR<{ frameworks: ComplianceFramework[] }>(
+    'compliance:frameworks',
+    () => complianceApi.listFrameworks(),
+  );
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+
+  // Auto-select the first framework when the list loads.
+  React.useEffect(() => {
+    if (!selectedSlug && frameworks?.frameworks?.[0]) {
+      setSelectedSlug(frameworks.frameworks[0].slug);
+    }
+  }, [frameworks, selectedSlug]);
+
+  if (fwLoading) return <div className="flex items-center justify-center py-16"><Spinner size="lg" /></div>;
+  if (fwError) {
+    const msg = fwError instanceof Error ? fwError.message : 'Unknown error';
+    if (/SCHEMA_UNAVAILABLE/i.test(msg)) {
+      return (
+        <EmptyState
+          icon={<FileCheck className="h-8 w-8" />}
+          title="Compliance schema not deployed"
+          description="Run pnpm db:migrate:deploy then pnpm seed:compliance to populate the SOC 2 catalogue."
+        />
+      );
+    }
+    return <EmptyState icon={<FileCheck className="h-8 w-8" />} title="Couldn't load frameworks" description={msg} />;
+  }
+  if (!frameworks?.frameworks?.length) {
+    return (
+      <EmptyState
+        icon={<FileCheck className="h-8 w-8" />}
+        title="No frameworks seeded"
+        description="Run pnpm seed:compliance to load the SOC 2 Type 2 catalogue."
+      />
+    );
+  }
+
+  const selected = frameworks.frameworks.find((f) => f.slug === selectedSlug);
+
+  return (
+    <div className="space-y-4 mt-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Frameworks</CardTitle>
+          <CardDescription>Pick a framework to view its controls + evidence coverage for your tenant.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {frameworks.frameworks.map((fw) => (
+              <Button
+                key={fw.slug}
+                variant={selectedSlug === fw.slug ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedSlug(fw.slug)}
+              >
+                {fw.shortName} <span className="text-xs ml-1 opacity-60">{fw.version}</span>
+              </Button>
+            ))}
+          </div>
+          {selected && (
+            <p className="text-xs text-muted-foreground mt-2">{selected.description}</p>
+          )}
+        </CardContent>
+      </Card>
+      {selected && <FrameworkSummary slug={selected.slug} />}
+      {selected && <AttestationsSection slug={selected.slug} />}
+    </div>
+  );
+}
+
+function FrameworkSummary({ slug }: { slug: string }) {
+  const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+  const { data, error, isLoading, mutate } = useSWR<ComplianceFrameworkSummary>(
+    ['compliance:framework', slug, JSON.stringify(period)],
+    () => complianceApi.framework(slug, period),
+    { refreshInterval: 30_000 },
+  );
+  const [expandedControlId, setExpandedControlId] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const toast = useToast();
+
+  const runAutoMap = async () => {
+    setRunning(true);
+    try {
+      const r = await complianceApi.autoMap(slug, {
+        ...(period.from ? { periodStart: period.from } : {}),
+        ...(period.to ? { periodEnd: period.to } : {}),
+      });
+      toast.success(`Auto-map complete: ${r.newMappingsCreated} new mappings.`);
+      mutate();
+    } catch (e) {
+      toast.error('Auto-map failed', e instanceof Error ? e.message : 'Unknown');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center py-12"><Spinner /></div>;
+  if (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm text-destructive">Couldn't load framework: {msg}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!data) return null;
+
+  // Group controls by category.
+  const byCategory = new Map<string, typeof data.controls>();
+  for (const c of data.controls) {
+    const list = byCategory.get(c.category) ?? [];
+    list.push(c);
+    byCategory.set(c.category, list);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-base">{data.framework.name}</CardTitle>
+            <CardDescription>
+              {data.framework.issuer} · {data.framework.version}
+            </CardDescription>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold tabular-nums">{data.coverageCounts.coveragePercent}%</div>
+            <div className="text-[10px] text-muted-foreground">
+              {data.coverageCounts.covered} / {data.coverageCounts.total} controls covered
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap items-end gap-2 mb-4">
+          <div>
+            <label className="text-xs text-muted-foreground">From</label>
+            <Input
+              type="date"
+              value={period.from?.slice(0, 10) ?? ''}
+              onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value ? new Date(e.target.value).toISOString() : undefined }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">To</label>
+            <Input
+              type="date"
+              value={period.to?.slice(0, 10) ?? ''}
+              onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value ? new Date(e.target.value).toISOString() : undefined }))}
+            />
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => mutate()}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+          <Button size="sm" onClick={runAutoMap} disabled={running}>
+            {running ? 'Running…' : 'Run auto-map'}
+          </Button>
+        </div>
+
+        {Array.from(byCategory.entries()).map(([category, controls]) => (
+          <div key={category} className="mb-4">
+            <h3 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">{category}</h3>
+            <ul className="border rounded divide-y">
+              {controls.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedControlId(expandedControlId === c.id ? null : c.id)}
+                    className="w-full text-left px-3 py-2 hover:bg-muted/30 flex items-center justify-between text-sm"
+                  >
+                    <div>
+                      <span className="font-mono text-xs mr-2">{c.code}</span>
+                      <span>{c.title}</span>
+                    </div>
+                    <Badge variant={c.evidenceCount > 0 ? 'default' : 'secondary'}>
+                      {c.evidenceCount > 0 ? `${c.evidenceCount} evidence` : 'uncovered'}
+                    </Badge>
+                  </button>
+                  {expandedControlId === c.id && (
+                    <ControlEvidenceDrillIn slug={slug} controlId={c.id} description={c.description} autoRuleKey={c.autoRuleKey} period={period} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ControlEvidenceDrillIn({ slug, controlId, description, autoRuleKey, period }: { slug: string; controlId: string; description: string; autoRuleKey: string | null; period: { from?: string; to?: string } }) {
+  const { data, error, isLoading } = useSWR<{ items: ControlEvidenceItem[]; total: number }>(
+    ['compliance:control-evidence', slug, controlId, JSON.stringify(period)],
+    () => complianceApi.controlEvidence(slug, controlId, period),
+  );
+  return (
+    <div className="px-3 py-2 bg-muted/30 border-t text-xs space-y-2">
+      <p className="text-muted-foreground italic">{description}</p>
+      <p className="text-[10px]">Auto-mapping rule: {autoRuleKey ? <code>{autoRuleKey}</code> : <span className="italic">none — human-mapped only</span>}</p>
+      {isLoading && <Spinner size="sm" />}
+      {error && <p className="text-destructive">Couldn't load evidence: {error instanceof Error ? error.message : 'Unknown'}</p>}
+      {data && data.items.length === 0 && (
+        <p className="italic text-muted-foreground">No evidence rows yet.</p>
+      )}
+      {data && data.items.length > 0 && (
+        <ul className="font-mono text-[10px] space-y-0.5 max-h-48 overflow-y-auto">
+          {data.items.map((m) => (
+            <li key={m.id}>
+              <span className="text-muted-foreground">[{new Date(m.evidenceAt).toLocaleString()}]</span>{' '}
+              <span>{m.evidenceType}</span>:<span>{m.evidenceId}</span>{' '}
+              <span className="text-muted-foreground">({m.mappingSource})</span>
+            </li>
+          ))}
+          {data.total > data.items.length && (
+            <li className="italic text-muted-foreground">+{data.total - data.items.length} more</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AttestationsSection({ slug }: { slug: string }) {
+  const { data, error, isLoading, mutate } = useSWR<{ items: AttestationListItem[]; total: number }>(
+    ['compliance:attestations', slug],
+    () => complianceApi.listAttestations({ framework: slug }),
+  );
+  const [start, setStart] = useState(() => new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [end, setEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [sign, setSign] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const toast = useToast();
+
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      const r = await complianceApi.generateAttestation(slug, {
+        periodStart: new Date(start).toISOString(),
+        periodEnd: new Date(end + 'T23:59:59Z').toISOString(),
+        sign,
+      });
+      toast.success(
+        `Attestation ready (${r.coveragePercent}% coverage, ${r.totalEvidence} evidence rows). ` +
+        (r.bundleArtifactId ? 'Signed bundle created.' : 'Awaiting reviewer approval to download.'),
+      );
+      mutate();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown';
+      toast.error('Attestation failed', msg);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Period attestations</CardTitle>
+        <CardDescription>Generate a signed PDF attestation for an audit period. Final attestations require reviewer approval before download.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="text-xs text-muted-foreground">Period start</label>
+            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Period end</label>
+            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+          <label className="flex items-center gap-1.5 text-xs">
+            <input type="checkbox" checked={sign} onChange={(e) => setSign(e.target.checked)} />
+            Also produce signed bundle
+          </label>
+          <Button size="sm" onClick={generate} disabled={generating}>
+            {generating ? 'Generating…' : 'Generate attestation'}
+          </Button>
+        </div>
+
+        <div>
+          {isLoading ? <Spinner size="sm" /> : null}
+          {error && <p className="text-xs text-destructive">Couldn't load: {error instanceof Error ? error.message : 'Unknown'}</p>}
+          {data && data.items.length === 0 ? (
+            <p className="text-xs italic text-muted-foreground">No attestations yet for this framework.</p>
+          ) : (
+            <table className="min-w-full text-xs mt-2">
+              <thead>
+                <tr className="border-b">
+                  <th className="px-2 py-1 text-left">Generated</th>
+                  <th className="px-2 py-1 text-left">Period</th>
+                  <th className="px-2 py-1 text-right">Coverage</th>
+                  <th className="px-2 py-1 text-right">Evidence</th>
+                  <th className="px-2 py-1 text-left">Artifact</th>
+                  <th className="px-2 py-1 text-left">Generated by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.items.map((row) => (
+                  <tr key={row.id} className="border-b hover:bg-muted/30">
+                    <td className="px-2 py-1">{new Date(row.createdAt).toLocaleString()}</td>
+                    <td className="px-2 py-1">{row.periodStart.slice(0, 10)} → {row.periodEnd.slice(0, 10)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{row.coveragePercent}%</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{row.totalEvidence.toLocaleString()}</td>
+                    <td className="px-2 py-1 font-mono text-[10px]">{row.artifactId ? row.artifactId.slice(0, 12) + '…' : '—'}</td>
+                    <td className="px-2 py-1 font-mono text-[10px]">{row.generatedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

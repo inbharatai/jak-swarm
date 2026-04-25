@@ -17,6 +17,8 @@
     "db:migrate:reset": "pnpm --filter @jak-swarm/db run db:migrate:reset",
     "db:execute": "pnpm --filter @jak-swarm/db run db:execute --",
     "db:seed": "pnpm --filter @jak-swarm/db db:seed",
+    "seed:compliance": "pnpm --filter @jak-swarm/db db:seed:compliance",
+    "seed:audit-demo": "pnpm --filter @jak-swarm/tests exec tsx ../scripts/seed-audit-demo.ts",
     "db:studio": "pnpm --filter @jak-swarm/db run db:studio",
     "start:dev": "bash scripts/start-dev.sh",
     "check:truth": "pnpm --filter @jak-swarm/tests exec tsx ../scripts/check-docs-truth.ts",

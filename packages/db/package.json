@@ -22,7 +22,8 @@
     "db:migrate:reset": "prisma migrate reset",
     "db:execute": "prisma db execute --schema prisma/schema.prisma --stdin",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:compliance": "tsx prisma/seed-compliance.ts"
   },
   "dependencies": {
     "@jak-swarm/shared": "workspace:*",

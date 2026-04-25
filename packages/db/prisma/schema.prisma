@@ -883,3 +883,135 @@ model RoutingLog {
   @@index([taskType, createdAt])
   @@map("routing_log")
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit & Compliance v1 — control framework mapping (e.g. SOC2 Type 2)
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Three-table model:
+//   1. ComplianceFramework — the framework definition (e.g. "SOC2 Type 2").
+//      Global; not tenant-scoped. Seeded from packages/db/prisma/seed-data/
+//      compliance-frameworks.ts.
+//
+//   2. ComplianceControl — individual control within a framework
+//      (e.g. SOC2 CC6.1 "Logical Access Controls"). Many-to-one with
+//      Framework. Global; auto-mapping rules live in code, not DB.
+//
+//   3. ControlEvidenceMapping — tenant-scoped link between a control
+//      and a piece of evidence (an AuditLog row, a WorkflowArtifact,
+//      etc.). One control accumulates many evidence mappings over time.
+//      Auto-populated by the auto-mapping engine; can also be created
+//      manually via the API for human-curated mappings.
+//
+// ControlAttestation — a periodic snapshot saying "as of date X, this
+// tenant's control Y had N pieces of evidence covering period Z". The
+// attestation document itself is a WorkflowArtifact (artifactType=
+// 'control_attestation') signed via bundle-signing. This row is just
+// the summary record so the UI can list attestations without fetching
+// every artifact's bytes.
+
+model ComplianceFramework {
+  id          String   @id @default(cuid())
+  // Stable slug used in URLs + auto-mapping rule lookups (e.g. "soc2-type2").
+  slug        String   @unique
+  name        String   // "SOC 2 Type 2"
+  shortName   String   // "SOC 2"
+  // Issuing body (e.g. "AICPA", "ISO/IEC", "HHS").
+  issuer      String
+  // Free-text description shown on the framework selector page.
+  description String   @db.Text
+  // Catalogue version we're seeding from (e.g. "2017 TSC, revised 2022").
+  version     String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  controls    ComplianceControl[]
+
+  @@map("compliance_frameworks")
+}
+
+model ComplianceControl {
+  id            String   @id @default(cuid())
+  frameworkId   String
+  // Stable code from the source standard (e.g. "CC6.1", "P1.1").
+  code          String
+  // Trust Services Category for SOC2 (e.g. "Security", "Privacy") or
+  // equivalent grouping for other frameworks.
+  category      String
+  // Common Criteria / Series identifier within the category (e.g. "CC6").
+  series        String
+  title         String
+  description   String   @db.Text
+  // Auto-mapping rule key — resolves to a function in the rule registry
+  // that decides which evidence rows belong to this control. Null when
+  // the control is human-mapped only (no automation).
+  autoRuleKey   String?
+  // Display order within its category.
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  framework     ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  evidence      ControlEvidenceMapping[]
+
+  @@unique([frameworkId, code])
+  @@index([frameworkId, category, sortOrder])
+  @@map("compliance_controls")
+}
+
+model ControlEvidenceMapping {
+  id           String   @id @default(cuid())
+  tenantId     String
+  controlId    String
+  // What kind of row this mapping points at.
+  //   - 'audit_log'        → AuditLog.id
+  //   - 'workflow'         → Workflow.id
+  //   - 'approval'         → ApprovalRequest.id
+  //   - 'artifact'         → WorkflowArtifact.id
+  //   - 'evidence_bundle'  → WorkflowArtifact.id where artifactType='evidence_bundle'
+  evidenceType String
+  evidenceId   String
+  // When the underlying evidence was produced (denormalised so the
+  // attestation can do period queries without joining 4 tables).
+  evidenceAt   DateTime
+  // Who created the mapping. 'auto-mapper' for engine-created rows;
+  // user id for human curated rows.
+  mappedBy     String
+  // 'auto' = engine-created via autoRuleKey; 'manual' = human curated.
+  mappingSource String  @default("auto")
+  // Optional human note when mappingSource=manual.
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  control      ComplianceControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, controlId, evidenceType, evidenceId])
+  @@index([tenantId, controlId, evidenceAt])
+  @@index([tenantId, evidenceAt])
+  @@map("control_evidence_mappings")
+}
+
+model ControlAttestation {
+  id              String   @id @default(cuid())
+  tenantId        String
+  frameworkId     String
+  // Period covered by this attestation.
+  periodStart     DateTime
+  periodEnd       DateTime
+  // Per-control evidence counts at attestation time, JSON-shaped:
+  //   [{ controlId, controlCode, evidenceCount }, ...]
+  controlSummary  Json
+  // Total evidence rows across all controls for this period.
+  totalEvidence   Int
+  // Coverage = controls with ≥1 evidence row in period / total controls.
+  coveragePercent Float
+  // The WorkflowArtifact that holds the signed PDF + JSON manifest.
+  // Null while the attestation is still generating; populated when ready.
+  artifactId      String?
+  generatedBy     String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, frameworkId, createdAt])
+  @@map("control_attestations")
+}

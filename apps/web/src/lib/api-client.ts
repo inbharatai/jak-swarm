@@ -674,6 +674,126 @@ export const auditApi = {
   dashboard: () => apiDataFetch<AuditDashboard>('/audit/dashboard'),
 };
 
+// ─── Audit & Compliance v1 ─────────────────────────────────────────────
+//
+// Wraps /compliance/* — control framework mapping (SOC 2 Type 2 etc.).
+// Built on top of the Audit & Compliance v0 audit log + reviewer surfaces.
+
+export interface ComplianceFramework {
+  slug: string;
+  name: string;
+  shortName: string;
+  issuer: string;
+  description: string;
+  version: string;
+}
+
+export interface ComplianceControl {
+  id: string;
+  code: string;
+  category: string;
+  series: string;
+  title: string;
+  description: string;
+  autoRuleKey: string | null;
+  evidenceCount: number;
+}
+
+export interface ComplianceFrameworkSummary {
+  framework: ComplianceFramework & { id: string };
+  controls: ComplianceControl[];
+  coverageCounts: { total: number; covered: number; uncovered: number; coveragePercent: number };
+}
+
+export interface ControlEvidenceItem {
+  id: string;
+  evidenceType: 'audit_log' | 'workflow' | 'approval' | 'artifact' | 'evidence_bundle';
+  evidenceId: string;
+  evidenceAt: string;
+  mappedBy: string;
+  mappingSource: 'auto' | 'manual';
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface AutoMapResultClient {
+  tenantId: string;
+  frameworkSlug: string;
+  periodStart: string;
+  periodEnd: string;
+  controlsProcessed: number;
+  controlsWithRule: number;
+  controlsWithoutRule: number;
+  newMappingsCreated: number;
+  totalEvidenceConsidered: number;
+  perControl: Array<{ controlCode: string; ruleKey: string | null; created: number; total: number }>;
+  durationMs: number;
+}
+
+export interface AttestationResultClient {
+  attestationId: string;
+  artifactId: string;
+  bundleArtifactId?: string;
+  bundleSignature?: string;
+  framework: { slug: string; name: string; version: string };
+  periodStart: string;
+  periodEnd: string;
+  totalEvidence: number;
+  coveragePercent: number;
+  controlSummary: Array<{ controlCode: string; title: string; evidenceCount: number }>;
+  fileName: string;
+}
+
+export interface AttestationListItem {
+  id: string;
+  frameworkSlug: string;
+  frameworkName: string;
+  periodStart: string;
+  periodEnd: string;
+  totalEvidence: number;
+  coveragePercent: number;
+  artifactId: string | null;
+  generatedBy: string;
+  createdAt: string;
+}
+
+export const complianceApi = {
+  listFrameworks: () =>
+    apiDataFetch<{ frameworks: ComplianceFramework[] }>('/compliance/frameworks'),
+  framework: (slug: string, params?: { from?: string; to?: string }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<ComplianceFrameworkSummary>(`/compliance/frameworks/${slug}${qs}`);
+  },
+  controlEvidence: (slug: string, controlId: string, params?: { from?: string; to?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<{ items: ControlEvidenceItem[]; total: number; limit: number; offset: number }>(
+      `/compliance/frameworks/${slug}/controls/${controlId}/evidence${qs}`,
+    );
+  },
+  autoMap: (slug: string, body?: { periodStart?: string; periodEnd?: string }) =>
+    apiDataFetch<AutoMapResultClient>(`/compliance/frameworks/${slug}/auto-map`, { method: 'POST', body: body ?? {} }),
+  generateAttestation: (slug: string, body: { periodStart: string; periodEnd: string; sign?: boolean; metadata?: Record<string, unknown> }) =>
+    apiDataFetch<AttestationResultClient>(`/compliance/frameworks/${slug}/attestations`, { method: 'POST', body }),
+  listAttestations: (params?: { framework?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<{ items: AttestationListItem[]; total: number }>(`/compliance/attestations${qs}`);
+  },
+};
+
 export const apiKeyApi = {
   /** GET /tenants/current/api-keys */
   list: () => apiDataFetch<unknown[]>('/tenants/current/api-keys'),

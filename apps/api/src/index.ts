@@ -77,6 +77,7 @@ import artifactsRoutes from './routes/artifacts.routes.js';
 import exportsRoutes from './routes/exports.routes.js';
 import bundlesRoutes from './routes/bundles.routes.js';
 import auditRoutes from './routes/audit.routes.js';
+import complianceRoutes from './routes/compliance.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
@@ -230,6 +231,11 @@ async function buildApp() {
   // Read-only views over the lifecycle + approval + artifact + bundle
   // foundation. RBAC-gated per endpoint.
   await fastify.register(auditRoutes);
+  // Audit & Compliance v1 — control framework mapping (SOC 2 Type 2):
+  // /compliance/frameworks, framework summary + control evidence,
+  // POST /auto-map (re-run rule engine), POST /attestations (real PDF
+  // + optional signed bundle), GET /compliance/attestations.
+  await fastify.register(complianceRoutes);
   await fastify.register(adminDiagnosticsRoutes);
 
   // ─── Model capability check ────────────────────────────────────────────
