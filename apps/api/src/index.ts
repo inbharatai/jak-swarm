@@ -76,6 +76,7 @@ import documentsRoutes from './routes/documents.routes.js';
 import artifactsRoutes from './routes/artifacts.routes.js';
 import exportsRoutes from './routes/exports.routes.js';
 import bundlesRoutes from './routes/bundles.routes.js';
+import auditRoutes from './routes/audit.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
@@ -224,6 +225,11 @@ async function buildApp() {
   // Tamper-evident evidence bundles — HMAC-signed, tenant-scoped key
   // derivation. EVIDENCE_SIGNING_SECRET env required (returns 503 if missing).
   await fastify.register(bundlesRoutes);
+  // Audit & Compliance product surface (v0): /audit/log,
+  // /audit/workflows/:id/trail, /audit/reviewer-queue, /audit/dashboard.
+  // Read-only views over the lifecycle + approval + artifact + bundle
+  // foundation. RBAC-gated per endpoint.
+  await fastify.register(auditRoutes);
   await fastify.register(adminDiagnosticsRoutes);
 
   // ─── Model capability check ────────────────────────────────────────────

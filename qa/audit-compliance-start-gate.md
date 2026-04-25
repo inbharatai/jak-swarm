@@ -1,7 +1,9 @@
 # Audit & Compliance product — start gate
 
 **Date:** 2026-04-25
-**Verdict:** **READY FOR FULL AUDIT PRODUCT BUILD** — every requirement listed by the operator in the foundation gate is closed in code + tests. Two operational gates remain (operator-side, not code-side):
+**Verdict:** **v0 BUILT + SHIPPED.** The Audit & Compliance v0 product surface is in `main` — see [qa/audit-compliance-v0-status.md](audit-compliance-v0-status.md). 4 tabs (Dashboard, Audit Log, Reviewer Queue, Workflow Trail) live at `/audit`, RBAC-gated to REVIEWER+. 11 new tests pass + 88 total green.
+
+This document remains the authoritative gate record. **Two operational gates remain** (operator-side, not code-side):
 
 1. Top up the OpenAI account so live workflow runs can be observed visually.
 2. Apply migration `10_workflow_artifacts` to staging via `pnpm db:migrate:deploy` so the artifact + bundle endpoints work in deployed env.

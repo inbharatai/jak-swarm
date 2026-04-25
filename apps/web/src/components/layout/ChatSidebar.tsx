@@ -16,6 +16,7 @@ import {
   BarChart3,
   Network,
   ShieldCheck,
+  ScrollText,
   FileText,
   LogOut,
   X,
@@ -39,7 +40,7 @@ import { useRouter } from 'next/navigation';
 // so non-admin users don't see a tempting nav item that dead-ends in
 // "Access Restricted".
 
-const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean }> = [
+const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean; reviewerOrAdmin?: boolean }> = [
   { href: '/swarm', label: 'Runs', icon: Network },
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -51,6 +52,11 @@ const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; admi
   { href: '/files', label: 'Files', icon: FileText },
   { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
   { href: '/skills', label: 'Skills', icon: Sparkles },
+  // Audit & Compliance v0 — visible to REVIEWER + admin roles. The page
+  // itself enforces per-tab gating server-side; hiding the link from
+  // VIEWER/OPERATOR users is purely a UX cleanup so they don't land on
+  // a page where most tabs say "Reviewer access required".
+  { href: '/audit', label: 'Audit', icon: ScrollText, reviewerOrAdmin: true },
   { href: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
 ];
 
@@ -67,6 +73,10 @@ export function ChatSidebar() {
   // so we compare as string to accept those too without a type narrow.
   const roleStr = String(user?.role ?? '');
   const isAdmin = roleStr === 'TENANT_ADMIN' || roleStr === 'SYSTEM_ADMIN' || roleStr === 'ADMIN';
+  // Audit & Compliance is gated to REVIEWER + above. OPERATOR is included
+  // because they're often the ones triggering high-risk workflows and need
+  // to follow up on their own approvals.
+  const isReviewerOrAdmin = isAdmin || roleStr === 'REVIEWER' || roleStr === 'OPERATOR';
   const collapsed = useConversationStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const conversations = useConversationStore((s) => s.conversations);
@@ -243,7 +253,11 @@ export function ChatSidebar() {
             Navigate
           </div>
           <div className="space-y-0.5">
-            {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+            {NAV_ITEMS.filter((item) => {
+              if (item.adminOnly && !isAdmin) return false;
+              if (item.reviewerOrAdmin && !isReviewerOrAdmin) return false;
+              return true;
+            }).map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
               return (

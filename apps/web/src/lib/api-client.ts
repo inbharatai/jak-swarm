@@ -578,6 +578,102 @@ export const adminApi = {
   listTools: () => apiDataFetch<unknown>('/tools'),
 };
 
+// ─── Audit & Compliance v0 ─────────────────────────────────────────────
+//
+// Wraps GET /audit/log, /audit/workflows/:id/trail, /audit/reviewer-queue,
+// /audit/dashboard. All routes are tenant-scoped server-side; the client
+// just passes the bearer token. Returns are wrapped in `{success, data}`
+// envelopes by `apiDataFetch` (which unwraps `data`).
+
+export interface AuditLogEntry {
+  id: string;
+  tenantId: string;
+  userId: string | null;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  details: Record<string, unknown> | null;
+  severity: string;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  items: AuditLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface WorkflowTrailEvent {
+  at: string;
+  source: 'lifecycle' | 'trace' | 'approval' | 'artifact';
+  type: string;
+  details: Record<string, unknown>;
+}
+
+export interface WorkflowTrail {
+  workflow: { id: string; goal: string; status: string; startedAt: string; completedAt: string | null; totalCostUsd: number };
+  events: WorkflowTrailEvent[];
+  eventCount: number;
+}
+
+export interface ReviewerQueue {
+  workflowApprovals: { items: ApprovalRequest[]; total: number };
+  artifactApprovals: {
+    items: Array<{
+      id: string;
+      workflowId: string;
+      fileName: string;
+      artifactType: string;
+      sizeBytes: number | null;
+      producedBy: string;
+      createdAt: string;
+    }>;
+    total: number;
+  };
+  limit: number;
+  offset: number;
+}
+
+export interface AuditDashboard {
+  generatedAt: string;
+  windows: { day: string; week: string };
+  workflows: {
+    total: number;
+    byStatus: Array<{ status: string; count: number }>;
+    last24h: number;
+    last7d: number;
+  };
+  approvals: { byStatus: Array<{ status: string; count: number }> };
+  artifacts: {
+    available: boolean;
+    byType: Array<{ artifactType: string; count: number }>;
+    byApprovalState: Array<{ approvalState: string; count: number }>;
+    signedBundles: number;
+  };
+  actionsLast7d: Array<{ action: string; count: number }>;
+}
+
+export const auditApi = {
+  log: (params?: { limit?: number; offset?: number; action?: string; resource?: string; resourceId?: string; userId?: string; from?: string; to?: string; q?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : '';
+    return apiDataFetch<AuditLogPage>(`/audit/log${qs}`);
+  },
+  workflowTrail: (workflowId: string) =>
+    apiDataFetch<WorkflowTrail>(`/audit/workflows/${workflowId}/trail`),
+  reviewerQueue: (params?: { limit?: number; offset?: number; riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<ReviewerQueue>(`/audit/reviewer-queue${qs}`);
+  },
+  dashboard: () => apiDataFetch<AuditDashboard>('/audit/dashboard'),
+};
+
 export const apiKeyApi = {
   /** GET /tenants/current/api-keys */
   list: () => apiDataFetch<unknown[]>('/tenants/current/api-keys'),
