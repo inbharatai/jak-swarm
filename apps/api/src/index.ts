@@ -74,6 +74,8 @@ import slackRoutes from './routes/slack.routes.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
 import artifactsRoutes from './routes/artifacts.routes.js';
+import exportsRoutes from './routes/exports.routes.js';
+import bundlesRoutes from './routes/bundles.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
@@ -216,6 +218,12 @@ async function buildApp() {
   // CRUD + approval-gated downloads. Routes live at the root because some
   // are workflow-scoped (/workflows/:id/artifacts) and others by id (/artifacts/:id).
   await fastify.register(artifactsRoutes);
+  // Real export converter routes (PDF / DOCX / XLSX / CSV / JSON).
+  // Each export creates a real WorkflowArtifact via ArtifactService.
+  await fastify.register(exportsRoutes);
+  // Tamper-evident evidence bundles — HMAC-signed, tenant-scoped key
+  // derivation. EVIDENCE_SIGNING_SECRET env required (returns 503 if missing).
+  await fastify.register(bundlesRoutes);
   await fastify.register(adminDiagnosticsRoutes);
 
   // ─── Model capability check ────────────────────────────────────────────

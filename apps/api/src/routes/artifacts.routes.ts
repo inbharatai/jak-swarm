@@ -26,11 +26,54 @@ import {
   ArtifactService,
   ArtifactGatedError,
   ArtifactNotFoundError,
+  ArtifactSchemaUnavailableError,
 } from '../services/artifact.service.js';
 import { ok, err } from '../types.js';
 
+/**
+ * Translate service errors → HTTP responses with honest codes.
+ * Keep in one helper so every route renders the same shape.
+ */
+function sendArtifactError(reply: FastifyReply, e: unknown, fallbackCode: string): FastifyReply {
+  if (e instanceof ArtifactSchemaUnavailableError) {
+    return reply.status(503).send(err('ARTIFACT_SCHEMA_UNAVAILABLE',
+      'Artifact storage is not provisioned in this database. Run pnpm db:migrate:deploy to apply migration 10_workflow_artifacts.'));
+  }
+  if (e instanceof ArtifactNotFoundError) {
+    return reply.status(404).send(err('NOT_FOUND', e.message));
+  }
+  if (e instanceof ArtifactGatedError) {
+    return reply.status(403).send(err(`ARTIFACT_GATED_${e.reason.toUpperCase()}`, e.message));
+  }
+  return reply.status(500).send(err(fallbackCode, e instanceof Error ? e.message : 'unknown'));
+}
+
 const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
   const service = new ArtifactService(fastify.db, fastify.log);
+
+  // ── Diagnostic: artifact subsystem health ───────────────────────────
+  fastify.get(
+    '/admin/diagnostics/artifacts',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const health = await service.healthCheck();
+      const ready = health.schemaPresent && health.bucketReachable === true;
+      return reply.send(ok({
+        ready,
+        ...health,
+        hint: !health.schemaPresent
+          ? 'Migration 10_workflow_artifacts not deployed. Run pnpm db:migrate:deploy.'
+          : health.bucketReachable === false
+            ? 'Supabase Storage not reachable. Check SUPABASE_SERVICE_ROLE_KEY + bucket creation.'
+            : 'Artifact subsystem is operational.',
+      }));
+    },
+  );
 
   // ── List artefacts for a workflow ───────────────────────────────────
   fastify.get(
@@ -43,7 +86,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         const rows = await service.listArtifactsForWorkflow(workflowId, tenantId);
         return reply.send(ok({ artifacts: rows }));
       } catch (e) {
-        return reply.status(500).send(err('ARTIFACT_LIST_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_LIST_FAILED');
       }
     },
   );
@@ -59,10 +102,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         const row = await service.getArtifact(id, tenantId);
         return reply.send(ok({ artifact: row }));
       } catch (e) {
-        if (e instanceof ArtifactNotFoundError) {
-          return reply.status(404).send(err('NOT_FOUND', e.message));
-        }
-        return reply.status(500).send(err('ARTIFACT_GET_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_GET_FAILED');
       }
     },
   );
@@ -83,14 +123,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         });
         return reply.send(ok(result));
       } catch (e) {
-        if (e instanceof ArtifactNotFoundError) {
-          return reply.status(404).send(err('NOT_FOUND', e.message));
-        }
-        if (e instanceof ArtifactGatedError) {
-          // 403 Forbidden — the cockpit shows this as "approval required" not "error"
-          return reply.status(403).send(err(`ARTIFACT_GATED_${e.reason.toUpperCase()}`, e.message));
-        }
-        return reply.status(500).send(err('ARTIFACT_DOWNLOAD_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_DOWNLOAD_FAILED');
       }
     },
   );
@@ -118,10 +151,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         });
         return reply.send(ok({ artifact: row }));
       } catch (e) {
-        if (e instanceof ArtifactNotFoundError) {
-          return reply.status(404).send(err('NOT_FOUND', e.message));
-        }
-        return reply.status(500).send(err('ARTIFACT_APPROVE_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_APPROVE_FAILED');
       }
     },
   );
@@ -146,10 +176,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         });
         return reply.send(ok({ artifact: row }));
       } catch (e) {
-        if (e instanceof ArtifactNotFoundError) {
-          return reply.status(404).send(err('NOT_FOUND', e.message));
-        }
-        return reply.status(500).send(err('ARTIFACT_REJECT_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_REJECT_FAILED');
       }
     },
   );
@@ -165,10 +192,7 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         await service.deleteArtifact({ artifactId: id, tenantId, deletedBy: userId });
         return reply.send(ok({ deleted: true, id }));
       } catch (e) {
-        if (e instanceof ArtifactNotFoundError) {
-          return reply.status(404).send(err('NOT_FOUND', e.message));
-        }
-        return reply.status(500).send(err('ARTIFACT_DELETE_FAILED', e instanceof Error ? e.message : 'unknown'));
+        return sendArtifactError(reply, e, 'ARTIFACT_DELETE_FAILED');
       }
     },
   );

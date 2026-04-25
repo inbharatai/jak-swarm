@@ -68,26 +68,55 @@ jobs:
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
 
-      - name: Verify OPENAI_API_KEY is set
+      - name: Verify OPENAI_API_KEY is set + mask
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          # Belt-and-suspenders: GitHub Actions auto-masks values pulled
+          # from `secrets.*`, but the explicit ::add-mask:: ensures any
+          # downstream string formatting (length checks, hashes) doesn't
+          # accidentally leak the value via stderr or step summaries.
           if [ -z "$OPENAI_API_KEY" ]; then
             echo "::error::OPENAI_API_KEY secret is not configured. Add it under repo Settings → Secrets and variables → Actions."
             exit 1
           fi
-          echo "OPENAI_API_KEY is set (length=${#OPENAI_API_KEY})."
+          echo "::add-mask::$OPENAI_API_KEY"
+          # Print presence + length only — never the value.
+          echo "OPENAI_API_KEY: SET (len=${#OPENAI_API_KEY})"
 
-      - name: Run benchmark
+      - name: Run benchmark (quota-aware)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Default OPENAI_BASE_URL is fine; only set if user has a custom proxy
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        # Honest exit-code handling. The bench CLI exits:
+        #   0 — every scenario passed
+        #   1 — at least one REAL failure (model behaviour / wiring)
+        #   2 — only quota / rate-limit failures (blocked, not failed)
+        # We bubble exit 0 + 1 directly. Exit 2 ("blocked") is reported as
+        # a warning + a neutral conclusion so the workflow isn't a red ❌
+        # for an external billing condition the operator must fix offline.
         run: |
+          set +e
           if [ "${{ inputs.mode }}" = "persona-core" ]; then
             pnpm bench:runtime -- --core
           else
             pnpm bench:runtime
+          fi
+          status=$?
+          set -e
+          echo "BENCH_EXIT_CODE=$status" >> $GITHUB_ENV
+          if [ "$status" = "0" ]; then
+            echo "::notice::Benchmark passed all scenarios."
+          elif [ "$status" = "1" ]; then
+            echo "::error::Benchmark had REAL failures (not quota/rate-limit). See artifact + job log."
+            exit 1
+          elif [ "$status" = "2" ]; then
+            echo "::warning::Benchmark BLOCKED on OpenAI quota / rate-limit. Top up at platform.openai.com/billing."
+            # Don't fail the workflow — this is an external condition, not a regression.
+          else
+            echo "::error::Benchmark exited with unexpected code $status."
+            exit "$status"
           fi
 
       - name: Upload Markdown report
@@ -110,7 +139,7 @@ jobs:
         if: always()
         run: |
           if [ -f qa/benchmark-results-openai-first.md ]; then
-            echo "## Benchmark results" >> $GITHUB_STEP_SUMMARY
+            echo "## Benchmark results (exit code: $BENCH_EXIT_CODE)" >> $GITHUB_STEP_SUMMARY
             head -60 qa/benchmark-results-openai-first.md >> $GITHUB_STEP_SUMMARY
           else
             echo "::warning::No benchmark report produced — check job logs."

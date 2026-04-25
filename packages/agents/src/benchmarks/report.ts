@@ -37,25 +37,43 @@ export function renderMarkdownReport(
   // ── Per-runtime summary ─────────────────────────────────────────────
   lines.push('## Per-runtime summary');
   lines.push('');
-  lines.push('| Runtime | Pass | Fail | p50 latency (ms) | p95 latency (ms) | Total cost (USD) |');
-  lines.push('|---|---:|---:|---:|---:|---:|');
+  lines.push('| Runtime | Pass | Fail | Quota-blocked | Real fails | p50 (ms) | p95 (ms) | Cost (USD) |');
+  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|');
   for (const [name, stats] of Object.entries(report.byRuntime)) {
+    const quotaBlocked = stats.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0;
+    const rateLimited = stats.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0;
+    const blocked = quotaBlocked + rateLimited;
+    const realFails = stats.fail - blocked;
     lines.push(
-      `| ${name} | ${stats.pass} | ${stats.fail} | ${stats.p50LatencyMs} | ${stats.p95LatencyMs} | $${stats.totalCostUsd.toFixed(4)} |`,
+      `| ${name} | ${stats.pass} | ${stats.fail} | ${blocked} | ${realFails} | ${stats.p50LatencyMs} | ${stats.p95LatencyMs} | $${stats.totalCostUsd.toFixed(4)} |`,
     );
   }
   lines.push('');
 
+  // Honest verdict line
+  const totalFail = Object.values(report.byRuntime).reduce((s, r) => s + r.fail, 0);
+  const totalBlocked = Object.values(report.byRuntime).reduce((s, r) => {
+    return s + (r.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0)
+             + (r.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0);
+  }, 0);
+  if (totalBlocked > 0 && totalBlocked === totalFail) {
+    lines.push(`> ⚠️ **All ${totalFail} failures were OpenAI quota / rate-limit issues, not model or runtime problems.** ` +
+      `The harness reached the OpenAI API and the API rejected the calls for billing reasons. ` +
+      `Top up the OpenAI account at platform.openai.com/billing and re-run.`);
+    lines.push('');
+  }
+
   // ── Per-scenario rows ───────────────────────────────────────────────
   lines.push('## Per-scenario results');
   lines.push('');
-  lines.push('| Scenario | Runtime | Status | Latency (ms) | Tool calls (matched/observed) | Reason |');
-  lines.push('|---|---|:---:|---:|---:|---|');
+  lines.push('| Scenario | Runtime | Status | Kind | Latency (ms) | Tool calls (matched/observed) | Reason |');
+  lines.push('|---|---|:---:|---|---:|---:|---|');
   for (const r of report.scenarios) {
     const status = r.ok ? '✅' : '❌';
+    const kind = r.failureKind ?? '';
     const reason = r.ok ? '' : (r.failureReason ?? '').replace(/\n/g, ' ').slice(0, 120);
     lines.push(
-      `| ${r.scenarioId} | ${r.runtime} | ${status} | ${r.latencyMs} | ${r.toolCallsMatched}/${r.toolCallsObserved} | ${reason} |`,
+      `| ${r.scenarioId} | ${r.runtime} | ${status} | ${kind} | ${r.latencyMs} | ${r.toolCallsMatched}/${r.toolCallsObserved} | ${reason} |`,
     );
   }
   lines.push('');

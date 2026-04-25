@@ -1,22 +1,24 @@
-# Benchmark results — hardening pass — 2026-04-25T08:33:20.271Z
+# Benchmark results — hardening pass — 2026-04-25T11:43:20.972Z
 
-Generated at: `2026-04-25T08:33:20.268Z`  
+Generated at: `2026-04-25T11:43:20.970Z`  
 Scenarios run: **4**
 
 ## Per-runtime summary
 
-| Runtime | Pass | Fail | p50 latency (ms) | p95 latency (ms) | Total cost (USD) |
-|---|---:|---:|---:|---:|---:|
-| openai-responses | 0 | 4 | 20438 | 20900 | $0.0000 |
+| Runtime | Pass | Fail | Quota-blocked | Real fails | p50 (ms) | p95 (ms) | Cost (USD) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| openai-responses | 0 | 4 | 4 | 0 | 18487 | 19077 | $0.0000 |
+
+> ⚠️ **All 4 failures were OpenAI quota / rate-limit issues, not model or runtime problems.** The harness reached the OpenAI API and the API rejected the calls for billing reasons. Top up the OpenAI account at platform.openai.com/billing and re-run.
 
 ## Per-scenario results
 
-| Scenario | Runtime | Status | Latency (ms) | Tool calls (matched/observed) | Reason |
-|---|---|:---:|---:|---:|---|
-| planning-simple | openai-responses | ❌ | 20900 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
-| research-task | openai-responses | ❌ | 20438 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
-| cmo-linkedin-post | openai-responses | ❌ | 17725 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
-| vibecoder-inspect | openai-responses | ❌ | 17595 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| Scenario | Runtime | Status | Kind | Latency (ms) | Tool calls (matched/observed) | Reason |
+|---|---|:---:|---|---:|---:|---|
+| planning-simple | openai-responses | ❌ | OPENAI_RATE_LIMITED | 18458 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| research-task | openai-responses | ❌ | OPENAI_RATE_LIMITED | 19077 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| cmo-linkedin-post | openai-responses | ❌ | OPENAI_RATE_LIMITED | 18487 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| vibecoder-inspect | openai-responses | ❌ | OPENAI_RATE_LIMITED | 17317 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
 
 ## Integration scenarios — deferred (require full stack)
 

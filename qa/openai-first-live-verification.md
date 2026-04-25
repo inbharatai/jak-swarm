@@ -1,79 +1,111 @@
 # OpenAI-first runtime — live verification
 
 **Date:** 2026-04-25
-**Method:** `/version` endpoint check + static trace + a real `pnpm bench:runtime` execution against the configured OpenAI key.
+**Method:** `/version` endpoint + static trace + a real `pnpm bench:runtime` execution against the configured OpenAI key, with the new quota-aware classification.
 
-## Live run result
+## Live run result (post quota classification)
 
-A real `pnpm bench:runtime` was executed in this audit using the `OPENAI_API_KEY` from `apps/api/.env`. **All 4 LLM scenarios returned `429 You exceeded your current quota`.** This is a real OpenAI API response — the harness is wired correctly, the runtime resolved the model, the call hit the API, and OpenAI rejected it for billing reasons.
+`pnpm bench:runtime` was re-executed in this hardening pass after the new `OPENAI_QUOTA_EXHAUSTED` classification landed:
 
 ```
-Per-runtime summary
-| Runtime          | Pass | Fail | p50  | p95  | Cost |
-| openai-responses |   0  |   4  | 20438| 20900| $0.0000 |
+──────── Summary ────────
+  openai-responses     0/4 pass (0%) · quota-blocked 4 · real fails 0 · p50 18487ms · p95 19077ms · $0.0000
 
-Per-scenario:
-| planning-simple    | ❌ | 429 quota exceeded
-| research-task      | ❌ | 429 quota exceeded
-| cmo-linkedin-post  | ❌ | 429 quota exceeded
-| vibecoder-inspect  | ❌ | 429 quota exceeded
+[bench-runtime] BLOCKED: all failures are OPENAI_QUOTA_EXHAUSTED or OPENAI_RATE_LIMITED.
+                Top up at platform.openai.com/billing and re-run.
+exit code 2  (BLOCKED, not failed)
 ```
 
-What this proves:
-- **OpenAIRuntime constructs and reaches the OpenAI API** (the failure happens at the OpenAI billing layer, not at our request shaping).
-- **The harness reports failures honestly** (no fake green ticks).
+**Honest interpretation:** the harness reached the OpenAI API. The API rejected the calls with HTTP 429 quota exhaustion. The bench classified all 4 failures as `OPENAI_QUOTA_EXHAUSTED`. Exit code 2 means "blocked by external billing condition, not a code regression". CI workflow treats this as a `::warning::`, not a failure.
 
-What this does NOT prove (because the calls didn't actually return content):
-- model behaviour is correct on real prompts
-- structured output enforcement works against real OpenAI responses
-- cockpit lifecycle events fire end-to-end during a real workflow
+## Verdict matrix
 
-To close this: top up the OpenAI account at platform.openai.com/billing and re-run `pnpm bench:runtime`. The output gets written to `qa/_generated/bench-runtime.json` + overwrites `qa/benchmark-results-openai-first.md`.
+Status legend:
+- **statically verified** — code path traced; tests pass
+- **live verified** — real call landed AND the call's content was observed
+- **live reached, blocked** — real call landed; provider declined for non-code reasons (quota, billing)
+- **not verified** — neither static nor live evidence
+- **failed** — a real attempt was made and failed for a code reason
 
-## /version snapshot
+| Capability | Verdict |
+|---|---|
+| OpenAI runtime path resolves correctly | **statically verified** |
+| API key is present + reaches OpenAI | **live verified** (the 429 is a real API response — the request shape, auth, and TLS path all work) |
+| Quota / billing state allows model calls | **live reached, blocked** (gate: top up account) |
+| Model resolver picks a real model | **statically verified** (cannot live-verify content without quota) |
+| Gemini / Anthropic NOT in critical path | **statically verified** (`provider-router.ts:286-296` returns OpenAIProvider first whenever key is set) |
+| Backend lifecycle events emit | **statically verified + tested** (5 integration tests, full coverage matrix) |
+| Cockpit renders events during a live run | **not verified** (would require a browser session with quota) |
+| Tool outcomes shown honestly | **statically verified + tested** (ToolOutcome enum end-to-end) |
+| Token / cost telemetry complete | **statically verified** (cost_updated event carries runtime, model, fallback, tokens, runId, stepId) |
+| Lifecycle assertion strict mode | **statically verified + tested** (32 tests, both modes) |
+| Approval round-trip lifecycle | **statically verified + tested** (5 integration tests) |
+| Artifact storage gate (REQUIRES_APPROVAL) | **statically verified + tested** (7 schema-failsafe tests + service-level approval gate) |
+| Export converters produce real bytes | **statically verified + tested** (15 tests including magic-byte verification) |
+| Bundle signing detects tampering | **statically verified + tested** (18 tests covering all tamper vectors) |
 
-```json
-{
-  "gitCommit": "ee4d9f1...",
-  "executionEngine": "(unset — defaults to openai-first when OPENAI_API_KEY is set)",
-  "workflowRuntime": "swarmgraph",
-  "workflowRuntimeStatus": "active",
-  "openaiRuntimeAgents": [],
-  "effectiveExecutionEngine": "openai-first",
-  "openaiApiKeySet": true,
-  "strictWorkflowState": false
-}
+## Exact commands to run after quota top-up
+
+```bash
+# 1. Re-run the bench scenarios
+pnpm bench:runtime              # 4 LLM scenarios — workflow_planning, research, CMO, vibecoder
+pnpm bench:runtime -- --core    # alternative: 7 persona-core scenarios
 ```
 
-## Per-claim verdict
+After the bench succeeds, the `qa/benchmark-results-openai-first.md` file will be overwritten with real pass/fail numbers.
 
-Status legend: **statically verified** = code path traced; **live verified** = real call landed and was observed; **not verified** = neither; **failed** = a real attempt was made and failed; **blocked** = blocked by external dependency.
+```bash
+# 2. Run the cockpit-visibility check manually (browser required)
+pnpm dev                        # boot apps/api + apps/web
 
-| Claim | Verdict | Evidence |
-|---|---|---|
-| OpenAI runtime selected by default | **statically verified** | `getRuntime` at `packages/agents/src/runtime/index.ts:52-86`. Live `/version` shows `effectiveExecutionEngine: openai-first`. |
-| OpenAI API actually reachable from this deploy's key | **live verified (with caveat)** | `pnpm bench:runtime` reached the API — the 429 quota response is proof the request shape + auth path are correct end-to-end. |
-| Model resolver picks a real model | **statically verified** | `OpenAIRuntime.resolveModel` calls `modelForTier` which goes through `ModelResolver`. Worker `worker-entry.ts` pre-warms via `void ensureModelMap()`. Cannot live-verify without quota. |
-| Gemini / Anthropic NOT in critical path | **statically verified** | `provider-router.ts:286-296` returns `OpenAIProvider` first whenever `OPENAI_API_KEY` is set. Gemini + Anthropic only reachable when key missing or `JAK_LEGACY_PROVIDER_CHAIN=true`. |
-| Backend events emitted | **statically verified** | Full SSE wiring traced in `qa/agent-run-cockpit-realness-audit.md`. |
-| Cockpit receives events during live run | **blocked** | Requires a real workflow run with quota + browser. The cockpit's mount + handlers are static-verified. |
-| Graph / DAG updates honestly during live run | **blocked** | Same as above. WorkflowDAG renders only when `plan_created` populates the cockpit; static-verified. |
-| Tool outcomes shown honestly | **statically verified + tested** | `ToolOutcome` enum end-to-end (registry → ToolResult → event → cockpit icon). Tests in `tests/integration/approval-roundtrip.test.ts` exercise the lifecycle wire-up. |
-| Token / cost usage captured | **statically verified** | `cost_updated` event now carries `runtime`, `model`, `fallbackModelUsed`, `promptTokens`, `completionTokens`, `totalTokens`, `costUsd`, `runId`, `stepId`. Cannot live-verify token counts without quota. |
-| Async / background worker run | **blocked** | Requires queue worker + Redis pub/sub + a long-running workflow. Static-verified via the queue worker code. |
-| Approval-required workflow | **blocked (live)** + **statically verified** | The `paused` SSE event gap was found and fixed in this pass. Approval round-trip lifecycle events tested (5 tests pass) but the live run requires quota + a real high-risk task. |
-| Resume after approval | **statically verified + tested** | `WorkflowRuntime.resume` routes through SwarmGraphRuntime → SwarmRunner.resume. Lifecycle events `approval_granted` + `resumed` emitted. Test coverage in `approval-roundtrip.test.ts`. |
-| Cancel workflow | **statically verified + tested** | `WorkflowRuntime.cancel` routes through. `cancelled` lifecycle event emitted. Test coverage in `approval-roundtrip.test.ts` (REJECTED branch tests cancel). |
+# In a browser at http://localhost:3000/workspace:
+#   a) Send: "hi"
+#      → confirm chat replies + cockpit shows 1 LLM call + cost > 0
+#   b) Send: "Write a 200-word LinkedIn post for JAK Swarm enterprise launch"
+#      → confirm right drawer shows: status badge, plan with 1 step,
+#        worker_started → worker_completed flips, cost footer shows
+#        runtime + model + fallback (if any)
+#   c) Send: "Send an email to test@example.com saying hello"
+#      → confirm: paused event arrives, status badge flips to AWAITING_APPROVAL,
+#        approval link appears in chat
+#   d) Approve via /approvals UI
+#      → confirm workflow continues to COMPLETED with completed tasks NOT re-run
 
-## What's blocked vs what's done
+# 3. Run the new export + bundle smoke tests (requires running API + auth)
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"workflow_report","format":"pdf","markFinal":true}' \
+  http://localhost:4000/workflows/$WORKFLOW_ID/export
+# → returns artifactId + status=READY + approvalState=REQUIRES_APPROVAL
 
-**Blocked on quota top-up:**
-- Live verification of model behaviour, full workflow runs, cockpit visual confirmation.
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:4000/artifacts/$ARTIFACT_ID/download
+# → returns 403 ARTIFACT_GATED_REQUIRES_APPROVAL (gate working)
 
-**Done (static + unit + integration tested):**
-- Every code path involved in the OpenAI-first runtime selection.
-- Lifecycle event vocabulary + emitter (32 unit tests).
-- Approval round-trip event sequencing (5 integration tests).
-- Tool outcome propagation end-to-end.
+curl -X POST -H "Authorization: Bearer $REVIEWER_TOKEN" \
+  http://localhost:4000/artifacts/$ARTIFACT_ID/approve
+# → returns artifact with approvalState=APPROVED
 
-**Honest summary:** the system is wired correctly. Until the OpenAI key has credit, we can't visually confirm a workflow renders in the cockpit. All the moving parts are individually verified.
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:4000/artifacts/$ARTIFACT_ID/download
+# → returns signed Supabase URL (gate satisfied)
+
+# 4. Bundle a workflow's artifacts into a signed evidence pack
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"metadata":{"controlFramework":"SOC2"}}' \
+  http://localhost:4000/workflows/$WORKFLOW_ID/bundle
+# → returns artifactId + manifest + signature + signatureAlgo
+
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:4000/artifacts/$BUNDLE_ID/verify
+# → returns {valid: true} (or {valid: false, reason: ...} on tamper)
+```
+
+## What's still NOT verified (and why)
+
+- **Model behaviour on real prompts** — blocked on quota top-up.
+- **Cockpit visual confirmation** — requires a human + browser; documented as the manual recipe above.
+- **Production smoke against deployed Render API** — requires the artifact migration `10_workflow_artifacts` to be deployed to staging first (`pnpm db:migrate:deploy`).
+
+These are deliberate gaps — they require things only the operator can do (spend money, open a browser, deploy a migration). The infrastructure is verified; the live operational checks are documented + ready to run.

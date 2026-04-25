@@ -26,6 +26,7 @@
 import type { LLMRuntime, LLMCallOptions } from '../runtime/llm-runtime.js';
 import type { AgentContext } from '../base/agent-context.js';
 import type OpenAI from 'openai';
+import { classifyProviderError } from '../base/provider-router.js';
 
 export interface BenchmarkScenario {
   /** Stable id for cross-run comparison. */
@@ -50,11 +51,37 @@ export interface BenchmarkScenario {
   timeoutMs?: number;
 }
 
+/**
+ * Honest classification of a benchmark failure. Distinguishes:
+ *   - OPENAI_QUOTA_EXHAUSTED — billing/quota issue, not a model or runtime fault
+ *   - OPENAI_RATE_LIMITED   — temporary rate limit, retry would likely work
+ *   - OPENAI_AUTH_ERROR     — bad / missing key, operator error
+ *   - OPENAI_SERVER_ERROR   — 5xx from OpenAI, infra issue
+ *   - MODEL_NOT_FOUND       — model name unknown to OpenAI
+ *   - EXPECTATION_MISMATCH  — call succeeded but content didn't match
+ *   - TOOL_CALL_MISMATCH    — call succeeded but expected tools weren't invoked
+ *   - RUNTIME_ERROR         — anything else
+ *
+ * The CLI runner uses this to print quota-aware exit messages and to choose
+ * the right exit code (quota exhaustion is a "blocked, not failed" case).
+ */
+export type BenchmarkFailureKind =
+  | 'OPENAI_QUOTA_EXHAUSTED'
+  | 'OPENAI_RATE_LIMITED'
+  | 'OPENAI_AUTH_ERROR'
+  | 'OPENAI_SERVER_ERROR'
+  | 'MODEL_NOT_FOUND'
+  | 'EXPECTATION_MISMATCH'
+  | 'TOOL_CALL_MISMATCH'
+  | 'RUNTIME_ERROR';
+
 export interface BenchmarkResult {
   scenarioId: string;
   runtime: string;
   ok: boolean;
   failureReason?: string;
+  /** Honest failure classification — see BenchmarkFailureKind. */
+  failureKind?: BenchmarkFailureKind;
   latencyMs: number;
   totalTokens?: number;
   costUsd?: number;
@@ -69,11 +96,33 @@ export interface BenchmarkReport {
   byRuntime: Record<string, {
     pass: number;
     fail: number;
+    /**
+     * Failures broken down by kind so the report can clearly say
+     * "blocked on quota: 4, real failures: 0".
+     */
+    failuresByKind: Partial<Record<BenchmarkFailureKind, number>>;
     p50LatencyMs: number;
     p95LatencyMs: number;
     totalCostUsd: number;
   }>;
   scenarios: BenchmarkResult[];
+}
+
+/**
+ * Translate a thrown error into a BenchmarkFailureKind. Re-uses the
+ * provider-router's classifyProviderError so the same vocabulary is
+ * applied everywhere.
+ */
+export function classifyBenchmarkFailure(err: unknown): BenchmarkFailureKind {
+  const kind = classifyProviderError(err);
+  switch (kind) {
+    case 'billing_error': return 'OPENAI_QUOTA_EXHAUSTED';
+    case 'rate_limit': return 'OPENAI_RATE_LIMITED';
+    case 'auth_error': return 'OPENAI_AUTH_ERROR';
+    case 'server_error': return 'OPENAI_SERVER_ERROR';
+    case 'model_not_found': return 'MODEL_NOT_FOUND';
+    default: return 'RUNTIME_ERROR';
+  }
 }
 
 /**
@@ -147,13 +196,18 @@ export async function runHarness(opts: {
         const expectedToolCount = (scenario.expectedToolCalls ?? []).length;
         if (expectMisses.length > 0) {
           result.failureReason = `expectations missed: ${expectMisses.join(', ')}`;
+          result.failureKind = 'EXPECTATION_MISMATCH';
         } else if (expectedToolCount > 0 && toolMatches < expectedToolCount) {
           result.failureReason = `tool-call match: ${toolMatches}/${expectedToolCount}`;
+          result.failureKind = 'TOOL_CALL_MISMATCH';
         } else {
           result.ok = true;
         }
       } catch (err) {
+        // Honest failure classification — don't lump quota exhaustion
+        // (an external billing issue) in with model behaviour failures.
         result.failureReason = err instanceof Error ? err.message : String(err);
+        result.failureKind = classifyBenchmarkFailure(err);
       } finally {
         result.latencyMs = Date.now() - startedAt;
         results.push(result);
@@ -166,16 +220,28 @@ export async function runHarness(opts: {
 
 function summarize(results: BenchmarkResult[]): BenchmarkReport {
   const byRuntimeLatencies = new Map<string, number[]>();
-  const byRuntimeStats = new Map<string, { pass: number; fail: number; cost: number }>();
+  const byRuntimeStats = new Map<string, {
+    pass: number;
+    fail: number;
+    cost: number;
+    failuresByKind: Partial<Record<BenchmarkFailureKind, number>>;
+  }>();
 
   for (const r of results) {
     const lats = byRuntimeLatencies.get(r.runtime) ?? [];
     lats.push(r.latencyMs);
     byRuntimeLatencies.set(r.runtime, lats);
 
-    const stats = byRuntimeStats.get(r.runtime) ?? { pass: 0, fail: 0, cost: 0 };
-    if (r.ok) stats.pass++;
-    else stats.fail++;
+    const stats = byRuntimeStats.get(r.runtime)
+      ?? { pass: 0, fail: 0, cost: 0, failuresByKind: {} as Partial<Record<BenchmarkFailureKind, number>> };
+    if (r.ok) {
+      stats.pass++;
+    } else {
+      stats.fail++;
+      if (r.failureKind) {
+        stats.failuresByKind[r.failureKind] = (stats.failuresByKind[r.failureKind] ?? 0) + 1;
+      }
+    }
     stats.cost += r.costUsd ?? 0;
     byRuntimeStats.set(r.runtime, stats);
   }
@@ -187,6 +253,7 @@ function summarize(results: BenchmarkResult[]): BenchmarkReport {
     byRuntime[name] = {
       pass: stats.pass,
       fail: stats.fail,
+      failuresByKind: stats.failuresByKind,
       p50LatencyMs: sorted[Math.floor(sorted.length * 0.5)] ?? 0,
       p95LatencyMs: sorted[Math.floor(sorted.length * 0.95)] ?? 0,
       totalCostUsd: stats.cost,

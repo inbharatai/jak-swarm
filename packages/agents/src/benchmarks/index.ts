@@ -28,11 +28,12 @@
  *   - zero break-glass activations in prod for ≥2 weeks
  */
 
-export { runHarness } from './harness.js';
+export { runHarness, classifyBenchmarkFailure } from './harness.js';
 export type {
   BenchmarkScenario,
   BenchmarkResult,
   BenchmarkReport,
+  BenchmarkFailureKind,
 } from './harness.js';
 export { PERSONA_CORE_SCENARIOS } from './scenarios/persona-core.js';
 export {

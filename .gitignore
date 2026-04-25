@@ -3,7 +3,20 @@ node_modules/
 dist/
 .next/
 *.local
+# Environment files — root + every workspace package + every app.
+# Belt and suspenders: previously `.env` only matched the root file, so
+# apps/api/.env could slip through (and did, in this repo's history).
+# Each pattern now covers its scope explicitly. Allow only `.env.example`
+# to remain tracked.
 .env
+.env.*
+!.env.example
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+packages/*/.env
+packages/*/.env.*
+!packages/*/.env.example
 .env.*.local
 coverage/
 *.log

@@ -88,6 +88,35 @@ export class ArtifactNotFoundError extends Error {
   }
 }
 
+/**
+ * Thrown when the workflow_artifacts table doesn't exist in the DB —
+ * usually means migration `10_workflow_artifacts` hasn't been deployed.
+ * Routes catch this and return 503 SERVICE_UNAVAILABLE with a clear
+ * "run pnpm db:migrate:deploy" hint instead of a generic 500.
+ */
+export class ArtifactSchemaUnavailableError extends Error {
+  constructor() {
+    super(
+      '[artifact] The workflow_artifacts table does not exist in this database. ' +
+      'Apply migration 10_workflow_artifacts via `pnpm db:migrate:deploy`.',
+    );
+    this.name = 'ArtifactSchemaUnavailableError';
+  }
+}
+
+/**
+ * Detect Prisma's "table doesn't exist" error (P2021) and translate it.
+ * Anything else re-throws unchanged.
+ */
+function rethrowIfSchemaMissing(err: unknown): never {
+  const code = (err as { code?: string }).code;
+  const msg = err instanceof Error ? err.message : String(err);
+  if (code === 'P2021' || /table .* does not exist|relation .* does not exist/i.test(msg)) {
+    throw new ArtifactSchemaUnavailableError();
+  }
+  throw err;
+}
+
 let cachedClient: SupabaseClient | null = null;
 let bucketEnsured = false;
 
@@ -157,7 +186,7 @@ export class ArtifactService {
     const workflow = await (this.db.workflow.findFirst as unknown as (args: unknown) => Promise<{ id: string } | null>)({
       where: { id: input.workflowId, tenantId: input.tenantId },
       select: { id: true },
-    });
+    }).catch((err) => rethrowIfSchemaMissing(err));
     if (!workflow) {
       throw new Error(`Workflow ${input.workflowId} not found in tenant ${input.tenantId}`);
     }
@@ -218,7 +247,7 @@ export class ArtifactService {
         ...(input.parentArtifactId ? { parentId: input.parentArtifactId } : {}),
         ...(input.metadata ? { metadata: input.metadata as object } : {}),
       },
-    });
+    }).catch((err) => rethrowIfSchemaMissing(err));
 
     // Audit row — always log artefact creation for the compliance trail.
     void this.audit
@@ -251,7 +280,7 @@ export class ArtifactService {
   async getArtifact(artifactId: string, tenantId: string): Promise<unknown> {
     const row = await (this.db.workflowArtifact.findFirst as unknown as (args: unknown) => Promise<unknown>)({
       where: { id: artifactId, tenantId, deletedAt: null },
-    });
+    }).catch((err) => rethrowIfSchemaMissing(err));
     if (!row) throw new ArtifactNotFoundError(artifactId);
     return row;
   }
@@ -264,7 +293,42 @@ export class ArtifactService {
     return (this.db.workflowArtifact.findMany as unknown as (args: unknown) => Promise<unknown[]>)({
       where: { workflowId, tenantId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-    });
+    }).catch((err) => rethrowIfSchemaMissing(err));
+  }
+
+  /**
+   * Diagnostic: probes whether the workflow_artifacts table exists in the
+   * database. Used by /admin/diagnostics/artifacts to surface migration
+   * status without trying to do a real CRUD op. Returns null if the
+   * schema is unavailable so the caller can render "migration not applied"
+   * cleanly.
+   */
+  async healthCheck(): Promise<{ schemaPresent: boolean; rowCount: number | null; bucketReachable: boolean | null }> {
+    let schemaPresent = false;
+    let rowCount: number | null = null;
+    try {
+      rowCount = await (this.db.workflowArtifact.count as unknown as (args: unknown) => Promise<number>)({});
+      schemaPresent = true;
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (code === 'P2021' || /does not exist/i.test(msg)) {
+        schemaPresent = false;
+      } else {
+        // Some other error — still probably means schema is broken; report null
+        schemaPresent = false;
+      }
+    }
+
+    let bucketReachable: boolean | null = null;
+    try {
+      await ensureBucket(this.log);
+      bucketReachable = true;
+    } catch {
+      bucketReachable = false;
+    }
+
+    return { schemaPresent, rowCount, bucketReachable };
   }
 
   /**

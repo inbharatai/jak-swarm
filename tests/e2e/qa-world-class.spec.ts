@@ -10,9 +10,12 @@
  *
  * Usage:
  *   E2E_BASE_URL=https://jakswarm.com \
- *   E2E_AUTH_EMAIL=reetu004@gmail.com E2E_AUTH_PASSWORD=Adubaby.004! \
+ *   E2E_AUTH_EMAIL=<your-email> E2E_AUTH_PASSWORD=<your-password> \
  *   pnpm exec playwright test e2e/qa-world-class.spec.ts \
  *     --reporter=list --workers=1 --project=chromium-mobile
+ *
+ * NEVER inline real credentials in this file. Use placeholders only — the
+ * password value is supplied by the operator at run time, not by source code.
  */
 
 import { test, type Page, type BrowserContext } from '@playwright/test';

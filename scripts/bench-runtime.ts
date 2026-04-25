@@ -90,11 +90,20 @@ async function main() {
 
   // Print summary to stdout
   console.log('\n──────── Summary ────────');
+  let anyRealFailure = false;
+  let anyQuotaBlocked = false;
   for (const [name, stats] of Object.entries(report.byRuntime)) {
     const total = stats.pass + stats.fail;
     const passPct = total > 0 ? Math.round((stats.pass / total) * 100) : 0;
+    const quotaBlocked = stats.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0;
+    const rateLimited = stats.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0;
+    const blocked = quotaBlocked + rateLimited;
+    const realFails = stats.fail - blocked;
+    if (realFails > 0) anyRealFailure = true;
+    if (blocked > 0) anyQuotaBlocked = true;
     console.log(
       `  ${name.padEnd(20)} ${stats.pass}/${total} pass (${passPct}%) ` +
+      `· quota-blocked ${blocked} · real fails ${realFails} ` +
       `· p50 ${stats.p50LatencyMs}ms · p95 ${stats.p95LatencyMs}ms ` +
       `· $${stats.totalCostUsd.toFixed(4)}`,
     );
@@ -113,9 +122,23 @@ async function main() {
   writeFileSync(outMarkdown, md, 'utf8');
   console.log(`[bench-runtime] MD    → ${outMarkdown}`);
 
-  // Exit code: 0 if every LLM scenario passed on at least one runtime; 1 otherwise.
-  const anyFailed = Object.values(report.byRuntime).some(s => s.fail > 0);
-  process.exit(anyFailed ? 1 : 0);
+  // Exit codes:
+  //   0 — every scenario passed
+  //   1 — at least one real failure (model behavior, tool-call mismatch, etc.)
+  //   2 — only quota / rate-limit failures — blocked by OpenAI account state,
+  //       NOT a code regression. CI should treat this as "skipped, not red".
+  if (anyRealFailure) {
+    console.error('[bench-runtime] FAIL: at least one real failure (not quota-blocked).');
+    process.exit(1);
+  }
+  if (anyQuotaBlocked) {
+    console.error(
+      '[bench-runtime] BLOCKED: all failures are OPENAI_QUOTA_EXHAUSTED or OPENAI_RATE_LIMITED. ' +
+      'Top up at https://platform.openai.com/billing and re-run.',
+    );
+    process.exit(2);
+  }
+  process.exit(0);
 }
 
 main().catch(err => {
