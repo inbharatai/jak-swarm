@@ -803,33 +803,123 @@ function FrameworkSummary({ slug }: { slug: string }) {
 }
 
 function ControlEvidenceDrillIn({ slug, controlId, description, autoRuleKey, period }: { slug: string; controlId: string; description: string; autoRuleKey: string | null; period: { from?: string; to?: string } }) {
-  const { data, error, isLoading } = useSWR<{ items: ControlEvidenceItem[]; total: number }>(
+  const { data, error, isLoading, mutate } = useSWR<{ items: ControlEvidenceItem[]; total: number }>(
     ['compliance:control-evidence', slug, controlId, JSON.stringify(period)],
     () => complianceApi.controlEvidence(slug, controlId, period),
   );
+  const { data: manual, mutate: mutateManual } = useSWR<{ items: Array<{ id: string; title: string; description: string; attachedArtifactId: string | null; createdBy: string; evidenceAt: string; createdAt: string }>; total: number }>(
+    ['compliance:manual-evidence', controlId],
+    () => complianceApi.listManualEvidence(controlId),
+  );
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [meTitle, setMeTitle] = useState('');
+  const [meDescription, setMeDescription] = useState('');
+  const [meSubmitting, setMeSubmitting] = useState(false);
+  const toast = useToast();
+
+  const submitManualEvidence = async () => {
+    if (!meTitle.trim() || !meDescription.trim()) return;
+    setMeSubmitting(true);
+    try {
+      await complianceApi.createManualEvidence({ controlId, title: meTitle.trim(), description: meDescription.trim() });
+      toast.success('Manual evidence added.');
+      setMeTitle('');
+      setMeDescription('');
+      setShowAddForm(false);
+      mutateManual();
+      mutate();
+    } catch (e) {
+      toast.error('Failed to add', e instanceof Error ? e.message : 'Unknown');
+    } finally {
+      setMeSubmitting(false);
+    }
+  };
+
+  const removeManualEvidence = async (id: string) => {
+    if (typeof window !== 'undefined' && !window.confirm('Remove this manual evidence? Coverage will drop.')) return;
+    try {
+      await complianceApi.deleteManualEvidence(id);
+      toast.success('Manual evidence removed.');
+      mutateManual();
+      mutate();
+    } catch (e) {
+      toast.error('Failed to remove', e instanceof Error ? e.message : 'Unknown');
+    }
+  };
+
   return (
     <div className="px-3 py-2 bg-muted/30 border-t text-xs space-y-2">
       <p className="text-muted-foreground italic">{description}</p>
       <p className="text-[10px]">Auto-mapping rule: {autoRuleKey ? <code>{autoRuleKey}</code> : <span className="italic">none — human-mapped only</span>}</p>
-      {isLoading && <Spinner size="sm" />}
-      {error && <p className="text-destructive">Couldn't load evidence: {error instanceof Error ? error.message : 'Unknown'}</p>}
-      {data && data.items.length === 0 && (
-        <p className="italic text-muted-foreground">No evidence rows yet.</p>
-      )}
-      {data && data.items.length > 0 && (
-        <ul className="font-mono text-[10px] space-y-0.5 max-h-48 overflow-y-auto">
-          {data.items.map((m) => (
-            <li key={m.id}>
-              <span className="text-muted-foreground">[{new Date(m.evidenceAt).toLocaleString()}]</span>{' '}
-              <span>{m.evidenceType}</span>:<span>{m.evidenceId}</span>{' '}
-              <span className="text-muted-foreground">({m.mappingSource})</span>
-            </li>
-          ))}
-          {data.total > data.items.length && (
-            <li className="italic text-muted-foreground">+{data.total - data.items.length} more</li>
-          )}
-        </ul>
-      )}
+
+      {/* Manual evidence section */}
+      <div className="border-l-2 border-primary/40 pl-2 space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider font-medium">Manual evidence ({manual?.total ?? 0})</span>
+          <button
+            type="button"
+            onClick={() => setShowAddForm((s) => !s)}
+            className="text-[10px] text-primary hover:underline"
+          >
+            {showAddForm ? 'Cancel' : '+ Add'}
+          </button>
+        </div>
+        {showAddForm && (
+          <div className="space-y-1 p-2 bg-background border rounded">
+            <Input placeholder="Title (e.g. 'Annual security training records — Q1 2026')" value={meTitle} onChange={(e) => setMeTitle(e.target.value)} className="text-xs" />
+            <textarea
+              placeholder="Description / where the evidence is stored / who reviewed it"
+              value={meDescription}
+              onChange={(e) => setMeDescription(e.target.value)}
+              rows={3}
+              className="w-full text-xs border rounded p-1"
+            />
+            <Button size="sm" onClick={submitManualEvidence} disabled={meSubmitting || !meTitle.trim() || !meDescription.trim()}>
+              {meSubmitting ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        )}
+        {manual && manual.items.length > 0 && (
+          <ul className="space-y-1">
+            {manual.items.map((m) => (
+              <li key={m.id} className="flex items-start justify-between p-1 hover:bg-background/50 rounded">
+                <div className="flex-1">
+                  <div className="font-medium text-[11px]">{m.title}</div>
+                  <div className="text-[10px] text-muted-foreground line-clamp-2">{m.description}</div>
+                  <div className="text-[9px] text-muted-foreground">by {m.createdBy} · {new Date(m.evidenceAt).toLocaleDateString()}</div>
+                </div>
+                <button onClick={() => removeManualEvidence(m.id)} className="text-[10px] text-destructive hover:underline ml-2">
+                  remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Auto-mapped evidence */}
+      <div className="border-l-2 border-border pl-2 space-y-1">
+        <span className="text-[10px] uppercase tracking-wider font-medium">Auto-mapped evidence ({data?.total ?? 0})</span>
+        {isLoading && <Spinner size="sm" />}
+        {error && <p className="text-destructive">Couldn't load evidence: {error instanceof Error ? error.message : 'Unknown'}</p>}
+        {data && data.items.length === 0 && (
+          <p className="italic text-muted-foreground">No auto-mapped rows. Run "Run auto-map" to refresh.</p>
+        )}
+        {data && data.items.length > 0 && (
+          <ul className="font-mono text-[10px] space-y-0.5 max-h-48 overflow-y-auto">
+            {data.items.map((m) => (
+              <li key={m.id}>
+                <span className="text-muted-foreground">[{new Date(m.evidenceAt).toLocaleString()}]</span>{' '}
+                <span>{m.evidenceType}</span>:<span>{m.evidenceId}</span>{' '}
+                <span className="text-muted-foreground">({m.mappingSource})</span>
+              </li>
+            ))}
+            {data.total > data.items.length && (
+              <li className="italic text-muted-foreground">+{data.total - data.items.length} more</li>
+            )}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

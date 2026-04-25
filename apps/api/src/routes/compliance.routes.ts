@@ -29,6 +29,7 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ComplianceMapperService, ComplianceSchemaUnavailableError } from '../services/compliance/compliance-mapper.service.js';
 import { AttestationService } from '../services/compliance/attestation.service.js';
+import { ManualEvidenceService, ManualEvidenceNotFoundError } from '../services/compliance/manual-evidence.service.js';
 import { ArtifactSchemaUnavailableError } from '../services/artifact.service.js';
 import { BundleSigningUnavailableError } from '../services/bundle-signing.service.js';
 import { ok, err } from '../types.js';
@@ -67,8 +68,19 @@ function sendComplianceError(reply: FastifyReply, e: unknown, fallbackCode: stri
   if (e instanceof BundleSigningUnavailableError) {
     return reply.status(503).send(err('BUNDLE_SIGNING_UNAVAILABLE', e.message));
   }
+  if (e instanceof ManualEvidenceNotFoundError) {
+    return reply.status(404).send(err('NOT_FOUND', e.message));
+  }
   return reply.status(500).send(err(fallbackCode, e instanceof Error ? e.message : 'unknown'));
 }
+
+const createManualEvidenceSchema = z.object({
+  controlId: z.string().min(1),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(10_000),
+  attachedArtifactId: z.string().optional(),
+  evidenceAt: z.string().optional(),
+});
 
 const complianceRoutes: FastifyPluginAsync = async (fastify) => {
   const mapper = new ComplianceMapperService(fastify.db, fastify.log);
@@ -236,6 +248,81 @@ const complianceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send(ok(result));
       } catch (e) {
         return sendComplianceError(reply, e, 'COMPLIANCE_ATTESTATION_LIST_FAILED');
+      }
+    },
+  );
+
+  // ── Manual evidence CRUD ────────────────────────────────────────────
+  const manualEvidence = new ManualEvidenceService(fastify.db, fastify.log);
+
+  fastify.post(
+    '/compliance/manual-evidence',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId, userId } = request.user;
+      const parsed = createManualEvidenceSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
+      }
+      try {
+        const result = await manualEvidence.create({
+          tenantId,
+          controlId: parsed.data.controlId,
+          title: parsed.data.title,
+          description: parsed.data.description,
+          ...(parsed.data.attachedArtifactId ? { attachedArtifactId: parsed.data.attachedArtifactId } : {}),
+          ...(parsed.data.evidenceAt ? { evidenceAt: parsed.data.evidenceAt } : {}),
+          createdBy: userId,
+        });
+        return reply.send(ok(result));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'MANUAL_EVIDENCE_CREATE_FAILED');
+      }
+    },
+  );
+
+  fastify.get(
+    '/compliance/controls/:controlId/manual-evidence',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { controlId } = request.params as { controlId: string };
+      const { tenantId } = request.user;
+      const q = request.query as { limit?: string; offset?: string };
+      try {
+        const result = await manualEvidence.list({
+          tenantId,
+          controlId,
+          ...(q.limit ? { limit: Number(q.limit) } : {}),
+          ...(q.offset ? { offset: Number(q.offset) } : {}),
+        });
+        return reply.send(ok(result));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'MANUAL_EVIDENCE_LIST_FAILED');
+      }
+    },
+  );
+
+  fastify.delete(
+    '/compliance/manual-evidence/:id',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId, userId } = request.user;
+      try {
+        await manualEvidence.delete({ id, tenantId, deletedBy: userId });
+        return reply.send(ok({ deleted: true, id }));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'MANUAL_EVIDENCE_DELETE_FAILED');
       }
     },
   );

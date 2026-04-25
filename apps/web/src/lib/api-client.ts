@@ -792,6 +792,21 @@ export const complianceApi = {
       : '';
     return apiDataFetch<{ items: AttestationListItem[]; total: number }>(`/compliance/attestations${qs}`);
   },
+  // Manual evidence — human-curated rows that supplement the auto-mapper
+  createManualEvidence: (body: { controlId: string; title: string; description: string; attachedArtifactId?: string; evidenceAt?: string }) =>
+    apiDataFetch<{ id: string; mappingId: string }>('/compliance/manual-evidence', { method: 'POST', body }),
+  listManualEvidence: (controlId: string, params?: { limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<{ items: Array<{ id: string; title: string; description: string; attachedArtifactId: string | null; createdBy: string; evidenceAt: string; createdAt: string }>; total: number }>(`/compliance/controls/${controlId}/manual-evidence${qs}`);
+  },
+  deleteManualEvidence: (id: string) =>
+    apiDataFetch<{ deleted: boolean; id: string }>(`/compliance/manual-evidence/${id}`, { method: 'DELETE' }),
 };
 
 export const apiKeyApi = {

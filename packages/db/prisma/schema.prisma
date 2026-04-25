@@ -992,6 +992,38 @@ model ControlEvidenceMapping {
   @@map("control_evidence_mappings")
 }
 
+// Manual evidence — human-curated rows that supplement the auto-mapping
+// engine. Used for organisational policies, signed BAAs, vendor SOC
+// reports, training records, and other artefacts that no audit log
+// can produce.
+//
+// Each ManualEvidence row appears in the control's evidence drill-in
+// alongside auto-mapped rows; both count toward coverage. The auto-
+// mapper never deletes manual evidence — it only adds/upserts auto rows.
+model ManualEvidence {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  controlId           String
+  title               String
+  description         String    @db.Text
+  // Optional FK (soft — no cascade) to a WorkflowArtifact (e.g. an
+  // uploaded PDF policy). When set, the UI can deep-link to download.
+  attachedArtifactId  String?
+  createdBy           String
+  // For period-scoped attestations, the date the evidence is "valid as
+  // of". Defaults to createdAt when not supplied — operators can backdate
+  // to reflect when a policy actually went into effect.
+  evidenceAt          DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  // Soft-delete pattern matches WorkflowArtifact + TenantDocument.
+  deletedAt           DateTime?
+
+  @@index([tenantId, controlId, deletedAt])
+  @@index([tenantId, evidenceAt])
+  @@map("manual_evidence")
+}
+
 model ControlAttestation {
   id              String   @id @default(cuid())
   tenantId        String
