@@ -12,11 +12,32 @@ import { workflowApi } from '@/lib/api-client';
 import { connectSSE } from '@/lib/sse-fetch';
 import { createClient } from '@/lib/supabase';
 import type { RoleId } from '@/lib/role-config';
+import type { WorkflowPlan, WorkflowPlanStep, AgentRole, TaskStatus, RiskLevel } from '@/types';
+import { TaskList } from '@/components/workspace/TaskList';
+import { WorkflowDAG } from '@/components/graph/WorkflowDAG';
 import {
   useConversationStore,
   useActiveConversation,
   useActiveMessages,
 } from '@/store/conversation-store';
+
+/**
+ * Stage 2.4 — Cockpit state. Per-workflow plan + live status updates so
+ * the DetailDrawer can render the existing TaskList + WorkflowDAG
+ * components against real backend data. The plan is built from the
+ * `plan_created` SSE event; status updates come from `worker_started`,
+ * `worker_completed` (success → COMPLETED, !success → FAILED), and
+ * `paused` (→ AWAITING_APPROVAL). Cost mirror lives in the same shape
+ * for the cockpit footer.
+ */
+interface CockpitState {
+  plan: WorkflowPlan | null;
+  status: 'queued' | 'running' | 'paused' | 'completed' | 'failed';
+  costUsd: number;
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
 
 export function ChatWorkspace() {
   const [inputValue, setInputValue] = useState('');
@@ -41,6 +62,11 @@ export function ChatWorkspace() {
   // footer instead of 20 mid-run cost noise bubbles. Keyed by workflowId
   // so concurrent workflows don't mix numbers.
   const costRef = useRef<Map<string, { costUsd: number; calls: number; promptTokens: number; completionTokens: number }>>(new Map());
+  // Stage 2.4: per-workflow cockpit state. Plan + step statuses + cost
+  // are aggregated from SSE events as the workflow runs; the
+  // DetailDrawer reads from cockpitByWorkflow[activeWorkflowId] to
+  // render the live TaskList + WorkflowDAG.
+  const [cockpitByWorkflow, setCockpitByWorkflow] = useState<Record<string, CockpitState>>({});
   const conversation = useActiveConversation();
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
@@ -145,7 +171,7 @@ export function ChatWorkspace() {
           const ev = event as Record<string, unknown>;
           const evType = ev.type as string;
 
-          // Agent started a task — show progress
+          // Agent started a task — show progress + flip cockpit status
           if (evType === 'worker_started' || evType === 'node_enter') {
             addMessage(convId, {
               role: 'assistant',
@@ -153,7 +179,11 @@ export function ChatWorkspace() {
               content: `⏳ ${(ev.agentRole as string) ?? 'Agent'} working on: ${(ev.taskName as string) ?? 'task'}…`,
               executionTrace: { workflowId: workflow.id },
             });
-          // Agent completed a task — show result
+            const role = ev.agentRole as string | undefined;
+            if (role) {
+              updateCockpitTaskStatus(setCockpitByWorkflow, workflow.id, role, 'IN_PROGRESS');
+            }
+          // Agent completed a task — show result + flip cockpit status
           } else if (evType === 'worker_completed' || evType === 'node_exit') {
             const success = ev.success !== false;
             const duration = ev.durationMs ? ` (${((ev.durationMs as number) / 1000).toFixed(1)}s)` : '';
@@ -163,10 +193,16 @@ export function ChatWorkspace() {
               content: `${success ? '✓' : '✗'} ${(ev.agentRole as string) ?? 'Agent'}: ${(ev.taskName as string) ?? 'task'} ${success ? 'completed' : 'failed'}${duration}`,
               executionTrace: { workflowId: workflow.id },
             });
-          // Stage 2.1: planner emitted a structured plan — render as a
-          // compact task-list in chat so the user sees what JAK will do.
+            const role = ev.agentRole as string | undefined;
+            if (role) {
+              updateCockpitTaskStatus(setCockpitByWorkflow, workflow.id, role, success ? 'COMPLETED' : 'FAILED');
+            }
+          // Stage 2.1 + 2.4: planner emitted a structured plan. Render
+          // as a compact task-list bubble in chat AND populate the
+          // cockpit state so the DetailDrawer's TaskList + WorkflowDAG
+          // can show the same plan with live status updates.
           } else if (evType === 'plan_created') {
-            const plan = ev.plan as { goal?: string; tasks?: Array<{ id: string; name?: string; description?: string; agentRole?: string; requiresApproval?: boolean }> } | undefined;
+            const plan = ev.plan as { goal?: string; tasks?: Array<{ id: string; name?: string; description?: string; agentRole?: string; dependsOn?: string[]; status?: string; riskLevel?: string; requiresApproval?: boolean }> } | undefined;
             if (plan?.tasks?.length) {
               const lines = plan.tasks.map((t, i) => {
                 const role = (t.agentRole ?? '').replace(/^WORKER_/, '');
@@ -179,6 +215,33 @@ export function ChatWorkspace() {
                 content: `📋 **Plan**\n\n${lines}`,
                 executionTrace: { workflowId: workflow.id },
               });
+
+              // Populate cockpit state — same data, structured for the
+              // existing TaskList + WorkflowDAG components.
+              const steps: WorkflowPlanStep[] = plan.tasks.map((t, i) => ({
+                id: t.id,
+                stepNumber: i + 1,
+                taskName: t.name ?? t.description ?? `Task ${i + 1}`,
+                description: t.description ?? '',
+                agentRole: (t.agentRole ?? 'WORKER_OPS') as AgentRole,
+                riskLevel: ((t.riskLevel ?? 'LOW').toUpperCase()) as RiskLevel,
+                status: (mapPlanStatus(t.status ?? 'pending')) as TaskStatus,
+                dependsOn: t.dependsOn ?? [],
+              }));
+              const wfPlan: WorkflowPlan = {
+                id: `plan_${workflow.id}`,
+                workflowId: workflow.id,
+                steps,
+                createdAt: new Date().toISOString(),
+              };
+              setCockpitByWorkflow((prev) => ({
+                ...prev,
+                [workflow.id]: {
+                  ...(prev[workflow.id] ?? { plan: null, status: 'running', costUsd: 0, calls: 0, promptTokens: 0, completionTokens: 0 }),
+                  plan: wfPlan,
+                  status: 'running',
+                },
+              }));
             }
           // Stage 2.2: tool call starting — compact live status row
           } else if (evType === 'tool_called') {
@@ -227,6 +290,20 @@ export function ChatWorkspace() {
             cur.promptTokens += (ev.promptTokens as number) ?? 0;
             cur.completionTokens += (ev.completionTokens as number) ?? 0;
             costRef.current.set(wfid, cur);
+            // Mirror into cockpit state for live display in DetailDrawer.
+            setCockpitByWorkflow((prev) => {
+              const existing = prev[wfid] ?? { plan: null, status: 'running' as const, costUsd: 0, calls: 0, promptTokens: 0, completionTokens: 0 };
+              return {
+                ...prev,
+                [wfid]: {
+                  ...existing,
+                  costUsd: cur.costUsd,
+                  calls: cur.calls,
+                  promptTokens: cur.promptTokens,
+                  completionTokens: cur.completionTokens,
+                },
+              };
+            });
           // Workflow completed — fetch and display final output.
           // QA H2 defence-in-depth: if the server's recovery layer missed
           // and `finalOutput` still matches the internal stub string, we
@@ -262,6 +339,13 @@ export function ChatWorkspace() {
               // Free the per-workflow cost slot so a second workflow on
               // the same page starts fresh.
               costRef.current.delete(workflow.id);
+              // Cockpit: mark workflow completed (keep state so DetailDrawer
+              // can still show the final plan + cost after run ends).
+              setCockpitByWorkflow((prev) =>
+                prev[workflow.id]
+                  ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'completed' } }
+                  : prev,
+              );
             });
             // QA fix: stuck-workflow banner persisted after the terminal
             // event because isSending only cleared on SSE onError. Clear
@@ -277,6 +361,11 @@ export function ChatWorkspace() {
           } else if (evType === 'failed') {
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
             const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
+            setCockpitByWorkflow((prev) =>
+              prev[workflow.id]
+                ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'failed' } }
+                : prev,
+            );
             void workflowApi.get(workflow.id).then((w) => {
               const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
               if (raw.trim().length > 0 && !STUB_RE.test(raw)) {
@@ -318,6 +407,11 @@ export function ChatWorkspace() {
                 `[Review and approve in the Approvals inbox →](/workspace?tab=approvals&workflow=${workflow.id})`,
               executionTrace: { workflowId: workflow.id },
             });
+            setCockpitByWorkflow((prev) =>
+              prev[workflow.id]
+                ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'paused' } }
+                : prev,
+            );
           }
         },
         onError: () => {
@@ -459,11 +553,14 @@ export function ChatWorkspace() {
         {drawerOpen && !isMobile && (
           <aside
             className={cn(
-              'w-[400px] shrink-0 border-l border-border bg-card overflow-y-auto',
+              'w-[480px] shrink-0 border-l border-border bg-card overflow-y-auto',
               'animate-fade-up',
             )}
           >
-            <DetailDrawer onClose={() => setDrawerOpen(false)} />
+            <DetailDrawer
+              onClose={() => setDrawerOpen(false)}
+              cockpitByWorkflow={cockpitByWorkflow}
+            />
           </aside>
         )}
 
@@ -474,8 +571,11 @@ export function ChatWorkspace() {
               onClick={() => setDrawerOpen(false)}
               aria-hidden
             />
-            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] rounded-t-2xl border-t border-border bg-card overflow-y-auto animate-fade-up">
-              <DetailDrawer onClose={() => setDrawerOpen(false)} />
+            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] rounded-t-2xl border-t border-border bg-card overflow-y-auto animate-fade-up">
+              <DetailDrawer
+                onClose={() => setDrawerOpen(false)}
+                cockpitByWorkflow={cockpitByWorkflow}
+              />
             </div>
           </>
         )}
@@ -484,17 +584,30 @@ export function ChatWorkspace() {
   );
 }
 
-// ─── Detail Drawer ───────────────────────────────────────────────────────────
+// ─── Detail Drawer (Stage 2.4 cockpit) ──────────────────────────────────────
+// The cockpit panel mounts the existing TaskList + WorkflowDAG components
+// (already shipped in WorkspaceDashboard, here finally surfaced in chat)
+// against per-workflow state aggregated from the SSE stream. Plan steps
+// flip in real time as worker_started / worker_completed fire; cost is
+// live; status badge follows the workflow state machine.
 
-function DetailDrawer({ onClose }: { onClose: () => void }) {
+function DetailDrawer({
+  onClose,
+  cockpitByWorkflow,
+}: {
+  onClose: () => void;
+  cockpitByWorkflow: Record<string, CockpitState>;
+}) {
   const messages = useActiveMessages();
   // Find the most recent workflow ID from messages
   const workflowId = [...messages].reverse().find(m => m.executionTrace?.workflowId)?.executionTrace?.workflowId;
+  const cockpit = workflowId ? cockpitByWorkflow[workflowId] : undefined;
+  const [showGraph, setShowGraph] = useState(false);
 
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Execution Details</h3>
+        <h3 className="text-sm font-semibold text-foreground">Agent Run Cockpit</h3>
         <button
           onClick={onClose}
           className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors md:hidden"
@@ -503,32 +616,164 @@ function DetailDrawer({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </button>
       </div>
-      {workflowId ? (
-        <div className="space-y-2">
-          <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-xs">
-            <span className="text-muted-foreground">Workflow:</span>{' '}
-            <code className="text-foreground">{workflowId.slice(0, 12)}...</code>
-          </div>
-          <a
-            href="/swarm"
-            className="block rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-primary hover:bg-muted transition-colors"
-          >
-            View in Runs Inspector →
-          </a>
-          <a
-            href={`/traces?workflowId=${workflowId}`}
-            className="block rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-primary hover:bg-muted transition-colors"
-          >
-            View Agent Traces →
-          </a>
-        </div>
-      ) : (
+      {!workflowId ? (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Send a message to start a workflow. Execution details will appear here.
+          Send a message to start a workflow. The plan, agents, tool calls and cost will appear here in real time.
         </p>
+      ) : (
+        <div className="space-y-3">
+          {/* Status + workflow ID + links */}
+          <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <code className="text-[10px] text-muted-foreground">{workflowId.slice(0, 18)}...</code>
+              <CockpitStatusBadge status={cockpit?.status ?? 'queued'} />
+            </div>
+            {cockpit && cockpit.calls > 0 && (
+              <div className="text-[10px] text-muted-foreground tabular-nums">
+                {formatCockpitCost(cockpit)}
+              </div>
+            )}
+          </div>
+
+          {/* Live task list — only renders once plan_created has fired */}
+          {cockpit?.plan?.steps?.length ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+                  Plan ({cockpit.plan.steps.length} step{cockpit.plan.steps.length === 1 ? '' : 's'})
+                </span>
+                <button
+                  onClick={() => setShowGraph((g) => !g)}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  {showGraph ? 'Hide DAG' : 'Show DAG'}
+                </button>
+              </div>
+              <TaskList
+                tasks={cockpit.plan.steps}
+                workflowId={workflowId}
+                showCompleted={cockpit.status === 'completed'}
+              />
+              {showGraph && (
+                <div className="h-[280px] rounded-lg border border-border overflow-hidden">
+                  <WorkflowDAG plan={cockpit.plan} workflowStatus={cockpit.status} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground italic">
+              Waiting for the planner to publish a plan…
+            </p>
+          )}
+
+          {/* Inspector + traces links */}
+          <div className="space-y-1.5 pt-1">
+            <a
+              href={`/swarm?workflowId=${workflowId}`}
+              className="block rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] text-primary hover:bg-muted transition-colors"
+            >
+              Open in Runs Inspector →
+            </a>
+            <a
+              href={`/traces?workflowId=${workflowId}`}
+              className="block rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] text-primary hover:bg-muted transition-colors"
+            >
+              View full agent traces →
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );
+}
+
+// ─── Cockpit helpers ────────────────────────────────────────────────────────
+
+/** Map the planner's task-status string (lowercase) to UI TaskStatus. */
+function mapPlanStatus(s: string): TaskStatus {
+  const u = s.toUpperCase();
+  if (u === 'IN_PROGRESS' || u === 'COMPLETED' || u === 'FAILED' || u === 'AWAITING_APPROVAL' || u === 'SKIPPED' || u === 'PENDING') {
+    return u as TaskStatus;
+  }
+  return 'PENDING';
+}
+
+/** Update the first task matching `agentRole` to a new status. Tasks are
+ *  named with WORKER_* role keys; we match by suffix-insensitive substring
+ *  to handle "PLANNER" / "WORKER_RESEARCH" / "Research" variants the
+ *  swarm graph uses across nodes. */
+function updateCockpitTaskStatus(
+  setCockpit: React.Dispatch<React.SetStateAction<Record<string, CockpitState>>>,
+  workflowId: string,
+  agentRole: string,
+  newStatus: TaskStatus,
+): void {
+  setCockpit((prev) => {
+    const cur = prev[workflowId];
+    if (!cur?.plan?.steps?.length) return prev;
+    const upper = agentRole.toUpperCase();
+    let touched = false;
+    const steps = cur.plan.steps.map((s) => {
+      if (touched) return s;
+      const sRole = s.agentRole.toUpperCase();
+      // Match exact OR strip WORKER_ prefix and substring match either way
+      if (
+        sRole === upper ||
+        sRole === `WORKER_${upper}` ||
+        upper === `WORKER_${sRole.replace(/^WORKER_/, '')}` ||
+        sRole.endsWith(upper) ||
+        upper.endsWith(sRole.replace(/^WORKER_/, ''))
+      ) {
+        touched = true;
+        return { ...s, status: newStatus };
+      }
+      return s;
+    });
+    if (!touched) return prev;
+    return {
+      ...prev,
+      [workflowId]: {
+        ...cur,
+        plan: { ...cur.plan, steps },
+      },
+    };
+  });
+}
+
+/** Compact status badge for the cockpit header. */
+function CockpitStatusBadge({ status }: { status: CockpitState['status'] }) {
+  const config = {
+    queued: { label: 'Queued', cls: 'bg-muted text-muted-foreground' },
+    running: { label: 'Running', cls: 'bg-blue-500/10 text-blue-600' },
+    paused: { label: 'Awaiting approval', cls: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+    completed: { label: 'Completed', cls: 'bg-emerald-500/10 text-emerald-600' },
+    failed: { label: 'Failed', cls: 'bg-destructive/10 text-destructive' },
+  }[status];
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${config.cls}`}>
+      {config.label}
+    </span>
+  );
+}
+
+/** Cockpit cost line. Reuses the chat footer formatting logic. */
+function formatCockpitCost(cockpit: CockpitState): string {
+  const totalTokens = cockpit.promptTokens + cockpit.completionTokens;
+  const tokenLabel =
+    totalTokens >= 1_000_000
+      ? `${(totalTokens / 1_000_000).toFixed(1)}M tokens`
+      : totalTokens >= 1_000
+        ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
+        : `${totalTokens} tokens`;
+  const callsLabel = `${cockpit.calls} call${cockpit.calls === 1 ? '' : 's'}`;
+  if (cockpit.costUsd > 0) {
+    const costLabel =
+      cockpit.costUsd >= 0.01
+        ? `$${cockpit.costUsd.toFixed(4)}`
+        : `$${cockpit.costUsd.toFixed(6)}`;
+    return `${costLabel} · ${callsLabel} · ${tokenLabel}`;
+  }
+  return `${callsLabel} · ${tokenLabel}`;
 }
 
 // Stage 2.6 helper — format an honest per-workflow cost footer.
