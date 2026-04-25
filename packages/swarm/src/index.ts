@@ -41,6 +41,7 @@ export {
   isTerminalStatus,
   assertTransition,
   transition as transitionStatus,
+  IllegalTransitionError,
   TERMINAL,
 } from './state/run-lifecycle.js';
 export type { MinimalLogger } from './state/run-lifecycle.js';

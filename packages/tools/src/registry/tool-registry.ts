@@ -3,10 +3,43 @@ import type {
   ToolMetadata,
   ToolExecutionContext,
   ToolResult,
+  ToolOutcome,
   ToolCategory,
   ToolRiskClass,
   ToolMaturity,
 } from '@jak-swarm/shared';
+
+/**
+ * Honest outcome inference for a tool that returned (didn't throw).
+ *
+ *   1. If the tool itself stamped an `outcome` on its return value, trust it.
+ *   2. Otherwise look at the tool's maturity:
+ *      - 'real' / 'config_dependent' → real_success
+ *      - mock / draft / heuristic / llm_passthrough → mapped accordingly
+ *   3. Specific shapes override: outputs with `{ posted: false, draftCreated: true }`
+ *      are draft_created regardless of maturity (the social adapters use this shape).
+ */
+function inferOutcome(maturity: ToolMaturity | undefined, output: unknown): ToolOutcome {
+  if (output && typeof output === 'object') {
+    const o = output as Record<string, unknown>;
+    if (typeof o['outcome'] === 'string') return o['outcome'] as ToolOutcome;
+    if (o['draftCreated'] === true && o['posted'] !== true) return 'draft_created';
+    if (o['_mock'] === true || o['_notice'] !== undefined) return 'mock_provider';
+  }
+  switch (maturity) {
+    case 'experimental':
+    case 'unclassified':
+    case 'llm_passthrough':
+    case 'heuristic':
+      return 'real_success'; // these are local logic, not external mocks
+    case 'test_only':
+      return 'mock_provider';
+    case 'real':
+    case 'config_dependent':
+    default:
+      return 'real_success';
+  }
+}
 
 export type ToolExecutor<TInput = unknown, TOutput = unknown> = (
   input: TInput,
@@ -216,6 +249,7 @@ export class ToolRegistry {
     if (!registered) {
       return {
         success: false,
+        outcome: 'failed',
         error: `Tool '${name}' not found in registry`,
         durationMs: Date.now() - startedAt,
       };
@@ -226,6 +260,7 @@ export class ToolRegistry {
       if (!parsed.success) {
         return {
           success: false,
+          outcome: 'failed',
           error: `Input validation failed for tool '${name}': ${formatZodError(parsed.error)}`,
           durationMs: Date.now() - startedAt,
         };
@@ -246,6 +281,7 @@ export class ToolRegistry {
           if (strict) {
             return {
               success: false,
+              outcome: 'failed',
               error: warning,
               durationMs,
             };
@@ -253,6 +289,7 @@ export class ToolRegistry {
           const result: ToolResult<TOutput> = {
             success: true,
             data: output as TOutput,
+            outcome: inferOutcome(registered.metadata.maturity, output),
             durationMs,
           };
           (result as ToolResult<TOutput> & { outputSchemaWarning?: string }).outputSchemaWarning =
@@ -264,14 +301,26 @@ export class ToolRegistry {
       return {
         success: true,
         data: output as TOutput,
+        outcome: inferOutcome(registered.metadata.maturity, output),
         durationMs,
       };
     } catch (err) {
       const durationMs = Date.now() - startedAt;
       const errorMessage = err instanceof Error ? err.message : String(err);
 
+      // Honest classification of "throwing" errors. The mock adapters now
+      // throw with a `not connected` message — surface that as the
+      // not_configured outcome so the cockpit shows a config CTA, not a
+      // generic red 'failed'.
+      const lower = errorMessage.toLowerCase();
+      const outcome: 'not_configured' | 'failed' =
+        /not connected|integration.*not configured|connect (gmail|caldav|crm|.*) in settings/i.test(lower)
+          ? 'not_configured'
+          : 'failed';
+
       return {
         success: false,
+        outcome,
         error: errorMessage,
         durationMs,
       };

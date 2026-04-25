@@ -94,9 +94,57 @@ export interface ToolExecutionContext {
   subscriptionTier?: SubscriptionTier;
 }
 
+/**
+ * Honest classification of WHAT happened when a tool ran. Independent
+ * of the boolean `success` (which a fake-success mock could lie about).
+ *
+ * - real_success:           an actual external side-effect occurred (email sent,
+ *                           CRM record updated, file written, API call returned)
+ * - draft_created:          a draft / preview was produced, no external commit
+ *                           (e.g. social post saved as draft, email composed but
+ *                           not sent)
+ * - mock_provider:          synthetic data from a mock adapter — useful for
+ *                           local dev, MUST NOT be displayed as real success
+ * - not_configured:         tool would run but missing credentials / config
+ *                           (the operator hasn't connected the integration)
+ * - blocked_requires_config:tool was registered but tenant policy or industry
+ *                           pack blocks it without additional configuration
+ * - failed:                 tool ran and a real error occurred (network, 4xx,
+ *                           parsing failure)
+ *
+ * The cockpit + audit log read this field to render an honest badge instead
+ * of guessing from substrings in the response payload.
+ */
+export type ToolOutcome =
+  | 'real_success'
+  | 'draft_created'
+  | 'mock_provider'
+  | 'not_configured'
+  | 'blocked_requires_config'
+  | 'failed';
+
 export interface ToolResult<T = unknown> {
+  /**
+   * Coarse boolean for "did the call complete without throwing?". Kept
+   * for backwards compatibility with all existing call sites — but the
+   * honest classification is `outcome` below.
+   */
   success: boolean;
+  /**
+   * Honest outcome classification. Optional only because old call sites
+   * may not yet populate it; new code should always set it. The cockpit
+   * defaults to `'real_success'` when success=true and outcome is absent
+   * (legacy compatibility), but emits a console warning so we can grep
+   * for unlabelled call sites and fix them.
+   */
+  outcome?: ToolOutcome;
   data?: T;
   error?: string;
   durationMs: number;
+  /**
+   * Optional human-readable note shown next to the outcome badge in the
+   * cockpit. Use for "draft saved to /drafts/abc" or "Gmail credentials
+   * not connected — connect via /integrations".
+   */
+  outcomeMessage?: string;
 }

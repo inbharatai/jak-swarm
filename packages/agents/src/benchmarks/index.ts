@@ -35,3 +35,12 @@ export type {
   BenchmarkReport,
 } from './harness.js';
 export { PERSONA_CORE_SCENARIOS } from './scenarios/persona-core.js';
+export {
+  HARDENING_PASS_SCENARIOS,
+  partitionByMode,
+} from './scenarios/hardening-pass.js';
+export type {
+  HardeningScenario,
+  ScenarioRunMode,
+} from './scenarios/hardening-pass.js';
+export { renderMarkdownReport } from './report.js';

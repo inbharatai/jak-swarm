@@ -305,11 +305,20 @@ async function buildApp() {
       // default" from "legacy explicitly chosen".
       executionEngine: engineEnvRaw || '(unset — defaults to openai-first when OPENAI_API_KEY is set)',
       workflowRuntime: config.workflowRuntime,
+      // Hardening pass — surface the workflow runtime's honesty status.
+      // 'langgraph' currently returns 'present-but-not-active' because it
+      // delegates real execution to SwarmGraph under the hood. Operators
+      // should NOT attribute observed behavior to LangGraph until this
+      // status is 'active'.
+      workflowRuntimeStatus: config.workflowRuntime === 'langgraph'
+        ? 'present-but-not-active (delegates to swarmgraph; full LangGraph node migration not shipped)'
+        : 'active',
       openaiRuntimeAgents: runtimeAgentsRaw ? runtimeAgentsRaw.split(',').map((s) => s.trim()).filter(Boolean) : [],
       // Effective runtime — what agents ACTUALLY use RIGHT NOW. This is
       // the value to check when verifying "is OpenAI-first live?".
       effectiveExecutionEngine: effectiveEngine,
       openaiApiKeySet: hasOpenAIKey,
+      strictWorkflowState: (process.env['JAK_STRICT_WORKFLOW_STATE'] ?? '').toLowerCase() === 'true',
     });
   });
 

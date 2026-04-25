@@ -260,15 +260,30 @@ export function ChatWorkspace() {
             const success = ev.success !== false;
             const duration = ev.durationMs ? ` (${((ev.durationMs as number) / 1000).toFixed(1)}s)` : '';
             const err = ev.error as string | undefined;
-            const icon = success ? '✓' : '✗';
-            // Surface the outputSummary when it contains honest flags
-            // (_mock, _notice, _warning) or an error — so the user sees
-            // "draft only" / "mock data" / "email NOT sent" instead of
-            // a generic "completed".
-            const output = (ev.outputSummary as string) ?? '';
-            const honesty =
-              /_mock|_notice|_warning|NOT sent|NOT created|NOT updated|draft only|not connected/i.exec(output);
-            const honestyTag = honesty ? ` — ⚠ ${honesty[0].replace(/^_/, '')}` : '';
+            // Hardening pass: read the honest outcome from the tool registry
+            // instead of guessing from substrings. real_success → ✓, draft →
+            // ✎, mock → ⓘ mock, not_configured → ⚙ not connected, blocked → ⛔,
+            // failed → ✗. Falls back to the legacy substring detection only
+            // when the outcome field is absent (older event emitters).
+            const outcome = (ev.outcome as string | undefined) ?? null;
+            let icon = success ? '✓' : '✗';
+            let honestyTag = '';
+            if (outcome) {
+              switch (outcome) {
+                case 'real_success': icon = '✓'; break;
+                case 'draft_created': icon = '✎'; honestyTag = ' — draft (not sent)'; break;
+                case 'mock_provider': icon = 'ⓘ'; honestyTag = ' — mock data'; break;
+                case 'not_configured': icon = '⚙'; honestyTag = ' — not connected'; break;
+                case 'blocked_requires_config': icon = '⛔'; honestyTag = ' — blocked (requires config)'; break;
+                case 'failed': icon = '✗'; break;
+              }
+            } else {
+              // Legacy fallback: substring heuristic on outputSummary
+              const output = (ev.outputSummary as string) ?? '';
+              const honesty =
+                /_mock|_notice|_warning|NOT sent|NOT created|NOT updated|draft only|not connected/i.exec(output);
+              honestyTag = honesty ? ` — ⚠ ${honesty[0].replace(/^_/, '')}` : '';
+            }
             addMessage(convId, {
               role: 'assistant',
               agentRole: (ev.agentRole as RoleId) ?? null,

@@ -14,7 +14,7 @@ import {
   WorkflowStateError,
   ForbiddenError,
 } from '../errors.js';
-import { assertTransition } from '@jak-swarm/swarm';
+import { assertTransition, IllegalTransitionError } from '@jak-swarm/swarm';
 import { WorkflowStatus as SharedWorkflowStatus } from '@jak-swarm/shared';
 
 const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
@@ -222,11 +222,25 @@ export class WorkflowService {
         );
       }
     } catch (lifecycleErr) {
-      // Lifecycle assertion must NEVER prevent a status write — we'd risk
-      // leaving workflows orphaned on the slightest enum drift.
+      // Strict mode (JAK_STRICT_WORKFLOW_STATE=true) — assertTransition
+      // threw an IllegalTransitionError. We intentionally re-throw so the
+      // caller (queue worker, HTTP handler) sees the failure instead of
+      // silently advancing a workflow into an inconsistent state. The
+      // operator opted into strict explicitly; surfacing the error is
+      // the whole point.
+      if (lifecycleErr instanceof IllegalTransitionError) {
+        this.log.error(
+          { workflowId, from: lifecycleErr.from, to: lifecycleErr.to },
+          '[run-lifecycle] STRICT: refusing illegal status write',
+        );
+        throw lifecycleErr;
+      }
+      // Default mode — if the assertion threw for any other reason
+      // (logger error, enum drift), log + proceed. The lifecycle check
+      // must never silently brick a status update in default mode.
       this.log.warn(
         { workflowId, err: lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr) },
-        '[run-lifecycle] assertion threw unexpectedly — proceeding with status write',
+        '[run-lifecycle] assertion threw unexpectedly — proceeding with status write (default mode)',
       );
     }
 

@@ -49,7 +49,26 @@ const RuntimeState = Annotation.Root({
 type RuntimeStateT = typeof RuntimeState.State;
 
 export class LangGraphRuntime implements WorkflowRuntime {
-  readonly name = 'langgraph';
+  // Honest naming — this runtime is NOT a native LangGraph orchestrator
+  // today; it's a thin wrapper that delegates real execution to the
+  // SwarmGraphRuntime and runs an empty proof-of-life StateGraph
+  // alongside. Diagnostics + UI surface 'langgraph-shim' so operators
+  // and customers know not to attribute observed behavior to LangGraph
+  // until the full node migration lands.
+  readonly name = 'langgraph-shim';
+  /**
+   * True when LangGraph is genuinely orchestrating nodes. Today: false.
+   * Flip to true only when commander/planner/router/worker/verifier are
+   * each native LangGraph nodes wired to the same agents.
+   */
+  readonly isFullyImplemented = false;
+  /** Why diagnostics show this runtime as 'shim'. */
+  readonly status = 'present-but-not-active' as const;
+  readonly statusReason =
+    'LangGraph adapter compiles and executes a proof-of-life StateGraph, ' +
+    'but the actual workflow nodes (commander/planner/worker/verifier) still ' +
+    'run via the SwarmGraph engine under the hood. Full LangGraph orchestration ' +
+    'is a future-phase rewrite.';
   private readonly inner: SwarmGraphRuntime;
   private readonly graph: ReturnType<typeof this.buildGraph>;
 

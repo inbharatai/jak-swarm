@@ -625,6 +625,9 @@ ${lines.join('\n')}
         const toolName = tc.function.name;
         let resultStr: string;
         let toolError: string | undefined;
+        // Hardening pass: capture the registry's honest outcome so the
+        // tool_completed event carries it through to the cockpit.
+        let toolOutcome: import('@jak-swarm/shared').ToolOutcome | undefined;
 
         // Stage 2.2: emit tool_called BEFORE execution so the client
         // cockpit renders a live "running" row. inputSummary is capped
@@ -648,6 +651,11 @@ ${lines.join('\n')}
           } else if (tenantToolRegistry.has(toolName)) {
             // Execute through tenant-scoped registry with provider/category/browser gates
             const result = await tenantToolRegistry.execute(toolName, parsedArgs, toolExecContext);
+            // Capture the honest tool outcome — registry sets it via inferOutcome.
+            // Used below to stamp the tool_completed SSE event so the cockpit
+            // can render a real/draft/mock/not_configured badge instead of
+            // guessing from substring matches.
+            toolOutcome = result.outcome;
             if (result.success) {
               const data = result.data as Record<string, unknown> | string | undefined;
               // Detect mock/demo data — inform the agent honestly
@@ -708,6 +716,12 @@ ${lines.join('\n')}
           agentRole: this.role,
           toolName,
           success: !toolError,
+          // Honest outcome from the tool registry — 'real_success',
+          // 'draft_created', 'mock_provider', 'not_configured', etc.
+          // The cockpit reads this directly instead of guessing from
+          // substrings in outputSummary. Falls back to 'failed' when
+          // the tool errored without classification.
+          outcome: toolOutcome ?? (toolError ? 'failed' : 'real_success'),
           durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
           outputSummary: resultStr.slice(0, 500),
           ...(toolError ? { error: toolError } : {}),

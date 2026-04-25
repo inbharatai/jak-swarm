@@ -111,9 +111,16 @@ export function isLegalTransition(from: WorkflowStatus, to: WorkflowStatus): boo
 }
 
 /**
- * Phase 5 behavior: log-only on illegal transitions. Production telemetry
- * surfaces any code path that's mutating status outside the legal graph.
- * Phase 6 will switch this to throw once telemetry confirms clean prod.
+ * Default behavior: log-only on illegal transitions. Production telemetry
+ * surfaces any code path that's mutating status outside the legal graph
+ * without breaking in-flight workflows.
+ *
+ * Strict mode (JAK_STRICT_WORKFLOW_STATE=true): throws IllegalTransitionError
+ * on any illegal transition. Operators who have already validated their
+ * deployment with a clean log-only baseline can opt into strict to fail
+ * loud the moment a regression slips in. Strict mode is OFF by default
+ * because it would break any old workflow whose persisted DB status
+ * doesn't appear in the canonical enum.
  *
  * `logger` is intentionally a minimal interface so any pino / fastify /
  * console-shaped logger satisfies it.
@@ -123,37 +130,82 @@ export interface MinimalLogger {
   info: (info: Record<string, unknown>, msg: string) => void;
 }
 
+export class IllegalTransitionError extends Error {
+  readonly from: WorkflowStatus;
+  readonly to: WorkflowStatus;
+  readonly workflowId: string;
+  readonly legalNext: WorkflowStatus[];
+
+  constructor(opts: {
+    from: WorkflowStatus;
+    to: WorkflowStatus;
+    workflowId: string;
+    legalNext: WorkflowStatus[];
+    reason?: string;
+  }) {
+    super(
+      `[run-lifecycle] illegal transition for workflow ${opts.workflowId}: ${opts.from} → ${opts.to}` +
+      ` (legal next from ${opts.from}: ${opts.legalNext.join(', ') || '(terminal)'})` +
+      (opts.reason ? `. reason: ${opts.reason}` : ''),
+    );
+    this.name = 'IllegalTransitionError';
+    this.from = opts.from;
+    this.to = opts.to;
+    this.workflowId = opts.workflowId;
+    this.legalNext = opts.legalNext;
+  }
+}
+
+/**
+ * Read the strict-mode flag at call time (not module-load time) so test
+ * code and runtime ops can flip it without restarting the process.
+ */
+function isStrictMode(): boolean {
+  return (process.env['JAK_STRICT_WORKFLOW_STATE'] ?? '').toLowerCase() === 'true';
+}
+
 export function assertTransition(
   from: WorkflowStatus,
   to: WorkflowStatus,
   context: { workflowId: string; logger?: MinimalLogger; reason?: string },
 ): void {
   if (isLegalTransition(from, to)) return;
-  const log = context.logger;
+  const legalNext = Array.from(TRANSITIONS[from] ?? []);
   const info = {
     workflowId: context.workflowId,
     from,
     to,
     reason: context.reason ?? '(unspecified)',
-    legalNext: Array.from(TRANSITIONS[from] ?? []),
+    legalNext,
+    strict: isStrictMode(),
   };
-  // Phase 5: log-only. Phase 6 changes this to throw.
-  if (log) log.warn(info, '[run-lifecycle] illegal transition (Phase 5: log-only)');
+  const log = context.logger;
+  if (log) log.warn(info, '[run-lifecycle] illegal transition');
   else if (typeof console !== 'undefined') {
-    // Fallback for code paths without a logger handle
     // eslint-disable-next-line no-console
     console.warn('[run-lifecycle] illegal transition', info);
+  }
+  if (isStrictMode()) {
+    throw new IllegalTransitionError({
+      from,
+      to,
+      workflowId: context.workflowId,
+      legalNext,
+      reason: context.reason,
+    });
   }
 }
 
 /**
  * Convenience helper — call this every time code mutates workflow.status.
- * Returns the new status so it can be inlined into a Prisma update payload:
+ * Returns the new status so it can be inlined into a Prisma update payload.
  *
- *   data: { status: lifecycle.transition(currentStatus, 'EXECUTING', ctx) }
+ *   data: { status: transition(currentStatus, 'EXECUTING', ctx) }
  *
- * Phase 5 returns `to` even on illegal transitions (caller's intent wins).
- * Phase 6 will throw on illegal transitions and never return.
+ * Default mode: returns `to` even on illegal transitions (caller's intent
+ * wins; assertTransition logs the warning). Strict mode: assertTransition
+ * throws IllegalTransitionError before this function returns, which the
+ * caller can catch + handle.
  */
 export function transition(
   from: WorkflowStatus,

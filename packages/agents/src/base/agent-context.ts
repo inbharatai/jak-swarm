@@ -1,4 +1,4 @@
-import type { AgentTrace, SubscriptionTier } from '@jak-swarm/shared';
+import type { AgentTrace, SubscriptionTier, ToolOutcome } from '@jak-swarm/shared';
 import { generateId, generateTraceId } from '@jak-swarm/shared';
 import type { ToolCategory } from '@jak-swarm/shared';
 
@@ -23,6 +23,14 @@ export type AgentActivityEvent =
       agentRole: string;
       toolName: string;
       success: boolean;
+      /**
+       * Honest outcome from the tool registry — `real_success` / `draft_created`
+       * / `mock_provider` / `not_configured` / `blocked_requires_config` /
+       * `failed`. The cockpit reads this directly to render the status badge
+       * instead of guessing from substrings in outputSummary. Optional only
+       * for backwards compatibility with old emit sites; new code always sets it.
+       */
+      outcome?: ToolOutcome;
       durationMs: number;
       /** Truncated output summary; `_notice` / `_warning` / mock flags surfaced honestly. */
       outputSummary: string;

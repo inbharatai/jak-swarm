@@ -830,6 +830,21 @@ export class SwarmExecutionService extends EventEmitter {
           resourceId: workflowId,
           details: { error: errorMessage, durationMs: result.durationMs },
         });
+      } else if (dbStatus === 'PAUSED') {
+        // Hardening pass: previously the SSE stream went silent when the
+        // approval-node halted the workflow — the cockpit never saw a
+        // 'paused' event, so the user believed the run was stuck. Emit
+        // the same shape the manual /pause route emits so ChatWorkspace
+        // flips the cockpit status badge to AWAITING_APPROVAL and
+        // surfaces the approval link.
+        const pendingIds = (result.pendingApprovals as SharedApprovalRequest[] | undefined)?.map(a => a.id) ?? [];
+        this.emit(`workflow:${workflowId}`, {
+          type: 'paused',
+          workflowId,
+          reason: 'awaiting_approval',
+          pendingApprovalIds: pendingIds,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Publish completion to supervisor bus
