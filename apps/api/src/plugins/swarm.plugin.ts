@@ -10,6 +10,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { Redis } from 'ioredis';
 import { SwarmExecutionService } from '../services/swarm-execution.service.js';
 import { SchedulerService } from '../services/scheduler.service.js';
+import { AttestationScheduler } from '../services/compliance/attestation-scheduler.service.js';
 import { WorkflowService } from '../services/workflow.service.js';
 import {
   RedisSchedulerLeader,
@@ -238,6 +239,16 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     { isLeader: () => leader.isLeader() },
   );
   scheduler.start();
+
+  // Audit & Compliance v1.3: recurring attestation generation. Polls
+  // ScheduledAttestation rows once a minute on the same leader-election
+  // pattern. Tolerates the migration not being deployed (silently skips).
+  const attestationScheduler = new AttestationScheduler(
+    fastify.db,
+    fastify.log,
+    { isLeader: () => leader.isLeader() },
+  );
+  attestationScheduler.start();
 
   // Auto-reconnect previously connected MCP integrations (tenant-scoped)
   const db = fastify.db;

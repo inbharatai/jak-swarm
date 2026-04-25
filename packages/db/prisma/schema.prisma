@@ -1024,6 +1024,61 @@ model ManualEvidence {
   @@map("manual_evidence")
 }
 
+// ScheduledAttestation — cron-driven recurring attestation generation.
+//
+// Each row represents a single recurring schedule for a (tenant, framework)
+// pair. The AttestationScheduler service polls these rows every minute
+// and fires generation when `nextRunAt` has passed; afterwards it
+// computes the next occurrence from the cron expression and updates
+// the row.
+//
+// Period semantics: each fire produces an attestation covering the
+// `windowDays` days immediately preceding the firing time. So a
+// weekly schedule with windowDays=7 always covers the previous week.
+//
+// Honest gating: schedules require operator opt-in (active=true) AND
+// EVIDENCE_SIGNING_SECRET if signBundles=true. The scheduler skips
+// schedules whose dependencies aren't satisfied (logs + leaves
+// nextRunAt unchanged so a future tick retries).
+model ScheduledAttestation {
+  id              String    @id @default(cuid())
+  tenantId        String
+  frameworkId     String
+  // Standard 5-field cron expression in UTC (e.g. "0 0 * * 1" = every
+  // Monday midnight UTC). Validated at write time via cron-parser.
+  cronExpression  String
+  // How many days back from the firing time the attestation covers.
+  windowDays      Int       @default(7)
+  // When true, attempts to also create a signed evidence bundle alongside.
+  // Requires EVIDENCE_SIGNING_SECRET; failure to sign leaves the PDF
+  // attestation but logs a warning.
+  signBundles     Boolean   @default(false)
+  // Optional metadata stamped on every generated attestation
+  // (e.g. control framework variant, customer name).
+  metadata        Json?
+  // Operator opt-in — defaults to false; flipping to true starts firings
+  // on the next scheduler tick.
+  active          Boolean   @default(false)
+  // Computed by the scheduler from cronExpression at create + after
+  // every fire. NULL means "schedule paused" — never fired again until
+  // active flips back on.
+  nextRunAt       DateTime?
+  // Timestamp of the most recent successful fire (for the UI history table).
+  lastRunAt       DateTime?
+  // Last fire's outcome — "success" or "failed:<reason>" for the UI.
+  lastRunStatus   String?
+  // ID of the most recent attestation row produced by this schedule
+  // (lets the UI deep-link to the latest output).
+  lastAttestationId String?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([active, nextRunAt])
+  @@index([tenantId, frameworkId])
+  @@map("scheduled_attestations")
+}
+
 model ControlAttestation {
   id              String   @id @default(cuid())
   tenantId        String

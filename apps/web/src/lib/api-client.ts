@@ -807,7 +807,34 @@ export const complianceApi = {
   },
   deleteManualEvidence: (id: string) =>
     apiDataFetch<{ deleted: boolean; id: string }>(`/compliance/manual-evidence/${id}`, { method: 'DELETE' }),
+  // Scheduled attestations — recurring auto-generation
+  listSchedules: () =>
+    apiDataFetch<{ items: Array<ScheduledAttestationItem> }>('/compliance/schedules'),
+  createSchedule: (body: { frameworkSlug: string; cronExpression: string; windowDays: number; signBundles: boolean; active?: boolean; metadata?: Record<string, unknown> }) =>
+    apiDataFetch<{ schedule: ScheduledAttestationItem }>('/compliance/schedules', { method: 'POST', body }),
+  updateSchedule: (id: string, body: { cronExpression?: string; windowDays?: number; signBundles?: boolean; active?: boolean; metadata?: Record<string, unknown> }) =>
+    apiDataFetch<{ schedule: ScheduledAttestationItem }>(`/compliance/schedules/${id}`, { method: 'PATCH', body }),
+  deleteSchedule: (id: string) =>
+    apiDataFetch<{ deleted: boolean; id: string }>(`/compliance/schedules/${id}`, { method: 'DELETE' }),
 };
+
+export interface ScheduledAttestationItem {
+  id: string;
+  tenantId: string;
+  frameworkId: string;
+  frameworkSlug?: string;
+  frameworkName?: string;
+  cronExpression: string;
+  windowDays: number;
+  signBundles: boolean;
+  active: boolean;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastAttestationId: string | null;
+  createdBy: string;
+  createdAt: string;
+}
 
 export const apiKeyApi = {
   /** GET /tenants/current/api-keys */

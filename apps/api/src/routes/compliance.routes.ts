@@ -30,6 +30,7 @@ import { z } from 'zod';
 import { ComplianceMapperService, ComplianceSchemaUnavailableError } from '../services/compliance/compliance-mapper.service.js';
 import { AttestationService } from '../services/compliance/attestation.service.js';
 import { ManualEvidenceService, ManualEvidenceNotFoundError } from '../services/compliance/manual-evidence.service.js';
+import { computeNextRun } from '../services/compliance/attestation-scheduler.service.js';
 import { ArtifactSchemaUnavailableError } from '../services/artifact.service.js';
 import { BundleSigningUnavailableError } from '../services/bundle-signing.service.js';
 import { ok, err } from '../types.js';
@@ -80,6 +81,23 @@ const createManualEvidenceSchema = z.object({
   description: z.string().min(1).max(10_000),
   attachedArtifactId: z.string().optional(),
   evidenceAt: z.string().optional(),
+});
+
+const createScheduleSchema = z.object({
+  frameworkSlug: z.string().min(1),
+  cronExpression: z.string().min(1).max(120),
+  windowDays: z.number().int().min(1).max(365).default(7),
+  signBundles: z.boolean().default(false),
+  active: z.boolean().default(true),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const updateScheduleSchema = z.object({
+  cronExpression: z.string().min(1).max(120).optional(),
+  windowDays: z.number().int().min(1).max(365).optional(),
+  signBundles: z.boolean().optional(),
+  active: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const complianceRoutes: FastifyPluginAsync = async (fastify) => {
@@ -323,6 +341,173 @@ const complianceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send(ok({ deleted: true, id }));
       } catch (e) {
         return sendComplianceError(reply, e, 'MANUAL_EVIDENCE_DELETE_FAILED');
+      }
+    },
+  );
+
+  // ── Scheduled attestations CRUD ─────────────────────────────────────
+
+  fastify.get(
+    '/compliance/schedules',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId } = request.user;
+      try {
+        const items = await fastify.db.scheduledAttestation.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+        });
+        // Resolve framework slugs in one pass
+        const fwIds = Array.from(new Set(items.map((s) => s.frameworkId)));
+        const fws = await fastify.db.complianceFramework.findMany({
+          where: { id: { in: fwIds } },
+          select: { id: true, slug: true, name: true },
+        });
+        const fwById = new Map(fws.map((f) => [f.id, f]));
+        return reply.send(ok({
+          items: items.map((s) => ({
+            ...s,
+            frameworkSlug: fwById.get(s.frameworkId)?.slug ?? '',
+            frameworkName: fwById.get(s.frameworkId)?.name ?? '',
+          })),
+        }));
+      } catch (e) {
+        const code = (e as { code?: string }).code;
+        if (code === 'P2021') {
+          return reply.status(503).send(err('COMPLIANCE_SCHEMA_UNAVAILABLE',
+            'Compliance schema not deployed. Run pnpm db:migrate:deploy + pnpm seed:compliance.'));
+        }
+        return sendComplianceError(reply, e, 'COMPLIANCE_SCHEDULE_LIST_FAILED');
+      }
+    },
+  );
+
+  fastify.post(
+    '/compliance/schedules',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId, userId } = request.user;
+      const parsed = createScheduleSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
+      }
+      try {
+        const fw = await fastify.db.complianceFramework.findUnique({ where: { slug: parsed.data.frameworkSlug } });
+        if (!fw) return reply.status(404).send(err('NOT_FOUND', `Framework ${parsed.data.frameworkSlug} not found`));
+
+        // Validate cron BEFORE write so the operator gets immediate feedback.
+        let nextRunAt: Date;
+        try {
+          nextRunAt = computeNextRun(parsed.data.cronExpression);
+        } catch (cronErr) {
+          return reply.status(400).send(err('INVALID_CRON', `Cron expression is invalid: ${cronErr instanceof Error ? cronErr.message : String(cronErr)}`));
+        }
+
+        const created = await fastify.db.scheduledAttestation.create({
+          data: {
+            tenantId,
+            frameworkId: fw.id,
+            cronExpression: parsed.data.cronExpression,
+            windowDays: parsed.data.windowDays,
+            signBundles: parsed.data.signBundles,
+            active: parsed.data.active,
+            ...(parsed.data.metadata ? { metadata: parsed.data.metadata as object } : {}),
+            nextRunAt: parsed.data.active ? nextRunAt : null,
+            createdBy: userId,
+          },
+        });
+        return reply.send(ok({ schedule: created }));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'COMPLIANCE_SCHEDULE_CREATE_FAILED');
+      }
+    },
+  );
+
+  fastify.patch(
+    '/compliance/schedules/:id',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
+      const parsed = updateScheduleSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
+      }
+      try {
+        // Verify ownership before update
+        const existing = await fastify.db.scheduledAttestation.findFirst({
+          where: { id, tenantId },
+        });
+        if (!existing) return reply.status(404).send(err('NOT_FOUND', 'Schedule not found'));
+
+        const updateData: Record<string, unknown> = {};
+        if (parsed.data.cronExpression !== undefined) {
+          // Validate + recompute nextRunAt when cron changes
+          try {
+            const next = computeNextRun(parsed.data.cronExpression);
+            updateData['cronExpression'] = parsed.data.cronExpression;
+            updateData['nextRunAt'] = (parsed.data.active ?? existing.active) ? next : null;
+          } catch (cronErr) {
+            return reply.status(400).send(err('INVALID_CRON', `Cron expression is invalid: ${cronErr instanceof Error ? cronErr.message : String(cronErr)}`));
+          }
+        }
+        if (parsed.data.windowDays !== undefined) updateData['windowDays'] = parsed.data.windowDays;
+        if (parsed.data.signBundles !== undefined) updateData['signBundles'] = parsed.data.signBundles;
+        if (parsed.data.metadata !== undefined) updateData['metadata'] = parsed.data.metadata;
+        if (parsed.data.active !== undefined) {
+          updateData['active'] = parsed.data.active;
+          // Toggling active recomputes nextRunAt
+          if (parsed.data.active && !updateData['nextRunAt']) {
+            try {
+              updateData['nextRunAt'] = computeNextRun(existing.cronExpression);
+            } catch {
+              return reply.status(400).send(err('INVALID_CRON', 'Cannot activate — saved cron expression is invalid. Update cron first.'));
+            }
+          }
+          if (!parsed.data.active) updateData['nextRunAt'] = null;
+        }
+
+        const updated = await fastify.db.scheduledAttestation.update({
+          where: { id },
+          data: updateData,
+        });
+        return reply.send(ok({ schedule: updated }));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'COMPLIANCE_SCHEDULE_UPDATE_FAILED');
+      }
+    },
+  );
+
+  fastify.delete(
+    '/compliance/schedules/:id',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
+      try {
+        const existing = await fastify.db.scheduledAttestation.findFirst({
+          where: { id, tenantId },
+        });
+        if (!existing) return reply.status(404).send(err('NOT_FOUND', 'Schedule not found'));
+        await fastify.db.scheduledAttestation.delete({ where: { id } });
+        return reply.send(ok({ deleted: true, id }));
+      } catch (e) {
+        return sendComplianceError(reply, e, 'COMPLIANCE_SCHEDULE_DELETE_FAILED');
       }
     },
   );

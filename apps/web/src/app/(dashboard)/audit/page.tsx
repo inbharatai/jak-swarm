@@ -674,6 +674,7 @@ function ComplianceTab() {
       </Card>
       {selected && <FrameworkSummary slug={selected.slug} />}
       {selected && <AttestationsSection slug={selected.slug} />}
+      {selected && <SchedulesSection slug={selected.slug} />}
     </div>
   );
 }
@@ -1013,6 +1014,144 @@ function AttestationsSection({ slug }: { slug: string }) {
             </table>
           )}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Scheduled attestations section ────────────────────────────────────
+
+function SchedulesSection({ slug }: { slug: string }) {
+  const { data, error, isLoading, mutate } = useSWR<{ items: import('@/lib/api-client').ScheduledAttestationItem[] }>(
+    'compliance:schedules',
+    () => complianceApi.listSchedules(),
+    { refreshInterval: 60_000 },
+  );
+  const [showCreate, setShowCreate] = useState(false);
+  const [cron, setCron] = useState('0 0 * * 1'); // weekly Mon midnight UTC
+  const [windowDays, setWindowDays] = useState(7);
+  const [sign, setSign] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
+
+  const create = async () => {
+    setSubmitting(true);
+    try {
+      await complianceApi.createSchedule({ frameworkSlug: slug, cronExpression: cron, windowDays, signBundles: sign, active: true });
+      toast.success('Schedule created.');
+      setShowCreate(false);
+      mutate();
+    } catch (e) {
+      toast.error('Failed to create schedule', e instanceof Error ? e.message : 'Unknown');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleActive = async (id: string, active: boolean) => {
+    try {
+      await complianceApi.updateSchedule(id, { active });
+      mutate();
+    } catch (e) {
+      toast.error('Failed to update schedule', e instanceof Error ? e.message : 'Unknown');
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (typeof window !== 'undefined' && !window.confirm('Delete this schedule?')) return;
+    try {
+      await complianceApi.deleteSchedule(id);
+      mutate();
+    } catch (e) {
+      toast.error('Failed to delete', e instanceof Error ? e.message : 'Unknown');
+    }
+  };
+
+  const filtered = data?.items?.filter((s) => s.frameworkSlug === slug) ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-base">Scheduled attestations</CardTitle>
+            <CardDescription>Recurring auto-generation. Cron expressions in UTC. Each fire produces a new attestation row + (optionally) a signed evidence bundle.</CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setShowCreate((s) => !s)}>
+            {showCreate ? 'Cancel' : '+ New schedule'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {showCreate && (
+          <div className="mb-4 p-3 bg-muted/30 rounded space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Cron (UTC)</label>
+                <Input value={cron} onChange={(e) => setCron(e.target.value)} className="font-mono text-xs" />
+                <p className="text-[10px] text-muted-foreground mt-0.5">e.g. <code>0 0 * * 1</code> = every Mon 00:00 UTC</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Window days</label>
+                <Input type="number" value={windowDays} onChange={(e) => setWindowDays(Math.max(1, Math.min(365, Number(e.target.value) || 7)))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Sign bundles</label>
+                <div className="pt-2">
+                  <input type="checkbox" checked={sign} onChange={(e) => setSign(e.target.checked)} />
+                </div>
+              </div>
+            </div>
+            <Button size="sm" onClick={create} disabled={submitting || !cron.trim()}>
+              {submitting ? 'Creating…' : 'Create schedule'}
+            </Button>
+          </div>
+        )}
+
+        {isLoading && <Spinner size="sm" />}
+        {error && <p className="text-xs text-destructive">{error instanceof Error ? error.message : 'Failed to load schedules'}</p>}
+        {!isLoading && filtered.length === 0 && (
+          <p className="text-xs italic text-muted-foreground">No schedules for this framework yet.</p>
+        )}
+        {filtered.length > 0 && (
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="px-2 py-1 text-left">Cron (UTC)</th>
+                <th className="px-2 py-1 text-right">Window</th>
+                <th className="px-2 py-1 text-left">Sign</th>
+                <th className="px-2 py-1 text-left">Next run</th>
+                <th className="px-2 py-1 text-left">Last run</th>
+                <th className="px-2 py-1 text-left">Active</th>
+                <th className="px-2 py-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((s) => (
+                <tr key={s.id} className="border-b hover:bg-muted/30">
+                  <td className="px-2 py-1 font-mono">{s.cronExpression}</td>
+                  <td className="px-2 py-1 text-right">{s.windowDays}d</td>
+                  <td className="px-2 py-1">{s.signBundles ? '🔒' : '—'}</td>
+                  <td className="px-2 py-1 text-[10px]">{s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '(paused)'}</td>
+                  <td className="px-2 py-1 text-[10px]">
+                    {s.lastRunAt ? (
+                      <>
+                        {new Date(s.lastRunAt).toLocaleString()}{' '}
+                        {s.lastRunStatus && <Badge variant={s.lastRunStatus === 'success' ? 'secondary' : 'destructive'} className="text-[9px]">{s.lastRunStatus.split(':')[0]}</Badge>}
+                      </>
+                    ) : '—'}
+                  </td>
+                  <td className="px-2 py-1">
+                    <input type="checkbox" checked={s.active} onChange={(e) => toggleActive(s.id, e.target.checked)} />
+                  </td>
+                  <td className="px-2 py-1">
+                    <button onClick={() => remove(s.id)} className="text-[10px] text-destructive hover:underline">delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </CardContent>
     </Card>
   );
