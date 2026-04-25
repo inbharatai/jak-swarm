@@ -818,6 +818,65 @@ export const complianceApi = {
     apiDataFetch<{ deleted: boolean; id: string }>(`/compliance/schedules/${id}`, { method: 'DELETE' }),
 };
 
+// ─── SYSTEM_ADMIN cross-tenant aggregate views ─────────────────────────
+//
+// Separate surface from /audit/* (tenant-scoped). Only SYSTEM_ADMIN
+// users can call these — the API enforces it.
+
+export interface AdminOverview {
+  generatedAt: string;
+  tenants: { total: number; byStatus: Array<{ status: string; count: number }> };
+  users: { total: number };
+  workflows: {
+    total: number;
+    byStatus: Array<{ status: string; count: number }>;
+    last24h: number;
+    last7d: number;
+    last30d: number;
+    totalCostUsd: number;
+  };
+  auditLog: { total: number; last24h: number };
+  compliance: { attestationsTotal: number; activeSchedules: number };
+}
+
+export interface AdminTenantRow {
+  id: string;
+  name: string;
+  slug: string;
+  industry: string | null;
+  status: string;
+  createdAt: string;
+  workflowCount: number;
+  approvalCount: number;
+  attestationCount: number;
+  evidenceMappingCount: number;
+}
+
+export interface AdminFrameworkRollup {
+  slug: string;
+  name: string;
+  version: string;
+  totalControls: number;
+  tenantsWithEvidence: number;
+  totalEvidenceMappings: number;
+  attestationsGenerated: number;
+}
+
+export const adminAggregateApi = {
+  overview: () => apiDataFetch<AdminOverview>('/admin/aggregate/overview'),
+  tenants: (params?: { limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<{ items: AdminTenantRow[]; total: number; limit: number; offset: number }>(`/admin/aggregate/tenants${qs}`);
+  },
+  compliance: () => apiDataFetch<{ frameworks: AdminFrameworkRollup[] }>('/admin/aggregate/compliance'),
+};
+
 export interface ScheduledAttestationItem {
   id: string;
   tenantId: string;

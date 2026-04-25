@@ -17,6 +17,7 @@ import {
   Network,
   ShieldCheck,
   ScrollText,
+  Globe2,
   FileText,
   LogOut,
   X,
@@ -40,7 +41,7 @@ import { useRouter } from 'next/navigation';
 // so non-admin users don't see a tempting nav item that dead-ends in
 // "Access Restricted".
 
-const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean; reviewerOrAdmin?: boolean }> = [
+const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; adminOnly?: boolean; reviewerOrAdmin?: boolean; systemAdminOnly?: boolean }> = [
   { href: '/swarm', label: 'Runs', icon: Network },
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -58,6 +59,9 @@ const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Network; admi
   // a page where most tabs say "Reviewer access required".
   { href: '/audit', label: 'Audit', icon: ScrollText, reviewerOrAdmin: true },
   { href: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
+  // SYSTEM_ADMIN-only platform-level dashboard. Hidden from TENANT_ADMIN
+  // because cross-tenant data is a hard role boundary.
+  { href: '/admin/platform', label: 'Platform', icon: Globe2, systemAdminOnly: true },
 ];
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -77,6 +81,9 @@ export function ChatSidebar() {
   // because they're often the ones triggering high-risk workflows and need
   // to follow up on their own approvals.
   const isReviewerOrAdmin = isAdmin || roleStr === 'REVIEWER' || roleStr === 'OPERATOR';
+  // Platform admin is SYSTEM_ADMIN only (cross-tenant data is a hard
+  // boundary that no TENANT_ADMIN should cross).
+  const isSystemAdmin = roleStr === 'SYSTEM_ADMIN';
   const collapsed = useConversationStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const conversations = useConversationStore((s) => s.conversations);
@@ -256,6 +263,7 @@ export function ChatSidebar() {
             {NAV_ITEMS.filter((item) => {
               if (item.adminOnly && !isAdmin) return false;
               if (item.reviewerOrAdmin && !isReviewerOrAdmin) return false;
+              if (item.systemAdminOnly && !isSystemAdmin) return false;
               return true;
             }).map((item) => {
               const Icon = item.icon;
