@@ -17,16 +17,22 @@ deploy-time typos are caught immediately.
 
 ## Phase rollout
 
-| Phase | Flag state | What changes |
+| Phase | Status | What landed |
 |---|---|---|
-| 1 (current) | both defaults | Pure no-op. Flags read + logged + surfaced in `/version`. Behavior identical to pre-migration. |
-| 2 | both defaults | `LLMRuntime` interface introduced. `LegacyRuntime` wraps the current path. `BaseAgent` delegates `callLLM`/`executeWithTools` through it. No external behavior change. |
-| 3 | both defaults | `OpenAIRuntime` implemented but not wired into any agent. Parity tests vs `LegacyRuntime`. |
-| 4 | `JAK_OPENAI_RUNTIME_AGENTS=PLANNER,COMMANDER,WORKER_RESEARCH` | Three agents flip onto `OpenAIRuntime` (Responses API + structured output). The other 23 stay on Legacy. |
-| 5 | both defaults | Run-lifecycle state machine replaces ad-hoc status strings. UI Runs page renders all 9 states. |
-| 6 | `JAK_WORKFLOW_RUNTIME=langgraph` for one workflow template (CMO) | LangGraph runs CMO behind `WorkflowRuntime`. Approval pause/resume use LangGraph `interrupt()`. |
-| 7 | `JAK_EXECUTION_ENGINE=openai-first`, `JAK_WORKFLOW_RUNTIME=langgraph` | All 26 workers on OpenAIRuntime. Gemini/Anthropic disabled in default routing (adapters stay compiling for break-glass). |
-| 8 | same as 7 | Benchmark harness proves parity. Gemini/Anthropic adapters deleted, SDKs removed. |
+| 1 | ✅ shipped | Flags wired + `/version` reports `effectiveExecutionEngine`. |
+| 2 | ✅ shipped | `LLMRuntime` interface + `LegacyRuntime` wrapping the existing path. `BaseAgent` delegates through it. |
+| 3 | ✅ shipped | `OpenAIRuntime` implemented (Responses API + hosted tools). Default for every agent when `OPENAI_API_KEY` is set and operator hasn't explicitly opted into legacy. |
+| 4 | ✅ shipped | Central zod schemas (`packages/agents/src/runtime/schemas/`) for Planner, Commander, Research. `runtime.respondStructured` enforces at the model layer (OpenAI) or post-parse (Legacy). Deterministic verb→worker overrides KEPT in Planner as defense-in-depth. |
+| 5 | ✅ shipped | Run-lifecycle state machine (`packages/swarm/src/state/run-lifecycle.ts`) wired into `WorkflowService.updateWorkflowStatus`. Log-only in this phase — surfaces drift without blocking writes. |
+| 6 | ✅ shipped (narrow) | `WorkflowRuntime` interface + `SwarmGraphRuntime` + `LangGraphRuntime` (proof-of-life). Resume + cancel paths in `SwarmExecutionService` go through it. The `start` path stays on direct `runner.run()` for now — extending `StartContext` with all the existing callbacks is its own follow-up. |
+| 7 | ⚠️ deferred (operational) | Default-engine flip is an env-var change in ops, not code. As of today `getRuntime` already returns `OpenAIRuntime` for every agent when `OPENAI_API_KEY` is set, so the practical effect is in place. The remaining work — flipping `AGENT_TIER_MAP` defaults to OpenAI-only and removing the Gemini/Anthropic rows from the Legacy router — should land only AFTER the per-worker shadow run hits ≥95% match. Not run yet. |
+| 8 | ⚠️ deferred (irreversible) | Adapter deletion is a one-way door. Will not run without the 30+ scenario benchmark harness in `packages/agents/src/benchmarks/` actually executing and showing OpenAI-first ≥90% on the persona suite. The harness scaffold exists; the runs do not. |
+
+### Why Phases 7 + 8 are deferred
+
+The full migration plan is in `C:\Users\reetu\.claude\plans\blunt-truth-first-8-5-misty-kettle.md`. Phase 7 + 8 each list explicit entry gates (≥1 week of clean prod, ≥72h zero fallback log lines, ≥95% per-worker shadow-run match, ≥90% benchmark parity). Running them inside one session — without the gates — would be the half-measure category we explicitly avoid. They land later, in their own PRs, with the gates honored.
+
+The default `effectiveExecutionEngine` reported in `/version` is already `openai-first` whenever `OPENAI_API_KEY` is set, so day-to-day traffic gets the OpenAI Responses path today. Legacy stays available as `JAK_EXECUTION_ENGINE=legacy` for break-glass.
 
 ## Verification
 
