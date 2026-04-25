@@ -22,6 +22,7 @@ const exportRequestSchema = z.object({
   kind: z.enum(['workflow_report', 'audit_evidence_index', 'control_matrix', 'workpaper', 'audit_pack']),
   format: z.enum(['json', 'csv', 'xlsx', 'pdf', 'docx']),
   markFinal: z.boolean().optional(),
+  redact: z.boolean().optional(),
 });
 
 const exportsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -45,6 +46,7 @@ const exportsRoutes: FastifyPluginAsync = async (fastify) => {
           kind: parsed.data.kind,
           format: parsed.data.format,
           ...(parsed.data.markFinal !== undefined ? { markFinal: parsed.data.markFinal } : {}),
+          ...(parsed.data.redact !== undefined ? { redact: parsed.data.redact } : {}),
         });
         return reply.send(ok(result));
       } catch (e) {

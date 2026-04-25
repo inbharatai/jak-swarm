@@ -51,6 +51,21 @@ export interface ExportRequest {
    * draft and can be downloaded by anyone in the tenant.
    */
   markFinal?: boolean;
+  /**
+   * When true, the export's text content is run through detectPII before
+   * the converter. Detected PII (emails, SSNs, credit cards, phone numbers,
+   * etc.) is replaced with redaction tokens (e.g. [REDACTED-EMAIL]). The
+   * resulting artifact is created with artifactType='redacted_export' so
+   * it sorts separately from raw exports in the UI. Original is NOT
+   * generated in the same call — request a separate non-redacted export
+   * if the operator wants both.
+   *
+   * Only meaningful for text-bearing formats (pdf, docx, json) — tabular
+   * formats (csv, xlsx) currently pass through unchanged with a
+   * `redactionApplied: false` flag in the metadata, since cell-level PII
+   * scanning is a future hardening item.
+   */
+  redact?: boolean;
 }
 
 export interface ExportResultSummary {
@@ -60,6 +75,14 @@ export interface ExportResultSummary {
   fileName: string;
   sizeBytes: number;
   error?: string;
+  /**
+   * Honest field — true when the export's text was actually scanned + tokens
+   * replaced. False when redact was requested but the format doesn't yet
+   * support it (csv/xlsx pass-through), so the UI can surface the gap.
+   */
+  redactionApplied?: boolean;
+  /** Counts of PII detected per type, when redaction ran. */
+  redactionSummary?: Record<string, number>;
 }
 
 interface WorkflowDataForExport {
@@ -266,7 +289,18 @@ export class ExportService {
     }
 
     const data: WorkflowDataForExport = { workflow, traces, approvals, artifacts };
-    const { payload, baseName } = buildConverterInput(req.kind, req.format, data);
+    let { payload, baseName } = buildConverterInput(req.kind, req.format, data);
+
+    // ── PII redaction (optional) ───────────────────────────────────────
+    let redactionApplied = false;
+    let redactionSummary: Record<string, number> | undefined;
+    if (req.redact) {
+      const result = await this.applyRedactionIfApplicable(payload, req.format);
+      payload = result.payload;
+      redactionApplied = result.applied;
+      if (result.summary) redactionSummary = result.summary;
+      if (redactionApplied) baseName = `${baseName}-REDACTED`;
+    }
 
     const draftSuffix = req.markFinal ? '' : '-DRAFT';
     const opts = { baseName: `${baseName}${draftSuffix}`, title: `${req.kind} (${req.markFinal ? 'final' : 'draft'})` };
@@ -308,12 +342,21 @@ export class ExportService {
       tenantId: req.tenantId,
       workflowId: req.workflowId,
       producedBy: req.requestedBy,
-      artifactType: 'export',
+      // Distinguish redacted derivatives from raw exports so the audit
+      // UI can sort + filter independently.
+      artifactType: redactionApplied ? 'redacted_export' : 'export',
       fileName: exportResult.fileName,
       mimeType: exportResult.mimeType,
       bytes: exportResult.bytes,
       approvalState: req.markFinal ? 'REQUIRES_APPROVAL' : 'NOT_REQUIRED',
-      metadata: { exportKind: req.kind, exportFormat: req.format, markFinal: Boolean(req.markFinal) },
+      metadata: {
+        exportKind: req.kind,
+        exportFormat: req.format,
+        markFinal: Boolean(req.markFinal),
+        redactRequested: Boolean(req.redact),
+        redactionApplied,
+        ...(redactionSummary ? { redactionSummary } : {}),
+      },
     }) as { id: string };
 
     return {
@@ -322,6 +365,71 @@ export class ExportService {
       approvalState: req.markFinal ? 'REQUIRES_APPROVAL' : 'NOT_REQUIRED',
       fileName: exportResult.fileName,
       sizeBytes: exportResult.sizeBytes,
+      ...(req.redact !== undefined ? { redactionApplied } : {}),
+      ...(redactionSummary ? { redactionSummary } : {}),
+    };
+  }
+
+  /**
+   * Apply PII redaction to a converter payload. Today supports document
+   * payloads ({title, sections}) and JSON payloads. CSV/XLSX payloads
+   * are returned unchanged with applied=false — cell-level scanning is
+   * a future hardening item.
+   *
+   * Honest about scope: detectPII catches common patterns (email, SSN,
+   * credit card, phone, DOB, MRN, passport, IPv4, bank account, driver
+   * license). Custom PII patterns require extending the detector.
+   */
+  private async applyRedactionIfApplicable(
+    payload: unknown,
+    format: ExportFormat,
+  ): Promise<{ payload: unknown; applied: boolean; summary?: Record<string, number> }> {
+    const { detectPII } = await import('@jak-swarm/security');
+
+    if (format === 'csv' || format === 'xlsx') {
+      // Tabular payloads — flag honestly that we didn't scan.
+      this.log.info({ format }, '[export] redact requested but tabular formats not scanned in v1.4');
+      return { payload, applied: false };
+    }
+
+    if (format === 'json') {
+      const raw = JSON.stringify(payload);
+      const result = detectPII(raw);
+      if (!result.containsPII) return { payload, applied: true, summary: {} };
+      const summary: Record<string, number> = {};
+      for (const m of result.matches) summary[m.type] = (summary[m.type] ?? 0) + 1;
+      // Re-parse the redacted JSON; if redaction broke the JSON shape,
+      // wrap in a string so the export still completes.
+      let redactedPayload: unknown;
+      try {
+        redactedPayload = JSON.parse(result.redacted);
+      } catch {
+        redactedPayload = { _redacted: true, _content: result.redacted };
+      }
+      return { payload: redactedPayload, applied: true, summary };
+    }
+
+    // pdf / docx — payload is { title, sections: [{heading?, body}] }
+    const doc = payload as { title?: unknown; sections?: unknown };
+    if (!doc || typeof doc.title !== 'string' || !Array.isArray(doc.sections)) {
+      return { payload, applied: false };
+    }
+    const summary: Record<string, number> = {};
+    let totalContains = false;
+    const newSections = doc.sections.map((s) => {
+      const sec = s as { heading?: string; body: string };
+      const result = detectPII(sec.body);
+      if (result.containsPII) {
+        totalContains = true;
+        for (const m of result.matches) summary[m.type] = (summary[m.type] ?? 0) + 1;
+        return { heading: sec.heading, body: result.redacted };
+      }
+      return sec;
+    });
+    return {
+      payload: { title: doc.title, sections: newSections },
+      applied: true,
+      ...(totalContains ? { summary } : { summary: {} }),
     };
   }
 }
