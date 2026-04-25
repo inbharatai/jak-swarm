@@ -37,6 +37,12 @@ interface CockpitState {
   calls: number;
   promptTokens: number;
   completionTokens: number;
+  /** Set of runtimes observed across cost_updated events (e.g. "openai-responses"). */
+  runtimes?: Set<string>;
+  /** Set of models actually used (covers both first-choice + fallbacks). */
+  models?: Set<string>;
+  /** Whether any LLM call fell back to a non-preferred model mid-run. */
+  fallbackUsed?: boolean;
 }
 
 export function ChatWorkspace() {
@@ -305,9 +311,19 @@ export function ChatWorkspace() {
             cur.promptTokens += (ev.promptTokens as number) ?? 0;
             cur.completionTokens += (ev.completionTokens as number) ?? 0;
             costRef.current.set(wfid, cur);
+            // Capture runtime + model + fallback into the cockpit so the
+            // DetailDrawer can show "openai-responses · gpt-5.4 · 1 fallback".
+            const evRuntime = (ev.runtime as string | undefined) ?? null;
+            const evModel = (ev.model as string | undefined) ?? null;
+            const evFallback = (ev.fallbackModelUsed as string | undefined) ?? null;
             // Mirror into cockpit state for live display in DetailDrawer.
             setCockpitByWorkflow((prev) => {
               const existing = prev[wfid] ?? { plan: null, status: 'running' as const, costUsd: 0, calls: 0, promptTokens: 0, completionTokens: 0 };
+              const runtimes = new Set<string>(existing.runtimes ?? []);
+              if (evRuntime) runtimes.add(evRuntime);
+              const models = new Set<string>(existing.models ?? []);
+              if (evModel) models.add(evModel);
+              if (evFallback) models.add(evFallback);
               return {
                 ...prev,
                 [wfid]: {
@@ -316,6 +332,9 @@ export function ChatWorkspace() {
                   calls: cur.calls,
                   promptTokens: cur.promptTokens,
                   completionTokens: cur.completionTokens,
+                  runtimes,
+                  models,
+                  fallbackUsed: existing.fallbackUsed || Boolean(evFallback),
                 },
               };
             });
@@ -781,14 +800,29 @@ function formatCockpitCost(cockpit: CockpitState): string {
         ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
         : `${totalTokens} tokens`;
   const callsLabel = `${cockpit.calls} call${cockpit.calls === 1 ? '' : 's'}`;
+  // Hardening pass: surface runtime + model honestly. The cockpit now
+  // shows "openai-responses · gpt-5.4" when the runtime stamp is on the
+  // event. If multiple models were used (fallback or multi-tier), they're
+  // shown comma-joined. fallbackUsed adds " · fallback" suffix.
+  const runtimeLabel = cockpit.runtimes && cockpit.runtimes.size > 0
+    ? Array.from(cockpit.runtimes).join('+')
+    : null;
+  const modelLabel = cockpit.models && cockpit.models.size > 0
+    ? Array.from(cockpit.models).join(',')
+    : null;
+  const stack = [runtimeLabel, modelLabel].filter(Boolean).join(' · ');
+  const fallbackTag = cockpit.fallbackUsed ? ' · fallback' : '';
+
   if (cockpit.costUsd > 0) {
     const costLabel =
       cockpit.costUsd >= 0.01
         ? `$${cockpit.costUsd.toFixed(4)}`
         : `$${cockpit.costUsd.toFixed(6)}`;
-    return `${costLabel} · ${callsLabel} · ${tokenLabel}`;
+    const base = `${costLabel} · ${callsLabel} · ${tokenLabel}`;
+    return stack ? `${base} · ${stack}${fallbackTag}` : `${base}${fallbackTag}`;
   }
-  return `${callsLabel} · ${tokenLabel}`;
+  const base = `${callsLabel} · ${tokenLabel}`;
+  return stack ? `${base} · ${stack}${fallbackTag}` : `${base}${fallbackTag}`;
 }
 
 // Stage 2.6 helper — format an honest per-workflow cost footer.

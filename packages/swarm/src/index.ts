@@ -51,12 +51,16 @@ export {
   getWorkflowRuntime,
   SwarmGraphRuntime,
   WorkflowPausedError,
+  NOOP_LIFECYCLE_EMITTER,
+  safeEmitLifecycle,
 } from './workflow-runtime/index.js';
 export type {
   WorkflowRuntime,
   StartContext,
   ResumeDecision,
   WorkflowSnapshot,
+  WorkflowLifecycleEvent,
+  WorkflowLifecycleEmitter,
 } from './workflow-runtime/index.js';
 
 // Runner

@@ -133,10 +133,97 @@ model Workflow {
   traces           AgentTrace[]
   approvalRequests ApprovalRequest[]
   jobs             WorkflowJob[]
+  artifacts        WorkflowArtifact[]
 
   @@index([tenantId, status])
   @@index([updatedAt])
   @@map("workflows")
+}
+
+// Hardening pass — foundation for the Audit & Compliance product.
+//
+// A WorkflowArtifact is a customer-deliverable evidence artefact produced
+// by a workflow run: the final output (markdown), an exported PDF/DOCX/CSV,
+// a worker-generated file, an evidence bundle ZIP, etc. Distinct from
+// AgentTrace (per-step internal record) and TenantDocument (user-uploaded
+// inputs) — both of which already exist.
+//
+// Storage policy:
+//   - Small text/JSON artefacts: stored inline in `inlineContent` (≤256KB).
+//   - Larger binary artefacts: stored in Supabase Storage at `storageKey`
+//     under bucket `tenant-artifacts/<tenantId>/<workflowId>/<id>.<ext>`.
+//   - Both fields can be null while `status='PENDING'` (artifact row created
+//     before the file is materialised — see `artifact.service.ts`).
+//
+// Approval gating:
+//   - `approvalState='REQUIRES_APPROVAL'` means the artifact was produced
+//     by a high-risk workflow and must NOT be downloaded until reviewed.
+//   - Download routes MUST check approvalState before signing a URL.
+model WorkflowArtifact {
+  id              String    @id @default(cuid())
+  tenantId        String
+  workflowId      String
+  // Optional — when an artifact corresponds to a single workflow task.
+  taskId          String?
+  // Who/what produced the artifact. Worker role for agent output, 'system'
+  // for export bundles, the user id for explicit user uploads.
+  producedBy      String
+  // Stable type label used by the audit UI for filtering. Open vocabulary
+  // because the Audit & Compliance product will introduce new types
+  // (evidence_bundle, control_attestation, signed_export, etc.) without
+  // a Prisma migration each time.
+  artifactType    String    // e.g. 'final_output' | 'export' | 'evidence_bundle' | 'attachment'
+  // Human-friendly file name shown in the UI.
+  fileName        String
+  mimeType        String
+  // Total size in bytes. NULL until the artifact materializes.
+  sizeBytes       Int?
+  // sha256 of the bytes — for integrity check + dedupe across a tenant.
+  contentHash     String?
+  // For small text/JSON artefacts kept inline. Null for binary objects in storage.
+  inlineContent   String?   @db.Text
+  // Supabase Storage key for binary objects. Null for inline-only.
+  storageKey      String?   @unique
+  // Lifecycle:
+  //   PENDING   — row created, file not yet written
+  //   READY     — file materialised (inline or storage), download allowed pending approval
+  //   FAILED    — production failed; see `error`
+  //   DELETED   — soft-delete, blob removed but row stays for audit trail
+  status          String    @default("PENDING")
+  // Compliance gate. The Audit & Compliance product reads this to enforce
+  // "evidence cannot be exported until human-approved" workflows.
+  //   NOT_REQUIRED         — artifact is non-sensitive, downloadable freely
+  //   REQUIRES_APPROVAL    — approval gate active; download blocked
+  //   APPROVED             — reviewer approved download
+  //   REJECTED             — reviewer blocked download permanently
+  approvalState   String    @default("NOT_REQUIRED")
+  // When approvalState transitions to APPROVED/REJECTED, who decided.
+  approvedBy      String?
+  approvedAt      DateTime?
+  // Audit field — last user who DOWNLOADED. Per-download events live in AuditLog.
+  lastDownloadedBy String?
+  lastDownloadedAt DateTime?
+  // For multi-format exports — track the source artifact ID.
+  // E.g. a PDF export of an evidence_bundle ZIP keeps `parentId` pointing at the bundle.
+  parentId        String?
+  // Free-form metadata the producer wants stamped on the row (workflow step
+  // id, source dataset version, signing key id, etc.).
+  metadata        Json?
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  // Soft-delete marker. Hard-delete is reserved for retention sweeps.
+  deletedAt       DateTime?
+
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  parent          WorkflowArtifact? @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
+  derivatives     WorkflowArtifact[] @relation("ArtifactParent")
+
+  @@index([tenantId, deletedAt])
+  @@index([workflowId])
+  @@index([tenantId, artifactType])
+  @@index([tenantId, status])
+  @@map("workflow_artifacts")
 }
 
 model WorkflowJob {

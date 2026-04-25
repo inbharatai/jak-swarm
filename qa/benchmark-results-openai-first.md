@@ -1,113 +1,57 @@
-# Benchmark results — OpenAI-first runtime
+# Benchmark results — hardening pass — 2026-04-25T08:33:20.271Z
 
-**Status:** scenarios + harness + CLI runner shipped; live run not executed in this audit (would spend ~$0.05 of OpenAI credit and require an interactive shell with `OPENAI_API_KEY` set).
+Generated at: `2026-04-25T08:33:20.268Z`  
+Scenarios run: **4**
 
-**To run:**
+## Per-runtime summary
 
-```bash
-export OPENAI_API_KEY=sk-...
-pnpm bench:runtime              # 4 LLM scenarios, OpenAI only, ~$0.05
-pnpm bench:runtime -- --core    # 7 persona-core scenarios instead
-```
+| Runtime | Pass | Fail | p50 latency (ms) | p95 latency (ms) | Total cost (USD) |
+|---|---:|---:|---:|---:|---:|
+| openai-responses | 0 | 4 | 20438 | 20900 | $0.0000 |
 
-Output is written to:
+## Per-scenario results
 
-- `qa/_generated/bench-runtime.json` — machine-readable
-- `qa/benchmark-results-openai-first.md` — overwrites this file with the live results
+| Scenario | Runtime | Status | Latency (ms) | Tool calls (matched/observed) | Reason |
+|---|---|:---:|---:|---:|---|
+| planning-simple | openai-responses | ❌ | 20900 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| research-task | openai-responses | ❌ | 20438 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| cmo-linkedin-post | openai-responses | ❌ | 17725 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
+| vibecoder-inspect | openai-responses | ❌ | 17595 | 0/0 | 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, rea |
 
-## Scenarios — what runs
+## Integration scenarios — deferred (require full stack)
 
-| # | Scenario | Run mode | Status | Notes |
-|---|---|---|---|---|
-| 1 | Simple planning task (PLANNER role) | llm | shipped | Decomposes a single goal into 1-3 tasks. Asserts WORKER_CONTENT routing. |
-| 2 | Research task (WORKER_RESEARCH) | llm | shipped | LangGraph framework comparison. Asserts the 3 frameworks appear in output. |
-| 3 | CMO LinkedIn post (WORKER_CONTENT) | llm | shipped | 200-300 word launch post. Asserts JAK Swarm + enterprise/business mention. |
-| 4 | VibeCoder file inspection (WORKER_CODER) | llm | shipped | Inspect a TS module, list functions, suggest improvement. |
-| 5 | Approval-required action | integration | deferred | Requires DB + approval-node + SSE stack. See verification recipe below. |
-| 6 | Mock/draft adapter truth | integration | deferred | Requires real tool registry + tenant policy. See recipe. |
-| 7 | Async/background worker task | integration | deferred | Requires queue worker + Redis pub/sub. See recipe. |
-| 8 | Cockpit event visibility | integration | deferred | Requires browser + EventSource. See recipe. |
-| 9 | Workflow cancel | integration | deferred | Requires SwarmRunner + cancel signals. See recipe. |
-| 10 | Workflow resume | integration | deferred | Requires DbWorkflowStateStore + WorkflowRuntime.resume. See recipe. |
+The following scenarios from the user-listed proof set require the full workflow stack (DB + queue worker + approval-node + SSE route + browser) and cannot be exercised by the in-process LLM harness. Each is documented with the human verification recipe below.
 
-**Honest scope:** the in-process LLM harness can prove correctness of scenarios 1-4 (LLM call → schema-validated output). Scenarios 5-10 require the full deployed stack and are documented as integration-suite work. The CLI runner reports them as "deferred to integration suite" with the verification recipe baked into the JSON output instead of pretending they ran.
+### 5. Approval-required action — workflow halts at AWAITING_APPROVAL
 
-## Integration scenario verification recipes
+**runMode:** `integration`  
+**verification:** Requires the full SwarmGraph + approval-node + DB. Verify by sending "Send an email to test@example.com about X" with autoApproveEnabled=false and confirming `paused` SSE event arrives + DB workflow.status === PAUSED.
 
-These run against staging or local `pnpm start:dev` with browser DevTools open. Each is a manual checklist the human verifier walks through.
+### 6. Mock / draft adapter truth — outcome surfaced honestly
 
-### 5. Approval-required action
+**runMode:** `integration`  
+**verification:** Requires real tool registry + tenant policy. Verify by calling email tool when GMAIL_EMAIL is unset; tool registry should return ToolResult with outcome="not_configured", and the cockpit tool_completed event should display "⚙ not connected" (not green ✓ success).
 
-1. Send a chat message: `"Send an email to test@example.com saying hello"`.
-2. Open DevTools → Network → Filter `/stream`.
-3. Confirm an event with `type: "paused"` and `reason: "awaiting_approval"` arrives within ~10s.
-4. Confirm the chat shows an approval link (added in Stage 2.4 of the cockpit work).
-5. Confirm the right-hand cockpit drawer shows the workflow status badge as `awaiting_approval`.
+### 7. Async / background worker task — events stream while detached
 
-**Pass criteria:** SSE `paused` event arrives, cockpit badge flips, approval link appears.
+**runMode:** `integration`  
+**verification:** Requires queue worker + Redis pub/sub. Verify by enqueuing a workflow via POST /workflows, closing the SSE connection, reopening it, and confirming events resume from the current state.
 
-### 6. Mock/draft adapter truth
+### 8. Cockpit event visibility — all 7 SSE events fire end-to-end
 
-1. Ensure `GMAIL_EMAIL` is unset in the deploy env.
-2. Trigger any workflow that calls `send_email` or `create_email_draft`.
-3. Open DevTools → Network → `/stream`.
-4. Find the `tool_completed` event for the email tool.
-5. Confirm the event payload carries `outcome: "not_configured"` (not `"real_success"`).
-6. In the chat, confirm the tool row shows "⚙ not connected" (not "✓ done").
+**runMode:** `integration`  
+**verification:** Requires browser + SSE listener. Verify by running a multi-step workflow and confirming each of the documented event types arrives in DevTools Network → EventSource: started, plan_created, worker_started, tool_called, tool_completed, cost_updated, worker_completed, completed.
 
-**Pass criteria:** outcome field is `not_configured` AND UI badge reflects it.
+### 9. Workflow cancel — runtime honors cancel signal at next node boundary
 
-### 7. Async/background worker task
+**runMode:** `integration`  
+**verification:** Requires SwarmRunner + cancel signals. Verify by starting a long workflow then calling DELETE /workflows/:id; workflow.status should flip to CANCELLED within ~5s (the next node boundary checks the cancel flag) and no further SSE events fire after the cancel event.
 
-1. Submit a long-running workflow (e.g. a multi-step research task).
-2. Within ~5s, navigate away from `/workspace` (or close the browser tab).
-3. Wait 30s. Reopen `/workspace`.
-4. Look up the workflow via `/swarm`. Confirm it reached `COMPLETED` (or progressed past where you left it).
-5. Confirm DB `workflow.completedAt` is set and `workflow.totalCostUsd > 0`.
+### 10. Workflow resume — approval grant continues from saved checkpoint
 
-**Pass criteria:** workflow finishes despite browser disconnect; final state persisted to DB.
+**runMode:** `integration`  
+**verification:** Requires DbWorkflowStateStore + approval-node + WorkflowRuntime.resume. Verify by triggering a workflow that pauses for approval, granting it via POST /approvals/:id/decide with APPROVED, and confirming the workflow continues to COMPLETED with the saved state intact.
 
-### 8. Cockpit event visibility — all SSE event types
+---
 
-Run a multi-step workflow (e.g. `"Write a SWOT for an AI company"`) and verify ALL of these arrive in `/stream`:
-
-- `connected`
-- `started`
-- `plan_created`
-- `worker_started`
-- `tool_called` (if the planner/worker uses any tools)
-- `tool_completed`
-- `cost_updated` (one per LLM call)
-- `worker_completed`
-- `completed`
-
-**Pass criteria:** all 8 expected event types observed at least once across the run.
-
-### 9. Workflow cancel
-
-1. Start a long workflow.
-2. Within ~5s, call `DELETE /workflows/:id`.
-3. Confirm the workflow status flips to `CANCELLED` within ~5s (next node boundary check).
-4. Confirm no further `worker_started` / `cost_updated` events fire.
-5. DB `workflow.completedAt` should be set, `workflow.error` should mention cancellation.
-
-**Pass criteria:** runtime honors cancel cooperatively at next boundary; no orphaned events.
-
-### 10. Workflow resume
-
-1. Start a workflow that triggers an approval gate (see scenario 5).
-2. Confirm DB `workflow.status === 'PAUSED'` and an approval row exists.
-3. Call `POST /approvals/:id/decide` with `{ decision: 'APPROVED' }`.
-4. Confirm a new `started` (or equivalent) event in `/stream` for the same workflowId.
-5. Confirm the workflow continues to `COMPLETED` with the saved checkpoint state intact (e.g. previously-completed tasks are NOT re-run).
-
-**Pass criteria:** resume continues from the saved checkpoint, not from scratch.
-
-## Why this isn't a full benchmark report yet
-
-The harness is built. The scenarios are real. The CLI is wired. What's missing is **the actual run**, which requires either:
-
-- The user running `pnpm bench:runtime` locally with a real OpenAI key (one-shot, ~$0.05 cost), OR
-- A CI workflow that runs it on every push (would need an OPENAI_API_KEY secret in GitHub Actions)
-
-This file gets overwritten with real numbers the first time `pnpm bench:runtime` runs. The integration-deferred section above is independent — those scenarios produce no LLM cost and run only via the human verification checklist.
+_This report is generated by the in-process benchmark harness. It does NOT prove production behavior — it only proves that the runtimes satisfy their LLM-level interface contracts on the chosen scenarios. For end-to-end production verification, the integration scenarios above must be run against staging or production via the documented recipes._

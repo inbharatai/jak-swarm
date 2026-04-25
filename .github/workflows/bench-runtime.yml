@@ -1,0 +1,117 @@
+name: Runtime Benchmark (manual / OpenAI key required)
+
+# This workflow is INTENTIONALLY manual-only (workflow_dispatch). It hits the
+# real OpenAI API and would cost ~$0.05 per run. Triggering it on every PR
+# would be wasteful and would block PRs from external contributors who don't
+# have access to the OPENAI_API_KEY GitHub secret.
+#
+# To run:
+#   gh workflow run bench-runtime.yml
+# or via the GitHub UI: Actions → "Runtime Benchmark" → Run workflow.
+#
+# Required GitHub repository secret:
+#   OPENAI_API_KEY — service-role key with at least $0.10 of credit.
+#
+# Output:
+#   - Markdown report uploaded as a workflow artifact
+#   - JSON report uploaded as a workflow artifact
+#   - Job summary printed to the workflow run page
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Scenario set to run'
+        type: choice
+        required: true
+        default: 'hardening-pass'
+        options:
+          - hardening-pass
+          - persona-core
+
+concurrency:
+  group: bench-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: Run benchmark scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @jak-swarm/db exec prisma generate
+
+      - name: Build dependency packages
+        run: |
+          pnpm --filter @jak-swarm/shared build
+          pnpm --filter @jak-swarm/industry-packs build
+          pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/db build
+          pnpm --filter @jak-swarm/tools build
+          pnpm --filter @jak-swarm/agents build
+          pnpm --filter @jak-swarm/swarm build
+
+      - name: Verify OPENAI_API_KEY is set
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY secret is not configured. Add it under repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is set (length=${#OPENAI_API_KEY})."
+
+      - name: Run benchmark
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Default OPENAI_BASE_URL is fine; only set if user has a custom proxy
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        run: |
+          if [ "${{ inputs.mode }}" = "persona-core" ]; then
+            pnpm bench:runtime -- --core
+          else
+            pnpm bench:runtime
+          fi
+
+      - name: Upload Markdown report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-md
+          path: qa/benchmark-results-openai-first.md
+          if-no-files-found: error
+
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-json
+          path: qa/_generated/bench-runtime.json
+          if-no-files-found: warn
+
+      - name: Summarise to workflow run page
+        if: always()
+        run: |
+          if [ -f qa/benchmark-results-openai-first.md ]; then
+            echo "## Benchmark results" >> $GITHUB_STEP_SUMMARY
+            head -60 qa/benchmark-results-openai-first.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::No benchmark report produced — check job logs."
+          fi

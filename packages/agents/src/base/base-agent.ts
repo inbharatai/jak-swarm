@@ -540,15 +540,29 @@ ${lines.join('\n')}
         const iterCost = calculateCost(iterModel, iterPrompt, iterCompletion);
         totalCostUsd += iterCost;
 
-        // Stage 2.3: surface cost in real-time to the client SSE stream.
-        // Fires once per LLM call; the UI cockpit aggregates across a run.
+        // Stage 2.3 + hardening pass: complete cost telemetry — runtime
+        // name, model, fallback model (if used), token breakdown, run +
+        // step ids. The cockpit aggregates these and the audit log can
+        // reconstruct per-step spend after the fact.
+        const runtimeName = this.runtime?.name ?? 'legacy';
+        const requestedModel =
+          (completion as unknown as { _requestedModel?: string })._requestedModel;
         context.emitActivity({
           type: 'cost_updated',
           agentRole: this.role,
+          runtime: runtimeName,
           model: iterModel,
+          ...(requestedModel && requestedModel !== iterModel
+            ? { fallbackModelUsed: iterModel }
+            : {}),
           promptTokens: iterPrompt,
           completionTokens: iterCompletion,
+          totalTokens: iterPrompt + iterCompletion,
           costUsd: iterCost,
+          runId: context.runId,
+          // The "step id" inside a workflow is the agent role for now;
+          // when WorkflowRuntime adds a per-task step id we'll use that.
+          stepId: this.role,
           timestamp: new Date().toISOString(),
         });
       }

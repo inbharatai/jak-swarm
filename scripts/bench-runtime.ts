@@ -22,15 +22,15 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runHarness } from '../packages/agents/src/benchmarks/harness.js';
+import { PERSONA_CORE_SCENARIOS } from '../packages/agents/src/benchmarks/scenarios/persona-core.js';
 import {
-  runHarness,
   HARDENING_PASS_SCENARIOS,
-  PERSONA_CORE_SCENARIOS,
   partitionByMode,
-  renderMarkdownReport,
-  OpenAIRuntime,
-  AgentContext,
-} from '../packages/agents/src/index.js';
+} from '../packages/agents/src/benchmarks/scenarios/hardening-pass.js';
+import { renderMarkdownReport } from '../packages/agents/src/benchmarks/report.js';
+import { OpenAIRuntime } from '../packages/agents/src/runtime/openai-runtime.js';
+import { AgentContext } from '../packages/agents/src/base/agent-context.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');

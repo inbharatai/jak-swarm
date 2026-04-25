@@ -29,6 +29,14 @@ export type {
   WorkflowSnapshot,
 } from './workflow-runtime.js';
 export { SwarmGraphRuntime } from './swarm-graph-runtime.js';
+export {
+  NOOP_LIFECYCLE_EMITTER,
+  safeEmitLifecycle,
+} from './lifecycle-events.js';
+export type {
+  WorkflowLifecycleEvent,
+  WorkflowLifecycleEmitter,
+} from './lifecycle-events.js';
 
 /**
  * Factory — picks the runtime based on JAK_WORKFLOW_RUNTIME env var.

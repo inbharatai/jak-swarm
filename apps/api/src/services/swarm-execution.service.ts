@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events';
 import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus, getWorkflowRuntime } from '@jak-swarm/swarm';
-import type { SwarmResult, WorkflowRuntime } from '@jak-swarm/swarm';
+import type { SwarmResult, WorkflowRuntime, WorkflowLifecycleEvent } from '@jak-swarm/swarm';
 import { config } from '../config.js';
 import { Industry, ToolRiskClass } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
@@ -135,10 +135,18 @@ export interface ResumeParams {
   decision: 'APPROVED' | 'REJECTED' | 'DEFERRED';
   reviewedBy: string;
   comment?: string;
+  /** Optional — populated when known so the lifecycle audit row carries the approval id. */
+  approvalId?: string;
 }
 
 export interface CancelParams {
   workflowId: string;
+  /** Optional — who triggered the cancel. Audit trail field. */
+  cancelledBy?: string;
+  /** Optional — reason string for the audit row. */
+  reason?: string;
+  /** Optional — tenant id used to scope the audit log entry. */
+  tenantId?: string;
 }
 
 /** Control actions that flow through the durable queue alongside normal executions. */
@@ -237,6 +245,55 @@ function classifyReplaySafety(state: Record<string, unknown>): {
 export class SwarmExecutionService extends EventEmitter {
   private readonly runner: SwarmRunner;
   private readonly workflowRuntime!: WorkflowRuntime;
+
+  /**
+   * Hardening pass — single chokepoint that turns a canonical
+   * WorkflowLifecycleEvent into BOTH an AuditLog row AND an SSE event
+   * for the cockpit. The audit row is the durable record (the Audit &
+   * Compliance product reads from there); the SSE is the live mirror.
+   *
+   * This emitter is wired into runner.run({ onAgentActivity }) AND into
+   * the resume + cancel paths so every observable transition produces
+   * an audit row even if the cockpit never connects.
+   */
+  private emitLifecycle(ev: WorkflowLifecycleEvent, tenantId: string, userId?: string): void {
+    // 1. Live SSE for the cockpit
+    this.emit(`workflow:${ev.workflowId}`, { ...ev, kind: 'lifecycle' });
+
+    // 2. Durable audit row — fire-and-forget, never block the runtime
+    const actionMap: Partial<Record<WorkflowLifecycleEvent['type'], AuditAction>> = {
+      created: AuditAction.WORKFLOW_CREATED,
+      planned: AuditAction.WORKFLOW_PLANNED,
+      started: AuditAction.WORKFLOW_STARTED,
+      step_started: AuditAction.WORKFLOW_STEP_STARTED,
+      step_completed: AuditAction.WORKFLOW_STEP_COMPLETED,
+      step_failed: AuditAction.WORKFLOW_STEP_FAILED,
+      approval_required: AuditAction.APPROVAL_REQUESTED,
+      approval_granted: AuditAction.APPROVAL_GRANTED,
+      approval_rejected: AuditAction.APPROVAL_REJECTED,
+      resumed: AuditAction.WORKFLOW_RESUMED,
+      cancelled: AuditAction.WORKFLOW_CANCELLED,
+      completed: AuditAction.WORKFLOW_COMPLETED,
+      failed: AuditAction.WORKFLOW_FAILED,
+    };
+    const action = actionMap[ev.type];
+    if (!action) return;
+    void this.audit
+      .log({
+        action,
+        tenantId,
+        ...(userId ? { userId } : {}),
+        resource: 'workflow',
+        resourceId: ev.workflowId,
+        details: ev as unknown as Record<string, unknown>,
+      })
+      .catch((err) => {
+        this.log.warn(
+          { workflowId: ev.workflowId, err: err instanceof Error ? err.message : String(err) },
+          '[lifecycle] audit log failed (non-fatal)',
+        );
+      });
+  }
   private readonly workflowService: WorkflowService;
   private readonly audit: AuditLogger;
   private readonly queueWorker: QueueWorker;
@@ -651,17 +708,17 @@ export class SwarmExecutionService extends EventEmitter {
 
     try {
       await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
-      this.emit(`workflow:${workflowId}`, { type: 'started', workflowId, timestamp: new Date().toISOString() });
 
-      // Audit: workflow started
-      void this.audit.log({
-        action: AuditAction.WORKFLOW_STARTED,
-        tenantId,
-        userId,
-        resource: 'workflow',
-        resourceId: workflowId,
-        details: { goal, industry },
-      });
+      // Hardening pass — emit canonical lifecycle 'created' + 'started'
+      // events. Both the SSE cockpit AND the audit log get them through
+      // emitLifecycle. Replaces the previous bare emit + manual audit.log
+      // pair so we never drift in two directions.
+      const nowIso = new Date().toISOString();
+      this.emitLifecycle({ type: 'created', workflowId, tenantId, userId, goal, timestamp: nowIso }, tenantId, userId);
+      this.emitLifecycle({ type: 'started', workflowId, runtime: this.workflowRuntime.name, timestamp: nowIso }, tenantId, userId);
+      // Keep the legacy 'started' SSE event for the old cockpit code that
+      // doesn't yet read the lifecycle envelope.
+      this.emit(`workflow:${workflowId}`, { type: 'started', workflowId, timestamp: nowIso });
 
       // Publish to supervisor bus for cross-cutting coordination
       supervisorBus.publish('workflow:started', {
@@ -747,6 +804,50 @@ export class SwarmExecutionService extends EventEmitter {
         connectedProviders,
         onAgentActivity: (data: unknown) => {
           this.emit(`workflow:${workflowId}`, data);
+          // Hardening pass — translate fine-grained agent events into the
+          // canonical workflow lifecycle vocabulary so the audit log
+          // captures step_started / step_completed / step_failed / planned
+          // without the runner needing to know about audit at all.
+          const ev = data as Record<string, unknown> | undefined;
+          if (!ev || typeof ev !== 'object') return;
+          const t = ev['type'] as string | undefined;
+          const nowIso = new Date().toISOString();
+          if (t === 'plan_created') {
+            const plan = ev['plan'] as { tasks?: unknown[] } | undefined;
+            this.emitLifecycle({
+              type: 'planned',
+              workflowId,
+              planId: ((ev['planId'] as string) ?? `${workflowId}-plan`),
+              taskCount: Array.isArray(plan?.tasks) ? plan!.tasks!.length : 0,
+              timestamp: nowIso,
+            }, tenantId, userId);
+          } else if (t === 'worker_started') {
+            this.emitLifecycle({
+              type: 'step_started',
+              workflowId,
+              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+              timestamp: nowIso,
+            }, tenantId, userId);
+          } else if (t === 'worker_completed') {
+            const success = ev['success'] !== false;
+            this.emitLifecycle(success ? {
+              type: 'step_completed',
+              workflowId,
+              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+              durationMs: (ev['durationMs'] as number) ?? 0,
+              timestamp: nowIso,
+            } : {
+              type: 'step_failed',
+              workflowId,
+              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+              error: (ev['error'] as string) ?? 'unknown',
+              durationMs: (ev['durationMs'] as number) ?? 0,
+              timestamp: nowIso,
+            }, tenantId, userId);
+          }
         },
       });
 
@@ -811,25 +912,25 @@ export class SwarmExecutionService extends EventEmitter {
       await this.workflowService.updateWorkflowStatus(workflowId, dbStatus, errorMessage);
 
       if (dbStatus === 'COMPLETED') {
+        // Lifecycle 'completed' — single emitter does both SSE + audit.
+        this.emitLifecycle({
+          type: 'completed',
+          workflowId,
+          finalStatus: 'COMPLETED' as never,
+          durationMs: result.durationMs,
+          timestamp: new Date().toISOString(),
+        }, tenantId, userId);
+        // Keep legacy SSE event for older cockpit code.
         this.emit(`workflow:${workflowId}`, { type: 'completed', workflowId, status: dbStatus, timestamp: new Date().toISOString() });
-        void this.audit.log({
-          action: AuditAction.WORKFLOW_COMPLETED,
-          tenantId,
-          userId,
-          resource: 'workflow',
-          resourceId: workflowId,
-          details: { durationMs: result.durationMs, traceCount: result.traces.length },
-        });
       } else if (dbStatus === 'FAILED') {
+        this.emitLifecycle({
+          type: 'failed',
+          workflowId,
+          error: errorMessage ?? 'unknown',
+          durationMs: result.durationMs,
+          timestamp: new Date().toISOString(),
+        }, tenantId, userId);
         this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: errorMessage, timestamp: new Date().toISOString() });
-        void this.audit.log({
-          action: AuditAction.WORKFLOW_FAILED,
-          tenantId,
-          userId,
-          resource: 'workflow',
-          resourceId: workflowId,
-          details: { error: errorMessage, durationMs: result.durationMs },
-        });
       } else if (dbStatus === 'PAUSED') {
         // Hardening pass: previously the SSE stream went silent when the
         // approval-node halted the workflow — the cockpit never saw a
@@ -837,7 +938,19 @@ export class SwarmExecutionService extends EventEmitter {
         // the same shape the manual /pause route emits so ChatWorkspace
         // flips the cockpit status badge to AWAITING_APPROVAL and
         // surfaces the approval link.
-        const pendingIds = (result.pendingApprovals as SharedApprovalRequest[] | undefined)?.map(a => a.id) ?? [];
+        const pendingApprovals = (result.pendingApprovals as SharedApprovalRequest[] | undefined) ?? [];
+        const pendingIds = pendingApprovals.map(a => a.id);
+        // One lifecycle 'approval_required' per pending approval — keeps
+        // the audit trail granular per request.
+        for (const a of pendingApprovals) {
+          this.emitLifecycle({
+            type: 'approval_required',
+            workflowId,
+            approvalId: a.id,
+            riskLevel: a.riskLevel,
+            timestamp: new Date().toISOString(),
+          }, tenantId, userId);
+        }
         this.emit(`workflow:${workflowId}`, {
           type: 'paused',
           workflowId,
@@ -1086,6 +1199,23 @@ export class SwarmExecutionService extends EventEmitter {
     this.log.info({ workflowId, decision, reviewedBy }, '[Swarm] Resuming after approval decision');
 
     if (decision === 'REJECTED') {
+      // Hardening pass: full lifecycle on the rejection path so the audit
+      // log distinguishes "user rejected approval" from "workflow failed".
+      this.emitLifecycle({
+        type: 'approval_rejected',
+        workflowId,
+        approvalId: params.approvalId ?? 'unknown',
+        reviewedBy,
+        ...(comment ? { reason: comment } : {}),
+        timestamp: new Date().toISOString(),
+      }, tenantId, reviewedBy);
+      this.emitLifecycle({
+        type: 'cancelled',
+        workflowId,
+        reason: `Rejected by ${reviewedBy}${comment ? `: ${comment}` : ''}`,
+        cancelledBy: reviewedBy,
+        timestamp: new Date().toISOString(),
+      }, tenantId, reviewedBy);
       await this.workflowService.updateWorkflowStatus(
         workflowId,
         'CANCELLED',
@@ -1104,6 +1234,20 @@ export class SwarmExecutionService extends EventEmitter {
     // (Phase 6). The runtime adapter delegates to runner.resume under
     // the hood today; in subsequent phases LangGraphRuntime can pick
     // up an interrupt() and resume natively without touching this code.
+    this.emitLifecycle({
+      type: 'approval_granted',
+      workflowId,
+      approvalId: params.approvalId ?? 'unknown',
+      reviewedBy,
+      timestamp: new Date().toISOString(),
+    }, tenantId, reviewedBy);
+    this.emitLifecycle({
+      type: 'resumed',
+      workflowId,
+      reason: 'approval',
+      timestamp: new Date().toISOString(),
+    }, tenantId, reviewedBy);
+
     try {
       await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
 
@@ -1136,10 +1280,19 @@ export class SwarmExecutionService extends EventEmitter {
    * The DB status should be updated separately via WorkflowService.cancelWorkflow().
    */
   async cancelWorkflow(params: CancelParams): Promise<void> {
-    // Phase 6: route through WorkflowRuntime so LangGraph can later honor
-    // cancel cooperatively without relying on the SwarmRunner's
-    // in-memory cancel signal directly.
+    // Phase 6 + hardening: route through WorkflowRuntime AND emit a
+    // canonical lifecycle 'cancelled' event so the audit log records
+    // who cancelled the workflow and why.
     await this.workflowRuntime.cancel(params.workflowId);
+    if (params.tenantId) {
+      this.emitLifecycle({
+        type: 'cancelled',
+        workflowId: params.workflowId,
+        ...(params.reason ? { reason: params.reason } : {}),
+        ...(params.cancelledBy ? { cancelledBy: params.cancelledBy } : {}),
+        timestamp: new Date().toISOString(),
+      }, params.tenantId, params.cancelledBy);
+    }
   }
 
   /** Pause a running workflow (it will pause between nodes). */

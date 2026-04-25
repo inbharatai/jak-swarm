@@ -19,6 +19,7 @@ import type {
   ResumeDecision,
   WorkflowSnapshot,
 } from './workflow-runtime.js';
+import { safeEmitLifecycle } from './lifecycle-events.js';
 
 export class SwarmGraphRuntime implements WorkflowRuntime {
   readonly name = 'swarmgraph';
@@ -26,6 +27,26 @@ export class SwarmGraphRuntime implements WorkflowRuntime {
   constructor(private readonly runner: SwarmRunner) {}
 
   async start(ctx: StartContext): Promise<SwarmResult> {
+    // Hardening pass: emit canonical lifecycle events at every observable
+    // transition. The audit log replays these to reconstruct exactly what
+    // happened in the workflow. SafeEmit never propagates errors back into
+    // the runtime path — telemetry must not block execution.
+    safeEmitLifecycle(ctx.onLifecycle, {
+      type: 'created',
+      workflowId: ctx.workflowId,
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      goal: ctx.goal,
+      timestamp: new Date().toISOString(),
+    });
+    safeEmitLifecycle(ctx.onLifecycle, {
+      type: 'started',
+      workflowId: ctx.workflowId,
+      runtime: this.name,
+      timestamp: new Date().toISOString(),
+    });
+
+    const startedAt = Date.now();
     const params: RunParams = {
       goal: ctx.goal,
       tenantId: ctx.tenantId,
@@ -44,7 +65,58 @@ export class SwarmGraphRuntime implements WorkflowRuntime {
       connectedProviders: ctx.connectedProviders,
       subscriptionTier: ctx.subscriptionTier,
     };
-    return this.runner.run(params);
+    try {
+      const result = await this.runner.run(params);
+      const durationMs = Date.now() - startedAt;
+
+      // Map terminal SwarmResult.status → lifecycle event.
+      if (result.status === WorkflowStatus.AWAITING_APPROVAL) {
+        for (const a of result.pendingApprovals ?? []) {
+          safeEmitLifecycle(ctx.onLifecycle, {
+            type: 'approval_required',
+            workflowId: ctx.workflowId,
+            approvalId: a.id,
+            riskLevel: a.riskLevel,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } else if (result.status === WorkflowStatus.CANCELLED) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'cancelled',
+          workflowId: ctx.workflowId,
+          reason: 'runtime-reported',
+          timestamp: new Date().toISOString(),
+        });
+      } else if (result.status === WorkflowStatus.FAILED) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'failed',
+          workflowId: ctx.workflowId,
+          error: result.error ?? 'unknown failure',
+          durationMs,
+          timestamp: new Date().toISOString(),
+        });
+      } else if (result.status === WorkflowStatus.COMPLETED) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'completed',
+          workflowId: ctx.workflowId,
+          finalStatus: WorkflowStatus.COMPLETED,
+          durationMs,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      return result;
+    } catch (err) {
+      const durationMs = Date.now() - startedAt;
+      safeEmitLifecycle(ctx.onLifecycle, {
+        type: 'failed',
+        workflowId: ctx.workflowId,
+        error: err instanceof Error ? err.message : String(err),
+        durationMs,
+        timestamp: new Date().toISOString(),
+      });
+      throw err;
+    }
   }
 
   async resume(workflowId: string, decision: ResumeDecision): Promise<SwarmResult> {

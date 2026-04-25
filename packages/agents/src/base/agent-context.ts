@@ -40,10 +40,26 @@ export type AgentActivityEvent =
   | {
       type: 'cost_updated';
       agentRole: string;
+      /** Runtime that produced the call ('openai-responses' | 'legacy' | 'langgraph-shim'). */
+      runtime?: string;
+      /** Resolved model name (e.g. 'gpt-5.4-mini'). */
       model: string;
+      /**
+       * If the runtime fell back to a different model than its first choice
+       * (e.g. tier-3 'gpt-5.4' rate-limited → fallback 'gpt-5'), this is
+       * the actually-used model so the cockpit can surface fallback usage.
+       * Equal to `model` when no fallback occurred.
+       */
+      fallbackModelUsed?: string;
       promptTokens: number;
       completionTokens: number;
+      /** Sum of prompt + completion tokens (mirrors OpenAI usage.total_tokens). */
+      totalTokens?: number;
       costUsd: number;
+      /** Run id (the workflow id at top level). */
+      runId?: string;
+      /** Step id within the workflow — usually the agent role doing this call. */
+      stepId?: string;
       timestamp: string;
     };
 

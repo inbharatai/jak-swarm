@@ -73,6 +73,7 @@ import paddleRoutes from './routes/paddle.routes.js';
 import slackRoutes from './routes/slack.routes.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
+import artifactsRoutes from './routes/artifacts.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
@@ -211,6 +212,10 @@ async function buildApp() {
   await fastify.register(slackRoutes, { prefix: '/slack' });
   await fastify.register(whatsappRoutes, { prefix: '/whatsapp' });
   await fastify.register(documentsRoutes, { prefix: '/documents' });
+  // Hardening pass — Audit & Compliance foundation. Tenant-scoped artifact
+  // CRUD + approval-gated downloads. Routes live at the root because some
+  // are workflow-scoped (/workflows/:id/artifacts) and others by id (/artifacts/:id).
+  await fastify.register(artifactsRoutes);
   await fastify.register(adminDiagnosticsRoutes);
 
   // ─── Model capability check ────────────────────────────────────────────

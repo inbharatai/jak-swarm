@@ -23,6 +23,7 @@
 import type { WorkflowStatus } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
 import type { SwarmResult } from '../runner/swarm-runner.js';
+import type { WorkflowLifecycleEmitter } from './lifecycle-events.js';
 
 /**
  * Decision payload supplied when resuming a paused workflow. Mirrors
@@ -60,6 +61,17 @@ export interface StartContext {
   disabledToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
+  /**
+   * Sink for canonical lifecycle events. Wired by SwarmExecutionService
+   * to persist the events into AuditLog + emit SSE for the cockpit. The
+   * runtime calls this for every transition (created, planned, started,
+   * step_started, step_completed, step_failed, approval_required,
+   * approval_granted, approval_rejected, resumed, cancelled, completed,
+   * failed). When undefined the runtime drops the events silently —
+   * keeping it optional preserves backward compatibility for callers
+   * that don't yet wire the audit emitter.
+   */
+  onLifecycle?: WorkflowLifecycleEmitter;
 }
 
 /**

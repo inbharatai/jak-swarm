@@ -332,32 +332,80 @@ export async function ingestDocumentInBackground(
     // than passing fastify.db because the ingestor's adapter wiring is
     // established at package load time.
     const ingestor = new DocumentIngestor();
+    let ingestedText: string | null = null;
     if (doc.mimeType === 'application/pdf') {
       await ingestor.ingestPDF(doc.tenantId, bytes, {
         documentId: doc.id,
         sourceKey: doc.fileName,
         title: doc.fileName,
       });
+      // PII / injection scan happens against the post-parse text — the
+      // ingestor doesn't surface it, so for now we re-parse to scan.
+      // Acceptable cost: PDF parse is already in the ingest path.
+      try {
+        // Lazy require — pdf-parse has no good ESM types but is already
+        // a transitive dep of @jak-swarm/tools used by DocumentIngestor.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>;
+        const parsed = await pdfParse(bytes);
+        ingestedText = parsed.text ?? null;
+      } catch {
+        ingestedText = null; // re-parse failure is non-fatal here
+      }
     } else if (doc.mimeType.startsWith('text/') || doc.mimeType === 'application/json') {
-      await ingestor.ingestText(doc.tenantId, bytes.toString('utf-8'), {
+      const textContent = bytes.toString('utf-8');
+      await ingestor.ingestText(doc.tenantId, textContent, {
         documentId: doc.id,
         sourceKey: doc.fileName,
         title: doc.fileName,
       });
+      ingestedText = textContent;
     } else {
-      // Images and office docs are stored but not yet indexed. Mark as indexed
-      // so the Files tab doesn't show a perpetual PENDING; the find_document
-      // tool will still surface them via filename/metadata match.
+      // Hardening pass: be honest about what we did. Office docs (XLSX/DOCX),
+      // images (PNG/JPEG/WEBP) are STORED but the bytes are NOT parsed,
+      // chunked, or embedded. Previously we silently flipped to INDEXED
+      // which made the find_document tool look like it was searching their
+      // content — it wasn't. Now the status is STORED_NOT_PARSED so the
+      // Files tab + find_document can show "filename match only" honestly.
       await fastify.db.tenantDocument.update({
         where: { id: documentId },
-        data: { status: 'INDEXED' },
+        data: { status: 'STORED_NOT_PARSED', ingestionError: `Content parsing not implemented for ${doc.mimeType}; file is searchable by filename and metadata only.` },
       });
       return;
     }
 
+    // Hardening pass: PII + prompt-injection scan on ingested text. The
+    // existing security infra (detectPII, detectInjection) was only wired
+    // to the workflow-goal path, not document upload — meaning a malicious
+    // PDF could ride right into the vector store with no guard. We log
+    // the finding into ingestionError for the Files tab to show, but
+    // we do NOT block ingestion (an Audit & Compliance UI lets the user
+    // see the warning + decide whether to keep / quarantine the file).
+    let scanWarning: string | null = null;
+    if (ingestedText && ingestedText.length > 0) {
+      try {
+        const { detectPII, detectInjection } = await import('@jak-swarm/security');
+        const piiResult = detectPII(ingestedText.slice(0, 200_000)); // cap to first ~200KB
+        const injResult = detectInjection(ingestedText.slice(0, 200_000));
+        const flags: string[] = [];
+        if (piiResult.containsPII) flags.push(`PII: ${piiResult.found.join(', ')}`);
+        if (injResult.detected) flags.push(`prompt-injection (confidence ${injResult.confidence})`);
+        if (flags.length > 0) scanWarning = `Document scanned and flagged: ${flags.join(' | ')}`;
+      } catch (scanErr) {
+        // Scan failure is non-fatal — proceed with ingestion + log.
+        fastify.log?.error?.(
+          { documentId, err: scanErr instanceof Error ? scanErr.message : String(scanErr) },
+          '[doc-ingest] PII/injection scan failed',
+        );
+      }
+    }
+
     await fastify.db.tenantDocument.update({
       where: { id: documentId },
-      data: { status: 'INDEXED' },
+      data: {
+        status: 'INDEXED',
+        ...(scanWarning ? { ingestionError: scanWarning } : {}),
+      },
     });
   } catch (err) {
     await fastify.db.tenantDocument.update({
