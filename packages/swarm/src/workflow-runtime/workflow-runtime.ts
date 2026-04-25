@@ -27,9 +27,13 @@ import type { SwarmResult } from '../runner/swarm-runner.js';
 /**
  * Decision payload supplied when resuming a paused workflow. Mirrors
  * `ApprovalDecision` from the existing approvals route.
+ *
+ * `approvalId` is optional because some callers (the approval resume
+ * flow that operates per-workflow rather than per-approval) don't have
+ * an approval id in scope; it's a logging breadcrumb when present.
  */
 export interface ResumeDecision {
-  approvalId: string;
+  approvalId?: string;
   decision: 'APPROVED' | 'REJECTED';
   reviewedBy: string;
   comment?: string;

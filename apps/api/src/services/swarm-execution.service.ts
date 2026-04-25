@@ -9,8 +9,8 @@
 import { EventEmitter } from 'node:events';
 import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
-import { SwarmRunner, supervisorBus } from '@jak-swarm/swarm';
-import type { SwarmResult } from '@jak-swarm/swarm';
+import { SwarmRunner, supervisorBus, getWorkflowRuntime } from '@jak-swarm/swarm';
+import type { SwarmResult, WorkflowRuntime } from '@jak-swarm/swarm';
 import { config } from '../config.js';
 import { Industry, ToolRiskClass } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
@@ -236,6 +236,7 @@ function classifyReplaySafety(state: Record<string, unknown>): {
 
 export class SwarmExecutionService extends EventEmitter {
   private readonly runner: SwarmRunner;
+  private readonly workflowRuntime!: WorkflowRuntime;
   private readonly workflowService: WorkflowService;
   private readonly audit: AuditLogger;
   private readonly queueWorker: QueueWorker;
@@ -258,6 +259,14 @@ export class SwarmExecutionService extends EventEmitter {
     super();
     const stateStore = new DbWorkflowStateStore(db);
     this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
+    // Phase 6 — pick the workflow orchestration engine. JAK_WORKFLOW_RUNTIME
+    // = 'swarmgraph' (default) wraps the existing SwarmRunner; 'langgraph'
+    // wraps it under @langchain/langgraph for proof-of-life parity. Both
+    // delegate to the same SwarmRunner under the hood today, so behavior
+    // is identical — the abstraction lets us swap engines per-request in
+    // future phases without touching this file.
+    this.workflowRuntime = getWorkflowRuntime(this.runner);
+    log.info({ runtime: this.workflowRuntime.name }, '[Swarm] WorkflowRuntime selected');
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
 
@@ -1076,12 +1085,15 @@ export class SwarmExecutionService extends EventEmitter {
       return;
     }
 
-    // APPROVED — re-run from where we left off
+    // APPROVED — re-run from where we left off via WorkflowRuntime
+    // (Phase 6). The runtime adapter delegates to runner.resume under
+    // the hood today; in subsequent phases LangGraphRuntime can pick
+    // up an interrupt() and resume natively without touching this code.
     try {
       await this.workflowService.updateWorkflowStatus(workflowId, 'RUNNING');
 
-      const result = await this.runner.resume(workflowId, {
-        status: 'APPROVED',
+      const result = await this.workflowRuntime.resume(workflowId, {
+        decision: 'APPROVED',
         reviewedBy,
         comment,
       });
@@ -1109,7 +1121,10 @@ export class SwarmExecutionService extends EventEmitter {
    * The DB status should be updated separately via WorkflowService.cancelWorkflow().
    */
   async cancelWorkflow(params: CancelParams): Promise<void> {
-    await this.runner.cancel(params.workflowId);
+    // Phase 6: route through WorkflowRuntime so LangGraph can later honor
+    // cancel cooperatively without relying on the SwarmRunner's
+    // in-memory cancel signal directly.
+    await this.workflowRuntime.cancel(params.workflowId);
   }
 
   /** Pause a running workflow (it will pause between nodes). */
