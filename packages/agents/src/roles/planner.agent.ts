@@ -222,9 +222,19 @@ export class PlannerAgent extends BaseAgent {
         context,
       );
     } catch (err) {
-      this.logger.error(
-        { err: err instanceof Error ? err.message : String(err) },
-        'Planner structured response failed; using fallback plan',
+      // Same recoverable-vs-fatal split as the Commander. A 401 / model-not-found
+      // is a config error and must propagate; a schema mismatch is the LLM
+      // responding badly and warrants the deterministic fallback plan.
+      const msg = err instanceof Error ? err.message : String(err);
+      const isFatalConfig =
+        /\b401\b|\b403\b|incorrect api key|invalid api key|model_not_found|model not found|model[- ]?that[- ]?does[- ]?not[- ]?exist|insufficient_quota|api key/i.test(msg);
+      if (isFatalConfig) {
+        this.logger.error({ err: msg }, 'Planner structured response hit a fatal configuration error; failing the workflow');
+        throw err;
+      }
+      this.logger.warn(
+        { err: msg },
+        'Planner structured response failed (recoverable schema/transient); using fallback plan',
       );
       parsed = {
         planName: 'Fallback Plan',

@@ -16,6 +16,13 @@
 
 import type { LLMRuntime } from './llm-runtime.js';
 import { LegacyRuntime, type LegacyAgentBackend } from './legacy-runtime.js';
+// Static import (was previously a `require('./openai-runtime.js')` which silently
+// failed under vitest/tsx because the .js extension doesn't resolve TS source.
+// The `export { OpenAIRuntime } from './openai-runtime.js'` at the bottom of
+// this file already triggers module load, so the lazy require was never actually
+// lazy. The require + try/catch fallback masked real OpenAI runtime errors in
+// CI — silently degrading to LegacyRuntime when the real intent was OpenAIRuntime.)
+import { OpenAIRuntime as OpenAIRuntimeImpl } from './openai-runtime.js';
 
 /**
  * Read the per-agent allowlist from env. Returns uppercase role names so
@@ -66,15 +73,12 @@ export function getRuntime(
 
   if (useOpenAI) {
     try {
-      // Phase 3: real OpenAIRuntime. Lazily imported so test paths that don't
-      // need it never pay the cost of constructing an OpenAI client.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { OpenAIRuntime } = require('./openai-runtime.js') as typeof import('./openai-runtime.js');
-      return new OpenAIRuntime();
+      return new OpenAIRuntimeImpl();
     } catch (err) {
-      // If OpenAIRuntime construction fails (missing key edge case, SDK
-      // mismatch), fall back to LegacyRuntime so the agent still works.
-      // Never throw here — agent construction must not fail during boot.
+      // If OpenAIRuntime construction fails (e.g. missing OPENAI_API_KEY at
+      // construction time despite the env check above — race), fall back to
+      // LegacyRuntime so the agent still works. Never throw here — agent
+      // construction must not fail during boot.
       // eslint-disable-next-line no-console
       console.warn(
         `[getRuntime] OpenAIRuntime unavailable (${err instanceof Error ? err.message : String(err)}), falling back to LegacyRuntime for role ${role}.`,

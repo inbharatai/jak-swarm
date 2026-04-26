@@ -163,6 +163,12 @@ describe('find_document tool — name + tag match against TenantDocument', () =>
   // This suite exercises the ACTUAL tool registered in the registry.
   // It fakes a Prisma-shaped db module so the tool's name-match path runs
   // without Postgres.
+  //
+  // The beforeEach loads @jak-swarm/tools + registers the full builtin tool
+  // catalog (122 tools). On a cold run inside vitest's parallel test pool
+  // the dynamic import + registration can exceed the default 10s hook
+  // timeout. Bumping to 30s makes the test stable under heavy parallel load
+  // without slowing the happy path (solo runs in ~1.3s).
 
   let findTool: { execute: (input: unknown, ctx: { tenantId: string; userId: string; workflowId: string; runId: string }) => Promise<unknown> } | undefined;
 
@@ -253,7 +259,7 @@ describe('find_document tool — name + tag match against TenantDocument', () =>
           execute: async (input, ctx) => entry.executor(input, ctx as never),
         }
       : undefined;
-  });
+  }, 30_000); // 30s hook timeout — see note at top of describe()
 
   afterEach(() => {
     vi.doUnmock('@jak-swarm/db');

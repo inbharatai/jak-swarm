@@ -142,7 +142,19 @@ export class CommanderAgent extends BaseAgent {
         context,
       );
     } catch (err) {
-      this.logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Commander structured response failed; using fallback');
+      // Distinguish recoverable schema mismatches (LLM responded with bad
+      // shape — fall back to default mission brief, workflow continues) from
+      // fatal configuration errors (auth, model-not-found, network down —
+      // re-throw so the workflow fails honestly instead of silently
+      // continuing with a default brief).
+      const msg = err instanceof Error ? err.message : String(err);
+      const isFatalConfig =
+        /\b401\b|\b403\b|incorrect api key|invalid api key|model_not_found|model not found|model[- ]?that[- ]?does[- ]?not[- ]?exist|insufficient_quota|api key/i.test(msg);
+      if (isFatalConfig) {
+        this.logger.error({ err: msg }, 'Commander structured response hit a fatal configuration error; failing the workflow');
+        throw err;
+      }
+      this.logger.warn({ err: msg }, 'Commander structured response failed (recoverable schema/transient); using fallback mission brief');
       parsed = {
         directAnswer: null,
         intent: rawInput,
