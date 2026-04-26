@@ -79,6 +79,7 @@ import bundlesRoutes from './routes/bundles.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import complianceRoutes from './routes/compliance.routes.js';
 import auditRunsRoutes from './routes/audit-runs.routes.js';
+import companyBrainRoutes from './routes/company-brain.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
@@ -244,6 +245,11 @@ async function buildApp() {
   // /exceptions/:id/remediation, /exceptions/:id/decide, /final-pack.
   // RBAC: writes REVIEWER+, reads any tenant member.
   await fastify.register(auditRunsRoutes);
+  // Company Brain (Migration 16) — CompanyProfile + IntentRecord +
+  // MemoryItem.status approval + WorkflowTemplate library.
+  // Routes: /company/profile/*, /intents, /memory/:id/(approve|reject),
+  // /workflow-templates, /admin/workflow-templates/seed.
+  await fastify.register(companyBrainRoutes);
   // SYSTEM_ADMIN-only cross-tenant aggregate views (separate from
   // /audit/* which is tenant-scoped).
   await fastify.register(adminAggregateRoutes);
@@ -256,6 +262,57 @@ async function buildApp() {
   void ensureModelMap().catch((err) => {
     fastify.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'ensureModelMap() at boot failed; resolver will use failsafe map (gpt-4o family)');
   });
+
+  // ─── Migration 16 — Company Brain wiring at boot ────────────────────────
+  // 1. Register CompanyContextProvider so BaseAgent.injectCompanyContext
+  //    loads the approved CompanyProfile into every agent's system prompt.
+  // 2. Idempotently seed system WorkflowTemplates so tenants that hit
+  //    the matching intent get a pre-tuned plan immediately.
+  try {
+    const { BaseAgent } = await import('@jak-swarm/agents');
+    const { CompanyProfileService } = await import('./services/company-brain/company-profile.service.js');
+    const { WorkflowTemplateService } = await import('./services/company-brain/workflow-template.service.js');
+    const profileSvc = new CompanyProfileService(fastify.db, fastify.log);
+    BaseAgent.companyContextProvider = {
+      getApprovedProfile: async (tenantId: string) => {
+        try {
+          const row = await profileSvc.getApproved(tenantId);
+          if (!row) return null;
+          return {
+            name: row.name,
+            industry: row.industry,
+            description: row.description,
+            productsServices: row.productsServices,
+            targetCustomers: row.targetCustomers,
+            brandVoice: row.brandVoice,
+            competitors: row.competitors,
+            pricing: row.pricing,
+            websiteUrl: row.websiteUrl,
+            goals: row.goals,
+            constraints: row.constraints,
+            preferredChannels: row.preferredChannels,
+          };
+        } catch {
+          // Schema may not be deployed yet (migration 16 pending). Return
+          // null so agents fall back to their default system prompt.
+          return null;
+        }
+      },
+    };
+    fastify.log.info('[CompanyBrain] CompanyContextProvider wired — agents will ground in approved CompanyProfile');
+
+    // Idempotent seed of system WorkflowTemplates. Best-effort — if the
+    // schema isn't deployed, log + continue so the app still boots.
+    try {
+      const tplSvc = new WorkflowTemplateService(fastify.db, fastify.log);
+      const result = await tplSvc.seedSystemTemplates();
+      fastify.log.info({ result }, '[CompanyBrain] WorkflowTemplate seeding done');
+    } catch (seedErr) {
+      fastify.log.warn({ err: seedErr instanceof Error ? seedErr.message : String(seedErr) }, '[CompanyBrain] WorkflowTemplate seeding skipped (schema may be unmigrated)');
+    }
+  } catch (brainErr) {
+    fastify.log.warn({ err: brainErr instanceof Error ? brainErr.message : String(brainErr) }, '[CompanyBrain] Boot wiring failed (non-fatal)');
+  }
 
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity

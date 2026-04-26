@@ -23,6 +23,30 @@ export interface MemoryProvider {
   }>>;
 }
 
+/**
+ * Company context provider — injected by the API layer at boot.
+ * Returns the tenant's APPROVED CompanyProfile (status='user_approved'
+ * or status='manual'). Returns null when no approved profile exists,
+ * which is the honest signal to the agent that it lacks brand voice /
+ * audience / etc. Migration 16.
+ */
+export interface CompanyContextProvider {
+  getApprovedProfile(tenantId: string): Promise<{
+    name: string | null;
+    industry: string | null;
+    description: string | null;
+    productsServices: unknown;
+    targetCustomers: string | null;
+    brandVoice: string | null;
+    competitors: unknown;
+    pricing: string | null;
+    websiteUrl: string | null;
+    goals: string | null;
+    constraints: string | null;
+    preferredChannels: unknown;
+  } | null>;
+}
+
 /** Loop detection: fingerprint → count */
 type ToolCallFingerprints = Map<string, number>;
 
@@ -185,7 +209,77 @@ export abstract class BaseAgent {
    */
   static memoryProvider: MemoryProvider | null = null;
 
+  /**
+   * Company context provider — injected at application boot. When set,
+   * BaseAgent loads the tenant's APPROVED CompanyProfile and prepends
+   * a `<company_context>` block to every agent's system prompt, so the
+   * agent grounds in brand voice / audience / competitors / etc. without
+   * needing to do its own lookup. Migration 16.
+   */
+  static companyContextProvider: CompanyContextProvider | null = null;
+
   abstract execute(input: unknown, context: AgentContext): Promise<unknown>;
+
+  /**
+   * Inject the tenant's approved CompanyProfile as a `<company_context>`
+   * system block. Inserts AFTER the agent's primary system prompt so it
+   * reads as supplementary grounding, not primary instructions.
+   * Non-blocking — any failure swallows + returns the messages unchanged.
+   */
+  protected async injectCompanyContext(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    context: AgentContext,
+  ): Promise<{ messages: OpenAI.ChatCompletionMessageParam[]; fieldsUsed: string[] }> {
+    if (!BaseAgent.companyContextProvider || !context.tenantId) return { messages, fieldsUsed: [] };
+    try {
+      const profile = await BaseAgent.companyContextProvider.getApprovedProfile(context.tenantId);
+      if (!profile) return { messages, fieldsUsed: [] };
+
+      const lines: string[] = [];
+      const fieldsUsed: string[] = [];
+      const push = (field: string, label: string, value: unknown): void => {
+        if (value === null || value === undefined) return;
+        if (typeof value === 'string' && value.trim().length === 0) return;
+        if (Array.isArray(value) && value.length === 0) return;
+        const str = typeof value === 'string' ? value : JSON.stringify(value);
+        if (str.length > 1500) return; // skip overly long fields
+        lines.push(`- ${label}: ${str}`);
+        fieldsUsed.push(field);
+      };
+      push('name',             'Company name',      profile.name);
+      push('industry',         'Industry',          profile.industry);
+      push('description',      'What the company does', profile.description);
+      push('productsServices', 'Products / services', profile.productsServices);
+      push('targetCustomers',  'Target customers',  profile.targetCustomers);
+      push('brandVoice',       'Brand voice',       profile.brandVoice);
+      push('competitors',      'Known competitors', profile.competitors);
+      push('pricing',          'Pricing context',   profile.pricing);
+      push('websiteUrl',       'Website',           profile.websiteUrl);
+      push('goals',            'Stated goals',      profile.goals);
+      push('constraints',      'Stated constraints', profile.constraints);
+      push('preferredChannels','Preferred channels', profile.preferredChannels);
+
+      if (lines.length === 0) return { messages, fieldsUsed: [] };
+
+      const block: OpenAI.ChatCompletionMessageParam = {
+        role: 'system',
+        content: `<company_context>
+The user's company has approved the following context for use across all agents.
+Ground your output in this context — match brand voice, target audience, and product positioning.
+Do not invent additional facts about the company; if a needed field is missing here, say so honestly.
+
+${lines.join('\n')}
+</company_context>`,
+      };
+
+      const result = [...messages];
+      const sysIdx = result.findIndex((m) => m.role === 'system');
+      result.splice(sysIdx + 1, 0, block);
+      return { messages: result, fieldsUsed };
+    } catch {
+      return { messages, fieldsUsed: [] };
+    }
+  }
 
   /**
    * Inject tenant memories into the message array.
@@ -493,7 +587,14 @@ ${lines.join('\n')}
     const allToolCalls: ToolCall[] = [];
     const totalTokens = { prompt: 0, completion: 0, total: 0 };
     let totalCostUsd = 0;
-    const conversation = [...messages];
+    // Migration 16 — inject approved CompanyProfile into the system prompt
+    // so every tool-using agent grounds in the user's company context.
+    // Best-effort: failure or absence of provider returns messages unchanged.
+    // The company_context_loaded lifecycle event is emitted at the workflow
+    // level (swarm-execution.persistIntentAndContext); agent-level emit
+    // is intentionally omitted to avoid double-counting.
+    const grounded = await this.injectCompanyContext(messages, context);
+    const conversation = [...grounded.messages];
     const toolCallFingerprints: ToolCallFingerprints = new Map();
 
     // Lazy-import tool registries to avoid circular dep at module load time

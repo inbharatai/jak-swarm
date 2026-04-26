@@ -960,6 +960,120 @@ export const auditRunsApi = {
     apiDataFetch<void>(`/audit/runs/${id}`, { method: 'DELETE' }),
 };
 
+// ─── Company Brain (Migration 16) ──────────────────────────────────────
+//
+// CompanyProfile + IntentRecord + Memory approval + WorkflowTemplate.
+// All tenant-scoped via the JWT (server reads tenantId from request.user).
+
+export type CompanyProfileStatus = 'extracted' | 'user_approved' | 'manual';
+
+export interface CompanyProfileClient {
+  id: string;
+  tenantId: string;
+  name: string | null;
+  industry: string | null;
+  description: string | null;
+  productsServices: Array<{ name: string; description?: string }> | null;
+  targetCustomers: string | null;
+  brandVoice: string | null;
+  competitors: Array<{ name: string; url?: string; notes?: string }> | null;
+  pricing: string | null;
+  websiteUrl: string | null;
+  goals: string | null;
+  constraints: string | null;
+  preferredChannels: string[] | null;
+  status: CompanyProfileStatus;
+  extractionConfidence: number | null;
+  sourceDocumentIds: string[] | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyProfileFields {
+  name?: string;
+  industry?: string;
+  description?: string;
+  productsServices?: Array<{ name: string; description?: string }>;
+  targetCustomers?: string;
+  brandVoice?: string;
+  competitors?: Array<{ name: string; url?: string; notes?: string }>;
+  pricing?: string;
+  websiteUrl?: string;
+  goals?: string;
+  constraints?: string;
+  preferredChannels?: string[];
+}
+
+export interface IntentRecordClient {
+  id: string;
+  tenantId: string;
+  workflowId: string | null;
+  userId: string;
+  rawInput: string;
+  intent: string;
+  intentConfidence: number | null;
+  subFunction: string | null;
+  urgency: number | null;
+  workflowTemplateId: string | null;
+  clarificationNeeded: boolean;
+  clarificationQuestion: string | null;
+  directAnswer: string | null;
+  createdAt: string;
+}
+
+export interface WorkflowTemplateClient {
+  id: string;
+  tenantId: string | null;
+  intent: string;
+  name: string;
+  description: string;
+  tasksJson: unknown;
+  requiredCompanyContext: string[] | null;
+  requiredUserInputs: string[] | null;
+  approvalGates: string[] | null;
+  expectedArtifacts: string[] | null;
+  status: string;
+}
+
+export const companyBrainApi = {
+  getProfile: () =>
+    apiDataFetch<{ profile: CompanyProfileClient | null }>('/company/profile'),
+  saveManualProfile: (fields: CompanyProfileFields) =>
+    apiDataFetch<{ profile: CompanyProfileClient }>('/company/profile/manual', { method: 'POST', body: fields }),
+  extractProfile: (body?: { documentIds?: string[] }) =>
+    apiDataFetch<{ profile: CompanyProfileClient }>('/company/profile/extract', { method: 'POST', body: body ?? {} }),
+  approveProfile: (body?: { edits?: CompanyProfileFields }) =>
+    apiDataFetch<{ profile: CompanyProfileClient }>('/company/profile/approve', { method: 'POST', body: body ?? {} }),
+  rejectProfile: () =>
+    apiDataFetch<void>('/company/profile', { method: 'DELETE' }),
+  listIntents: (params?: { intent?: string; userId?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: IntentRecordClient[]; total: number; limit: number; offset: number }>(`/intents${qs}`);
+  },
+  intentStats: () =>
+    apiDataFetch<{ stats: Array<{ intent: string; count: number }> }>('/intents/stats'),
+  listPendingMemory: (params?: { limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: Array<{ id: string; key: string; value: unknown; memoryType: string; status: string; suggestedBy: string | null; createdAt: string }>; total: number }>(`/memory/pending${qs}`);
+  },
+  approveMemory: (id: string) =>
+    apiDataFetch<{ approved: boolean; id: string }>(`/memory/${id}/approve`, { method: 'POST', body: {} }),
+  rejectMemory: (id: string, reason?: string) =>
+    apiDataFetch<{ rejected: boolean; id: string }>(`/memory/${id}/reject`, { method: 'POST', body: { reason } }),
+  listTemplates: (intent?: string) => {
+    const qs = intent ? `?intent=${encodeURIComponent(intent)}` : '';
+    return apiDataFetch<{ items: WorkflowTemplateClient[] }>(`/workflow-templates${qs}`);
+  },
+  templateForIntent: (intent: string) =>
+    apiDataFetch<{ template: WorkflowTemplateClient }>(`/workflow-templates/by-intent/${encodeURIComponent(intent)}`),
+};
+
 // ─── SYSTEM_ADMIN cross-tenant aggregate views ─────────────────────────
 //
 // Separate surface from /audit/* (tenant-scoped). Only SYSTEM_ADMIN

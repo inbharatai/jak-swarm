@@ -159,10 +159,17 @@ export function shouldFailover(kind: ProviderErrorKind): boolean {
  *   AGENT_MODEL_MAP['WORKER_APP_ARCHITECT'] = 'claude-opus-4-20250514'; // specific model
  */
 export const AGENT_TIER_MAP: Record<string, ProviderTier> = {
-  // Orchestrators — always premium
+  // Orchestrators — recalibrated in Migration 16 audit pass.
+  // Commander still tier-3 (intent classification needs the best model).
+  // Planner still tier-3 (decomposition quality matters).
+  // Verifier dropped to tier-2 (heuristic-grounded; tier-3 escalation
+  //   happens only on uncertainty — not implemented yet, see roadmap).
+  // Router (new): tier-1 — short, structured agent-to-task assignment.
+  // Guardrail / Approval: deterministic, no LLM.
   COMMANDER: 3,
   PLANNER: 3,
-  VERIFIER: 3,
+  ROUTER: 1,
+  VERIFIER: 2,
   GUARDRAIL: 1, // heuristic, no LLM needed
   APPROVAL: 1,
 

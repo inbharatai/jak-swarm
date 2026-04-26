@@ -5,7 +5,7 @@ import type {
   CRMDeal,
   ContactFilter,
 } from './crm.interface.js';
-import { generateId } from '@jak-swarm/shared';
+// generateId no longer needed — write methods now throw before allocating ids.
 
 const MOCK_CONTACTS: CRMContact[] = [
   {
@@ -287,45 +287,30 @@ export class MockCRMAdapter implements CRMAdapter {
     );
   }
 
-  async updateContact(id: string, updates: Partial<CRMContact>): Promise<CRMContact> {
-    const existing = await this.getContact(id);
-    const updated: CRMContact = {
-      ...existing,
-      ...updates,
-      id: existing.id, // Prevent ID override
-      updatedAt: new Date().toISOString(),
-    };
-    contactStore.set(id, updated);
-    return {
-      ...updated,
-      _mock: true,
-      _notice: 'CRM not connected. Changes NOT saved. Connect HubSpot in Settings > Integrations.',
-    } as CRMContact;
+  // Honesty fix (matches the email + calendar mocks): write operations
+  // THROW instead of returning a success-shaped object with a `_notice`
+  // field that nothing downstream actually inspects. Previously the LLM,
+  // tool handler, and UI all saw what looked like a successful CRM
+  // mutation, then relied on a `_notice` metadata field — which nothing
+  // checked. The agent then reported "✓ updated contact" to the user.
+  // Now these methods throw a typed error the tool layer translates to
+  // a clear "CRM not connected" outcome in the cockpit.
+
+  async updateContact(_id: string, _updates: Partial<CRMContact>): Promise<CRMContact> {
+    throw new Error(
+      'CRM not connected — contact update NOT saved. Connect HubSpot in Settings > Integrations.',
+    );
   }
 
   async createNote(
-    contactId: string,
-    content: string,
-    authorId: string,
-    authorName: string,
+    _contactId: string,
+    _content: string,
+    _authorId: string,
+    _authorName: string,
   ): Promise<CRMNote> {
-    const contact = await this.getContact(contactId);
-    const note: CRMNote = {
-      id: generateId('note_'),
-      contactId,
-      content,
-      authorId,
-      authorName,
-      createdAt: new Date().toISOString(),
-    };
-    contact.notes.push(note);
-    contact.lastActivity = new Date().toISOString();
-    contactStore.set(contactId, contact);
-    return {
-      ...note,
-      _mock: true,
-      _notice: 'CRM not connected. Note NOT saved. Connect HubSpot in Settings > Integrations.',
-    } as CRMNote;
+    throw new Error(
+      'CRM not connected — note NOT saved. Connect HubSpot in Settings > Integrations.',
+    );
   }
 
   async listDeals(contactId?: string): Promise<CRMDeal[]> {
@@ -336,20 +321,9 @@ export class MockCRMAdapter implements CRMAdapter {
     return results;
   }
 
-  async updateDealStage(dealId: string, stage: string, notes?: string): Promise<CRMDeal> {
-    const deal = dealStore.get(dealId);
-    if (!deal) throw new Error(`Deal '${dealId}' not found`);
-    const updated: CRMDeal = {
-      ...deal,
-      stage,
-      notes: notes ?? deal.notes,
-      updatedAt: new Date().toISOString(),
-    };
-    dealStore.set(dealId, updated);
-    return {
-      ...updated,
-      _mock: true,
-      _notice: 'CRM not connected. Changes NOT saved. Connect HubSpot in Settings > Integrations.',
-    } as CRMDeal;
+  async updateDealStage(_dealId: string, _stage: string, _notes?: string): Promise<CRMDeal> {
+    throw new Error(
+      'CRM not connected — deal stage NOT updated. Connect HubSpot in Settings > Integrations.',
+    );
   }
 }

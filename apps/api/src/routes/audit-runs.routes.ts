@@ -548,6 +548,65 @@ const auditRunsRoutes: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+
+  // ── Live SSE on audit_run:{id} channel (Migration 16 / Phase 8) ─────
+  // Replaces the 15s SWR poll on the audit detail page with an
+  // immediate-update stream. Reuses the same channel
+  // `fastify.swarm.emit('audit_run:{id}', ...)` that audit-runs.routes
+  // already publishes to. Backend events are unchanged — this just gives
+  // the cockpit a faster path. SWR poll remains as the safety net.
+  fastify.get(
+    '/audit/runs/:id/stream',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      // Support legacy EventSource token query param (no auth header).
+      const query = request.query as { token?: string };
+      if (!request.headers.authorization && query.token) {
+        request.headers.authorization = `Bearer ${query.token}`;
+      }
+      try {
+        await fastify.authenticate(request, reply);
+      } catch {
+        return reply.code(401).send(err('UNAUTHORIZED', 'Unauthorized'));
+      }
+
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
+
+      // Verify the audit run belongs to this tenant before opening stream
+      try {
+        await runs.get(id, tenantId);
+      } catch {
+        return reply.code(404).send(err('NOT_FOUND', `Audit run ${id} not found`));
+      }
+
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Access-Control-Allow-Origin': '*',
+      });
+
+      const sendEvent = (data: unknown) => {
+        try { reply.raw.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* closed */ }
+      };
+
+      sendEvent({ type: 'connected', auditRunId: id });
+
+      const handler = (event: unknown) => sendEvent(event);
+      fastify.swarm.on(`audit_run:${id}`, handler);
+
+      const heartbeat = setInterval(() => {
+        try { reply.raw.write(`: heartbeat\n\n`); } catch { clearInterval(heartbeat); }
+      }, 15000);
+
+      request.raw.on('close', () => {
+        fastify.swarm.removeListener(`audit_run:${id}`, handler);
+        clearInterval(heartbeat);
+      });
+    },
+  );
 };
 
 export default auditRunsRoutes;

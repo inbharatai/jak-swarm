@@ -3,7 +3,7 @@ export { AgentContext } from './base/agent-context.js';
 export type { AgentActivityEvent, AgentActivityEmitter } from './base/agent-context.js';
 export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent, extractFirstJsonBlob } from './base/base-agent.js';
-export type { ToolLoopResult, MemoryProvider } from './base/base-agent.js';
+export type { ToolLoopResult, MemoryProvider, CompanyContextProvider } from './base/base-agent.js';
 
 // LLM Providers
 export type { LLMProvider, LLMResponse, TextContent, ImageContent, MessageContent } from './base/llm-provider.js';
@@ -34,6 +34,16 @@ export {
 // Orchestrator agents
 export { CommanderAgent } from './roles/commander.agent.js';
 export type { MissionBrief, CommanderOutput } from './roles/commander.agent.js';
+
+// Intent vocabulary — canonical 18 named intents for the company OS.
+export {
+  COMPANY_OS_INTENTS,
+  CompanyOSIntentSchema,
+  INTENT_DESCRIPTIONS,
+  INTENT_TO_LIKELY_AGENTS,
+  INTENT_REQUIRED_CONTEXT,
+} from './intents/intent-vocabulary.js';
+export type { CompanyOSIntent } from './intents/intent-vocabulary.js';
 
 export { PlannerAgent } from './roles/planner.agent.js';
 export type { PlannerOutput } from './roles/planner.agent.js';

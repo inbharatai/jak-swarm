@@ -642,11 +642,18 @@ export function registerBuiltinTools(): void {
 
         for (const chunk of semanticMatches) {
           if (!chunk.documentId) continue;
+          // Migration 16 / Phase 12 — sanitize chunk content before
+          // returning to the agent. Wraps in <UNTRUSTED_DOCUMENT_CONTENT>
+          // tags + scrubs ANSI/zero-width + flags injection patterns.
+          // The system prompt (BaseAgent) tells the model to treat
+          // anything in those tags as data, never instructions.
+          const { sanitizeDocumentChunk } = await import('../security/document-sanitizer.js');
+          const sanitized = sanitizeDocumentChunk(chunk.content.slice(0, 400));
           const existing = byId.get(chunk.documentId);
           if (existing) {
             // Keep the higher of the two scores
             existing.matchScore = Math.max(existing.matchScore, chunk.score);
-            existing.topMatchSnippet = chunk.content.slice(0, 400);
+            existing.topMatchSnippet = sanitized.wrapped;
           } else {
             // Chunk surfaced a document that didn't match by name — fetch the doc.
             const doc = await prisma.tenantDocument.findMany({
@@ -664,7 +671,7 @@ export function registerBuiltinTools(): void {
                 status: d.status,
                 createdAt: d.createdAt.toISOString(),
                 sizeBytes: d.sizeBytes,
-                topMatchSnippet: chunk.content.slice(0, 400),
+                topMatchSnippet: sanitized.wrapped,
                 matchScore: chunk.score,
               });
             }

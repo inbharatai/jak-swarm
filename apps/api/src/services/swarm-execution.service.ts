@@ -14,6 +14,10 @@ import type { SwarmResult, WorkflowRuntime, WorkflowLifecycleEvent } from '@jak-
 import { config } from '../config.js';
 import { Industry, ToolRiskClass } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
+import { COMPANY_OS_INTENTS, INTENT_REQUIRED_CONTEXT, type CompanyOSIntent } from '@jak-swarm/agents';
+import { IntentRecordService } from './company-brain/intent-record.service.js';
+import { CompanyProfileService } from './company-brain/company-profile.service.js';
+import { WorkflowTemplateService } from './company-brain/workflow-template.service.js';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
 import { detectPII, detectInjection, AuditLogger, AuditAction, classifyToolRisk } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
@@ -256,6 +260,146 @@ export class SwarmExecutionService extends EventEmitter {
    * the resume + cancel paths so every observable transition produces
    * an audit row even if the cockpit never connects.
    */
+  /**
+   * Migration 16 — emit intent_detected, persist IntentRecord, then check
+   * required CompanyProfile context per intent. If a required context
+   * field is missing on the approved profile, emit company_context_missing
+   * so the cockpit can surface "we need your brand voice" / etc.
+   *
+   * Workflow_selected fires when a tenant has a matching WorkflowTemplate
+   * for the detected intent.
+   *
+   * Best-effort: any persistence failure logs + continues. Never blocks.
+   */
+  private async persistIntentAndContext(input: {
+    workflowId: string;
+    tenantId: string;
+    userId: string;
+    goal: string;
+    result: { missionBrief?: { intent?: string; intentConfidence?: number | null; subFunction?: string; urgency?: number; riskIndicators?: string[]; requiredOutputs?: string[]; clarificationNeeded?: boolean; clarificationQuestion?: string }; directAnswer?: string };
+  }): Promise<void> {
+    const intentRecords = new IntentRecordService(this.db, this.log);
+    const profileSvc = new CompanyProfileService(this.db, this.log);
+    const templateSvc = new WorkflowTemplateService(this.db, this.log);
+
+    // 1. Determine the intent from the result.
+    let intent: CompanyOSIntent;
+    let intentConfidence: number | null = null;
+    let directAnswer: string | undefined;
+    let clarificationNeeded = false;
+    let clarificationQuestion: string | null = null;
+    let subFunction: string | undefined;
+    let urgency: number | undefined;
+    let riskIndicators: string[] | undefined;
+    let requiredOutputs: string[] | undefined;
+
+    if (input.result.directAnswer) {
+      intent = 'general_question';
+      directAnswer = input.result.directAnswer;
+    } else if (input.result.missionBrief?.clarificationNeeded) {
+      intent = 'ambiguous_request';
+      clarificationNeeded = true;
+      clarificationQuestion = input.result.missionBrief.clarificationQuestion ?? null;
+    } else if (input.result.missionBrief) {
+      const raw = input.result.missionBrief.intent ?? '';
+      intent = (COMPANY_OS_INTENTS as readonly string[]).includes(raw)
+        ? (raw as CompanyOSIntent)
+        : 'ambiguous_request';
+      intentConfidence = input.result.missionBrief.intentConfidence ?? null;
+      subFunction = input.result.missionBrief.subFunction;
+      urgency = input.result.missionBrief.urgency;
+      riskIndicators = input.result.missionBrief.riskIndicators;
+      requiredOutputs = input.result.missionBrief.requiredOutputs;
+    } else {
+      // No mission brief AND no direct answer — Commander failed silently.
+      intent = 'ambiguous_request';
+    }
+
+    // 2. Try to find a matching WorkflowTemplate.
+    let templateId: string | undefined;
+    if (intent !== 'general_question' && intent !== 'ambiguous_request') {
+      try {
+        const template = await templateSvc.findForIntent({ tenantId: input.tenantId, intent });
+        if (template) {
+          templateId = template.id;
+          this.emitLifecycle({
+            type: 'workflow_selected',
+            workflowId: input.workflowId,
+            templateId: template.id,
+            templateName: template.name,
+            intent,
+            timestamp: new Date().toISOString(),
+          }, input.tenantId, input.userId);
+        }
+      } catch {/* schema may not be deployed yet — ignore */}
+    }
+
+    // 3. Persist IntentRecord (analytics + audit trail).
+    try {
+      await intentRecords.create({
+        tenantId: input.tenantId,
+        userId: input.userId,
+        workflowId: input.workflowId,
+        rawInput: input.goal,
+        intent,
+        intentConfidence,
+        ...(subFunction ? { subFunction } : {}),
+        ...(urgency !== undefined ? { urgency } : {}),
+        ...(riskIndicators ? { riskIndicators } : {}),
+        ...(requiredOutputs ? { requiredOutputs } : {}),
+        ...(templateId ? { workflowTemplateId: templateId } : {}),
+        clarificationNeeded,
+        clarificationQuestion,
+        ...(directAnswer ? { directAnswer } : {}),
+      });
+    } catch {/* schema may not be deployed yet — ignore */}
+
+    // 4. Emit intent_detected lifecycle event.
+    this.emitLifecycle({
+      type: 'intent_detected',
+      workflowId: input.workflowId,
+      intent,
+      intentConfidence,
+      ...(subFunction ? { subFunction } : {}),
+      ...(urgency !== undefined ? { urgency } : {}),
+      timestamp: new Date().toISOString(),
+    }, input.tenantId, input.userId);
+
+    // 5. Emit clarification_required when the brief asked for clarification.
+    if (clarificationNeeded && clarificationQuestion) {
+      this.emitLifecycle({
+        type: 'clarification_required',
+        workflowId: input.workflowId,
+        question: clarificationQuestion,
+        timestamp: new Date().toISOString(),
+      }, input.tenantId, input.userId);
+    }
+
+    // 6. Check required CompanyProfile context per intent. Emit
+    // company_context_missing when fields are absent on the APPROVED
+    // profile (extracted-but-unapproved doesn't count for grounding).
+    const requiredFields = INTENT_REQUIRED_CONTEXT[intent] ?? [];
+    if (requiredFields.length > 0) {
+      try {
+        const profile = await profileSvc.getApproved(input.tenantId);
+        const missing = requiredFields.filter((field) => {
+          if (!profile) return true;
+          const v = (profile as unknown as Record<string, unknown>)[field];
+          return v === null || v === undefined || (typeof v === 'string' && v.trim().length === 0);
+        });
+        if (missing.length > 0) {
+          this.emitLifecycle({
+            type: 'company_context_missing',
+            workflowId: input.workflowId,
+            intent,
+            missingFields: missing,
+            timestamp: new Date().toISOString(),
+          }, input.tenantId, input.userId);
+        }
+      } catch {/* schema may not be deployed yet — ignore */}
+    }
+  }
+
   private emitLifecycle(ev: WorkflowLifecycleEvent, tenantId: string, userId?: string): void {
     // 1. Live SSE for the cockpit
     this.emit(`workflow:${ev.workflowId}`, { ...ev, kind: 'lifecycle' });
@@ -275,6 +419,22 @@ export class SwarmExecutionService extends EventEmitter {
       cancelled: AuditAction.WORKFLOW_CANCELLED,
       completed: AuditAction.WORKFLOW_COMPLETED,
       failed: AuditAction.WORKFLOW_FAILED,
+      // Migration 16 — new typed events. Mapped to closest existing
+      // AuditAction so we don't need a schema migration for AuditLog.
+      // The full event payload is preserved in the `details` JSON column.
+      intent_detected: AuditAction.WORKFLOW_PLANNED,
+      clarification_required: AuditAction.WORKFLOW_PLANNED,
+      clarification_answered: AuditAction.WORKFLOW_RESUMED,
+      workflow_selected: AuditAction.WORKFLOW_PLANNED,
+      agent_assigned: AuditAction.WORKFLOW_STEP_STARTED,
+      verification_started: AuditAction.WORKFLOW_STEP_STARTED,
+      verification_completed: AuditAction.WORKFLOW_STEP_COMPLETED,
+      company_context_loaded: AuditAction.MEMORY_READ,
+      company_context_used_by_agent: AuditAction.MEMORY_READ,
+      company_context_missing: AuditAction.WORKFLOW_PLANNED,
+      company_memory_suggested: AuditAction.MEMORY_WRITTEN,
+      company_memory_approved: AuditAction.APPROVAL_GRANTED,
+      company_memory_rejected: AuditAction.APPROVAL_REJECTED,
     };
     const action = actionMap[ev.type];
     if (!action) return;
@@ -853,6 +1013,24 @@ export class SwarmExecutionService extends EventEmitter {
 
       await this.persistTraces(result, tenantId, workflowId);
       await this.persistApprovals(result, tenantId, workflowId);
+
+      // Migration 16 — emit intent_detected, persist IntentRecord, emit
+      // company_context_missing when required CompanyProfile fields aren't
+      // approved. Best-effort; never blocks the workflow.
+      try {
+        await this.persistIntentAndContext({
+          workflowId,
+          tenantId,
+          userId,
+          goal,
+          result: result as { missionBrief?: { intent?: string; intentConfidence?: number | null; subFunction?: string; urgency?: number; riskIndicators?: string[]; requiredOutputs?: string[]; clarificationNeeded?: boolean; clarificationQuestion?: string }; directAnswer?: string },
+        });
+      } catch (intentErr) {
+        this.log.warn(
+          { workflowId, err: intentErr instanceof Error ? intentErr.message : String(intentErr) },
+          '[intent] persistence failed (non-fatal)',
+        );
+      }
 
       // Compile and save final output
       let directAnswerOverride: string | undefined;

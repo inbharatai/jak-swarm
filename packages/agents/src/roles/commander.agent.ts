@@ -6,11 +6,23 @@ import {
   CommanderResponseSchema,
   type CommanderResponseT,
 } from '../runtime/schemas/index.js';
+import {
+  COMPANY_OS_INTENTS,
+  INTENT_DESCRIPTIONS,
+  type CompanyOSIntent,
+} from '../intents/intent-vocabulary.js';
 
 export interface MissionBrief {
   id: string;
   goal: string;
-  intent: string;
+  /**
+   * One of the 18 named intents (CompanyOSIntent enum). Constrained at
+   * the LLM layer via CommanderResponseSchema. Falls back to
+   * 'ambiguous_request' when the LLM is uncertain or to 'general_question'
+   * when Commander short-circuits with a directAnswer.
+   */
+  intent: CompanyOSIntent;
+  intentConfidence: number | null;
   industry: Industry;
   subFunction: string;
   urgency: 1 | 2 | 3 | 4 | 5;
@@ -51,6 +63,10 @@ function detectIndustry(text: string): Industry {
   return bestMatch;
 }
 
+const COMMANDER_INTENT_CATALOG = COMPANY_OS_INTENTS
+  .map((i) => `  - "${i}": ${INTENT_DESCRIPTIONS[i]}`)
+  .join('\n');
+
 const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and either (a) answer trivial requests directly to avoid unnecessary orchestration, or (b) extract structured intelligence from raw user input so specialist agents can execute.
 
 Respond with strict JSON only — no markdown fences, no prose prefix, no explanation.
@@ -58,7 +74,8 @@ Respond with strict JSON only — no markdown fences, no prose prefix, no explan
 You must respond with a JSON object matching this schema:
 {
   "directAnswer": "<string or null>",
-  "intent": "one sentence describing what the user wants to accomplish",
+  "intent": "<one of the 18 named intents below>",
+  "intentConfidence": <number 0-1 — your confidence in the intent classification>,
   "subFunction": "the specific business sub-function this relates to (e.g. 'Claims Processing', 'Invoice Approval', 'Customer Onboarding')",
   "urgency": <number 1-5 where 1=not urgent, 5=critical/emergency>,
   "riskIndicators": ["list of strings describing potential risks or sensitive aspects"],
@@ -66,6 +83,15 @@ You must respond with a JSON object matching this schema:
   "clarificationNeeded": <boolean>,
   "clarificationQuestion": "<question to ask the user if clarification is needed, or null>"
 }
+
+NAMED INTENT VOCABULARY (intent MUST be exactly one of these values):
+${COMMANDER_INTENT_CATALOG}
+
+How to choose:
+- Pick the SINGLE best-matching intent from the list above. Set intentConfidence to your honest confidence (0.9+ when obvious, 0.6-0.8 for plausible match, <0.6 when unsure).
+- When intentConfidence < 0.6 AND no intent is a strong fit → use "ambiguous_request" + set clarificationNeeded=true + write a clarificationQuestion.
+- When directAnswer is set (greeting/trivial) → use "general_question".
+- When the user request is "audit my compliance" / "run a SOC 2 audit" → use "audit_compliance_workflow" (this routes to the dedicated /audit/runs API surface).
 
 CRITICAL RULE — Direct-answer short-circuit:
 Set \`directAnswer\` to a non-empty string ONLY when the input can be answered from general knowledge WITHOUT needing to search the web, run tools, write code, fetch user documents, or consult other agents.
@@ -157,13 +183,16 @@ export class CommanderAgent extends BaseAgent {
       this.logger.warn({ err: msg }, 'Commander structured response failed (recoverable schema/transient); using fallback mission brief');
       parsed = {
         directAnswer: null,
-        intent: rawInput,
+        // Fallback intent: 'ambiguous_request' is honest — we genuinely
+        // failed to classify. The clarification gate will fire below.
+        intent: 'ambiguous_request',
+        intentConfidence: 0,
         subFunction: 'General Task',
         urgency: 3,
         riskIndicators: [],
         requiredOutputs: ['task completion'],
-        clarificationNeeded: false,
-        clarificationQuestion: null,
+        clarificationNeeded: true,
+        clarificationQuestion: 'I had trouble understanding your request. Could you rephrase what you\'d like me to do?',
       };
     }
 
@@ -205,7 +234,12 @@ export class CommanderAgent extends BaseAgent {
     const missionBrief: MissionBrief = {
       id: this.generateId('mb_'),
       goal: rawInput,
-      intent: parsed.intent ?? rawInput,
+      // parsed.intent is now constrained to a CompanyOSIntent by the schema;
+      // null only when the LLM omits it (rare given strict json_schema). We
+      // fall back to 'ambiguous_request' rather than free text to keep the
+      // downstream IntentRecord + WorkflowTemplate lookup surface stable.
+      intent: (parsed.intent as CompanyOSIntent | null) ?? 'ambiguous_request',
+      intentConfidence: parsed.intentConfidence,
       industry: detectedIndustry,
       subFunction: parsed.subFunction ?? 'General Task',
       urgency: (Math.min(5, Math.max(1, parsed.urgency ?? 3)) as 1 | 2 | 3 | 4 | 5),

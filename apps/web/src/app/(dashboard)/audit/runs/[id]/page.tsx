@@ -69,8 +69,47 @@ export default function AuditRunDetailPage() {
   const { data, error, isLoading, mutate: refresh } = useSWR<AuditRunDetail>(
     id ? `audit:runs:${id}` : null,
     () => auditRunsApi.get(id),
+    // 15s SWR poll as fallback. Live updates come via the SSE channel
+    // `audit_run:{id}` wired below — when an event arrives we mutate
+    // immediately, so the poll is only for safety net + initial load.
     { refreshInterval: 15_000 },
   );
+
+  // Live SSE on the audit_run:{id} channel — drops the per-action wait
+  // from "up to 15s" to "immediate". Backend already emits all 13 audit
+  // lifecycle events on this channel via fastify.swarm.emit() in
+  // audit-runs.routes.ts. We just need to listen.
+  React.useEffect(() => {
+    if (!id) return;
+    // Pull a JWT for the EventSource query param (EventSource can't set
+    // headers). The api-client cookie/header path doesn't help here.
+    let es: EventSource | null = null;
+    try {
+      const token = typeof window !== 'undefined'
+        ? (window.localStorage.getItem('jak_token') ?? document.cookie.split('; ').find((c) => c.startsWith('jak_token='))?.split('=')[1] ?? '')
+        : '';
+      const apiBase = (process.env['NEXT_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
+      if (!apiBase) return;
+      const url = `${apiBase}/audit/runs/${encodeURIComponent(id)}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      es = new EventSource(url);
+      es.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data) as { type?: string };
+          if (typeof ev?.type === 'string') {
+            // Any audit lifecycle event → refetch the detail. Cheap because
+            // the cockpit shows a single audit run, and the GET is small.
+            void refresh();
+          }
+        } catch { /* ignore malformed */ }
+      };
+      es.onerror = () => {
+        // Silent — SWR poll picks up the slack.
+        es?.close();
+        es = null;
+      };
+    } catch { /* SSE unavailable — fall back to SWR poll */ }
+    return () => { es?.close(); };
+  }, [id, refresh]);
 
   if (isAuthLoading || isLoading) {
     return (

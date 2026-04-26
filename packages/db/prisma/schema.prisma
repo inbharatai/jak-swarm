@@ -50,6 +50,7 @@ model Tenant {
   vectorDocuments VectorDocument[]
   tenantDocuments TenantDocument[]
   subscription    Subscription?
+  companyProfile  CompanyProfile?
 
   @@map("tenants")
 }
@@ -395,6 +396,20 @@ model MemoryItem {
   contentHash    String?
   version        Int       @default(1)
   expiresAt      DateTime?
+  // Approval status — added in migration 16. Existing rows default to
+  // 'user_approved' (backward compat: any pre-existing memory was
+  // necessarily user-curated since there was no agent-suggestion flow).
+  // - 'extracted'      : auto-extracted from documents/website, awaits review
+  // - 'suggested'      : agent proposed during a workflow run, awaits review
+  // - 'user_approved'  : reviewer or user explicitly approved (only these
+  //                     are loaded into agent prompts via grounding)
+  // - 'rejected'       : reviewer explicitly rejected; never re-suggested
+  status         String    @default("user_approved")
+  // Who suggested it (when status='suggested') or extracted (when 'extracted')
+  suggestedBy    String?
+  // Who approved/rejected
+  reviewedBy     String?
+  reviewedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -406,6 +421,7 @@ model MemoryItem {
   @@unique([tenantId, scopeType, scopeId, key])
   @@index([tenantId, scopeType, scopeId])
   @@index([tenantId, memoryType])
+  @@index([tenantId, status])
   @@index([tenantId, updatedAt])
   @@index([tenantId, deletedAt])
   @@map("memory_items")
@@ -1291,4 +1307,153 @@ model AuditWorkpaper {
   @@unique([auditRunId, controlId])
   @@index([tenantId, auditRunId, status])
   @@map("audit_workpapers")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Migration 16 — Company Brain + Intent vocabulary + Workflow templates
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Adds the four primitives the layman-friendly company OS needs:
+//   1. CompanyProfile  — name/industry/brand voice/audience/competitors/etc.
+//   2. IntentRecord    — persisted intent classification per workflow
+//   3. WorkflowTemplate— pre-tuned best-practice decompositions per intent
+//   4. CompanyKnowledgeSource — URLs the user wants ingested (separate from
+//                              uploaded TenantDocuments)
+//
+// All additive — no changes to existing models. Approval gates enforced at
+// the service layer via the `status` field.
+
+// CompanyProfile — one row per tenant (logical singleton).
+//
+// Status:
+//   - 'extracted'    : LLM extracted from uploaded docs/URLs; awaits user review
+//   - 'user_approved': user reviewed + confirmed; agents may load this profile
+//                     into their system prompt for grounding
+//   - 'manual'       : user typed everything by hand, no extraction
+//
+// The agent-grounding layer ONLY loads profiles where status='user_approved'
+// or status='manual'. Extracted-but-unapproved profiles are visible to the
+// user for review but NOT used by agents until approved. No silent
+// overwrite — the user must explicitly approve.
+model CompanyProfile {
+  id                  String    @id @default(cuid())
+  tenantId            String    @unique
+  name                String?
+  industry            String?
+  description         String?   @db.Text
+  productsServices    Json?     // Array of {name, description}
+  targetCustomers     String?   @db.Text
+  brandVoice          String?   @db.Text  // e.g. "professional, warm, jargon-light"
+  competitors         Json?     // Array of {name, url?, notes?}
+  pricing             String?   @db.Text
+  websiteUrl          String?
+  goals               String?   @db.Text
+  constraints         String?   @db.Text
+  preferredChannels   Json?     // ['email', 'slack', 'whatsapp']
+  status              String    @default("extracted")
+  // Confidence per LLM extraction (0-1). Null when status='manual'.
+  extractionConfidence Float?
+  // Source documents the extraction was based on (TenantDocument ids)
+  sourceDocumentIds   Json?
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+// CompanyKnowledgeSource — URLs the user wants ingested into the Brain.
+// Separate from TenantDocument because this is for ongoing tracking
+// (monitor a competitor's pricing page, watch for changes, etc.).
+model CompanyKnowledgeSource {
+  id          String    @id @default(cuid())
+  tenantId    String
+  url         String
+  kind        String    // 'website' | 'competitor' | 'pricing' | 'product' | 'blog' | 'other'
+  title       String?
+  // Last successful crawl
+  lastCrawledAt DateTime?
+  // Status of last crawl: 'pending' | 'crawled' | 'failed'
+  lastCrawlStatus String  @default("pending")
+  lastCrawlError String?  @db.Text
+  // Vector document ids produced from the crawl (so we can re-ingest)
+  vectorDocumentIds Json?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([tenantId, url])
+  @@index([tenantId, kind, deletedAt])
+  @@map("company_knowledge_sources")
+}
+
+// IntentRecord — persists the Commander's intent classification per
+// workflow run, so we have a queryable history (analytics, future
+// follow-up routing, audit trail).
+//
+// The `intent` field is constrained at the application layer to one of
+// the 18 named values defined in COMPANY_OS_INTENTS (packages/agents/
+// src/intents/intent-vocabulary.ts).
+model IntentRecord {
+  id                String    @id @default(cuid())
+  tenantId          String
+  workflowId        String?   // null when Commander short-circuits with directAnswer
+  userId            String
+  rawInput          String    @db.Text
+  intent            String    // one of the 18 named intents
+  intentConfidence  Float?    // 0-1, LLM-self-reported
+  subFunction       String?
+  urgency           Int?      // 1-5
+  riskIndicators    Json?     // String[]
+  requiredOutputs   Json?     // String[]
+  workflowTemplateId String?  // FK to WorkflowTemplate.id when matched
+  clarificationNeeded Boolean @default(false)
+  clarificationQuestion String? @db.Text
+  directAnswer      String?   @db.Text  // when Commander short-circuited
+  createdAt         DateTime  @default(now())
+
+  @@index([tenantId, intent, createdAt])
+  @@index([tenantId, workflowId])
+  @@index([tenantId, userId, createdAt])
+  @@map("intent_records")
+}
+
+// WorkflowTemplate — pre-tuned best-practice workflow specifications,
+// matched to user intents. The Commander/Planner can look up a template
+// by intent and use its tuned decomposition instead of asking the LLM
+// to re-derive it from scratch.
+//
+// status: 'active' | 'inactive' | 'experimental'
+model WorkflowTemplate {
+  id              String    @id @default(cuid())
+  // Per-tenant overrides allowed. tenantId=null means a system template
+  // available to all tenants (the seeded library).
+  tenantId        String?
+  intent          String    // one of the 18 named intents
+  name            String
+  description     String    @db.Text
+  // The tasks the Planner should produce. Array of {id, name, agentRole,
+  // toolsRequired, dependsOn, riskLevel, requiresApproval, retryable}.
+  tasksJson       Json
+  // Required company-context fields (e.g. ['brandVoice', 'targetCustomers'])
+  // The Commander surfaces "missing inputs" when these aren't on the tenant's
+  // CompanyProfile.
+  requiredCompanyContext Json?
+  // Required user inputs (e.g. ['websiteUrl', 'audience'])
+  requiredUserInputs Json?
+  // Approval gates — array of step ids that need approval before continuing.
+  approvalGates   Json?
+  // Expected artifact types (e.g. ['report.pdf', 'campaign.json'])
+  expectedArtifacts Json?
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, intent, name])
+  @@index([intent, status])
+  @@map("workflow_templates")
 }
