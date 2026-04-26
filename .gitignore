@@ -36,3 +36,12 @@ docs/_generated/
 scripts/automation/.env.*
 .env.render-*
 .env.vercel-*
+
+# Playwright + test artifacts (transient — produced by QA test runs, never source-of-truth)
+qa/playwright-artifacts/
+qa/post-fix-playwright-artifacts/
+qa/_generated/
+qa/_findings-pretty.json
+qa/_selectors.json
+tests/test-results/
+playwright-report/

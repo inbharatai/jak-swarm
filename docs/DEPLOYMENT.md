@@ -321,6 +321,19 @@ The SupervisorBus is currently in-process (Node EventEmitter). For multi-instanc
 | `AUTH_SECRET` | JWT signing secret (strong random, 32+ chars) |
 | `OPENAI_API_KEY` | Primary LLM provider |
 
+### Required for the Audit & Compliance Agent Pack
+| Variable | Description |
+|---|---|
+| `EVIDENCE_SIGNING_SECRET` | 32+ byte HMAC-SHA256 secret for final-pack + evidence-bundle signing. Generate with `openssl rand -base64 48`. Without it, `POST /audit/runs/:id/final-pack` and `POST /bundles` return `503 BUNDLE_SIGNING_UNAVAILABLE`. **Rotate independently of `AUTH_SECRET`** — they intentionally do not share key material. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL — required by `ArtifactService` for storing workpaper PDF / bundle bytes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
+
+After the first deploy with these set, run:
+```bash
+pnpm db:migrate:deploy             # applies migration 15_audit_runs (additive)
+pnpm seed:compliance               # seeds 167 controls (idempotent)
+```
+
 ### Optional (enable features when set)
 | Variable | Feature |
 |---|---|

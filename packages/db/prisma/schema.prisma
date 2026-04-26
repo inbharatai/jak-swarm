@@ -1109,3 +1109,186 @@ model ControlAttestation {
   @@index([tenantId, frameworkId, createdAt])
   @@map("control_attestations")
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit & Compliance v2 — Audit Run product
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Distinct from generic Workflow + Compliance attestation systems. An
+// AuditRun represents a full audit engagement (e.g. "Q1 2026 SOC 2 Type 2
+// readiness check for Apex Health Network"). It owns ControlTest rows
+// (one per control in the framework), AuditException rows (created when a
+// test fails), and AuditWorkpaper rows (one per control with rich
+// narrative).
+//
+// State machine (audit-run-status enum stored as String):
+//   PLANNING       — created, awaiting plan() call
+//   PLANNED        — control tests seeded
+//   MAPPING        — auto-mapper running
+//   TESTING        — control tests running
+//   REVIEWING      — workpapers generated, awaiting reviewer
+//   READY_TO_PACK  — all workpapers approved
+//   FINAL_PACK     — final pack generated
+//   COMPLETED      — terminal: pack delivered
+//   FAILED         — terminal: error before pack
+//   CANCELLED      — terminal: operator cancelled
+
+model AuditRun {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  userId              String
+  // Stable framework slug (e.g. "soc2-type2") — soft FK to ComplianceFramework.slug
+  frameworkSlug       String
+  // Human-friendly title shown in the workspace (e.g. "Q1 2026 SOC 2 readiness")
+  title               String
+  // Optional scope description (e.g. "production cluster + customer support workflows")
+  scope               String?   @db.Text
+  // Period the audit covers
+  periodStart         DateTime
+  periodEnd           DateTime
+  // State machine
+  status              String    @default("PLANNING")
+  // Risk summary computed from test results: 'low' / 'medium' / 'high' / 'critical'
+  riskSummary         String?
+  // Computed coverage % across ControlTest rows (passed / total).
+  coveragePercent     Float?
+  // Set when status transitions to FINAL_PACK; points at the signed evidence bundle artifact
+  finalPackArtifactId String?
+  // Optional metadata (control framework variant, customer name, etc.)
+  metadata            Json?
+  // Soft-delete pattern matches WorkflowArtifact + TenantDocument
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  controlTests        ControlTest[]
+  exceptions          AuditException[]
+  workpapers          AuditWorkpaper[]
+
+  @@index([tenantId, status, deletedAt])
+  @@index([tenantId, frameworkSlug])
+  @@index([tenantId, createdAt])
+  @@map("audit_runs")
+}
+
+// ControlTest — one row per (auditRun, control). Records the test
+// procedure, evidence considered, result, and any reviewer notes.
+//
+// Statuses: 'not_started' / 'evidence_missing' / 'evidence_received' /
+// 'testing' / 'passed' / 'failed' / 'exception_found' /
+// 'reviewer_required' / 'approved' / 'rejected' / 'remediated'
+//
+// Result: 'pass' / 'fail' / 'exception' / 'needs_evidence' (terminal)
+model ControlTest {
+  id              String    @id @default(cuid())
+  tenantId        String
+  auditRunId      String
+  // Soft FK to ComplianceControl.id — the control being tested
+  controlId       String
+  // Snapshot of the control code at test time (e.g. "CC6.1") so the
+  // workpaper survives if the catalog is reorganised
+  controlCode     String
+  controlTitle   String
+  // Test procedure narrative (LLM-generated or human-curated)
+  testProcedure   String?   @db.Text
+  // Per-test status (state machine — see comment above model)
+  status          String    @default("not_started")
+  // Terminal result (when status reaches a terminal state)
+  result          String?
+  // LLM rationale for the result
+  rationale       String?   @db.Text
+  // 0-1 confidence — when <0.7 the workpaper requires reviewer override
+  confidence      Float?
+  // Snapshot of evidence considered (audit_log/workflow/approval/artifact/manual_evidence ids)
+  evidenceConsidered Json?
+  evidenceCount   Int       @default(0)
+  // Set when result='fail' or 'exception' → AuditException row id
+  exceptionId     String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+
+  @@unique([auditRunId, controlId])
+  @@index([tenantId, auditRunId, status])
+  @@index([tenantId, controlId])
+  @@map("control_tests")
+}
+
+// AuditException — created when a ControlTest result is 'fail' or
+// 'exception'. Tracked through remediation lifecycle.
+//
+// Severity: 'low' / 'medium' / 'high' / 'critical' (from control's riskLevel)
+// Status: 'open' / 'remediation_planned' / 'remediation_in_progress' /
+// 'remediation_complete' / 'accepted' / 'rejected' / 'closed'
+model AuditException {
+  id              String    @id @default(cuid())
+  tenantId        String
+  auditRunId      String
+  controlTestId   String?
+  controlId       String
+  controlCode     String
+  severity        String    @default("medium")
+  // Description of the exception (LLM-synthesised or human)
+  description     String    @db.Text
+  // Root cause analysis
+  cause           String?   @db.Text
+  // Business impact narrative
+  impact          String?   @db.Text
+  // Remediation plan (suggested by AI or curated)
+  remediationPlan String?   @db.Text
+  remediationOwner String?
+  remediationDueDate DateTime?
+  status          String    @default("open")
+  // Reviewer decision when accepted/rejected
+  reviewerStatus  String?
+  reviewerComment String?   @db.Text
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, auditRunId, status])
+  @@index([tenantId, severity, status])
+  @@map("audit_exceptions")
+}
+
+// AuditWorkpaper — per-control narrative pulling together control,
+// tests, evidence, exceptions, reviewer notes. Generated as a real PDF
+// via existing exportPdf() and persisted as a WorkflowArtifact with
+// artifactType='workpaper' + approvalState='REQUIRES_APPROVAL'.
+//
+// Status: 'draft' / 'needs_evidence' / 'needs_review' / 'rejected' /
+// 'approved' / 'final'
+model AuditWorkpaper {
+  id              String    @id @default(cuid())
+  tenantId        String
+  auditRunId      String
+  controlTestId   String?
+  controlId       String
+  controlCode     String
+  controlTitle    String
+  // The PDF artifact id (FK to workflow_artifacts via app code; no schema FK
+  // because WorkflowArtifact has its own approval gate flow)
+  artifactId      String?
+  // Status (mirrors WorkflowArtifact.approvalState semantics; 'final' set
+  // once included in a final pack)
+  status          String    @default("draft")
+  // Reviewer narrative override (when reviewer edits the LLM-generated text)
+  reviewerNotes   String?   @db.Text
+  generatedBy     String
+  reviewedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+
+  @@unique([auditRunId, controlId])
+  @@index([tenantId, auditRunId, status])
+  @@map("audit_workpapers")
+}

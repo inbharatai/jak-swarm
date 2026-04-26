@@ -7,14 +7,15 @@
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
+[![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_HIPAA_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](https://jakswarm.com)
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-448_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Typecheck](https://img.shields.io/badge/Typecheck-23_packages_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**Operator-grade multi-agent control plane. 38 specialist agents + 122 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
+**Operator-grade multi-agent control plane. 38 specialist agents + 122 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Production Audit & Compliance Agent Pack (SOC 2 / HIPAA / ISO 27001) with 167 seeded controls, LLM-driven control testing, reviewer-gated workpaper PDFs, and HMAC-signed final evidence packs. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
 
-[Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
+[Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
 ---
 
@@ -150,6 +151,7 @@ flowchart LR
 | | Feature | Description |
 |---|---------|-------------|
 | 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
+| 🛡️ | **Audit & Compliance Agent Pack** | Full audit engagement workflow: `AuditRun` lifecycle (PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED), 167 controls seeded across SOC 2 Type 2 (48), HIPAA Security Rule (37), and ISO/IEC 27001:2022 (82). LLM-driven control test evaluation (deterministic fallback when no key), auto-created `AuditException` rows on test failure, per-control workpaper PDFs gated by reviewer approval, HMAC-SHA256 signed final evidence pack. End-to-end e2e test passes. See [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md). |
 | 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
 | 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
@@ -595,6 +597,99 @@ flowchart TD
 
 ---
 
+## 🛡️ Audit & Compliance Agent Pack
+
+<div align="center">
+
+**Run a real SOC 2 / HIPAA / ISO 27001 audit engagement end-to-end. Plan controls, auto-map evidence, run LLM-driven control tests, generate per-control workpaper PDFs gated by reviewer approval, and produce a binding HMAC-signed final evidence pack — verifiable byte-for-byte.**
+
+*Built on the same durable workflow + lifecycle event + RBAC + signed-bundle foundation that powers everything else in JAK.*
+
+</div>
+
+### Frameworks shipped (167 controls total)
+
+| Framework | Slug | Issuer | Version | Controls |
+|---|---|---|---|---|
+| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 48 |
+| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 |
+| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 |
+
+Each control is real-seeded from the published standard. 10 implemented `autoRuleKey` rules map evidence (audit log rows, approvals, workflow artifacts, signed bundles, PII detections, guardrail events, tool blocks, …) onto controls that have automation; controls without a rule are clearly classified as human-mapped only.
+
+### Engagement flow
+
+```
+User → POST /audit/runs                                  AuditRunService.create()
+                                                         status = PLANNING
+                                                         emit audit_run_started
+       POST /audit/runs/:id/plan                         seed ControlTest rows
+                                                         status = PLANNED
+                                                         emit audit_plan_created
+       POST /audit/runs/:id/auto-map                     ComplianceMapperService.runForTenant()
+                                                         emit evidence_mapped
+       POST /audit/runs/:id/test-controls                ControlTestService.runAll()
+                                                         per control: emit control_test_started/_completed
+                                                         on fail/exception: emit exception_found + auto-create AuditException
+                                                         status = TESTING → REVIEWING
+       POST /audit/runs/:id/workpapers/generate          WorkpaperService.generateAll()
+                                                         per control: render real PDF (pdfkit)
+                                                         persist as WorkflowArtifact, approvalState=REQUIRES_APPROVAL
+                                                         emit workpaper_generated + reviewer_action_required
+       POST /audit/runs/:id/workpapers/:wpId/decide      WorkpaperService.setReviewDecision()
+                                                         propagates to ArtifactService.setApprovalState
+                                                         all approved → status = READY_TO_PACK
+       POST /audit/runs/:id/final-pack                   FinalAuditPackService.generate()
+                                                         GATE: refuses if any workpaper unapproved
+                                                         bundles workpapers + control matrix CSV +
+                                                         exceptions JSON + executive summary PDF
+                                                         signs via bundle-signing.service (HMAC-SHA256)
+                                                         status = FINAL_PACK → COMPLETED
+                                                         emit final_pack_generated + audit_run_completed
+```
+
+### What's shipped (real, working, typechecked, e2e-tested)
+
+| Capability | File |
+|---|---|
+| 4 Prisma models (`AuditRun`, `ControlTest`, `AuditException`, `AuditWorkpaper`) + migration 15 | [packages/db/prisma/migrations/15_audit_runs/migration.sql](packages/db/prisma/migrations/15_audit_runs/migration.sql) |
+| State machine with `assertAuditTransition()` refusing illegal jumps | [apps/api/src/services/audit/audit-run.service.ts](apps/api/src/services/audit/audit-run.service.ts) |
+| LLM-driven control test evaluation (deterministic fallback when no key) | [apps/api/src/services/audit/control-test.service.ts](apps/api/src/services/audit/control-test.service.ts) |
+| Auto-create exceptions on test failure + reviewer lifecycle | [apps/api/src/services/audit/audit-exception.service.ts](apps/api/src/services/audit/audit-exception.service.ts) |
+| Real PDF workpapers via existing `exportPdf` (pdfkit) | [apps/api/src/services/audit/workpaper.service.ts](apps/api/src/services/audit/workpaper.service.ts) |
+| HMAC-SHA256 signed final pack with workpaper-approval gate | [apps/api/src/services/audit/final-audit-pack.service.ts](apps/api/src/services/audit/final-audit-pack.service.ts) |
+| 14 REST endpoints under `/audit/runs/*`, REVIEWER+ RBAC on writes | [apps/api/src/routes/audit-runs.routes.ts](apps/api/src/routes/audit-runs.routes.ts) |
+| 13 audit-specific lifecycle events on the `audit_run:{id}` SSE channel | (see [docs/agent-run-cockpit.md](docs/agent-run-cockpit.md)) |
+| `/audit/runs` workspace + `/audit/runs/:id` detail UI (control matrix + workpaper + exception panels) | [apps/web/src/app/(dashboard)/audit/runs/page.tsx](apps/web/src/app/(dashboard)/audit/runs/page.tsx) |
+| 11-assertion end-to-end test: create → plan → test → workpaper → approve → signed pack → signature verify | [tests/integration/audit-run-e2e.test.ts](tests/integration/audit-run-e2e.test.ts) |
+
+### Reviewer gates (enforced at every layer)
+
+1. **Test confidence < 0.7** → status `reviewer_required` (won't auto-pass)
+2. **Every workpaper PDF** persists with `approvalState='REQUIRES_APPROVAL'` — download blocked, run can't advance until approved
+3. **Final-pack signing** refuses if ANY workpaper is unapproved (`FinalPackGateError`)
+4. **Exception lifecycle** runs through its own state machine — `IllegalAuditExceptionTransitionError` blocks bad transitions
+
+### Honesty notes
+
+- LLM evaluation is real (`OpenAIRuntime.respondStructured` with strict json_schema). When `OPENAI_API_KEY` is absent, the service falls back to a deterministic coverage rule and writes `"deterministic coverage rule (no LLM key configured)"` as the rationale so reviewers see the difference. Never silent-faked.
+- Lifecycle events carry an `agentRole` field (`AUDIT_COMMANDER`, `CONTROL_TEST_AGENT`, `EXCEPTION_FINDER`, `WORKPAPER_WRITER`, `FINAL_AUDIT_PACK_AGENT`, `COMPLIANCE_MAPPER`). The work itself is performed by the named service. We did NOT create 9 fake `BaseAgent` placeholder classes — that's a documented Phase 2 optimization in [qa/audit-compliance-readiness-audit.md](qa/audit-compliance-readiness-audit.md).
+- Things explicitly deferred (and named, not faked) — external auditor portal (~2 weeks), real LangGraph nodes (~2 weeks), DOCX/XLSX/image content parsing for evidence (~3 days), live SSE on the audit detail page (~1 day; currently 15s SWR polling). Full deferral table in [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md).
+
+### Reference docs
+
+| Doc | Purpose |
+|---|---|
+| [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md) | Product overview |
+| [docs/audit-framework-library.md](docs/audit-framework-library.md) | Per-framework + per-control reference |
+| [docs/audit-workpapers.md](docs/audit-workpapers.md) | Workpaper generation + approval flow |
+| [docs/audit-human-review.md](docs/audit-human-review.md) | 4 human-in-loop surfaces + RBAC matrix |
+| [docs/audit-api.md](docs/audit-api.md) | Endpoint reference + error codes + SSE channel |
+| [docs/agent-run-cockpit.md](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
+| [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md) | 26-point shipped + deferred report |
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -626,13 +721,18 @@ Edit `.env` -- at minimum set:
 OPENAI_API_KEY=sk-your-key-here
 DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
 AUTH_SECRET=your-random-32-char-string-here
+
+# Required for the Audit & Compliance final-pack signing
+EVIDENCE_SIGNING_SECRET=$(openssl rand -base64 48)
 ```
 
 ### 3. Setup Database
 
 ```bash
 pnpm --filter @jak-swarm/db db:migrate
-pnpm --filter @jak-swarm/db db:seed    # optional: seed sample data
+pnpm --filter @jak-swarm/db db:seed         # optional: seed sample data
+pnpm seed:compliance                        # seeds 167 SOC 2 / HIPAA / ISO 27001 controls
+pnpm seed:audit-demo                        # optional: seeds a demo audit run for end-to-end exercise
 ```
 
 ### 4. Build
@@ -669,6 +769,8 @@ http://localhost:3000
 | 🏢 **Workspace** | Command center — text/voice input, DAG view, agent tracker |
 | ⚡ **Builder** | Vibe Coding IDE — Monaco editor, chat, preview, deploy |
 | 🐝 **Swarm** | Workflow inspector with agent timeline visualization |
+| 🛡️ **Audit** | Audit & Compliance home — dashboard, audit log, reviewer queue, workflow trail, compliance frameworks (SOC 2 / HIPAA / ISO 27001), and **Audit Runs** workspace |
+| 🛡️ **Audit Runs** | `/audit/runs` index + `/audit/runs/:id` engagement detail (control matrix · workpapers · exceptions · final pack) |
 | 🔎 **Traces** | Full agent trace explorer with token/cost breakdown |
 | 📊 **Analytics** | Usage metrics, cost tracking, agent performance charts |
 | ⏰ **Schedules** | Cron-based recurring workflow management |
@@ -774,12 +876,13 @@ Create recurring workflows from the dashboard at `/schedules`:
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **122** | 50+ | Custom | ~10 |
-| Built-in UI | **12 pages** | — | LangSmith | IDE |
+| Built-in UI | **13 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
 | Scheduling | ✅ | ✅ | ✅ | — |
-| Browser control | **27 tools** | Via plugin | Via plugin | — |
+| Browser control | **30 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
 | Self-correction | **4 layers** (heuristic) | Limited | Manual | Limited |
+| **SOC 2 / HIPAA / ISO 27001 audit pack** (167 controls + signed evidence bundles) | ✅ | ❌ | ❌ | ❌ |
 | Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
 | Price | **Free** | Free | Free+$39 | $20/mo |
 
@@ -862,7 +965,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | **Monorepo** | pnpm workspaces + Turborepo |
 | **Language** | TypeScript 5.7 (strict) |
 | **API** | Fastify |
-| **Frontend** | Next.js 15, React, Tailwind CSS |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS |
 | **DAG Visualization** | React Flow |
 | **Database** | PostgreSQL + Prisma ORM |
 | **Durable Workflows** | PostgreSQL state persistence (Temporal package included, API wiring in progress) |
@@ -883,14 +986,20 @@ jak-swarm/
 ├── apps/
 │   ├── api/                    # Fastify REST API (port 4000)
 │   │   └── src/
-│   │       ├── routes/         # 14 route modules (+ slack, voice trigger)
-│   │       ├── services/       # Business logic
+│   │       ├── routes/         # 16 route modules (workflows, approvals, audit, audit-runs, compliance, artifacts, bundles, exports, integrations, schedules, memory, tools, traces, voice, slack, ...)
+│   │       ├── services/
+│   │       │   ├── audit/       # AuditRun · ControlTest · Exception · Workpaper · FinalPack
+│   │       │   ├── compliance/  # Mapper · Attestation · ManualEvidence · Scheduler · auto-mapping rules
+│   │       │   ├── exporters/   # JSON · CSV · XLSX · PDF · DOCX
+│   │       │   └── ...          # artifact, bundle, bundle-signing, db-state-store, swarm-execution, workflow, etc.
 │   │       ├── middleware/      # Auth, RBAC, rate limiting
 │   │       ├── boot/           # Config validation + environment diagnostics
 │   │       └── plugins/        # Fastify plugins
-│   └── web/                    # Next.js 15 dashboard (port 3000)
+│   └── web/                    # Next.js 16 dashboard (port 3000)
 │       └── src/app/(dashboard)/
 │           ├── home/           # Mission control
+│           ├── audit/          # Audit & Compliance home (5 tabs: dashboard, log, queue, trail, compliance)
+│           │   └── runs/       # /audit/runs index + /audit/runs/[id] detail (control matrix · workpapers · exceptions · final pack)
 │           ├── swarm/          # Real-time DAG execution view
 │           ├── traces/         # Agent trace explorer
 │           ├── analytics/      # Usage & cost metrics
@@ -899,13 +1008,13 @@ jak-swarm/
 │           ├── knowledge/      # Knowledge base
 │           ├── workspace/      # Team settings
 │           ├── settings/       # LLM & approval config
-│           └── admin/          # Tenant management
+│           └── admin/          # Tenant management + /admin/platform (SYSTEM_ADMIN)
 ├── packages/
 │   ├── agents/                 # 38 agent implementations
 │   │   └── src/
 │   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination, memory injection
 │   │       ├── roles/          # 6 orchestrator agents
-│   │       └── workers/        # 33 worker agents
+│   │       └── workers/        # 32 worker agents
 │   ├── tools/                  # 122 tool implementations
 │   │   └── src/
 │   │       ├── registry/       # Singleton ToolRegistry
@@ -1144,6 +1253,78 @@ Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. 
 
 </details>
 
+<details>
+<summary><b>🛡️ Audit & Compliance — v0 (audit log + reviewer surfaces)</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| GET | `/audit/log` | JWT | Paginated AuditLog with filters (action / resource / dates / search) |
+| GET | `/audit/workflows/:id/trail` | JWT | Chronological event stream for one workflow |
+| GET | `/audit/reviewer-queue` | JWT + Reviewer | Pending workflow approvals + pending artifact downloads |
+| GET | `/audit/dashboard` | JWT + Reviewer | High-level audit metrics |
+
+</details>
+
+<details>
+<summary><b>🛡️ Compliance — v1 (control framework mapping)</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| GET | `/compliance/frameworks` | JWT | List all available frameworks (soc2-type2, hipaa-security, iso27001-2022) |
+| GET | `/compliance/frameworks/:slug` | JWT | Framework detail + per-control evidence count |
+| GET | `/compliance/frameworks/:slug/controls/:controlId/evidence` | JWT | Drill into one control's evidence rows |
+| POST | `/compliance/frameworks/:slug/auto-map` | JWT + Reviewer | Re-run the auto-mapping rule engine |
+| POST | `/compliance/frameworks/:slug/attestations` | JWT + Reviewer | Generate a period attestation PDF (optionally signed) |
+| GET | `/compliance/attestations` | JWT | List previously generated attestations |
+| POST | `/compliance/manual-evidence` | JWT + Reviewer | Add a curated manual evidence row (BAA, training record, etc.) |
+| GET | `/compliance/controls/:controlId/manual-evidence` | JWT | List manual evidence for a control |
+| DELETE | `/compliance/manual-evidence/:id` | JWT + Reviewer | Soft-delete manual evidence |
+| GET | `/compliance/schedules` | JWT | List recurring attestation schedules |
+| POST | `/compliance/schedules` | JWT + Reviewer | Create a recurring attestation cron schedule |
+| PATCH | `/compliance/schedules/:id` | JWT + Reviewer | Update a schedule |
+| DELETE | `/compliance/schedules/:id` | JWT + Reviewer | Delete a schedule |
+
+</details>
+
+<details>
+<summary><b>🛡️ Audit Runs — v2 (full engagement workflow)</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| POST | `/audit/runs` | JWT + Reviewer | Create a new audit run for a framework + period (status='PLANNING') |
+| GET | `/audit/runs` | JWT | List audit runs (paginated, filterable by status) |
+| GET | `/audit/runs/:id` | JWT | Detail with embedded controls, exceptions, workpapers |
+| POST | `/audit/runs/:id/plan` | JWT + Reviewer | Seed `ControlTest` rows from framework. PLANNING → PLANNED |
+| POST | `/audit/runs/:id/auto-map` | JWT + Reviewer | Run `ComplianceMapperService` for the run's framework + period |
+| POST | `/audit/runs/:id/test-controls` | JWT + Reviewer | Run all not-yet-passed tests. PLANNED → TESTING → REVIEWING |
+| POST | `/audit/runs/:id/controls/:controlTestId/test` | JWT + Reviewer | Re-run one test |
+| POST | `/audit/runs/:id/workpapers/generate` | JWT + Reviewer | Render PDFs for every terminal control test |
+| POST | `/audit/runs/:id/workpapers/:wpId/decide` | JWT + Reviewer | Approve / reject one workpaper |
+| POST | `/audit/runs/:id/exceptions` | JWT + Reviewer | Manually create an exception |
+| PATCH | `/audit/runs/:id/exceptions/:exId/remediation` | JWT + Reviewer | Update remediation plan / owner / due date |
+| POST | `/audit/runs/:id/exceptions/:exId/decide` | JWT + Reviewer | Apply state transition (accepted / rejected / closed / …) |
+| POST | `/audit/runs/:id/final-pack` | JWT + Reviewer | Generate signed final evidence pack (gated on workpaper approval) |
+| DELETE | `/audit/runs/:id` | JWT + TenantAdmin | Soft-delete an audit run |
+
+Errors include `409 ILLEGAL_TRANSITION` (state machine refused), `409 FINAL_PACK_GATE` (workpapers unapproved), `503 AUDIT_SCHEMA_UNAVAILABLE` (apply migration 15 with `pnpm db:migrate:deploy`), `503 BUNDLE_SIGNING_UNAVAILABLE` (set `EVIDENCE_SIGNING_SECRET`).
+
+</details>
+
+<details>
+<summary><b>📦 Artifacts + Bundles + Exports</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| GET | `/artifacts/:id` | JWT | Get artifact metadata (tenant-scoped) |
+| GET | `/artifacts/:id/download` | JWT | Signed download URL (gated by `approvalState`) |
+| POST | `/artifacts/:id/approve` | JWT + Reviewer | Approve an artifact for download |
+| POST | `/artifacts/:id/reject` | JWT + Reviewer | Reject artifact (download permanently blocked) |
+| POST | `/exports` | JWT | Create an export (json/csv/xlsx/pdf/docx) |
+| POST | `/bundles` | JWT + Reviewer | Generate HMAC-signed evidence bundle for a workflow |
+| GET | `/bundles/:id/verify` | JWT | Verify bundle signature + re-hash referenced artifacts |
+
+</details>
+
 ---
 
 ## 🌍 Environment Variables
@@ -1157,6 +1338,9 @@ Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. 
 | `REDIS_URL` | No | `redis://localhost:6379` | Redis for scheduling/queues |
 | `AUTH_SECRET` | Yes | -- | Random secret for session signing (32+ chars) |
 | `AUTH_URL` | No | `http://localhost:3000` | Base URL for auth callbacks |
+| `EVIDENCE_SIGNING_SECRET` | Yes (for audit pack) | -- | 32+ byte random secret for HMAC-SHA256 signing of audit evidence bundles. Generate with `openssl rand -base64 48`. Without it the final audit pack route returns `503 BUNDLE_SIGNING_UNAVAILABLE`. Intentionally separate from `AUTH_SECRET` so the two can be rotated independently. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes (for storage) | -- | Supabase project URL — required by `ArtifactService` for storing workpaper PDF / final-pack bytes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes (for storage) | -- | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
 | `OPENAI_API_KEY` | Yes | -- | OpenAI API key (primary LLM provider) |
 | `OPENAI_ORG_ID` | No | -- | OpenAI organization ID |
 | `ANTHROPIC_API_KEY` | No | -- | Anthropic API key for Claude models |
@@ -1329,6 +1513,29 @@ Five roles in ascending privilege: `VIEWER` (read-only), `REVIEWER` (approve/rej
 <summary><b>How does SSE streaming work?</b></summary>
 
 `GET /workflows/:id/stream` accepts a JWT via `?token=` query param (since EventSource cannot set headers). The server emits events for node transitions, task completions, and errors. A heartbeat every 15s keeps the connection alive.
+
+</details>
+
+<details>
+<summary><b>Is the Audit & Compliance pack production-ready?</b></summary>
+
+The audit pack is functionally complete and end-to-end tested ([tests/integration/audit-run-e2e.test.ts](tests/integration/audit-run-e2e.test.ts) — 11 assertions covering create → plan → test → workpaper → approve → signed pack → signature verify, all green). All 23 workspace packages typecheck clean.
+
+To bring it into production:
+
+1. Apply migration 15 against the production database: `pnpm db:migrate:deploy`
+2. Verify `EVIDENCE_SIGNING_SECRET` is set (required for final-pack signing — `openssl rand -base64 48`)
+3. Verify `OPENAI_API_KEY` is set (optional — without it, control test evaluation falls back to a deterministic coverage rule with the rationale `"deterministic coverage rule (no LLM key configured)"` so reviewers see the difference)
+4. Smoke-test by creating an audit run via `POST /audit/runs` for an existing tenant
+
+What's deferred and named honestly (not faked) — external auditor portal (~2 weeks), DOCX/XLSX/image content parsing for evidence (~3 days), live SSE on the audit detail page (~1 day; currently 15s SWR polling). Full table in [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md).
+
+</details>
+
+<details>
+<summary><b>What audit-related lifecycle events does the cockpit show?</b></summary>
+
+13 audit-specific events on the `audit_run:{id}` SSE channel: `audit_run_started`, `audit_plan_created`, `evidence_mapped`, `control_test_started`, `control_test_completed`, `exception_found`, `workpaper_generated`, `reviewer_action_required`, `final_pack_started`, `final_pack_generated`, `audit_run_completed`, `audit_run_failed`, `audit_run_cancelled`. Every event carries `agentRole` (`AUDIT_COMMANDER`, `CONTROL_TEST_AGENT`, `EXCEPTION_FINDER`, `WORKPAPER_WRITER`, `FINAL_AUDIT_PACK_AGENT`, `COMPLIANCE_MAPPER`) so the cockpit attributes each step to the responsible role. Full reference in [docs/agent-run-cockpit.md](docs/agent-run-cockpit.md).
 
 </details>
 

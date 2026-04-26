@@ -825,6 +825,141 @@ export const complianceApi = {
     apiDataFetch<{ deleted: boolean; id: string }>(`/compliance/schedules/${id}`, { method: 'DELETE' }),
 };
 
+// ─── Audit & Compliance v2 — engagement runs ───────────────────────────
+//
+// Wraps /audit/runs/* — full audit engagements with control tests,
+// exceptions, workpapers, reviewer approval, signed final pack.
+// Built on top of the v1 framework mapping + v0 audit log surfaces.
+
+export type AuditRunStatusClient =
+  | 'PLANNING' | 'PLANNED' | 'MAPPING' | 'TESTING' | 'REVIEWING'
+  | 'READY_TO_PACK' | 'FINAL_PACK' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface AuditRunSummary {
+  id: string;
+  tenantId: string;
+  userId: string;
+  frameworkSlug: string;
+  title: string;
+  scope: string | null;
+  periodStart: string;
+  periodEnd: string;
+  status: AuditRunStatusClient;
+  riskSummary: 'low' | 'medium' | 'high' | 'critical' | null;
+  coveragePercent: number | null;
+  finalPackArtifactId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ControlTestRow {
+  id: string;
+  controlId: string;
+  controlCode: string;
+  controlTitle: string;
+  testProcedure: string | null;
+  status: string;
+  result: 'pass' | 'fail' | 'exception' | 'needs_evidence' | null;
+  rationale: string | null;
+  confidence: number | null;
+  evidenceCount: number;
+  exceptionId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface AuditExceptionRow {
+  id: string;
+  controlId: string;
+  controlCode: string;
+  controlTestId: string | null;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: string;
+  description: string;
+  cause: string | null;
+  impact: string | null;
+  remediationPlan: string | null;
+  remediationOwner: string | null;
+  remediationDueDate: string | null;
+  reviewerStatus: string | null;
+  reviewerComment: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditWorkpaperRow {
+  id: string;
+  controlId: string;
+  controlCode: string;
+  controlTitle: string;
+  controlTestId: string | null;
+  artifactId: string | null;
+  status: 'draft' | 'needs_evidence' | 'needs_review' | 'rejected' | 'approved' | 'final';
+  reviewerNotes: string | null;
+  generatedBy: string;
+  reviewedBy: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditRunDetail {
+  run: AuditRunSummary;
+  controlTests: ControlTestRow[];
+  exceptions: AuditExceptionRow[];
+  workpapers: AuditWorkpaperRow[];
+}
+
+export interface FinalPackResultClient {
+  artifactId: string;
+  signature: string;
+  signatureAlgo: string;
+  manifest: { version: number; tenantId: string; workflowId: string; generatedAt: string; artifacts: Array<{ artifactId: string; fileName: string; contentHash: string; sizeBytes: number; artifactType: string }>; metadata?: Record<string, unknown> };
+  workpaperCount: number;
+  exceptionCount: number;
+  controlCount: number;
+}
+
+export const auditRunsApi = {
+  list: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && String(v).length > 0)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return apiDataFetch<{ items: AuditRunSummary[]; total: number; limit: number; offset: number }>(`/audit/runs${qs}`);
+  },
+  get: (id: string) =>
+    apiDataFetch<AuditRunDetail>(`/audit/runs/${id}`),
+  create: (body: { frameworkSlug: string; title: string; scope?: string; periodStart: string; periodEnd: string; metadata?: Record<string, unknown> }) =>
+    apiDataFetch<{ id: string; status: AuditRunStatusClient }>('/audit/runs', { method: 'POST', body }),
+  plan: (id: string) =>
+    apiDataFetch<{ controlsSeeded: number }>(`/audit/runs/${id}/plan`, { method: 'POST', body: {} }),
+  autoMap: (id: string) =>
+    apiDataFetch<AutoMapResultClient>(`/audit/runs/${id}/auto-map`, { method: 'POST', body: {} }),
+  testControls: (id: string, body?: { limit?: number }) =>
+    apiDataFetch<{ totalTests: number; ranTests: number; passed: number; failed: number; exceptions: number; needsEvidence: number; durationMs: number }>(`/audit/runs/${id}/test-controls`, { method: 'POST', body: body ?? {} }),
+  testSingle: (id: string, controlTestId: string) =>
+    apiDataFetch<{ result: 'pass' | 'fail' | 'exception' | 'needs_evidence' }>(`/audit/runs/${id}/controls/${controlTestId}/test`, { method: 'POST', body: {} }),
+  generateWorkpapers: (id: string, body?: { forceRegenerate?: boolean }) =>
+    apiDataFetch<{ totalControls: number; generated: number; skipped: number; failed: number; durationMs: number }>(`/audit/runs/${id}/workpapers/generate`, { method: 'POST', body: body ?? {} }),
+  decideWorkpaper: (id: string, wpId: string, body: { decision: 'approved' | 'rejected'; reviewerNotes?: string }) =>
+    apiDataFetch<AuditWorkpaperRow>(`/audit/runs/${id}/workpapers/${wpId}/decide`, { method: 'POST', body }),
+  createException: (id: string, body: { controlId: string; controlCode: string; severity: 'low' | 'medium' | 'high' | 'critical'; description: string; cause?: string; impact?: string; remediationPlan?: string; remediationOwner?: string; remediationDueDate?: string }) =>
+    apiDataFetch<{ id: string; status: string }>(`/audit/runs/${id}/exceptions`, { method: 'POST', body }),
+  updateRemediation: (id: string, exId: string, body: { remediationPlan?: string; remediationOwner?: string; remediationDueDate?: string }) =>
+    apiDataFetch<AuditExceptionRow>(`/audit/runs/${id}/exceptions/${exId}/remediation`, { method: 'PATCH', body }),
+  decideException: (id: string, exId: string, body: { to: 'accepted' | 'rejected' | 'closed' | 'remediation_planned' | 'remediation_in_progress' | 'remediation_complete'; reviewerComment?: string }) =>
+    apiDataFetch<AuditExceptionRow>(`/audit/runs/${id}/exceptions/${exId}/decide`, { method: 'POST', body }),
+  finalPack: (id: string) =>
+    apiDataFetch<FinalPackResultClient>(`/audit/runs/${id}/final-pack`, { method: 'POST', body: {} }),
+  delete: (id: string) =>
+    apiDataFetch<void>(`/audit/runs/${id}`, { method: 'DELETE' }),
+};
+
 // ─── SYSTEM_ADMIN cross-tenant aggregate views ─────────────────────────
 //
 // Separate surface from /audit/* (tenant-scoped). Only SYSTEM_ADMIN

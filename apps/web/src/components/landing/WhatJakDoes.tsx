@@ -60,12 +60,12 @@ const PILLARS: Array<{
   {
     key: 'verify',
     eyebrow: 'Verify',
-    title: 'Approvals, audit, and risk checks.',
-    body: 'Human approval on every high-risk action, full audit trail, and four-layer fraud detection before your agents act.',
+    title: 'Approvals, audit pack, and risk checks.',
+    body: 'Human approval on every high-risk action, a full SOC 2 / HIPAA / ISO 27001 audit-engagement workflow with HMAC-signed evidence packs, and four-layer fraud detection before your agents act.',
     points: [
-      'Approval gates + audit log',
-      'Email / document / invoice / identity checks',
-      'Cross-evidence correlation',
+      '167 controls (SOC 2 / HIPAA / ISO 27001) + signed evidence bundles',
+      'Reviewer-gated workpaper PDFs · final-pack approval gate',
+      'Email / document / invoice / identity verification',
     ],
     color: '#f472b6',
     iconName: 'shield',

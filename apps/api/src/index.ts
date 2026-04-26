@@ -78,6 +78,7 @@ import exportsRoutes from './routes/exports.routes.js';
 import bundlesRoutes from './routes/bundles.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import complianceRoutes from './routes/compliance.routes.js';
+import auditRunsRoutes from './routes/audit-runs.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
@@ -237,6 +238,12 @@ async function buildApp() {
   // POST /auto-map (re-run rule engine), POST /attestations (real PDF
   // + optional signed bundle), GET /compliance/attestations.
   await fastify.register(complianceRoutes);
+  // Audit & Compliance v2 — full engagement runs:
+  // /audit/runs CRUD, /plan, /auto-map, /test-controls,
+  // /workpapers/generate, /workpapers/:id/decide, /exceptions,
+  // /exceptions/:id/remediation, /exceptions/:id/decide, /final-pack.
+  // RBAC: writes REVIEWER+, reads any tenant member.
+  await fastify.register(auditRunsRoutes);
   // SYSTEM_ADMIN-only cross-tenant aggregate views (separate from
   // /audit/* which is tenant-scoped).
   await fastify.register(adminAggregateRoutes);

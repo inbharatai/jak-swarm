@@ -119,7 +119,19 @@ TypeScript enums and interfaces used across all packages:
 
 ### `packages/db` -- Database
 
-Prisma ORM with PostgreSQL. Schema covers tenants, users, workflows, tasks, traces, integrations, credentials, schedules, memory, and skills.
+Prisma ORM with PostgreSQL. Schema covers tenants, users, workflows, tasks, traces, integrations, credentials, schedules, memory, skills, and the Audit & Compliance product surface (`ComplianceFramework`, `ComplianceControl`, `ControlEvidenceMapping`, `ManualEvidence`, `ScheduledAttestation`, `ControlAttestation`, `WorkflowArtifact`, `AuditRun`, `ControlTest`, `AuditException`, `AuditWorkpaper`).
+
+### `apps/api/src/services/audit` -- Audit & Compliance Agent Pack
+
+Five tenant-scoped services that drive a full audit engagement end-to-end:
+
+- **`AuditRunService`** -- Engagement lifecycle (`PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED`) with `assertAuditTransition()` refusing illegal jumps. Emits 13 audit-specific lifecycle events with `agentRole` attribution.
+- **`ControlTestService`** -- Builds test procedures + evaluates evidence via `OpenAIRuntime.respondStructured` with strict zod schema. Falls back to a deterministic coverage rule (with explicit "no LLM key" rationale) when `OPENAI_API_KEY` is unset.
+- **`AuditExceptionService`** -- Auto-creates exceptions on test fail/exception. Independent state machine for the remediation lifecycle (`open → remediation_planned → … → closed`).
+- **`WorkpaperService`** -- Renders per-control PDFs via existing `exportPdf` (pdfkit) and persists as `WorkflowArtifact` with `approvalState='REQUIRES_APPROVAL'`. Lazy-creates one backing `Workflow` row per `AuditRun`.
+- **`FinalAuditPackService`** -- Hard gate: `FinalPackGateError` if any workpaper is unapproved. Bundles workpapers + control matrix CSV + exceptions JSON + executive summary PDF + HMAC-SHA256 signature via existing `bundle-signing.service`.
+
+Routes: `apps/api/src/routes/audit-runs.routes.ts` (14 endpoints, REVIEWER+ on writes). UI: `apps/web/src/app/(dashboard)/audit/runs/`. End-to-end test: `tests/integration/audit-run-e2e.test.ts` (11 assertions, all green).
 
 ### `packages/workflows` -- Temporal Integration (Optional)
 

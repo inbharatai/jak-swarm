@@ -331,6 +331,23 @@ Never auto-approve. Never proceed without explicit human sign-off for high-risk 
 
 ---
 
+## Audit & Compliance Roles (Service-Backed)
+
+The Audit & Compliance Agent Pack ([docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md)) introduces six role identities that drive the audit-engagement workflow. They are NOT separate `BaseAgent` subclasses today — each role identifies the responsible service that emits the lifecycle event with `agentRole` set. The work itself is real (real DB rows, real LLM evaluation, real PDF rendering, real HMAC signing) — only the dedicated `BaseAgent` placeholder classes are intentionally deferred (see [qa/audit-compliance-readiness-audit.md](qa/audit-compliance-readiness-audit.md)).
+
+| `agentRole` value | Role | Backing service | Lifecycle events emitted |
+|---|---|---|---|
+| `AUDIT_COMMANDER` | Engagement orchestration + state-machine transitions | `AuditRunService` ([apps/api/src/services/audit/audit-run.service.ts](apps/api/src/services/audit/audit-run.service.ts)) | `audit_run_started`, `audit_plan_created`, `audit_run_completed`, `audit_run_failed`, `audit_run_cancelled` |
+| `COMPLIANCE_MAPPER` | Maps audit-log / approval / artifact / bundle rows onto controls | `ComplianceMapperService` ([apps/api/src/services/compliance/compliance-mapper.service.ts](apps/api/src/services/compliance/compliance-mapper.service.ts)) | `evidence_mapped` |
+| `CONTROL_TEST_AGENT` | Builds test procedure + evaluates evidence per control | `ControlTestService` ([apps/api/src/services/audit/control-test.service.ts](apps/api/src/services/audit/control-test.service.ts)) — uses `OpenAIRuntime.respondStructured` with strict zod schema; deterministic fallback if `OPENAI_API_KEY` is unset | `control_test_started`, `control_test_completed` |
+| `EXCEPTION_FINDER` | Auto-creates exceptions on test fail/exception, drives remediation lifecycle | `AuditExceptionService` ([apps/api/src/services/audit/audit-exception.service.ts](apps/api/src/services/audit/audit-exception.service.ts)) | `exception_found` |
+| `WORKPAPER_WRITER` | Renders per-control workpaper PDFs and persists with `approvalState=REQUIRES_APPROVAL` | `WorkpaperService` ([apps/api/src/services/audit/workpaper.service.ts](apps/api/src/services/audit/workpaper.service.ts)) | `workpaper_generated`, `reviewer_action_required` |
+| `FINAL_AUDIT_PACK_AGENT` | Bundles approved workpapers + control matrix + exceptions into HMAC-signed final pack | `FinalAuditPackService` ([apps/api/src/services/audit/final-audit-pack.service.ts](apps/api/src/services/audit/final-audit-pack.service.ts)) | `final_pack_started`, `final_pack_generated` |
+
+**Honest distinction:** these six roles are *real execution paths* (testable end-to-end via [tests/integration/audit-run-e2e.test.ts](tests/integration/audit-run-e2e.test.ts)) but they are not LLM-driven autonomous agents in the same sense as Commander / Planner / Verifier. They are deterministic orchestrators that delegate the heavy LLM lifting to `OpenAIRuntime` for the one step that genuinely benefits from it (control test evaluation). This is by design — the audit workflow is too high-stakes to leave the lifecycle transitions to LLM judgment.
+
+---
+
 ## Worker Agents
 
 Worker agents are leaf nodes in the execution graph. Each receives a single `WorkflowTask` with defined tools and produces a concrete result. Workers never handoff to other workers directly — all orchestration flows through the Router.

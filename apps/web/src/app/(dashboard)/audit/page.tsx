@@ -28,6 +28,7 @@ import React, { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import {
   BarChart3,
+  ClipboardCheck,
   Clock,
   FileCheck,
   FileSearch,
@@ -36,6 +37,7 @@ import {
   Search,
   ShieldCheck,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   auditApi,
   approvalApi,
@@ -70,7 +72,7 @@ import { useToast } from '@/components/ui/toast';
 
 const PAGE_SIZE = 50;
 
-type TabId = 'dashboard' | 'log' | 'queue' | 'trail' | 'compliance';
+type TabId = 'dashboard' | 'log' | 'queue' | 'trail' | 'compliance' | 'runs';
 
 export default function AuditPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -128,6 +130,12 @@ export default function AuditPage() {
               Compliance
             </TabsTrigger>
           )}
+          {canSeeReviewerSurfaces && (
+            <TabsTrigger value="runs">
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Audit Runs
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="dashboard">
@@ -147,6 +155,32 @@ export default function AuditPage() {
         {canSeeReviewerSurfaces && (
           <TabsContent value="compliance">
             <ComplianceTab />
+          </TabsContent>
+        )}
+        {canSeeReviewerSurfaces && (
+          <TabsContent value="runs">
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardCheck className="h-5 w-5" />
+                  Audit Runs
+                </CardTitle>
+                <CardDescription>
+                  Full engagement workspace — control tests, exceptions, workpapers, and signed final pack.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Open the dedicated workspace to create new runs, drive the test loop, approve workpapers, and generate the final signed evidence pack.
+                </p>
+                <Link href="/audit/runs">
+                  <Button>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Open Audit Runs Workspace
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
       </Tabs>

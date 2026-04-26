@@ -808,6 +808,112 @@ export default function HomePage() {
         {/* ── 4aa. What JAK does — three-pillar summary (NEW, per audit §9) ─ */}
         <WhatJakDoes />
 
+        {/* ── 4ab. Audit & Compliance Agent Pack (SOC 2 / HIPAA / ISO 27001) ─
+             Surfaces the production audit-engagement product: 167 controls,
+             LLM-driven control testing, reviewer-gated workpaper PDFs, and
+             HMAC-signed final evidence packs. Sits between the cross-cutting
+             "what JAK does" pillars and the Build section so visitors see
+             the trust/compliance story before the app-builder content. */}
+        <section className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, rgba(251,146,60,0.04), rgba(244,114,182,0.03), transparent)' }}>
+          <div className="mx-auto max-w-6xl relative z-10">
+            <div className="text-center mb-16 max-w-3xl mx-auto">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-400 mb-3 font-sans">
+                Audit &amp; Compliance Agent Pack
+              </p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
+                A SOC 2 audit you can actually finish.
+              </h2>
+              <p className="mt-4 text-slate-300 font-sans">
+                Run a real SOC 2, HIPAA, or ISO 27001 engagement end-to-end. JAK plans the controls, auto-maps your evidence, runs LLM-driven control tests, generates per-control workpaper PDFs gated by reviewer approval, and produces a binding HMAC-signed final evidence pack &mdash; verifiable byte-for-byte.
+              </p>
+            </div>
+
+            {/* Framework cards */}
+            <div className="grid gap-4 md:grid-cols-3 mb-12">
+              {[
+                { code: 'SOC 2 Type 2', issuer: 'AICPA', year: '2017', controls: 48, color: '#fb923c' },
+                { code: 'HIPAA Security Rule', issuer: 'HHS', year: '2013', controls: 37, color: '#f472b6' },
+                { code: 'ISO/IEC 27001:2022', issuer: 'ISO/IEC', year: '2022', controls: 82, color: '#c084fc' },
+              ].map((fw) => (
+                <div
+                  key={fw.code}
+                  className="glass-card rounded-2xl p-6"
+                  style={{ borderTop: `2px solid ${fw.color}` }}
+                >
+                  <div className="flex items-baseline justify-between mb-2">
+                    <h3 className="font-display font-semibold text-white text-base">{fw.code}</h3>
+                    <span className="text-2xl font-display font-bold tabular-nums" style={{ color: fw.color }}>
+                      {fw.controls}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-sans">{fw.issuer} &middot; {fw.year}</p>
+                  <p className="text-[11px] text-slate-500 mt-3 font-sans uppercase tracking-widest">controls seeded</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Engagement flow — 5 steps */}
+            <div className="grid gap-6 md:grid-cols-5 mb-12">
+              {[
+                { step: '01', title: 'Plan', desc: 'Pick framework + period. JAK seeds one ControlTest row per control.', iconName: 'architecture' as LandingIconName, color: '#fb923c' },
+                { step: '02', title: 'Auto-map', desc: 'Existing audit logs, approvals, artifacts, and signed bundles map onto controls automatically.', iconName: 'link' as LandingIconName, color: '#f59e0b' },
+                { step: '03', title: 'Test', desc: 'LLM-driven test procedure + evidence evaluation. Confidence < 0.7 routes to reviewer override.', iconName: 'shield' as LandingIconName, color: '#f472b6' },
+                { step: '04', title: 'Workpaper', desc: 'Per-control PDF persisted as REQUIRES_APPROVAL artifact. Reviewer approves before pack can sign.', iconName: 'document' as LandingIconName, color: '#c084fc' },
+                { step: '05', title: 'Sign', desc: 'HMAC-SHA256 signed evidence pack. Verifies byte-for-byte. Refuses if any workpaper unapproved.', iconName: 'shield' as LandingIconName, color: '#a855f7' },
+              ].map((s) => (
+                <div key={s.step} className="text-center">
+                  <div
+                    className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                    style={{ background: `${s.color}15`, border: `1px solid ${s.color}30`, color: s.color }}
+                  >
+                    <LandingIcon name={s.iconName} className="h-6 w-6" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-500 mb-1 uppercase tracking-widest">Step {s.step}</div>
+                  <h3 className="font-display font-semibold text-white text-sm mb-1">{s.title}</h3>
+                  <p className="text-xs text-slate-400 font-sans">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Honest gates band */}
+            <div className="glass-card rounded-2xl p-8 max-w-4xl mx-auto mb-10" style={{ borderLeft: '3px solid #fb923c' }}>
+              <h3 className="font-display font-semibold text-white mb-4 text-center">Reviewer gates &mdash; enforced at every layer</h3>
+              <div className="grid gap-4 md:grid-cols-2 text-sm font-sans">
+                <div className="flex items-start gap-3">
+                  <span className="text-orange-400 font-mono text-xs mt-0.5">01</span>
+                  <p className="text-slate-300"><strong className="text-white">Test confidence &lt; 0.7</strong> &mdash; status auto-flips to <code className="text-orange-300 font-mono text-xs">reviewer_required</code>. Never silent-passes.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-orange-400 font-mono text-xs mt-0.5">02</span>
+                  <p className="text-slate-300"><strong className="text-white">Every workpaper PDF</strong> persists with <code className="text-orange-300 font-mono text-xs">approvalState=REQUIRES_APPROVAL</code>. Download blocked until approved.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-orange-400 font-mono text-xs mt-0.5">03</span>
+                  <p className="text-slate-300"><strong className="text-white">Final-pack signing</strong> refuses if any workpaper is unapproved. <code className="text-orange-300 font-mono text-xs">FinalPackGateError</code> at the service layer.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-orange-400 font-mono text-xs mt-0.5">04</span>
+                  <p className="text-slate-300"><strong className="text-white">Exception lifecycle</strong> runs through its own state machine. Illegal transitions throw at the service layer, not just the UI.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <Link
+                href="/audit/runs"
+                className="inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-orange-400"
+                style={{ background: 'linear-gradient(135deg, #fb923c, #f472b6)', touchAction: 'manipulation' }}
+              >
+                Open Audit Runs Workspace
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
+              <p className="text-xs text-slate-500 mt-4 font-sans">
+                Engagement workspace at <code className="text-orange-300 font-mono">/audit/runs</code>. Sign-in required (REVIEWER+ for writes).
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* ── 4b. Build — consolidated (was two Vibe-Coding sections) ────────
              Audit §19/§20: merge the former 6-card grid + 5-step pipeline
              + cost band into ONE Build section. IDE mockup removed — the

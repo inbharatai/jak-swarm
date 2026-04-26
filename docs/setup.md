@@ -45,6 +45,13 @@ REDIS_URL="redis://localhost:6379"
 AUTH_SECRET="any-random-32-char-string-here-abc"
 OPENAI_API_KEY="sk-your-openai-key"
 NODE_ENV="development"
+
+# Required by the Audit & Compliance Agent Pack — final-pack signing fails 503 without it
+EVIDENCE_SIGNING_SECRET="run: openssl rand -base64 48"
+
+# Required by ArtifactService for storing workpaper PDFs / signed bundles
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="your-supabase-service-role-key"
 ```
 
 All other values default to local addresses. Voice features require the additional voice API keys.
@@ -177,6 +184,17 @@ cd packages/db && pnpm db:studio
 ```
 
 Prisma Studio opens at `http://localhost:5555`.
+
+### Seed Compliance Frameworks (required for the Audit & Compliance Agent Pack)
+
+```bash
+pnpm seed:compliance         # seeds 167 controls across SOC 2 / HIPAA / ISO 27001
+pnpm seed:audit-demo         # optional: seeds a demo audit run for end-to-end exercise
+```
+
+The compliance seeder is idempotent — re-running upserts only. The demo seeder produces one `AuditRun` in `PLANNED` status with control tests already seeded so you can drive `/test-controls` → `/workpapers/generate` → reviewer approval → `/final-pack` immediately.
+
+> Final-pack signing requires `EVIDENCE_SIGNING_SECRET` in `.env` (32+ byte random — `openssl rand -base64 48`). Without it, the `/audit/runs/:id/final-pack` route returns `503 BUNDLE_SIGNING_UNAVAILABLE`.
 
 ---
 
