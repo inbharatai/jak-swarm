@@ -20,7 +20,16 @@
  */
 
 import { Buffer } from 'node:buffer';
-import * as XLSX from 'xlsx';
+// exceljs (MIT, actively maintained) replaces sheetjs `xlsx`. The xlsx
+// package is unmaintained on npm — its security patches ship only via
+// SheetJS's own CDN, not the npm registry, so any version reachable via
+// `pnpm install` carries known prototype-pollution + ReDoS advisories
+// (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9). Both advisories trigger in
+// the PARSE path (`XLSX.read`); we only ever WROTE xlsx files, so the
+// real exploit surface in our use was zero. We swapped the dep anyway
+// because keeping a CVE-flagged package in the prod tree breaks
+// `pnpm audit --prod --audit-level=high` in CI.
+import ExcelJS from 'exceljs';
 
 export type ExportFormat = 'json' | 'csv' | 'xlsx' | 'pdf' | 'docx';
 
@@ -110,19 +119,29 @@ export function exportCsv(
  * Single-sheet XLSX from row-of-objects. Column order is `opts.columns`
  * if supplied, else the first row's keys. Empty rows produce a sheet
  * with the header row only.
+ *
+ * Async because exceljs's `workbook.xlsx.writeBuffer()` is async (it
+ * streams + zips internally). Callers go through the dispatcher which
+ * already awaits.
  */
-export function exportXlsx(
+export async function exportXlsx(
   rows: ReadonlyArray<Record<string, unknown>>,
   opts: ExportOptions & { columns?: ReadonlyArray<string>; sheetName?: string },
-): ExportResult {
+): Promise<ExportResult> {
   const sheetName = opts.sheetName ?? 'Sheet1';
   const columns = opts.columns ?? (rows[0] ? Object.keys(rows[0]) : []);
-  const aoa: unknown[][] = [columns.slice()];
-  for (const r of rows) aoa.push(columns.map((c) => r[c] ?? ''));
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  const bytes: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheetName);
+  // Header row first.
+  ws.addRow(columns.slice());
+  // Data rows in declared column order. `r[c] ?? ''` mirrors the prior
+  // behavior — undefined cells become empty strings, preserving column
+  // alignment in tools that don't tolerate sparse rows.
+  for (const r of rows) ws.addRow(columns.map((c) => r[c] ?? ''));
+
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  const bytes = Buffer.from(arrayBuffer as ArrayBuffer);
   return {
     bytes: new Uint8Array(bytes),
     mimeType: MIME.xlsx,

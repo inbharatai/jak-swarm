@@ -59,8 +59,8 @@ describe('CSV exporter', () => {
 });
 
 describe('XLSX exporter', () => {
-  it('produces a real XLSX (PK ZIP magic bytes)', () => {
-    const result = exportXlsx(
+  it('produces a real XLSX (PK ZIP magic bytes)', async () => {
+    const result = await exportXlsx(
       [{ a: 1, b: 2 }, { a: 3, b: 4 }],
       { baseName: 'sheet' },
     );
@@ -72,8 +72,8 @@ describe('XLSX exporter', () => {
     expect(result.mimeType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   });
 
-  it('produces a header-only XLSX when rows are empty', () => {
-    const result = exportXlsx([], { baseName: 'empty', columns: ['x', 'y'] });
+  it('produces a header-only XLSX when rows are empty', async () => {
+    const result = await exportXlsx([], { baseName: 'empty', columns: ['x', 'y'] });
     expect(result.bytes.byteLength).toBeGreaterThan(0);
     expect(result.bytes[0]).toBe(0x50);
   });
