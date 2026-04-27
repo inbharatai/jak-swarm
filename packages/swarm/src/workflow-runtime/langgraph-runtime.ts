@@ -1,125 +1,298 @@
 /**
- * LangGraphRuntime — peer of SwarmGraphRuntime that uses
- * `@langchain/langgraph` for orchestration. Phase 6 ships the proof-of-
- * life: LangGraph is installed, a tiny StateGraph is compiled, and the
- * runtime answers calls through it. The full migration of every node
- * type (commander → planner → router → guardrail → worker → verifier
- * → approval) is incremental — happens behind `JAK_WORKFLOW_RUNTIME=
- * langgraph` and per-template flags as later phases are wired up.
+ * LangGraphRuntime — Sprint 2.5 / A.3.
  *
- * Today's Phase 6 implementation runs a SINGLE-NODE graph that:
- *   1. accepts a goal
- *   2. delegates to the existing SwarmRunner (via SwarmGraphRuntime)
- *      because porting all 9 nodes to LangGraph idioms is a multi-week
- *      project
- *   3. returns the result, having proven the LangGraph adapter compiles,
- *      runs, and respects the WorkflowRuntime contract
+ * Real native-LangGraph orchestrator backed by `PostgresCheckpointSaver`.
+ * Replaces the previous proof-of-life shim. The runtime:
  *
- * Subsequent phases (post-Phase-8) replace the inner SwarmRunner call
- * with native LangGraph nodes that share the same workers/tools/etc.
+ *   - Compiles a `StateGraph` with the 9 SwarmGraph node functions added
+ *     via `addNode` and the 4 conditional-edge functions reused verbatim
+ *     from `swarm-graph.ts`.
+ *   - Persists every checkpoint into Postgres via the
+ *     `PostgresCheckpointSaver` (Sprint 2.5 / A.2).
+ *   - Pauses on approval via LangGraph's native `interrupt()` (called
+ *     inside the approval node wrapper). Resumes via
+ *     `Command(resume=...)` — the standard LangGraph contract.
+ *   - Implements the JAK-owned `WorkflowRuntime` interface so
+ *     SwarmExecutionService consumes it identically to the old runtime.
  *
- * INVARIANT: no @langchain/langgraph import escapes this file. The rest
- * of the codebase only imports from ./workflow-runtime + this module's
- * default export.
+ * INVARIANT: no `@langchain/langgraph` import escapes this directory.
  */
 
-import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
+import {
+  Command,
+  GraphInterrupt,
+  isInterrupted,
+} from '@langchain/langgraph';
+import { WorkflowStatus } from '@jak-swarm/shared';
+import type { ToolCategory, AgentTrace, ApprovalRequest } from '@jak-swarm/shared';
+import type { SwarmRunner, SwarmResult } from '../runner/swarm-runner.js';
+import {
+  buildLangGraph,
+  makeRunnableConfig,
+  type CompiledLangGraph,
+} from './langgraph-graph-builder.js';
+import type { CheckpointPrismaClient } from './postgres-checkpointer.js';
 import type {
   WorkflowRuntime,
   StartContext,
   ResumeDecision,
   WorkflowSnapshot,
 } from './workflow-runtime.js';
-import { SwarmGraphRuntime } from './swarm-graph-runtime.js';
-import type { SwarmRunner, SwarmResult } from '../runner/swarm-runner.js';
-
-/**
- * Minimal state schema for the proof-of-life graph. Real schema will
- * mirror SwarmState in subsequent phases.
- */
-const RuntimeState = Annotation.Root({
-  workflowId: Annotation<string>(),
-  goal: Annotation<string>(),
-  result: Annotation<SwarmResult | null>({
-    reducer: (_old: SwarmResult | null, next: SwarmResult | null) => next,
-    default: () => null,
-  }),
-});
-
-type RuntimeStateT = typeof RuntimeState.State;
+import { safeEmitLifecycle } from './lifecycle-events.js';
+import { createInitialSwarmState, type SwarmState } from '../state/swarm-state.js';
+import { WorkflowPausedError } from './workflow-runtime.js';
 
 export class LangGraphRuntime implements WorkflowRuntime {
-  // Honest naming — this runtime is NOT a native LangGraph orchestrator
-  // today; it's a thin wrapper that delegates real execution to the
-  // SwarmGraphRuntime and runs an empty proof-of-life StateGraph
-  // alongside. Diagnostics + UI surface 'langgraph-shim' so operators
-  // and customers know not to attribute observed behavior to LangGraph
-  // until the full node migration lands.
-  readonly name = 'langgraph-shim';
-  /**
-   * True when LangGraph is genuinely orchestrating nodes. Today: false.
-   * Flip to true only when commander/planner/router/worker/verifier are
-   * each native LangGraph nodes wired to the same agents.
-   */
-  readonly isFullyImplemented = false;
-  /** Why diagnostics show this runtime as 'shim'. */
-  readonly status = 'present-but-not-active' as const;
-  readonly statusReason =
-    'LangGraph adapter compiles and executes a proof-of-life StateGraph, ' +
-    'but the actual workflow nodes (commander/planner/worker/verifier) still ' +
-    'run via the SwarmGraph engine under the hood. Full LangGraph orchestration ' +
-    'is a future-phase rewrite.';
-  private readonly inner: SwarmGraphRuntime;
-  private readonly graph: ReturnType<typeof this.buildGraph>;
+  readonly name = 'langgraph';
+  /** True now that the cutover is real. */
+  readonly isFullyImplemented = true;
+  readonly status = 'active' as const;
 
-  constructor(runner: SwarmRunner) {
-    this.inner = new SwarmGraphRuntime(runner);
-    this.graph = this.buildGraph();
-  }
+  private readonly graph: CompiledLangGraph;
+  private readonly runner: SwarmRunner;
 
-  /**
-   * Phase 6 graph: START → executeNode → END. The `executeNode` delegates
-   * to the existing SwarmGraphRuntime so semantics + outputs match the
-   * legacy path 1:1. Future phases replace this with the full
-   * commander/planner/router/worker/verifier mirror in LangGraph idioms.
-   */
-  private buildGraph() {
-    const builder = new StateGraph(RuntimeState)
-      .addNode('execute', async (state: RuntimeStateT) => {
-        // Delegate to SwarmGraphRuntime. The startCtx must be carried in
-        // closure on the runtime; the graph itself only knows workflowId
-        // + goal. Phase 6's adapter layer pulls the rest from the runtime
-        // instance.
-        return { result: state.result };
-      })
-      .addEdge(START, 'execute')
-      .addEdge('execute', END);
-    return builder.compile();
+  constructor(runner: SwarmRunner, db: CheckpointPrismaClient) {
+    this.runner = runner;
+    // Wire cooperative cancel/pause flags from the SwarmRunner to the
+    // graph's per-node wrappers. We reuse the SwarmRunner's flag sets
+    // because nothing else in the system tracks per-workflow cancel
+    // state, and the callers (HTTP cancel route + UI pause button)
+    // already mutate them via runner.stop / runner.pause.
+    this.graph = buildLangGraph({
+      db,
+      shouldStop: (id) => runner.isCancelled(id),
+      shouldPause: (id) => runner.isPaused(id),
+    });
   }
 
   async start(ctx: StartContext): Promise<SwarmResult> {
-    // Phase 6 pragmatic strategy: do the actual run via SwarmGraphRuntime
-    // (battle-tested) AND emit the LangGraph trace so observability
-    // demonstrates the graph executed end-to-end. This proves the runtime
-    // is wired without forcing a full-rewrite of the 9 node types.
-    const result = await this.inner.start(ctx);
-    await this.graph.invoke({
+    safeEmitLifecycle(ctx.onLifecycle, {
+      type: 'created',
       workflowId: ctx.workflowId,
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
       goal: ctx.goal,
-      result,
+      timestamp: new Date().toISOString(),
     });
-    return result;
+    safeEmitLifecycle(ctx.onLifecycle, {
+      type: 'started',
+      workflowId: ctx.workflowId,
+      runtime: this.name,
+      timestamp: new Date().toISOString(),
+    });
+
+    const startedAt = Date.now();
+    const initialState = createInitialSwarmState({
+      goal: ctx.goal,
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      workflowId: ctx.workflowId,
+      industry: ctx.industry,
+      roleModes: ctx.roleModes,
+      idempotencyKey: ctx.idempotencyKey,
+      maxCostUsd: ctx.maxCostUsd,
+      autoApproveEnabled: ctx.autoApproveEnabled,
+      approvalThreshold: ctx.approvalThreshold,
+      allowedDomains: ctx.allowedDomains,
+      browserAutomationEnabled: ctx.browserAutomationEnabled,
+      restrictedCategories: ctx.restrictedCategories as ToolCategory[] | undefined,
+      disabledToolNames: ctx.disabledToolNames,
+      connectedProviders: ctx.connectedProviders,
+      subscriptionTier: ctx.subscriptionTier,
+    });
+
+    const config = makeRunnableConfig(ctx.workflowId, ctx.tenantId);
+    return this.runOrPause(initialState, config, ctx, startedAt);
   }
 
   async resume(workflowId: string, decision: ResumeDecision): Promise<SwarmResult> {
-    return this.inner.resume(workflowId, decision);
+    // Look up tenantId from the existing checkpoint header. We cannot
+    // rebuild the full state ourselves — LangGraph rehydrates from
+    // the checkpointer when invoke is called with the same thread_id.
+    const tenantId = await this.findTenantIdForThread(workflowId);
+    if (!tenantId) {
+      throw new Error(`[LangGraphRuntime.resume] no checkpoint found for workflow ${workflowId}`);
+    }
+    const config = makeRunnableConfig(workflowId, tenantId);
+    const startedAt = Date.now();
+
+    // Resume via Command(resume=...). LangGraph applies the value to the
+    // most recent interrupt() call inside the approval wrapper.
+    const resumeCommand = new Command({
+      resume: {
+        status: decision.decision,
+        reviewedBy: decision.reviewedBy,
+        ...(decision.comment ? { comment: decision.comment } : {}),
+      },
+    });
+
+    return this.runOrPause(resumeCommand as unknown as Partial<SwarmState>, config, undefined, startedAt);
   }
 
   async cancel(workflowId: string, _reason?: string): Promise<void> {
-    return this.inner.cancel(workflowId);
+    this.runner.stop(workflowId);
   }
 
   async getState(workflowId: string): Promise<WorkflowSnapshot | null> {
-    return this.inner.getState(workflowId);
+    // Find the most recent checkpoint for this thread across tenants.
+    // We use a low-level lookup because configurable.tenantId is required
+    // but the caller (GET /workflows/:id) might not have it in scope.
+    const tenantId = await this.findTenantIdForThread(workflowId);
+    if (!tenantId) return null;
+    const config = makeRunnableConfig(workflowId, tenantId);
+    const snapshot = await this.graph.getState(config);
+    if (!snapshot) return null;
+
+    const state = snapshot.values as unknown as SwarmState;
+    return {
+      workflowId,
+      status: state.status,
+      currentStage: snapshot.next?.[0],
+      ...(state.plan?.tasks?.[state.currentTaskIndex ?? 0]
+        ? { currentTaskId: state.plan.tasks[state.currentTaskIndex ?? 0]!.id }
+        : {}),
+      completedTaskIds: state.completedTaskIds ?? [],
+      failedTaskIds: state.failedTaskIds ?? [],
+      pendingApprovalIds: (state.pendingApprovals ?? []).map((a) => a.id),
+      ...(state.error ? { error: state.error } : {}),
+      rawState: state,
+    };
+  }
+
+  /**
+   * Run the graph and convert LangGraph's GraphInterrupt into the
+   * JAK-owned WorkflowPausedError. Any other terminal status produces
+   * a SwarmResult.
+   */
+  private async runOrPause(
+    input: Partial<SwarmState> | unknown,
+    config: ReturnType<typeof makeRunnableConfig>,
+    ctx: StartContext | undefined,
+    startedAt: number,
+  ): Promise<SwarmResult> {
+    let finalState: SwarmState;
+    try {
+      const result = await this.graph.invoke(input as Parameters<typeof this.graph.invoke>[0], config);
+      finalState = result as unknown as SwarmState;
+    } catch (err) {
+      // GraphInterrupt → workflow paused for approval. Return a
+      // WorkflowPausedError so SwarmExecutionService enqueues a resume.
+      if (err instanceof GraphInterrupt || isInterrupted(err)) {
+        // Read the current state to extract pendingApprovals.
+        const snapshot = await this.graph.getState(config);
+        const state = (snapshot?.values ?? {}) as unknown as SwarmState;
+
+        if (ctx?.onLifecycle) {
+          for (const a of state.pendingApprovals ?? []) {
+            safeEmitLifecycle(ctx.onLifecycle, {
+              type: 'approval_required',
+              workflowId: ctx.workflowId,
+              approvalId: a.id,
+              riskLevel: a.riskLevel,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+        // Return an AWAITING_APPROVAL SwarmResult; SwarmExecutionService
+        // recognises this status and persists pendingApprovals.
+        return {
+          workflowId: state.workflowId,
+          status: WorkflowStatus.AWAITING_APPROVAL,
+          outputs: state.outputs ?? [],
+          traces: state.traces ?? [],
+          pendingApprovals: state.pendingApprovals ?? [],
+          clarificationNeeded: state.clarificationNeeded ?? false,
+          ...(state.clarificationQuestion ? { clarificationQuestion: state.clarificationQuestion } : {}),
+          durationMs: Date.now() - startedAt,
+          startedAt: new Date(startedAt),
+          completedAt: new Date(),
+        };
+      }
+      // Non-interrupt error: surface as FAILED.
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const durationMs = Date.now() - startedAt;
+      if (ctx?.onLifecycle) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'failed',
+          workflowId: ctx.workflowId,
+          error: errorMessage,
+          durationMs,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      throw err;
+    }
+
+    // Terminal state — emit corresponding lifecycle event.
+    const durationMs = Date.now() - startedAt;
+    if (ctx?.onLifecycle) {
+      if (finalState.status === WorkflowStatus.CANCELLED) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'cancelled',
+          workflowId: ctx.workflowId,
+          reason: 'runtime-reported',
+          timestamp: new Date().toISOString(),
+        });
+      } else if (finalState.status === WorkflowStatus.FAILED) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'failed',
+          workflowId: ctx.workflowId,
+          error: finalState.error ?? 'unknown failure',
+          durationMs,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        // Treat anything that wasn't FAILED / CANCELLED as COMPLETED for
+        // lifecycle purposes (matches SwarmGraphRuntime behavior).
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'completed',
+          workflowId: ctx.workflowId,
+          finalStatus: finalState.status,
+          durationMs,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    return this.toSwarmResult(finalState, startedAt);
+  }
+
+  private toSwarmResult(state: SwarmState, startedAt: number): SwarmResult {
+    return {
+      workflowId: state.workflowId,
+      status: state.status,
+      outputs: state.outputs ?? [],
+      traces: (state.traces ?? []) as AgentTrace[],
+      pendingApprovals: (state.pendingApprovals ?? []) as ApprovalRequest[],
+      clarificationNeeded: state.clarificationNeeded ?? false,
+      ...(state.clarificationQuestion ? { clarificationQuestion: state.clarificationQuestion } : {}),
+      ...(state.error ? { error: state.error } : {}),
+      durationMs: Date.now() - startedAt,
+      startedAt: new Date(startedAt),
+      completedAt: new Date(),
+    };
+  }
+
+  /**
+   * Best-effort tenant lookup for an existing workflow's checkpoint.
+   * Used by getState + resume when the caller doesn't carry tenantId
+   * explicitly. Reads any checkpoint row for the thread and returns
+   * its tenant_id. Returns undefined if no checkpoint exists.
+   */
+  private async findTenantIdForThread(workflowId: string): Promise<string | undefined> {
+    // We piggyback on the same Prisma client the checkpointer uses by
+    // accessing its private `db`. This is intentional — the runtime
+    // owns both for the duration of a workflow.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cp = (this.graph as unknown as { checkpointer?: { db?: CheckpointPrismaClient } }).checkpointer;
+    if (!cp || !cp.db) return undefined;
+    const row = (await cp.db.workflowCheckpoint.findFirst({
+      where: { threadId: workflowId },
+      orderBy: { createdAt: 'desc' },
+    })) as { tenantId?: string } | null;
+    return row?.tenantId;
   }
 }
+
+// Re-export so the index.ts export from this directory remains consistent.
+export { WorkflowPausedError };

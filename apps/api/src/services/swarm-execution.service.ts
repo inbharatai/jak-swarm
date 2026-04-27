@@ -477,13 +477,15 @@ export class SwarmExecutionService extends EventEmitter {
     super();
     const stateStore = new DbWorkflowStateStore(db);
     this.runner = new SwarmRunner({ defaultTimeoutMs: 5 * 60 * 1000, stateStore });
-    // Phase 6 — pick the workflow orchestration engine. JAK_WORKFLOW_RUNTIME
-    // = 'swarmgraph' (default) wraps the existing SwarmRunner; 'langgraph'
-    // wraps it under @langchain/langgraph for proof-of-life parity. Both
-    // delegate to the same SwarmRunner under the hood today, so behavior
-    // is identical — the abstraction lets us swap engines per-request in
-    // future phases without touching this file.
-    this.workflowRuntime = getWorkflowRuntime(this.runner);
+    // Sprint 2.5 / A.3 — pick the workflow orchestration engine.
+    // Default is now 'langgraph': real native @langchain/langgraph
+    // StateGraph backed by the PostgresCheckpointSaver
+    // (workflow_checkpoints table). The 'swarmgraph' fallback remains
+    // available via JAK_WORKFLOW_RUNTIME=swarmgraph for the transition
+    // window so an operator can revert if a regression appears.
+    // After ≥1 release at parity, A.6 deletes SwarmGraph + the env-flag
+    // handling.
+    this.workflowRuntime = getWorkflowRuntime(this.runner, db as unknown as Parameters<typeof getWorkflowRuntime>[1]);
     log.info({ runtime: this.workflowRuntime.name }, '[Swarm] WorkflowRuntime selected');
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);

@@ -1457,3 +1457,41 @@ model WorkflowTemplate {
   @@index([intent, status])
   @@map("workflow_templates")
 }
+
+// WorkflowCheckpoint — Sprint 2.5 / A.2.
+//
+// Stores LangGraph checkpoint snapshots and pending writes for the new
+// PostgresCheckpointSaver. Replaces the previous Workflow.stateJson
+// storage when LangGraph is the active runtime.
+//
+// Tenant isolation is enforced at every read via composite (tenantId,
+// threadId) WHERE clauses in PostgresCheckpointSaver. Cross-tenant
+// access attempts return undefined as if the checkpoint did not exist.
+//
+// Two row types share the table:
+//   - type='checkpoint' rows hold a full state snapshot (Checkpoint +
+//     metadata + channelVersions). Uniqueness is on
+//     (threadId, checkpointNs, checkpointId).
+//   - type='write' rows hold pending per-task writes that have not yet
+//     been folded into a checkpoint. Multiple writes can share a
+//     parent checkpoint, so they have no uniqueness constraint.
+model WorkflowCheckpoint {
+  id                  String    @id @default(cuid())
+  threadId            String    @map("thread_id")
+  checkpointNs        String    @default("") @map("checkpoint_ns")
+  checkpointId        String    @map("checkpoint_id")
+  parentCheckpointId  String?   @map("parent_checkpoint_id")
+  tenantId            String    @map("tenant_id")
+  type                String    // 'checkpoint' | 'write'
+  checkpointJson      Json?     @map("checkpoint_json")
+  metadataJson        Json?     @map("metadata_json")
+  channelVersionsJson Json?     @map("channel_versions_json")
+  taskId              String?   @map("task_id")
+  writesJson          Json?     @map("writes_json")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, threadId, createdAt(sort: Desc)], map: "workflow_checkpoints_tenant_thread_created_idx")
+  @@index([threadId, parentCheckpointId], map: "workflow_checkpoints_thread_parent_idx")
+  @@index([type, threadId], map: "workflow_checkpoints_type_thread_idx")
+  @@map("workflow_checkpoints")
+}
