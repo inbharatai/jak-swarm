@@ -23,6 +23,12 @@
  *   GET    /workflow-templates               List templates available to tenant
  *   GET    /workflow-templates/by-intent/:intent  Find template for intent
  *   POST   /admin/workflow-templates/seed    SYSTEM_ADMIN — seed system templates (idempotent)
+ *
+ * Knowledge sources (Sprint 2.3 / Item C):
+ *   POST   /company/knowledge-sources           Register a URL to crawl + ingest
+ *   GET    /company/knowledge-sources           List tenant's knowledge sources
+ *   POST   /company/knowledge-sources/:id/crawl Trigger crawl + ingest of a source
+ *   DELETE /company/knowledge-sources/:id       Soft-delete a knowledge source
  */
 
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
@@ -32,6 +38,7 @@ import { CompanyProfileService, CompanyBrainSchemaUnavailableError } from '../se
 import { IntentRecordService } from '../services/company-brain/intent-record.service.js';
 import { MemoryApprovalService, IllegalMemoryTransitionError } from '../services/company-brain/memory-approval.service.js';
 import { WorkflowTemplateService } from '../services/company-brain/workflow-template.service.js';
+import { CompanyKnowledgeCrawlerService } from '../services/company-brain/crawler.service.js';
 import { ok, err } from '../types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────────────
@@ -68,6 +75,20 @@ const intentListQuerySchema = z.object({
 
 const memoryDecisionSchema = z.object({
   reason: z.string().max(2000).optional(),
+});
+
+// Sprint 2.3 / Item C — knowledge source CRUD + crawl trigger.
+const knowledgeSourceCreateSchema = z.object({
+  url: z.string().url().max(2000),
+  kind: z.enum(['website', 'competitor', 'pricing', 'product', 'blog', 'other']),
+  title: z.string().max(500).optional(),
+});
+
+const knowledgeSourceListQuerySchema = z.object({
+  kind: z.enum(['website', 'competitor', 'pricing', 'product', 'blog', 'other']).optional(),
+  status: z.enum(['pending', 'crawled', 'failed']).optional(),
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 // ─── Error mapper ───────────────────────────────────────────────────────
@@ -235,6 +256,88 @@ const companyBrainRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await templates.seedSystemTemplates();
       return reply.send(ok(result));
     } catch (e) { return sendBrainError(reply, e, 'WORKFLOW_TEMPLATES_SEED_FAILED'); }
+  });
+
+  // ── Knowledge sources (Sprint 2.3 / Item C) ─────────────────────────
+  // CRUD + crawl trigger for CompanyKnowledgeSource rows. The crawler
+  // service does its own SSRF + robots.txt + rate-limit checks; the
+  // route layer just validates input and dispatches.
+
+  const crawler = new CompanyKnowledgeCrawlerService(fastify.db, fastify.log);
+
+  fastify.post('/company/knowledge-sources', {
+    preHandler: [fastify.authenticate, ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN', 'OPERATOR')] : [])],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const parsed = knowledgeSourceCreateSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row = await (fastify.db as any).companyKnowledgeSource.create({
+        data: {
+          tenantId: request.user.tenantId,
+          url: parsed.data.url,
+          kind: parsed.data.kind,
+          title: parsed.data.title ?? null,
+          createdBy: request.user.userId,
+        },
+      });
+      return reply.status(201).send(ok({ source: row }));
+    } catch (e) {
+      // Unique constraint (tenantId + url) → 409
+      if (e instanceof Error && /unique constraint|P2002/i.test(e.message)) {
+        return reply.status(409).send(err('DUPLICATE_URL', 'A knowledge source for this URL already exists in this tenant.'));
+      }
+      return sendBrainError(reply, e, 'KNOWLEDGE_SOURCE_CREATE_FAILED');
+    }
+  });
+
+  fastify.get('/company/knowledge-sources', { preHandler: [fastify.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const parsed = knowledgeSourceListQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = await (fastify.db as any).companyKnowledgeSource.findMany({
+        where: {
+          tenantId: request.user.tenantId,
+          deletedAt: null,
+          ...(parsed.data.kind ? { kind: parsed.data.kind } : {}),
+          ...(parsed.data.status ? { lastCrawlStatus: parsed.data.status } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: parsed.data.limit,
+        skip: parsed.data.offset,
+      });
+      return reply.send(ok({ sources: rows }));
+    } catch (e) { return sendBrainError(reply, e, 'KNOWLEDGE_SOURCE_LIST_FAILED'); }
+  });
+
+  fastify.post('/company/knowledge-sources/:id/crawl', {
+    preHandler: [fastify.authenticate, ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN', 'OPERATOR')] : [])],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const result = await crawler.crawlAndIngest(id, request.user.tenantId);
+      // The crawler already persisted status to the source row; surface
+      // the result to the API caller. Non-success statuses still 200 (the
+      // call itself succeeded) but the body's `status` reveals the
+      // outcome — the UI uses the status field, not HTTP code.
+      return reply.send(ok({ result }));
+    } catch (e) { return sendBrainError(reply, e, 'KNOWLEDGE_SOURCE_CRAWL_FAILED'); }
+  });
+
+  fastify.delete('/company/knowledge-sources/:id', {
+    preHandler: [fastify.authenticate, ...(fastify.requireRole ? [fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN', 'OPERATOR')] : [])],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updated = await (fastify.db as any).companyKnowledgeSource.updateMany({
+        where: { id, tenantId: request.user.tenantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      if (updated.count === 0) return reply.status(404).send(err('NOT_FOUND', `Knowledge source id=${id} not found in this tenant.`));
+      return reply.send(ok({ deleted: true }));
+    } catch (e) { return sendBrainError(reply, e, 'KNOWLEDGE_SOURCE_DELETE_FAILED'); }
   });
 };
 

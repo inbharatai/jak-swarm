@@ -1072,7 +1072,47 @@ export const companyBrainApi = {
   },
   templateForIntent: (intent: string) =>
     apiDataFetch<{ template: WorkflowTemplateClient }>(`/workflow-templates/by-intent/${encodeURIComponent(intent)}`),
+
+  // ── Knowledge sources (Sprint 2.3 / Item C) ──────────────────────────
+  // URLs registered for the company brain crawler. The crawler service
+  // is server-side; clients just trigger + poll.
+  listKnowledgeSources: (params?: { kind?: string; status?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ sources: Array<KnowledgeSourceClient> }>(`/company/knowledge-sources${qs}`);
+  },
+  createKnowledgeSource: (body: { url: string; kind: 'website' | 'competitor' | 'pricing' | 'product' | 'blog' | 'other'; title?: string }) =>
+    apiDataFetch<{ source: KnowledgeSourceClient }>('/company/knowledge-sources', { method: 'POST', body }),
+  crawlKnowledgeSource: (id: string) =>
+    apiDataFetch<{ result: KnowledgeSourceCrawlResult }>(`/company/knowledge-sources/${id}/crawl`, { method: 'POST', body: {} }),
+  deleteKnowledgeSource: (id: string) =>
+    apiDataFetch<{ deleted: boolean }>(`/company/knowledge-sources/${id}`, { method: 'DELETE' }),
 };
+
+export interface KnowledgeSourceClient {
+  id: string;
+  tenantId: string;
+  url: string;
+  kind: string;
+  title: string | null;
+  lastCrawledAt: string | null;
+  lastCrawlStatus: string;
+  lastCrawlError: string | null;
+  vectorDocumentIds: unknown;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeSourceCrawlResult {
+  status: 'crawled' | 'failed' | 'blocked_by_robots' | 'rate_limited' | 'invalid_url';
+  textLength: number;
+  chunksCreated?: number;
+  title?: string;
+  error?: string;
+  flags: string[];
+}
 
 // ─── SYSTEM_ADMIN cross-tenant aggregate views ─────────────────────────
 //
