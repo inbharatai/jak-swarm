@@ -46,6 +46,7 @@ jobs:
           pnpm --filter @jak-swarm/verification build
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
+          pnpm --filter @jak-swarm/security build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
 
@@ -116,6 +117,7 @@ jobs:
           pnpm --filter @jak-swarm/verification build
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
+          pnpm --filter @jak-swarm/security build
           pnpm --filter @jak-swarm/agents build
 
       - name: Run unit tests with coverage (blocking)
