@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload Markdown report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-md
           path: qa/benchmark-results-openai-first.md
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload JSON report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-json
           path: qa/_generated/bench-runtime.json
