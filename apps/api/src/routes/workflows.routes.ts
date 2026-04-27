@@ -45,6 +45,145 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId, userId } = request.user;
 
       try {
+        // Sprint 2.1 / Item J — Follow-up command short-circuit.
+        // Before spending credits or creating a new workflow, see if the
+        // user typed a short follow-up command ("approve", "show graph",
+        // "what is the CMO doing?", etc.) against an already-running
+        // workflow. If so, dispatch to the matching action handler and
+        // return without creating a new workflow.
+        //
+        // Gating:
+        //   - input must be < 200 chars (parser returns null for longer)
+        //   - there must be an active workflow on this tenant+user
+        //
+        // Failures: parser is rule-based and pure; can never throw.
+        // If no command matches → fall through to normal workflow creation.
+        if (goal.length < 200) {
+          const ACTIVE_STATUSES: Array<WorkflowStatus> = ['PENDING', 'RUNNING', 'PAUSED'];
+          const activeWorkflow = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ id: string; status: string; goal: string } | null>)({
+            where: { tenantId, userId, status: { in: ACTIVE_STATUSES } },
+            orderBy: { startedAt: 'desc' },
+            select: { id: true, status: true, goal: true },
+          });
+          if (activeWorkflow) {
+            // Look up most-recent pending approval (informs parser bias)
+            const pendingApproval = await (fastify.db.approvalRequest.findFirst as unknown as (a: unknown) => Promise<{ id: string; status: string } | null>)({
+              where: { workflowId: activeWorkflow.id, status: 'PENDING' },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true, status: true },
+            });
+            const { parseFollowup, describeFollowup } = await import('../services/conversation/followup-parser.js');
+            const cmd = parseFollowup(goal, { hasPendingApproval: Boolean(pendingApproval) });
+            if (cmd) {
+              const description = describeFollowup(cmd);
+              const baseResult = {
+                kind: 'followup_executed' as const,
+                command: cmd,
+                description,
+                workflowId: activeWorkflow.id,
+              };
+              try {
+                switch (cmd.kind) {
+                  case 'approve':
+                  case 'reject': {
+                    if (!pendingApproval) {
+                      return reply.status(409).send(err('NO_PENDING_APPROVAL', `Workflow ${activeWorkflow.id} has no pending approval to ${cmd.kind}.`));
+                    }
+                    const decision = cmd.kind === 'approve' ? 'APPROVED' : 'REJECTED';
+                    await workflowService.resolveApproval(tenantId, pendingApproval.id, decision, userId);
+                    await fastify.auditLog(request, `APPROVAL_${decision}_VIA_FOLLOWUP`, 'ApprovalRequest', pendingApproval.id, { decision, source: 'chat_followup' });
+                    return reply.status(200).send(ok({ ...baseResult, approvalId: pendingApproval.id, decision }));
+                  }
+                  case 'pause': {
+                    fastify.swarm.pauseWorkflow(activeWorkflow.id);
+                    return reply.status(200).send(ok(baseResult));
+                  }
+                  case 'resume': {
+                    fastify.swarm.unpauseWorkflow(activeWorkflow.id);
+                    return reply.status(200).send(ok(baseResult));
+                  }
+                  case 'cancel': {
+                    fastify.swarm.stopWorkflow(activeWorkflow.id);
+                    return reply.status(200).send(ok(baseResult));
+                  }
+                  case 'show_graph': {
+                    // Return the plan + statuses; the cockpit already
+                    // renders the DAG component from these fields when
+                    // the user navigates to the workflow detail.
+                    const wf = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ id: string; planJson: unknown; status: string } | null>)({
+                      where: { id: activeWorkflow.id, tenantId },
+                      select: { id: true, planJson: true, status: true },
+                    });
+                    return reply.status(200).send(ok({ ...baseResult, plan: wf?.planJson ?? null, status: wf?.status }));
+                  }
+                  case 'show_status': {
+                    return reply.status(200).send(ok({
+                      ...baseResult,
+                      activeWorkflow,
+                      ...(cmd.agentRole ? { agentRole: cmd.agentRole } : {}),
+                      hint: cmd.agentRole
+                        ? `Live activity for ${cmd.agentRole} streams on the cockpit SSE channel workflow:${activeWorkflow.id}.`
+                        : `Live activity streams on the cockpit SSE channel workflow:${activeWorkflow.id}.`,
+                    }));
+                  }
+                  case 'show_failed': {
+                    const failedTraces = await fastify.db.agentTrace.findMany({
+                      where: { workflowId: activeWorkflow.id, error: { not: null } },
+                      select: { id: true, agentRole: true, error: true, stepIndex: true },
+                      orderBy: { stepIndex: 'asc' },
+                      take: 50,
+                    });
+                    return reply.status(200).send(ok({ ...baseResult, failedTraces }));
+                  }
+                  case 'show_cost': {
+                    const wf = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ totalCostUsd: number; maxCostUsd: number | null } | null>)({
+                      where: { id: activeWorkflow.id, tenantId },
+                      select: { totalCostUsd: true, maxCostUsd: true },
+                    });
+                    return reply.status(200).send(ok({ ...baseResult, totalCostUsd: wf?.totalCostUsd ?? 0, maxCostUsd: wf?.maxCostUsd ?? null }));
+                  }
+                  case 'download_report': {
+                    return reply.status(200).send(ok({ ...baseResult, downloadUrl: `/workflows/${activeWorkflow.id}/output` }));
+                  }
+                  case 'finalize_workpaper': {
+                    // Workpaper finalization happens per-audit-run via
+                    // POST /audit/runs/:id/workpapers/:wpId/decide. The
+                    // chat surface doesn't know which workpaper without
+                    // more context, so we honestly say so.
+                    return reply.status(200).send(ok({
+                      ...baseResult,
+                      hint: 'To finalize a workpaper, open the audit run detail page and use the per-workpaper Approve button. The chat shortcut cannot infer which workpaper to finalize.',
+                    }));
+                  }
+                  case 'why_waiting': {
+                    if (!pendingApproval) {
+                      return reply.status(200).send(ok({ ...baseResult, reason: 'no_pending_approval', hint: `Workflow ${activeWorkflow.id} is in status '${activeWorkflow.status}' and has no pending approval.` }));
+                    }
+                    const fullApproval = await fastify.db.approvalRequest.findFirst({
+                      where: { id: pendingApproval.id, tenantId },
+                    });
+                    return reply.status(200).send(ok({ ...baseResult, pendingApproval: fullApproval }));
+                  }
+                  case 'continue': {
+                    // Workflows continue automatically once unpaused or
+                    // approval-resolved. No explicit "continue" action.
+                    return reply.status(200).send(ok({
+                      ...baseResult,
+                      hint: 'Workflows continue automatically. If this run is paused, use "resume". If it is awaiting approval, use "approve" or "reject".',
+                    }));
+                  }
+                }
+              } catch (followupErr) {
+                // If the dispatch fails, log but do NOT silently fall
+                // through to creating a new workflow — that would be a
+                // false success. Surface the error.
+                fastify.log.warn({ workflowId: activeWorkflow.id, err: followupErr instanceof Error ? followupErr.message : String(followupErr) }, '[followup] dispatch failed');
+                return reply.status(500).send(err('FOLLOWUP_FAILED', followupErr instanceof Error ? followupErr.message : 'Follow-up command failed'));
+              }
+            }
+          }
+        }
+
         // ── Credit check: estimate cost and verify user has budget ───────
         const creditService = new CreditService(fastify.db);
 

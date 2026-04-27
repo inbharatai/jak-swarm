@@ -61,6 +61,39 @@ export type AgentActivityEvent =
       /** Step id within the workflow — usually the agent role doing this call. */
       stepId?: string;
       timestamp: string;
+    }
+  // Sprint 2.1 / Item K — Router emits one of these per task → agentRole
+  // mapping it produced. The swarm-execution.service.ts onAgentActivity
+  // handler translates each to a workflow-lifecycle `agent_assigned` event
+  // for the cockpit + AuditLog.
+  | {
+      type: 'agent_assigned';
+      taskId: string;
+      taskName?: string;
+      agentRole: string;
+      /** Optional reason the Router chose this agent (verb match, fallback, etc.) */
+      routingReason?: string;
+      timestamp: string;
+    }
+  // Sprint 2.1 / Item K — Verifier emits these at entry / exit so the
+  // cockpit shows a dedicated verification panel rather than inferring
+  // from `step_started`/`step_completed` with agentRole='VERIFIER'.
+  | {
+      type: 'verification_started';
+      taskId: string;
+      taskName?: string;
+      timestamp: string;
+    }
+  | {
+      type: 'verification_completed';
+      taskId: string;
+      taskName?: string;
+      passed: boolean;
+      /** 0-1; the Verifier's confidence in its judgment (heuristic-grounded today). */
+      groundingScore?: number;
+      /** Issues array length when passed=false. */
+      issueCount?: number;
+      timestamp: string;
     };
 
 /**

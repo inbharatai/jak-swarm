@@ -3,14 +3,62 @@ import { VerifierAgent, AgentContext } from '@jak-swarm/agents';
 import type { VerifierInput } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
+import { getActivityEmitter } from '../../supervisor/activity-registry.js';
 
 const MAX_RETRIES = 2;  // max worker retries per task before accepting the result as-is
+
+/**
+ * Sprint 2.1 / Item K — `verification_completed` emit helper.
+ *
+ * Centralised so every return path of `verifierNode` (auto-pass, retry,
+ * final pass, final fail) emits the same shape. Fire-and-forget; never
+ * blocks the verification decision.
+ */
+function emitVerificationCompleted(
+  workflowId: string,
+  task: { id: string; name?: string },
+  result: { passed: boolean; confidence?: number; issues?: string[] },
+): void {
+  try {
+    const emitter = getActivityEmitter(workflowId);
+    if (!emitter) return;
+    emitter({
+      type: 'verification_completed',
+      taskId: task.id,
+      ...(task.name ? { taskName: task.name } : {}),
+      passed: result.passed,
+      ...(typeof result.confidence === 'number' ? { groundingScore: result.confidence } : {}),
+      ...(Array.isArray(result.issues) ? { issueCount: result.issues.length } : {}),
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    // Emission failure must never break verification.
+  }
+}
 
 export async function verifierNode(state: SwarmState): Promise<Partial<SwarmState>> {
   const task = getCurrentTask(state);
 
   if (!task) {
     return { status: WorkflowStatus.COMPLETED };
+  }
+
+  // Sprint 2.1 / Item K — emit `verification_started` at entry. We emit
+  // even for the auto-pass branch below so the cockpit shows verification
+  // ran (and then completed instantly), rather than going silent on
+  // skipped verifications.
+  try {
+    const emitter = getActivityEmitter(state.workflowId);
+    if (emitter) {
+      emitter({
+        type: 'verification_started',
+        taskId: task.id,
+        ...(task.name ? { taskName: task.name } : {}),
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch {
+    // ignore — never block verification on telemetry
   }
 
   const taskOutput = state.taskResults[task.id];
@@ -39,6 +87,9 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     // trace still shows a Verifier decision for audit, but with zero
     // LLM call. Uses the existing VerificationResult shape; the
     // retryReason field carries the skip reason for trace clarity.
+    emitVerificationCompleted(state.workflowId, task, {
+      passed: true, confidence: 1, issues: [],
+    });
     return {
       verificationResults: {
         [task.id]: {
@@ -82,6 +133,12 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
   if (!result.passed && result.needsRetry && currentRetries < MAX_RETRIES) {
     // Budget remaining — schedule a retry. Store the raw result (needsRetry:true)
     // so afterVerifier() correctly routes back to the worker node.
+    // Sprint 2.1 / Item K: emit `verification_completed` with passed=false
+    // so the cockpit reflects the retry trigger; the next verifier pass
+    // will emit a fresh `verification_started` + `verification_completed`.
+    emitVerificationCompleted(state.workflowId, task, {
+      passed: false, confidence: result.confidence, issues: result.issues,
+    });
     return {
       verificationResults: { [task.id]: result },
       taskResults: { [retryKey]: currentRetries + 1 },
@@ -115,6 +172,12 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
         ),
       }
     : state.plan;
+
+  // Sprint 2.1 / Item K: final `verification_completed` (after retry budget
+  // exhausted, or initial pass that didn't request retry).
+  emitVerificationCompleted(state.workflowId, task, {
+    passed: finalResult.passed, confidence: finalResult.confidence, issues: finalResult.issues,
+  });
 
   return {
     verificationResults: { [task.id]: finalResult },

@@ -10,10 +10,12 @@ import {
   Users,
   Plug,
   Rocket,
+  Brain,
 } from 'lucide-react';
-import { onboardingApi } from '@/lib/api-client';
-import { Button, Card, CardContent } from '@/components/ui';
+import { onboardingApi, companyBrainApi } from '@/lib/api-client';
+import { Button, Card, CardContent, Input, Textarea } from '@/components/ui';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
+import { useToast } from '@/components/ui/toast';
 import type { JobFunction, IntegrationProvider } from '@/types';
 
 // ─── Step data ──────────────────────────────────────────────────────────────
@@ -37,16 +39,24 @@ const ONBOARDING_PROVIDERS: { provider: IntegrationProvider; name: string; emoji
   { provider: 'GITHUB', name: 'GitHub', emoji: '\uD83D\uDC19' },
 ];
 
-const STEP_LABELS = ['Your Role', 'Invite Team', 'Connect Tools', 'Ready!'];
+const STEP_LABELS = ['Your Role', 'Company Info', 'Invite Team', 'Connect Tools', 'Ready!'];
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const toast = useToast();
   const [step, setStep] = useState(0);
   const [selectedRole, setSelectedRole] = useState<JobFunction | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [connectingProvider, setConnectingProvider] = useState<{ provider: IntegrationProvider; name: string; emoji: string } | null>(null);
+
+  // Company Info step state (all optional — form can be skipped)
+  const [companyName, setCompanyName] = useState('');
+  const [companyIndustry, setCompanyIndustry] = useState('');
+  const [companyDescription, setCompanyDescription] = useState('');
+  const [companyBrandVoice, setCompanyBrandVoice] = useState('');
+  const [savingCompany, setSavingCompany] = useState(false);
 
   // Load existing onboarding state
   useEffect(() => {
@@ -80,12 +90,54 @@ export default function OnboardingPage() {
       await markStep('role_selected');
     }
     if (step === 1) {
-      await markStep('team_invite');
+      // Company Info — optional. If user provided ANY field, persist via
+      // saveManualProfile; if they skipped (all blank), just advance with no
+      // backend call. We never silently swallow errors — show a toast and
+      // BLOCK advancement so user can retry or explicitly skip.
+      const hasAny =
+        companyName.trim() ||
+        companyIndustry.trim() ||
+        companyDescription.trim() ||
+        companyBrandVoice.trim();
+      if (hasAny) {
+        setSavingCompany(true);
+        try {
+          await companyBrainApi.saveManualProfile({
+            name: companyName.trim() || undefined,
+            industry: companyIndustry.trim() || undefined,
+            description: companyDescription.trim() || undefined,
+            brandVoice: companyBrandVoice.trim() || undefined,
+          });
+          await markStep('company_info');
+        } catch (err) {
+          toast.error(
+            'Could not save company info',
+            err instanceof Error ? err.message : 'Try again or skip this step.',
+          );
+          setSavingCompany(false);
+          return; // do not advance
+        }
+        setSavingCompany(false);
+      } else {
+        await markStep('company_info_skipped');
+      }
     }
     if (step === 2) {
+      await markStep('team_invite');
+    }
+    if (step === 3) {
       await markStep('tools_connected');
     }
-    setStep((s) => Math.min(s + 1, 3));
+    setStep((s) => Math.min(s + 1, 4));
+  };
+
+  const handleSkipCompany = async () => {
+    setCompanyName('');
+    setCompanyIndustry('');
+    setCompanyDescription('');
+    setCompanyBrandVoice('');
+    await markStep('company_info_skipped');
+    setStep((s) => Math.min(s + 1, 4));
   };
 
   const handleFinish = async () => {
@@ -176,8 +228,77 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 1: Team invite */}
+            {/* Step 1: Company Info */}
             {step === 1 && (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Brain className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Tell us about your company</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Agents use this to ground their work. All fields are optional &mdash;
+                      you can fill them in later from the Company page.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Company name
+                    </label>
+                    <Input
+                      placeholder="Acme Inc."
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      disabled={savingCompany}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Industry
+                    </label>
+                    <Input
+                      placeholder="SaaS, Fintech, Healthcare&hellip;"
+                      value={companyIndustry}
+                      onChange={(e) => setCompanyIndustry(e.target.value)}
+                      disabled={savingCompany}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      What does the company do?
+                    </label>
+                    <Textarea
+                      placeholder="One or two sentences&hellip;"
+                      rows={2}
+                      value={companyDescription}
+                      onChange={(e) => setCompanyDescription(e.target.value)}
+                      disabled={savingCompany}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Brand voice (optional)
+                    </label>
+                    <Textarea
+                      placeholder="Formal and concise / Friendly and casual / Technical and precise&hellip;"
+                      rows={2}
+                      value={companyBrandVoice}
+                      onChange={(e) => setCompanyBrandVoice(e.target.value)}
+                      disabled={savingCompany}
+                    />
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground text-center">
+                  Skip if you&apos;d rather come back to this later.
+                </p>
+              </div>
+            )}
+
+            {/* Step 2: Team invite */}
+            {step === 2 && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -201,8 +322,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 2: Connect tools */}
-            {step === 2 && (
+            {/* Step 3: Connect tools */}
+            {step === 3 && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -236,8 +357,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 3: Done */}
-            {step === 3 && (
+            {/* Step 4: Done */}
+            {step === 4 && (
               <div className="text-center py-6">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
                   <Rocket className="h-8 w-8 text-green-600 dark:text-green-400" />
@@ -255,27 +376,39 @@ export default function OnboardingPage() {
             )}
 
             {/* Navigation */}
-            {step < 3 && (
+            {step < 4 && (
               <div className="mt-6 flex items-center justify-between">
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={step === 0}
+                  disabled={step === 0 || savingCompany}
                   onClick={() => setStep((s) => Math.max(s - 1, 0))}
                   className="gap-1"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={handleNext}
-                  disabled={step === 0 && !selectedRole}
-                  className="gap-1"
-                >
-                  {step === 2 ? 'Finish' : 'Next'}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {step === 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSkipCompany}
+                      disabled={savingCompany}
+                    >
+                      Skip
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={handleNext}
+                    disabled={(step === 0 && !selectedRole) || savingCompany}
+                    className="gap-1"
+                  >
+                    {savingCompany ? 'Saving…' : step === 3 ? 'Finish' : 'Next'}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

@@ -1007,6 +1007,37 @@ export class SwarmExecutionService extends EventEmitter {
               durationMs: (ev['durationMs'] as number) ?? 0,
               timestamp: nowIso,
             }, tenantId, userId);
+          } else if (t === 'agent_assigned') {
+            // Sprint 2.1 / Item K — Router emitted one of these per
+            // (taskId → agentRole) mapping. Translate to workflow lifecycle.
+            this.emitLifecycle({
+              type: 'agent_assigned',
+              workflowId,
+              stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) ?? 'task',
+              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+              ...(typeof ev['routingReason'] === 'string' ? { routingReason: ev['routingReason'] as string } : {}),
+              timestamp: nowIso,
+            }, tenantId, userId);
+          } else if (t === 'verification_started') {
+            this.emitLifecycle({
+              type: 'verification_started',
+              workflowId,
+              ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
+                ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
+                : {}),
+              timestamp: nowIso,
+            }, tenantId, userId);
+          } else if (t === 'verification_completed') {
+            this.emitLifecycle({
+              type: 'verification_completed',
+              workflowId,
+              ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
+                ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
+                : {}),
+              passed: ev['passed'] === true,
+              ...(typeof ev['groundingScore'] === 'number' ? { groundingScore: ev['groundingScore'] as number } : {}),
+              timestamp: nowIso,
+            }, tenantId, userId);
           }
         },
       });
