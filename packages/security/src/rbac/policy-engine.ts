@@ -4,6 +4,11 @@ import type { Permission } from './roles.js';
 
 // Role hierarchy for comparison
 const ROLE_HIERARCHY: Record<UserRole, number> = {
+  // EXTERNAL_AUDITOR is intentionally below END_USER. The portal does
+  // its own engagement-scoped checks; this hierarchy is for general
+  // RBAC and an auditor must never satisfy a "ceiling" check meant
+  // for normal tenant users.
+  [UserRole.EXTERNAL_AUDITOR]: 0,
   [UserRole.END_USER]: 1,
   [UserRole.REVIEWER]: 2,
   [UserRole.OPERATOR]: 3,

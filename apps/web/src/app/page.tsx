@@ -519,7 +519,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-8 max-w-xl text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-                One platform that plans, executes, verifies, and recovers &mdash; with human approvals on every high-risk action. Build, operate, and verify autonomous work on infrastructure you control.
+                One platform that plans, executes, verifies, and recovers &mdash; with human approvals on every high-risk action. Native <strong className="text-emerald-300">LangGraph</strong> orchestration, Postgres checkpoints, source-grounded verification, runtime PII redaction. Build, operate, and verify autonomous work on infrastructure you control.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
@@ -898,6 +898,32 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* External auditor portal — added Sprint 2.6 */}
+            <div className="glass-card rounded-2xl p-8 max-w-4xl mx-auto mb-10" style={{ borderLeft: '3px solid #c084fc' }}>
+              <h3 className="font-display font-semibold text-white mb-2">External Auditor Portal</h3>
+              <p className="text-sm text-slate-300 font-sans mb-4">
+                Invite a third-party auditor to review your engagement. They get scoped access to the audit run you assigned them &mdash; nothing else. SHA-256 hashed invite tokens, engagement-level isolation middleware, immutable audit trail of every action they take.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2 text-xs font-sans">
+                <div className="flex items-start gap-3">
+                  <span className="text-purple-400 font-mono text-xs mt-0.5">●</span>
+                  <p className="text-slate-300"><strong className="text-white">Invite-token-only auth.</strong> Cleartext token returned once on creation; only the SHA-256 hash is persisted. <code className="text-purple-300 font-mono">crypto.timingSafeEqual</code> on verification.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-purple-400 font-mono text-xs mt-0.5">●</span>
+                  <p className="text-slate-300"><strong className="text-white">Engagement isolation.</strong> Per-request middleware verifies role + active engagement for the requested audit run. Cross-tenant access returns 403.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-purple-400 font-mono text-xs mt-0.5">●</span>
+                  <p className="text-slate-300"><strong className="text-white">Audit trail.</strong> Every view, comment, approve/reject/request-changes writes an <code className="text-purple-300 font-mono text-[10px]">ExternalAuditorAction</code> row. Decide endpoint logs intent before mutation.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-purple-400 font-mono text-xs mt-0.5">●</span>
+                  <p className="text-slate-300"><strong className="text-white">Revocation.</strong> Single transaction flips invite to REVOKED + sets <code className="text-purple-300 font-mono text-[10px]">accessRevokedAt</code> on the engagement. Subsequent requests fail isolation check.</p>
+                </div>
+              </div>
+            </div>
+
             <div className="text-center">
               <Link
                 href="/audit/runs"
@@ -908,7 +934,7 @@ export default function HomePage() {
                 <ArrowRightIcon className="h-4 w-4" />
               </Link>
               <p className="text-xs text-slate-500 mt-4 font-sans">
-                Engagement workspace at <code className="text-orange-300 font-mono">/audit/runs</code>. Sign-in required (REVIEWER+ for writes).
+                Engagement workspace at <code className="text-orange-300 font-mono">/audit/runs</code>. Sign-in required (REVIEWER+ for writes). External auditors land at <code className="text-orange-300 font-mono">/auditor/accept/[token]</code>.
               </p>
             </div>
           </div>

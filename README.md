@@ -13,7 +13,9 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Typecheck](https://img.shields.io/badge/Typecheck-23_packages_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**Operator-grade multi-agent control plane. 38 specialist agents + 122 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Production Audit & Compliance Agent Pack (SOC 2 / HIPAA / ISO 27001) with 167 seeded controls, LLM-driven control testing, reviewer-gated workpaper PDFs, and HMAC-signed final evidence packs. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
+**Operator-grade multi-agent control plane orchestrated by [LangGraph](https://langchain-ai.github.io/langgraphjs/). 38 specialist agents + 122 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Production Audit & Compliance Agent Pack (SOC 2 / HIPAA / ISO 27001) with 167 seeded controls, LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only External Auditor Portal for third-party reviewers. Company Brain (CompanyProfile + URL crawler + DOCX/XLSX/image ingestion). Source-grounded outputs with citation density verification. Runtime PII redaction in LLM prompts. OpenAI prompt-cache aware cost telemetry. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
+
+> **Sprint 2.x updates (Apr 2026):** native LangGraph orchestrator with Postgres checkpointer (no more custom state machine); URL crawler + DOCX/XLSX/image parsing; runtime PII auto-redaction in LLM prompts; OpenAI prompt-cache cost telemetry; source-grounded output verification; external auditor portal with SHA-256-hashed invite tokens. See [`qa/final-a-to-z-product-verification.md`](qa/final-a-to-z-product-verification.md) for the truthful per-feature classification.
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -53,6 +55,8 @@
 ## 🏗️ How It Works
 
 JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. You give it a high-level goal in natural language. A Commander agent interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers (in parallel where possible), and a Verifier checks every output before it ships. The entire pipeline is observable through a real-time DAG visualization dashboard.
+
+The orchestrator is a real native [`@langchain/langgraph`](https://langchain-ai.github.io/langgraphjs/) `StateGraph` — checkpoints persist to a `workflow_checkpoints` Postgres table via the `PostgresCheckpointSaver`; approval pauses use LangGraph's native `interrupt()` + `Command(resume=…)` cycle. The previous custom SwarmGraph state machine was deleted in Sprint 2.5/A.6 (commit `34491f2`); LangGraph is the only orchestration engine and the `JAK_WORKFLOW_RUNTIME` env-flag fallback no longer exists.
 
 It connects to real infrastructure — Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright — so agents do actual work, not demos.
 
@@ -605,11 +609,25 @@ flowchart TD
 
 <div align="center">
 
-**Run a real SOC 2 / HIPAA / ISO 27001 audit engagement end-to-end. Plan controls, auto-map evidence, run LLM-driven control tests, generate per-control workpaper PDFs gated by reviewer approval, and produce a binding HMAC-signed final evidence pack — verifiable byte-for-byte.**
+**Run a real SOC 2 / HIPAA / ISO 27001 audit engagement end-to-end. Plan controls, auto-map evidence, run LLM-driven control tests, generate per-control workpaper PDFs gated by reviewer approval, produce a binding HMAC-signed final evidence pack, and invite a third-party auditor through a secure portal — verifiable byte-for-byte.**
 
 *Built on the same durable workflow + lifecycle event + RBAC + signed-bundle foundation that powers everything else in JAK.*
 
 </div>
+
+### External Auditor Portal (Sprint 2.6)
+
+Third-party auditors get a dedicated portal scoped to the engagements they're invited to. They never see other tenant data and never see audit runs they aren't on.
+
+| Surface | Real-and-tested |
+|---|---|
+| Invite flow | Admin (`REVIEWER+`) creates an invite via `POST /audit/runs/:id/auditors/invite`. Cleartext token is returned **once**; only the SHA-256 hash is persisted (`crypto.randomBytes(32)` → 64-char hex → `SHA-256` → hex). |
+| Acceptance | Auditor visits `/auditor/accept/[token]`. Token is hashed + verified with `crypto.timingSafeEqual`. On accept: an `EXTERNAL_AUDITOR` user row is created (no password — invite-token is the auth) and an `ExternalAuditorEngagement` row grants per-audit-run scope. |
+| Engagement isolation | Every auditor route runs through `requireAuditorEngagement` middleware: verifies role + active engagement (not expired, not revoked) for the `:auditRunId` path param. Cross-engagement access returns 403. |
+| Audit trail | Every auditor action (view, comment, approve/reject/request-changes) writes an `ExternalAuditorAction` row. The decide endpoint logs INTENT before mutating so failed mutations leave a forensic trace. |
+| Revocation | `POST /audit/runs/:id/auditors/:inviteId/revoke` flips the invite to `REVOKED` AND sets `accessRevokedAt` on the engagement in a single transaction; subsequent JWTs cannot pass the engagement check. |
+| Tests | 11 unit tests (`tests/unit/services/external-auditor.test.ts`) cover token format, cleartext-never-persisted, expired/revoked rejection, cross-tenant isolation. |
+| Security audit | [`qa/external-auditor-portal-security-audit.md`](qa/external-auditor-portal-security-audit.md) records the threat model + per-requirement implementation status. |
 
 ### Frameworks shipped (167 controls total)
 

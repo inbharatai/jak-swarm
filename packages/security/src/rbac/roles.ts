@@ -87,6 +87,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, Set<Permission>> = {
     Permissions.TOOL_EXECUTE_READ,
     Permissions.MEMORY_READ,
   ]),
+
+  // Sprint 2.6 — third-party auditors invited per-engagement.
+  // Permissions are intentionally MINIMAL at the global RBAC layer; the
+  // engagement-isolation middleware in apps/api/src/routes/external-
+  // auditor.routes.ts is the source of truth for what an auditor can
+  // see (per-audit-run scoped). At the global RBAC level, an
+  // EXTERNAL_AUDITOR holds no broad permissions — they cannot create
+  // workflows, view other tenant data, or touch admin surfaces.
+  [UserRole.EXTERNAL_AUDITOR]: new Set<Permission>([]),
 };
 
 /**
