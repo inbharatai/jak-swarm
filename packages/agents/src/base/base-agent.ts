@@ -597,6 +597,18 @@ ${lines.join('\n')}
     const conversation = [...grounded.messages];
     const toolCallFingerprints: ToolCallFingerprints = new Map();
 
+    // Sprint 2.4 / Item G — PII auto-redaction in LLM prompts.
+    // One redactor per executeWithTools call. Disabled via env when
+    // operators want raw passthrough for debugging.
+    // The redactor lives on the LLM boundary: messages are redacted just
+    // before they cross to the model, the assistant response is restored
+    // before tool execution + before the trace records it. Tools see
+    // ORIGINAL values; the LLM sees PLACEHOLDER values. The trace shows
+    // ORIGINAL values (since restore happens pre-trace).
+    const redactor = process.env['JAK_PII_REDACTION_DISABLED'] === '1'
+      ? null
+      : new (await import('@jak-swarm/security')).RuntimePIIRedactor();
+
     // Lazy-import tool registries to avoid circular dep at module load time
     const { getTenantToolRegistry } = await import('@jak-swarm/tools');
 
@@ -623,8 +635,13 @@ ${lines.join('\n')}
     };
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
+      // Sprint 2.4 / Item G — redact PII in messages JUST before sending
+      // to LLM. We pass the redacted view to callLLM, but conversation[]
+      // (the running array) keeps the originals so the trace store + the
+      // worker-step persistence sees real values.
+      const llmInput = redactor ? redactor.redactMessages(conversation) : conversation;
       const completion = await this.callLLM(
-        conversation,
+        llmInput,
         tools.length > 0 ? tools : undefined,
         { maxTokens: options?.maxTokens, temperature: options?.temperature },
       );
@@ -662,6 +679,14 @@ ${lines.join('\n')}
         const runtimeName = this.runtime?.name ?? 'legacy';
         const requestedModel =
           (completion as unknown as { _requestedModel?: string })._requestedModel;
+        // Sprint 2.4 / Item G — surface PII redaction stats on the cost
+        // event when redactor caught something this iteration. Only emit
+        // the field when there was redaction; absent field signals
+        // "nothing was found" (which is also valid info, but we don't
+        // bloat events with empty objects).
+        const piiStats = redactor?.getStats();
+        const hasPii = piiStats && piiStats.totalMatches > 0;
+
         context.emitActivity({
           type: 'cost_updated',
           agentRole: this.role,
@@ -675,6 +700,15 @@ ${lines.join('\n')}
           totalTokens: iterPrompt + iterCompletion,
           ...(iterCached > 0 ? { cachedReadTokens: iterCached } : {}),
           ...(iterReasoning > 0 ? { reasoningTokens: iterReasoning } : {}),
+          ...(hasPii && piiStats
+            ? {
+                piiRedacted: {
+                  byType: piiStats.byType as Record<string, number>,
+                  totalMatches: piiStats.totalMatches,
+                  uniquePlaceholders: piiStats.uniquePlaceholders,
+                },
+              }
+            : {}),
           costUsd: iterCost,
           runId: context.runId,
           // The "step id" inside a workflow is the agent role for now;
@@ -687,7 +721,24 @@ ${lines.join('\n')}
       const choice = completion.choices[0];
       if (!choice) break;
 
-      const assistantMsg = choice.message;
+      // Sprint 2.4 / Item G — restore PII placeholders in the assistant
+      // response BEFORE we use it (tool execution, trace persistence, or
+      // final return). Tools must operate on real values; the trace must
+      // show real values. Only the LLM ever saw placeholders.
+      let assistantMsg = choice.message;
+      if (redactor && redactor.hasRedactions()) {
+        const restoredContent = typeof assistantMsg.content === 'string'
+          ? redactor.restoreInResponse(assistantMsg.content)
+          : assistantMsg.content;
+        const restoredToolCalls = assistantMsg.tool_calls
+          ? redactor.restoreInToolCalls(assistantMsg.tool_calls)
+          : undefined;
+        assistantMsg = {
+          ...assistantMsg,
+          content: restoredContent,
+          ...(restoredToolCalls ? { tool_calls: restoredToolCalls } : {}),
+        };
+      }
 
       // If the LLM returned content without tool calls, we're done
       if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {

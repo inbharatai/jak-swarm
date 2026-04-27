@@ -34,6 +34,35 @@ export interface RoleManifestEntry {
   limitations?: string[];
   /** Optional link to the file that implements the role. */
   implementation?: string;
+  /**
+   * Sprint 2.4 / Item F — when true, the Verifier enforces source
+   * citation density. Roles that produce factual claims (research, audit
+   * controls, design specs) need to ground every claim in evidence.
+   * Roles that produce creative output (marketing, content, strategy)
+   * don't — citations would be artificial. Default: undefined → false.
+   */
+  needsGrounding?: boolean;
+  /**
+   * Threshold (0-1) for citation density when needsGrounding is true.
+   * Default: 0.7 (70% of claim sentences must reference an evidence id).
+   * Set lower (e.g. 0.5) for roles where some claims are interpretive.
+   */
+  groundingDensityThreshold?: number;
+}
+
+/**
+ * Helper: lookup a role's grounding requirements. Returns
+ * { enforce: false } when the role doesn't need grounding so callers
+ * have a single uniform shape.
+ */
+export function getGroundingRequirement(role: AgentRole): {
+  enforce: boolean;
+  threshold: number;
+} {
+  const entry = ROLE_MANIFEST[role];
+  const enforce = entry?.needsGrounding === true;
+  const threshold = entry?.groundingDensityThreshold ?? 0.7;
+  return { enforce, threshold };
 }
 
 /**
@@ -166,6 +195,11 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
       'Citation-to-claim mapping',
     ],
     implementation: 'packages/agents/src/workers/research.agent.ts',
+    // Sprint 2.4 / Item F — research output is factual claims; every
+    // assertion needs a citation back to a tool result, vector chunk,
+    // or named source.
+    needsGrounding: true,
+    groundingDensityThreshold: 0.7,
   },
   [AgentRole.WORKER_CALENDAR]: {
     role: AgentRole.WORKER_CALENDAR,
@@ -254,6 +288,11 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['Design-system thinking', 'Accessibility awareness'],
     implementation: 'packages/agents/src/workers/designer.agent.ts',
+    // Sprint 2.4 / Item F — design specs cite WCAG / pattern libraries /
+    // brand guidelines; threshold is lower (0.5) because some design
+    // choices are subjective creative calls.
+    needsGrounding: true,
+    groundingDensityThreshold: 0.5,
   },
   [AgentRole.WORKER_KNOWLEDGE]: {
     role: AgentRole.WORKER_KNOWLEDGE,

@@ -17,17 +17,24 @@ const MAX_RETRIES = 2;  // max worker retries per task before accepting the resu
 function emitVerificationCompleted(
   workflowId: string,
   task: { id: string; name?: string },
-  result: { passed: boolean; confidence?: number; issues?: string[] },
+  result: { passed: boolean; confidence?: number; issues?: string[]; citationDensity?: number },
 ): void {
   try {
     const emitter = getActivityEmitter(workflowId);
     if (!emitter) return;
+    // Sprint 2.4 / Item F — when the verifier computed a citationDensity,
+    // surface it as the groundingScore (replaces the legacy "confidence"
+    // value for roles that need grounding). Otherwise fall back to
+    // confidence so legacy behavior is preserved.
+    const groundingScore = typeof result.citationDensity === 'number'
+      ? result.citationDensity
+      : result.confidence;
     emitter({
       type: 'verification_completed',
       taskId: task.id,
       ...(task.name ? { taskName: task.name } : {}),
       passed: result.passed,
-      ...(typeof result.confidence === 'number' ? { groundingScore: result.confidence } : {}),
+      ...(typeof groundingScore === 'number' ? { groundingScore } : {}),
       ...(Array.isArray(result.issues) ? { issueCount: result.issues.length } : {}),
       timestamp: new Date().toISOString(),
     });

@@ -3,6 +3,7 @@ import { AgentRole } from '@jak-swarm/shared';
 import type { WorkflowTask, ToolCall } from '@jak-swarm/shared';
 import { BaseAgent } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
+import { getGroundingRequirement } from '../role-manifest.js';
 
 export interface VerificationResult {
   passed: boolean;
@@ -10,6 +11,118 @@ export interface VerificationResult {
   confidence: number;
   needsRetry: boolean;
   retryReason?: string;
+  /**
+   * Sprint 2.4 / Item F — citation density when source-grounded contract
+   * applies. Undefined when the worker's role does not require grounding.
+   * Range 0-1 (1.0 = every claim has a citation).
+   */
+  citationDensity?: number;
+  /** Uncited claim sentences that triggered a grounding failure. */
+  uncitedClaims?: string[];
+}
+
+// ─── Source-grounded output contract (Sprint 2.4 / Item F) ─────────────
+
+/**
+ * Verbs that signal a factual or imperative claim. When a sentence
+ * contains one of these AND the role needsGrounding, we expect an
+ * evidence citation.
+ *
+ * Conservative list — false positives here would penalise creative
+ * roles. Modal verbs (should/must) only count when paired with a
+ * subject indicator, but the simple presence test is good enough for
+ * v1. Noisy edge cases (idioms, hypotheticals) are accepted as cost
+ * of a heuristic check; the density threshold gives slack.
+ */
+const CLAIM_VERB_PATTERN = /\b(is|are|has|have|will|equals|contains|was|were|showed|shows|found|finds|states|reports|measures|measured|increased|decreased|grew|fell|achieves|achieved|enables|caused|launched|released|raised|acquired|acquires|hired|fired|owns|costs|priced)\b/i;
+
+const CITATION_PATTERN = /\[(?:evidence|source|cite|ref|citation):[^\]]{1,200}\]/i;
+
+/**
+ * Split text into sentences, honoring common abbreviations. Returns
+ * trimmed strings; empty entries are dropped.
+ *
+ * Honest caveat: this is a heuristic split, not a tokenizer-grade one.
+ * Edge cases (Mr. / Mrs. / Inc. / decimal numbers) are mostly handled by
+ * looking back for capital letters + alphanumerics. Good enough for a
+ * citation-density check.
+ */
+export function splitIntoSentences(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  // Protect common abbreviations from premature splits.
+  const protectedText = text
+    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|Inc|Ltd|Co|Corp|Sr|Jr|St|vs|etc|e\.g|i\.e)\.\s/g, '$1<DOT> ')
+    .replace(/(\d)\.(\d)/g, '$1<DOT>$2');
+
+  const sentences = protectedText
+    .split(/(?<=[.!?])\s+(?=[A-Z"'])/)
+    .map((s) => s.replace(/<DOT>/g, '.').trim())
+    .filter((s) => s.length > 0);
+
+  return sentences;
+}
+
+export interface CitationDensityReport {
+  totalClaims: number;
+  citedClaims: number;
+  density: number;
+  uncited: string[];
+}
+
+/**
+ * Compute citation density for a piece of text.
+ *
+ * A "claim" is a sentence that contains at least one claim verb. A
+ * claim is "cited" when the same sentence (or the sentence immediately
+ * preceding it) contains an evidence citation `[evidence:xxx]` or
+ * similar.
+ *
+ * When totalClaims = 0, density is 1 (no claims = nothing to ground;
+ * the grounding gate passes vacuously).
+ */
+export function computeCitationDensity(text: string): CitationDensityReport {
+  const sentences = splitIntoSentences(text);
+  const claimSentences: { idx: number; sentence: string }[] = [];
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    if (s === undefined) continue;
+    // Skip questions — they aren't factual claims even if they contain
+    // a claim verb ("How are you?" / "What was the result?").
+    if (s.trimEnd().endsWith('?')) continue;
+    if (CLAIM_VERB_PATTERN.test(s)) claimSentences.push({ idx: i, sentence: s });
+  }
+  if (claimSentences.length === 0) {
+    return { totalClaims: 0, citedClaims: 0, density: 1, uncited: [] };
+  }
+  const cited: typeof claimSentences = [];
+  const uncited: string[] = [];
+  for (const c of claimSentences) {
+    if (CITATION_PATTERN.test(c.sentence)) {
+      cited.push(c);
+      continue;
+    }
+    // A prior sentence's citation only carries forward when that prior
+    // sentence is a pure setup marker — it has a citation and NO claim
+    // verb of its own. ("[evidence:doc_42] The platform achieves 99%.")
+    // We do NOT let one sentence's citation cover another sentence with
+    // its own independent claim — every claim needs its own evidence.
+    const prior = c.idx > 0 ? sentences[c.idx - 1] : undefined;
+    if (
+      prior !== undefined &&
+      CITATION_PATTERN.test(prior) &&
+      !CLAIM_VERB_PATTERN.test(prior)
+    ) {
+      cited.push(c);
+    } else {
+      uncited.push(c.sentence);
+    }
+  }
+  return {
+    totalClaims: claimSentences.length,
+    citedClaims: cited.length,
+    density: cited.length / claimSentences.length,
+    uncited,
+  };
 }
 
 export interface VerifierInput {
@@ -167,6 +280,32 @@ Verify the output and respond with JSON.`,
       };
     }
 
+    // Sprint 2.4 / Item F — source-grounded output contract.
+    // For roles that need grounding (research, designer, audit-controls),
+    // compute citation density and fail if below the threshold.
+    // Creative roles (marketing, content, strategy) skip this gate.
+    const grounding = getGroundingRequirement(task.agentRole);
+    if (grounding.enforce) {
+      const density = computeCitationDensity(outputStr);
+      llmResult.citationDensity = density.density;
+      if (density.totalClaims > 0 && density.density < grounding.threshold) {
+        const reason = `Citation density ${(density.density * 100).toFixed(0)}% < required ${(grounding.threshold * 100).toFixed(0)}% for grounded role ${task.agentRole}; ${density.uncited.length}/${density.totalClaims} claims missing evidence references.`;
+        llmResult.passed = false;
+        llmResult.issues.push(reason);
+        // Cap the surfaced uncited list at 5 to avoid bloating the
+        // verification record. Operators can re-run with verbose tracing
+        // if they need the full list.
+        llmResult.uncitedClaims = density.uncited.slice(0, 5);
+        if (task.retryable) {
+          llmResult.needsRetry = true;
+          llmResult.retryReason = reason;
+        }
+        // Lower the LLM-reported confidence — citation gap is a strong
+        // signal regardless of what the verifier-LLM thought.
+        llmResult.confidence = Math.min(llmResult.confidence, 0.4);
+      }
+    }
+
     this.recordTrace(context, input, llmResult, [], startedAt);
 
     this.logger.info(
@@ -175,6 +314,7 @@ Verify the output and respond with JSON.`,
         passed: llmResult.passed,
         confidence: llmResult.confidence,
         issueCount: llmResult.issues.length,
+        ...(llmResult.citationDensity !== undefined ? { citationDensity: llmResult.citationDensity } : {}),
       },
       'Verifier completed check',
     );

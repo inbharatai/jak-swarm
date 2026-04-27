@@ -64,6 +64,20 @@ export type AgentActivityEvent =
       cachedReadTokens?: number;
       /** Sprint 2.2 / Item I — reasoning tokens (o-series models). */
       reasoningTokens?: number;
+      /**
+       * Sprint 2.4 / Item G — PII redaction stats for this LLM call.
+       * Only set when at least one PII match was found + replaced. The
+       * cockpit shows a "PII redacted" badge with the totals.
+       * Keys are PIIType strings ('EMAIL', 'PHONE', etc.).
+       */
+      piiRedacted?: {
+        /** Per-type match count. Empty type-keys mean that type was not seen. */
+        byType: Record<string, number>;
+        /** Total match instances detected (includes duplicates). */
+        totalMatches: number;
+        /** Distinct placeholders generated (de-duplicated values). */
+        uniquePlaceholders: number;
+      };
       costUsd: number;
       /** Run id (the workflow id at top level). */
       runId?: string;

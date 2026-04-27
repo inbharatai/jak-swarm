@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@jak-swarm/security": "workspace:^",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/tools": "workspace:^",
     "openai": "^4.76.3",
