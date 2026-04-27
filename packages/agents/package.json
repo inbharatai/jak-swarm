@@ -23,7 +23,7 @@
     "@jak-swarm/tools": "workspace:^",
     "openai": "^4.76.3",
     "pino": "^9.5.0",
-    "zod": "^3.23.8",
+    "zod": "^4.3.6",
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
