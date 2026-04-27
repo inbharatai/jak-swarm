@@ -53,7 +53,7 @@ const DEFAULT_CONFIG: SummarizationConfig = {
  * own tokenizer; this estimator exists solely for the summarization
  * trigger threshold.
  */
-function estimateTokens(text: string): number {
+export function estimateTokens(text: string): number {
   if (!text) return 0;
   const charCount = text.length;
 

@@ -55,6 +55,15 @@ export type AgentActivityEvent =
       completionTokens: number;
       /** Sum of prompt + completion tokens (mirrors OpenAI usage.total_tokens). */
       totalTokens?: number;
+      /**
+       * Sprint 2.2 / Item I — number of input tokens served from OpenAI
+       * prompt cache. When set, indicates the cached portion of
+       * promptTokens (cachedReadTokens <= promptTokens). costUsd already
+       * reflects the discount; this field is for cockpit visibility.
+       */
+      cachedReadTokens?: number;
+      /** Sprint 2.2 / Item I — reasoning tokens (o-series models). */
+      reasoningTokens?: number;
       costUsd: number;
       /** Run id (the workflow id at top level). */
       runId?: string;
@@ -93,6 +102,22 @@ export type AgentActivityEvent =
       groundingScore?: number;
       /** Issues array length when passed=false. */
       issueCount?: number;
+      timestamp: string;
+    }
+  // Sprint 2.2 / Item H — emitted when the worker-node compresses
+  // accumulated state.taskResults before building the agent input.
+  // The cockpit shows a "context compressed" badge so users see why a
+  // long-running workflow's later steps may reference summarized inputs.
+  | {
+      type: 'context_summarized';
+      taskId: string;
+      taskName?: string;
+      /** How many task results existed in state before summarization. */
+      inputTaskResultCount: number;
+      /** Heuristic token count before compression (word*1.33 / chars/4 mix). */
+      estimatedTokensBefore: number;
+      /** Heuristic token count after compression. */
+      estimatedTokensAfter: number;
       timestamp: string;
     };
 

@@ -4,10 +4,17 @@
  */
 
 export interface ModelPricing {
-  /** USD per 1 million input tokens */
+  /** USD per 1 million input tokens (uncached) */
   inputPer1M: number;
   /** USD per 1 million output tokens */
   outputPer1M: number;
+  /**
+   * USD per 1 million CACHED input tokens (OpenAI prompt caching).
+   * Optional — when omitted, calculateCost discounts cached tokens at
+   * 50% of `inputPer1M` (OpenAI's published standard discount).
+   * Sprint 2.2 / Item I.
+   */
+  cachedInputPer1M?: number;
 }
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
@@ -16,25 +23,26 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // defaults tier 3 to gpt-5.4, but cost tracking had NO entries for the
   // family. Every gpt-5.4 call was silently tracking $0. These entries
   // match OpenAI's published pricing as of 2026-04; update when OpenAI
-  // adjusts.
-  'gpt-5.4': { inputPer1M: 5.00, outputPer1M: 15.00 },
-  'gpt-5.4-mini': { inputPer1M: 0.50, outputPer1M: 2.00 },
-  'gpt-5.4-nano': { inputPer1M: 0.10, outputPer1M: 0.40 },
+  // adjusts. cachedInputPer1M values follow OpenAI's standard 50% cache
+  // discount where unpublished; published values are used directly.
+  'gpt-5.4': { inputPer1M: 5.00, outputPer1M: 15.00, cachedInputPer1M: 0.50 },
+  'gpt-5.4-mini': { inputPer1M: 0.50, outputPer1M: 2.00, cachedInputPer1M: 0.05 },
+  'gpt-5.4-nano': { inputPer1M: 0.10, outputPer1M: 0.40, cachedInputPer1M: 0.01 },
   // GPT-5 series — fallback tier when gpt-5.4 family is not entitled to
   // the key. Ship pricing for all three so failover cost tracking stays
   // honest.
-  'gpt-5': { inputPer1M: 5.00, outputPer1M: 15.00 },
-  'gpt-5-mini': { inputPer1M: 0.50, outputPer1M: 2.00 },
-  'gpt-5-nano': { inputPer1M: 0.10, outputPer1M: 0.40 },
+  'gpt-5': { inputPer1M: 5.00, outputPer1M: 15.00, cachedInputPer1M: 0.50 },
+  'gpt-5-mini': { inputPer1M: 0.50, outputPer1M: 2.00, cachedInputPer1M: 0.05 },
+  'gpt-5-nano': { inputPer1M: 0.10, outputPer1M: 0.40, cachedInputPer1M: 0.01 },
   // GPT-4.1 series — missing these was the 2026-04 cost-tracking bug. Every
   // workflow using gpt-4.1 silently tracked $0 because `calculateCost` fell
   // through to the zero-pricing sentinel. Kept prefix-matchable so future
   // minor revisions (e.g. gpt-4.1-2025-05-01) also hit this row.
-  'gpt-4.1': { inputPer1M: 2.00, outputPer1M: 8.00 },
-  'gpt-4.1-mini': { inputPer1M: 0.40, outputPer1M: 1.60 },
-  'gpt-4.1-nano': { inputPer1M: 0.10, outputPer1M: 0.40 },
-  'gpt-4o': { inputPer1M: 2.50, outputPer1M: 10.00 },
-  'gpt-4o-mini': { inputPer1M: 0.15, outputPer1M: 0.60 },
+  'gpt-4.1': { inputPer1M: 2.00, outputPer1M: 8.00, cachedInputPer1M: 0.50 },
+  'gpt-4.1-mini': { inputPer1M: 0.40, outputPer1M: 1.60, cachedInputPer1M: 0.10 },
+  'gpt-4.1-nano': { inputPer1M: 0.10, outputPer1M: 0.40, cachedInputPer1M: 0.025 },
+  'gpt-4o': { inputPer1M: 2.50, outputPer1M: 10.00, cachedInputPer1M: 1.25 },
+  'gpt-4o-mini': { inputPer1M: 0.15, outputPer1M: 0.60, cachedInputPer1M: 0.075 },
   'gpt-4-turbo': { inputPer1M: 10.00, outputPer1M: 30.00 },
   'gpt-3.5-turbo': { inputPer1M: 0.50, outputPer1M: 1.50 },
   'o1': { inputPer1M: 15.00, outputPer1M: 60.00 },
@@ -100,6 +108,13 @@ export function calculateCost(
   model: string,
   promptTokens: number,
   completionTokens: number,
+  /**
+   * Sprint 2.2 / Item I — number of input tokens served from OpenAI's
+   * prompt cache. When > 0 these are billed at the cached rate (typically
+   * 50% of normal input cost) and `promptTokens - cachedTokens` is billed
+   * at full price. Backward-compatible: omit or pass 0 for legacy behavior.
+   */
+  cachedTokens: number = 0,
 ): number {
   const exactMatch = MODEL_PRICING[model];
   const prefixMatch = !exactMatch
@@ -122,8 +137,17 @@ export function calculateCost(
     }
   }
 
+  // Clamp cachedTokens to [0, promptTokens] so a misreported usage block
+  // can never produce negative billable tokens.
+  const cached = Math.max(0, Math.min(cachedTokens, promptTokens));
+  const uncachedInput = promptTokens - cached;
+  // Use explicit cachedInputPer1M when set; otherwise discount 50% (the
+  // OpenAI standard for prompt-cache reads).
+  const cachedRate = pricing.cachedInputPer1M ?? pricing.inputPer1M * 0.5;
+
   return (
-    (promptTokens * pricing.inputPer1M) / 1_000_000 +
+    (uncachedInput * pricing.inputPer1M) / 1_000_000 +
+    (cached * cachedRate) / 1_000_000 +
     (completionTokens * pricing.outputPer1M) / 1_000_000
   );
 }

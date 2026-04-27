@@ -26,6 +26,21 @@ export interface JakHostedToolOutput {
 export interface JakAdaptedChatCompletion extends OpenAI.ChatCompletion {
   /** Hosted-tool outputs surfaced for callers that asked for them. Optional + ignorable. */
   _jakHostedTools?: JakHostedToolOutput[];
+  /**
+   * Sprint 2.2 / Item I — number of input tokens served from OpenAI's
+   * prompt cache. Sourced from
+   * `Response.usage.input_tokens_details.cached_tokens`. The standard
+   * ChatCompletion.usage shape doesn't carry this, so we surface it here
+   * for callers that want cache-aware cost telemetry. Always defined when
+   * the upstream response had a usage block.
+   */
+  _jakCachedInputTokens?: number;
+  /**
+   * Sprint 2.2 / Item I — number of output tokens used for reasoning
+   * (o-series models). Useful for surfacing reasoning-vs-answer cost
+   * splits in the cockpit.
+   */
+  _jakReasoningTokens?: number;
 }
 
 export function responsesToChatCompletion(
@@ -108,6 +123,19 @@ export function responsesToChatCompletion(
 
   if (hostedOutputs.length > 0) {
     completion._jakHostedTools = hostedOutputs;
+  }
+
+  // Sprint 2.2 / Item I — preserve OpenAI prompt-cache + reasoning token
+  // breakdown that the standard ChatCompletion.usage shape can't carry.
+  if (resp.usage) {
+    const cached = resp.usage.input_tokens_details?.cached_tokens;
+    if (typeof cached === 'number' && cached >= 0) {
+      completion._jakCachedInputTokens = cached;
+    }
+    const reasoning = resp.usage.output_tokens_details?.reasoning_tokens;
+    if (typeof reasoning === 'number' && reasoning > 0) {
+      completion._jakReasoningTokens = reasoning;
+    }
   }
 
   return completion;

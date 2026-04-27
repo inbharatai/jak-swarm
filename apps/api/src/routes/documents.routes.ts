@@ -361,17 +361,60 @@ export async function ingestDocumentInBackground(
       });
       ingestedText = textContent;
     } else {
-      // Hardening pass: be honest about what we did. Office docs (XLSX/DOCX),
-      // images (PNG/JPEG/WEBP) are STORED but the bytes are NOT parsed,
-      // chunked, or embedded. Previously we silently flipped to INDEXED
-      // which made the find_document tool look like it was searching their
-      // content — it wasn't. Now the status is STORED_NOT_PARSED so the
-      // Files tab + find_document can show "filename match only" honestly.
-      await fastify.db.tenantDocument.update({
-        where: { id: documentId },
-        data: { status: 'STORED_NOT_PARSED', ingestionError: `Content parsing not implemented for ${doc.mimeType}; file is searchable by filename and metadata only.` },
+      // Sprint 2.2 / Item D — DOCX / XLSX / image content parsing.
+      // Replaces the previous STORED_NOT_PARSED branch for these mime
+      // families with real text extraction (mammoth / exceljs / tesseract).
+      // Other mime types (audio, video, archives) still flip to
+      // STORED_NOT_PARSED honestly.
+      const { parseByMimeType } = await import('../services/document-parsing/parsers.js');
+      let parsed;
+      try {
+        parsed = await parseByMimeType(doc.mimeType, bytes);
+      } catch (parseErr) {
+        // Parsing crashed (corrupt file, OOM during OCR, etc). Fall back
+        // honestly — do not pretend we extracted content.
+        await fastify.db.tenantDocument.update({
+          where: { id: documentId },
+          data: {
+            status: 'STORED_NOT_PARSED',
+            ingestionError: `Parser failed for ${doc.mimeType}: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}. File is searchable by filename only.`,
+          },
+        });
+        return;
+      }
+      if (!parsed) {
+        // Unknown mime type — keep the honest STORED_NOT_PARSED behavior.
+        await fastify.db.tenantDocument.update({
+          where: { id: documentId },
+          data: { status: 'STORED_NOT_PARSED', ingestionError: `Content parsing not implemented for ${doc.mimeType}; file is searchable by filename and metadata only.` },
+        });
+        return;
+      }
+      if (parsed.text.length === 0) {
+        // Parser succeeded but produced no text (empty XLSX, blank image).
+        // Persist as STORED_NOT_PARSED with the diagnostic so reviewers
+        // see why the file isn't searchable.
+        await fastify.db.tenantDocument.update({
+          where: { id: documentId },
+          data: {
+            status: 'STORED_NOT_PARSED',
+            ingestionError: `${parsed.diagnostics.parser} extracted no text (${parsed.diagnostics.notes.join('; ')})`,
+          },
+        });
+        return;
+      }
+      await ingestor.ingestText(doc.tenantId, parsed.text, {
+        documentId: doc.id,
+        sourceKey: doc.fileName,
+        title: doc.fileName,
+        metadata: {
+          parseConfidence: parsed.parseConfidence,
+          parser: parsed.diagnostics.parser,
+          parserNotes: parsed.diagnostics.notes,
+          mimeType: doc.mimeType,
+        },
       });
-      return;
+      ingestedText = parsed.text;
     }
 
     // Hardening pass: PII + prompt-injection scan on ingested text. The

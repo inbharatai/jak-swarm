@@ -429,6 +429,7 @@ export class SwarmExecutionService extends EventEmitter {
       agent_assigned: AuditAction.WORKFLOW_STEP_STARTED,
       verification_started: AuditAction.WORKFLOW_STEP_STARTED,
       verification_completed: AuditAction.WORKFLOW_STEP_COMPLETED,
+      context_summarized: AuditAction.WORKFLOW_STEP_STARTED,
       company_context_loaded: AuditAction.MEMORY_READ,
       company_context_used_by_agent: AuditAction.MEMORY_READ,
       company_context_missing: AuditAction.WORKFLOW_PLANNED,
@@ -1036,6 +1037,19 @@ export class SwarmExecutionService extends EventEmitter {
                 : {}),
               passed: ev['passed'] === true,
               ...(typeof ev['groundingScore'] === 'number' ? { groundingScore: ev['groundingScore'] as number } : {}),
+              timestamp: nowIso,
+            }, tenantId, userId);
+          } else if (t === 'context_summarized') {
+            // Sprint 2.2 / Item H — long-DAG state compression event.
+            const stepId = (typeof ev['taskName'] === 'string' && ev['taskName']) ||
+              (typeof ev['taskId'] === 'string' ? (ev['taskId'] as string) : '');
+            this.emitLifecycle({
+              type: 'context_summarized',
+              workflowId,
+              stepId,
+              inputTaskResultCount: typeof ev['inputTaskResultCount'] === 'number' ? (ev['inputTaskResultCount'] as number) : 0,
+              tokensBefore: typeof ev['estimatedTokensBefore'] === 'number' ? (ev['estimatedTokensBefore'] as number) : 0,
+              tokensAfter: typeof ev['estimatedTokensAfter'] === 'number' ? (ev['estimatedTokensAfter'] as number) : 0,
               timestamp: nowIso,
             }, tenantId, userId);
           }

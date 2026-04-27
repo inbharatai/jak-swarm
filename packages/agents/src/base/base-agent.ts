@@ -638,7 +638,21 @@ ${lines.join('\n')}
         totalTokens.total += completion.usage.total_tokens ?? 0;
 
         const iterModel = completion.model || this.provider?.name || 'gpt-4o';
-        const iterCost = calculateCost(iterModel, iterPrompt, iterCompletion);
+        // Sprint 2.2 / Item I — read OpenAI prompt-cache + reasoning
+        // token breakdown that OpenAIRuntime preserves on the completion
+        // via the JakAdaptedChatCompletion extension fields. LegacyRuntime
+        // never sets these so iterCached/iterReasoning remain 0 there.
+        const adapted = completion as unknown as {
+          _jakCachedInputTokens?: number;
+          _jakReasoningTokens?: number;
+        };
+        const iterCached = typeof adapted._jakCachedInputTokens === 'number'
+          ? adapted._jakCachedInputTokens
+          : 0;
+        const iterReasoning = typeof adapted._jakReasoningTokens === 'number'
+          ? adapted._jakReasoningTokens
+          : 0;
+        const iterCost = calculateCost(iterModel, iterPrompt, iterCompletion, iterCached);
         totalCostUsd += iterCost;
 
         // Stage 2.3 + hardening pass: complete cost telemetry — runtime
@@ -659,6 +673,8 @@ ${lines.join('\n')}
           promptTokens: iterPrompt,
           completionTokens: iterCompletion,
           totalTokens: iterPrompt + iterCompletion,
+          ...(iterCached > 0 ? { cachedReadTokens: iterCached } : {}),
+          ...(iterReasoning > 0 ? { reasoningTokens: iterReasoning } : {}),
           costUsd: iterCost,
           runId: context.runId,
           // The "step id" inside a workflow is the agent role for now;

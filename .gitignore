@@ -45,3 +45,7 @@ qa/_findings-pretty.json
 qa/_selectors.json
 tests/test-results/
 playwright-report/
+
+# Tesseract.js OCR training data — auto-downloaded on first parseImage run (~5MB).
+# Cached locally; never committed.
+*.traineddata

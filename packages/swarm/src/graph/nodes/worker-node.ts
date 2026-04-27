@@ -7,6 +7,11 @@ import { getBreakerFactory } from '../../supervisor/breaker-registry.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
 import { createWorkerAgent } from './worker/agent-factory.js';
 import { buildTaskInput } from './worker/task-input-builders.js';
+import {
+  needsSummarization,
+  summarizeTaskResults,
+  estimateTokens,
+} from '../../context/context-summarizer.js';
 
 // ─── Public browser types + plan builder (preserved from pre-P5b worker-node.ts) ─
 //
@@ -76,7 +81,38 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
         taskId: task.id,
       };
     } else {
-      const taskInput = buildTaskInput(task, state);
+      // Sprint 2.2 / Item H — context summarization for long DAGs.
+      // When state.taskResults has accumulated past the configured budget
+      // (default: 6+ tasks AND > 16k tokens), compress older non-protected
+      // entries into key-value summaries so the agent input stays bounded.
+      // The current task + its direct dependencies + the last 2 completed
+      // tasks are protected from compression. Fire-and-forget cockpit
+      // event so users see why later steps reference summarized inputs.
+      let stateForInput = state;
+      if (needsSummarization(state)) {
+        const beforeStr = JSON.stringify(state.taskResults);
+        const tokensBefore = estimateTokens(beforeStr);
+        const summarizedResults = summarizeTaskResults(state);
+        const afterStr = JSON.stringify(summarizedResults);
+        const tokensAfter = estimateTokens(afterStr);
+        stateForInput = { ...state, taskResults: summarizedResults };
+        try {
+          if (onActivity) {
+            onActivity({
+              type: 'context_summarized',
+              taskId: task.id,
+              ...(task.name ? { taskName: task.name } : {}),
+              inputTaskResultCount: Object.keys(state.taskResults).length,
+              estimatedTokensBefore: tokensBefore,
+              estimatedTokensAfter: tokensAfter,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // Telemetry failure must never break the worker.
+        }
+      }
+      const taskInput = buildTaskInput(task, stateForInput);
 
       // Distributed breaker (shared across instances) if registered for this
       // workflow in the breaker-registry side-channel; else local per-process.

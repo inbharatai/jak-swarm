@@ -61,6 +61,9 @@ export type WorkflowLifecycleEvent =
   // typed events so the cockpit can render a dedicated verification panel).
   | { type: 'verification_started'; workflowId: string; stepId?: string; timestamp: string }
   | { type: 'verification_completed'; workflowId: string; stepId?: string; passed: boolean; groundingScore?: number; timestamp: string }
+  // Sprint 2.2 / Item H — fires when worker-node compresses
+  // state.taskResults before building the agent input on long DAGs.
+  | { type: 'context_summarized'; workflowId: string; stepId: string; inputTaskResultCount: number; tokensBefore: number; tokensAfter: number; timestamp: string }
   | { type: 'approval_required'; workflowId: string; approvalId: string; stepId?: string; riskLevel?: string; timestamp: string }
   | { type: 'approval_granted'; workflowId: string; approvalId: string; reviewedBy: string; timestamp: string }
   | { type: 'approval_rejected'; workflowId: string; approvalId: string; reviewedBy: string; reason?: string; timestamp: string }

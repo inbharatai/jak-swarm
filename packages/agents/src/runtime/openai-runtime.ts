@@ -230,10 +230,14 @@ export class OpenAIRuntime implements LLMRuntime {
       if (resp.usage) {
         totalPrompt += resp.usage.input_tokens ?? 0;
         totalCompletion += resp.usage.output_tokens ?? 0;
+        // Sprint 2.2 / Item I — pass cached_tokens to calculateCost so
+        // prompt-cache reads bill at the discounted rate.
+        const cached = resp.usage.input_tokens_details?.cached_tokens ?? 0;
         totalCostUsd += calculateCost(
           resp.model,
           resp.usage.input_tokens ?? 0,
           resp.usage.output_tokens ?? 0,
+          cached,
         );
       }
 
