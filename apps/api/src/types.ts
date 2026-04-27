@@ -8,7 +8,9 @@ export type UserRole =
   | 'TENANT_ADMIN'
   | 'OPERATOR'
   | 'REVIEWER'
-  | 'VIEWER';
+  | 'VIEWER'
+  | 'END_USER'
+  | 'EXTERNAL_AUDITOR'; // Sprint 2.6 — third-party auditors invited per-engagement
 
 export type WorkflowStatus =
   | 'PENDING'

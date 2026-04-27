@@ -65,7 +65,7 @@ import {
   afterApproval,
   afterVerifier,
   type NodeName,
-} from '../graph/swarm-graph.js';
+} from '../graph/edges.js';
 import {
   getCurrentTask,
   type SwarmState,

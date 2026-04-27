@@ -79,6 +79,7 @@ import bundlesRoutes from './routes/bundles.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import complianceRoutes from './routes/compliance.routes.js';
 import auditRunsRoutes from './routes/audit-runs.routes.js';
+import externalAuditorRoutes from './routes/external-auditor.routes.js';
 import companyBrainRoutes from './routes/company-brain.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
@@ -245,6 +246,11 @@ async function buildApp() {
   // /exceptions/:id/remediation, /exceptions/:id/decide, /final-pack.
   // RBAC: writes REVIEWER+, reads any tenant member.
   await fastify.register(auditRunsRoutes);
+  // External Auditor Portal (Sprint 2.6) — invite-token-only auth for
+  // third-party auditors. Admin routes (REVIEWER+) for invite/revoke,
+  // public route for accept, EXTERNAL_AUDITOR routes with engagement-
+  // isolation middleware for review/comment/decide actions.
+  await fastify.register(externalAuditorRoutes);
   // Company Brain (Migration 16) — CompanyProfile + IntentRecord +
   // MemoryItem.status approval + WorkflowTemplate library.
   // Routes: /company/profile/*, /intents, /memory/:id/(approve|reject),

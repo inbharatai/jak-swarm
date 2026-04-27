@@ -1,12 +1,14 @@
-// Graph
-export { buildSwarmGraph, SwarmGraph } from './graph/swarm-graph.js';
+// Graph edges (Sprint 2.5 / A.6 — extracted from deleted swarm-graph.ts)
+// SwarmGraph + buildSwarmGraph + SwarmGraph class deleted; LangGraph is
+// the only orchestrator. Edge functions remain because the LangGraph
+// builder reuses them.
 export {
   afterCommander,
   afterGuardrail,
   afterApproval,
   afterVerifier,
-} from './graph/swarm-graph.js';
-export type { NodeName, NodeHandler, SwarmGraphEvents } from './graph/swarm-graph.js';
+} from './graph/edges.js';
+export type { NodeName } from './graph/edges.js';
 
 // Nodes (for testing/extension)
 export { commanderNode } from './graph/nodes/commander-node.js';
@@ -46,13 +48,17 @@ export {
 } from './state/run-lifecycle.js';
 export type { MinimalLogger } from './state/run-lifecycle.js';
 
-// Phase 6 — workflow runtime interface (orchestration engine abstraction)
+// Workflow runtime — LangGraph (Sprint 2.5 / A.6 deleted SwarmGraphRuntime)
 export {
   getWorkflowRuntime,
-  SwarmGraphRuntime,
+  LangGraphRuntime,
   WorkflowPausedError,
   NOOP_LIFECYCLE_EMITTER,
   safeEmitLifecycle,
+  PostgresCheckpointSaver,
+  buildLangGraph,
+  makeRunnableConfig,
+  SwarmStateAnnotation,
 } from './workflow-runtime/index.js';
 export type {
   WorkflowRuntime,

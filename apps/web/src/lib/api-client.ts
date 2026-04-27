@@ -1336,3 +1336,86 @@ export const usageApi = {
     message: string;
   }>('/usage/estimate', { method: 'POST', body: { goal } }),
 };
+
+// ─── External Auditor Portal (Sprint 2.6) ───────────────────────────────
+
+export interface AuditorEngagement {
+  id: string;
+  tenantId: string;
+  userId: string;
+  auditorEmail: string;
+  auditRunId: string;
+  inviteId: string;
+  scopes: string[];
+  accessGrantedAt: string;
+  accessRevokedAt: string | null;
+  expiresAt: string;
+}
+
+export interface AuditorInvite {
+  id: string;
+  auditorEmail: string;
+  auditorName: string | null;
+  status: string;
+  scopes: string[];
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditorAction {
+  id: string;
+  userId: string;
+  auditorEmail: string;
+  auditRunId: string;
+  engagementId: string;
+  objectType: string;
+  objectId: string | null;
+  action: string;
+  comment: string | null;
+  createdAt: string;
+}
+
+export const externalAuditorApi = {
+  // Admin (REVIEWER+) endpoints
+  createInvite: (auditRunId: string, body: { auditorEmail: string; auditorName?: string; scopes?: string[]; expiresInDays?: number }) =>
+    apiDataFetch<{ inviteId: string; cleartextToken: string; acceptUrl: string; expiresAt: string }>(
+      `/audit/runs/${encodeURIComponent(auditRunId)}/auditors/invite`,
+      { method: 'POST', body },
+    ),
+  listInvites: (auditRunId: string) =>
+    apiDataFetch<{ invites: AuditorInvite[] }>(`/audit/runs/${encodeURIComponent(auditRunId)}/auditors`),
+  revokeInvite: (auditRunId: string, inviteId: string) =>
+    apiDataFetch<{ revoked: boolean }>(
+      `/audit/runs/${encodeURIComponent(auditRunId)}/auditors/${encodeURIComponent(inviteId)}/revoke`,
+      { method: 'POST', body: {} },
+    ),
+  listActions: (auditRunId: string) =>
+    apiDataFetch<{ actions: AuditorAction[] }>(`/audit/runs/${encodeURIComponent(auditRunId)}/auditors/actions`),
+
+  // Auditor (EXTERNAL_AUDITOR role) endpoints
+  acceptInvite: (token: string) =>
+    apiDataFetch<{ token: string; engagement: { id: string; auditRunId: string; tenantId: string; scopes: string[]; expiresAt: string } }>(
+      `/auditor/accept/${encodeURIComponent(token)}`,
+      { method: 'POST', body: {} },
+    ),
+  myEngagements: () =>
+    apiDataFetch<{ engagements: AuditorEngagement[] }>('/auditor/runs'),
+  getRun: (auditRunId: string) =>
+    apiDataFetch<{ auditRun: Record<string, unknown> }>(`/auditor/runs/${encodeURIComponent(auditRunId)}`),
+  listWorkpapers: (auditRunId: string) =>
+    apiDataFetch<{ workpapers: Array<Record<string, unknown>> }>(
+      `/auditor/runs/${encodeURIComponent(auditRunId)}/workpapers`,
+    ),
+  decideWorkpaper: (auditRunId: string, wpId: string, body: { decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES'; comment?: string }) =>
+    apiDataFetch<{ workpaper: Record<string, unknown> }>(
+      `/auditor/runs/${encodeURIComponent(auditRunId)}/workpapers/${encodeURIComponent(wpId)}/decide`,
+      { method: 'POST', body },
+    ),
+  postComment: (auditRunId: string, comment: string) =>
+    apiDataFetch<{ logged: boolean }>(
+      `/auditor/runs/${encodeURIComponent(auditRunId)}/comment`,
+      { method: 'POST', body: { comment } },
+    ),
+};

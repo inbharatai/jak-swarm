@@ -3,6 +3,10 @@ export enum UserRole {
   OPERATOR = 'OPERATOR',
   REVIEWER = 'REVIEWER',
   END_USER = 'END_USER',
+  // Sprint 2.6 — third-party auditors invited per-engagement. Cannot
+  // access general tenant data; scoped only to the audit runs they
+  // were invited to via ExternalAuditorEngagement rows.
+  EXTERNAL_AUDITOR = 'EXTERNAL_AUDITOR',
 }
 
 export enum JobFunction {

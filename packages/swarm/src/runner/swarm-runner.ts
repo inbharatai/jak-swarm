@@ -1,11 +1,29 @@
+/**
+ * SwarmRunner — Sprint 2.5 / A.6 rewrite.
+ *
+ * After the LangGraph hard cutover, this class is now a thin facade
+ * over the LangGraphRuntime. The public API (run, resume, pause, stop,
+ * isCancelled, isPaused, cancel, getState) is preserved so existing
+ * callers (swarm-execution.service.ts, queue worker, tests) require
+ * no changes. SwarmGraph itself is deleted; everything below
+ * delegates to the native @langchain/langgraph orchestrator built in
+ * langgraph-graph-builder.ts.
+ *
+ * Why preserve the SwarmRunner facade rather than make every caller
+ * use WorkflowRuntime.start() directly: SwarmRunner has unique
+ * responsibilities the workflow-runtime interface doesn't carry —
+ * concurrency limits, the activity-emitter side-channel registration,
+ * timeout enforcement, supervisor-bus lifecycle events. Folding these
+ * into LangGraphRuntime would bloat the runtime contract; keeping them
+ * here keeps the runtime pure and the facade minimal.
+ */
+
 import { WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace, ApprovalRequest } from '@jak-swarm/shared';
 import type { ToolCategory } from '@jak-swarm/shared';
 import { createLogger } from '@jak-swarm/shared';
 import { generateId } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
-import { createInitialSwarmState } from '../state/swarm-state.js';
-import { buildSwarmGraph } from '../graph/swarm-graph.js';
 import type { WorkflowStateStore } from '../state/workflow-state-store.js';
 import { InMemoryStateStore } from '../state/workflow-state-store.js';
 import { supervisorBus } from '../supervisor/supervisor-bus.js';
@@ -18,6 +36,9 @@ import {
   clearActivityEmitter,
 } from '../supervisor/activity-registry.js';
 import type { AgentActivityEvent } from '@jak-swarm/agents';
+import { LangGraphRuntime } from '../workflow-runtime/langgraph-runtime.js';
+import type { CheckpointPrismaClient } from '../workflow-runtime/postgres-checkpointer.js';
+import type { WorkflowLifecycleEmitter } from '../workflow-runtime/lifecycle-events.js';
 
 export interface RunParams {
   goal: string;
@@ -30,12 +51,8 @@ export interface RunParams {
   timeoutMs?: number;
   onStateChange?: (workflowId: string, state: unknown) => Promise<void>;
   onAgentActivity?: (data: unknown) => void;
+  onLifecycle?: WorkflowLifecycleEmitter;
   maxCostUsd?: number;
-  /**
-   * Opt-in auto-approve bypass for tasks with risk strictly below
-   * `approvalThreshold`. Default (false) means every task routed to
-   * the approval node pauses for human review.
-   */
   autoApproveEnabled?: boolean;
   approvalThreshold?: string;
   allowedDomains?: string[];
@@ -43,14 +60,12 @@ export interface RunParams {
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
   connectedProviders?: string[];
-  /**
-   * Coarse plan tier for gating paid external services (Serper, Tavily).
-   * 'free' forces DDG-only search; 'paid' or undefined allows the full chain.
-   */
   subscriptionTier?: 'free' | 'paid';
   loadState?: (id: string) => Promise<unknown | undefined>;
-  /** Optional distributed circuit breaker factory. When provided, worker nodes use shared breakers. */
-  circuitBreakerFactory?: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
+  circuitBreakerFactory?: (
+    name: string,
+    opts: { failureThreshold: number; resetTimeoutMs: number },
+  ) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
 }
 
 export interface SwarmResult {
@@ -75,31 +90,102 @@ export interface ApprovalDecision {
 
 const logger = createLogger('swarm-runner');
 
-/** Clean up signals after workflow completes */
-function cleanupSignals(signals: { cancelled: Set<string>; paused: Set<string> }, workflowId: string): void {
+function cleanupSignals(
+  signals: { cancelled: Set<string>; paused: Set<string> },
+  workflowId: string,
+): void {
   signals.cancelled.delete(workflowId);
   signals.paused.delete(workflowId);
 }
 
+export interface SwarmRunnerOptions {
+  defaultTimeoutMs?: number;
+  maxConcurrentWorkflows?: number;
+  stateStore?: WorkflowStateStore;
+  /**
+   * Prisma client for the LangGraph PostgresCheckpointSaver. Required
+   * for production deployment so checkpoints persist across processes.
+   * When omitted (e.g. in unit tests), an in-memory adapter is used —
+   * checkpoints are lost on process exit but the rest of the runtime
+   * works identically.
+   */
+  db?: CheckpointPrismaClient;
+}
+
+/**
+ * In-memory CheckpointPrismaClient stub used when no real db is
+ * provided. Implements the same surface (workflowCheckpoint methods)
+ * with an array-backed store. Tenant isolation is preserved because
+ * the saver still scopes by tenantId in all queries.
+ */
+function makeInMemoryCheckpointDb(): CheckpointPrismaClient {
+  interface Row { [k: string]: unknown }
+  const rows: Row[] = [];
+  let idCounter = 0;
+  function matches(row: Row, where: Record<string, unknown>): boolean {
+    for (const [k, v] of Object.entries(where)) {
+      if (v && typeof v === 'object' && 'lt' in (v as object)) {
+        if (!((row[k] as string) < (v as { lt: string }).lt)) return false;
+      } else if (row[k] !== v) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return {
+    workflowCheckpoint: {
+      async findFirst(args: unknown) {
+        const a = args as { where: Record<string, unknown> };
+        const filtered = rows.filter((r) => matches(r, a.where));
+        filtered.sort((x, y) => ((y['createdAt'] as Date).getTime() - (x['createdAt'] as Date).getTime()));
+        return filtered[0] ?? null;
+      },
+      async findMany(args: unknown) {
+        const a = args as { where: Record<string, unknown>; take?: number };
+        let filtered = rows.filter((r) => matches(r, a.where));
+        filtered.sort((x, y) => ((y['createdAt'] as Date).getTime() - (x['createdAt'] as Date).getTime()));
+        if (typeof a.take === 'number') filtered = filtered.slice(0, a.take);
+        return filtered;
+      },
+      async create(args: unknown) {
+        const a = args as { data: Record<string, unknown> };
+        const row: Row = { id: `mem_${++idCounter}`, createdAt: new Date(Date.now() + idCounter), ...a.data };
+        rows.push(row);
+        return row;
+      },
+      async upsert() { throw new Error('upsert not used'); },
+      async deleteMany(args: unknown) {
+        const a = args as { where: Record<string, unknown> };
+        const before = rows.length;
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const row = rows[i];
+          if (row && matches(row, a.where)) rows.splice(i, 1);
+        }
+        return { count: before - rows.length };
+      },
+      async updateMany() { throw new Error('updateMany not used'); },
+    },
+  };
+}
+
 export class SwarmRunner {
-  private readonly graph = buildSwarmGraph();
   private readonly defaultTimeoutMs: number;
   private readonly maxConcurrent: number;
   private activeWorkflows = new Set<string>();
   private readonly stateStore: WorkflowStateStore;
 
-  // Instance-level signal sets — prevents race conditions across SwarmRunner instances
+  // Instance-level signal sets — prevents race conditions across instances.
   private readonly cancelledWorkflows = new Set<string>();
   private readonly pausedWorkflows = new Set<string>();
 
-  constructor(options?: { defaultTimeoutMs?: number; maxConcurrentWorkflows?: number; stateStore?: WorkflowStateStore }) {
-    this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 5 * 60 * 1000; // 5 minutes
-    this.maxConcurrent = options?.maxConcurrentWorkflows ?? 20;
-    this.stateStore = options?.stateStore ?? new InMemoryStateStore();
+  /** Native LangGraph runtime; this is where the actual orchestration runs. */
+  private readonly runtime: LangGraphRuntime;
 
-    // Wire signal callbacks to graph
-    this.graph.shouldStop = (wfId) => this.cancelledWorkflows.has(wfId);
-    this.graph.shouldPause = (wfId) => this.pausedWorkflows.has(wfId);
+  constructor(options: SwarmRunnerOptions = {}) {
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 5 * 60 * 1000;
+    this.maxConcurrent = options.maxConcurrentWorkflows ?? 20;
+    this.stateStore = options.stateStore ?? new InMemoryStateStore();
+    this.runtime = new LangGraphRuntime(this, options.db ?? makeInMemoryCheckpointDb());
   }
 
   pause(workflowId: string): void {
@@ -126,7 +212,6 @@ export class SwarmRunner {
     const workflowId = params.workflowId ?? generateId('wf_');
     const startedAt = new Date();
 
-    // Enforce concurrent workflow limit
     if (this.activeWorkflows.size >= this.maxConcurrent) {
       return {
         workflowId,
@@ -145,110 +230,139 @@ export class SwarmRunner {
 
     logger.info(
       { workflowId, tenantId: params.tenantId, industry: params.industry },
-      'Starting swarm workflow',
+      'Starting swarm workflow (LangGraph runtime)',
     );
 
-    // Publish workflow lifecycle event to SupervisorBus
     supervisorBus.publish('workflow:started', {
       type: 'workflow:started',
       tenantId: params.tenantId,
       workflowId,
     });
 
-    const initialState = createInitialSwarmState({
-      goal: params.goal,
-      tenantId: params.tenantId,
-      userId: params.userId,
-      workflowId,
-      industry: params.industry,
-      roleModes: params.roleModes,
-      idempotencyKey: params.idempotencyKey,
-      maxCostUsd: params.maxCostUsd,
-      autoApproveEnabled: params.autoApproveEnabled,
-      approvalThreshold: params.approvalThreshold,
-      allowedDomains: params.allowedDomains,
-      browserAutomationEnabled: params.browserAutomationEnabled,
-      restrictedCategories: params.restrictedCategories,
-      disabledToolNames: params.disabledToolNames,
-      connectedProviders: params.connectedProviders,
-      subscriptionTier: params.subscriptionTier,
-    });
-
-    // Register circuit-breaker factory in a side-channel (NOT state).
-    // Factories are Functions — putting them in state crashes Prisma persistence.
-    // Worker nodes look up the factory via workflowId; unregister on cleanup.
     if (params.circuitBreakerFactory) {
       registerBreakerFactory(workflowId, params.circuitBreakerFactory);
     }
 
-    // Stage 2: register an activity emitter in the same side-channel so
-    // BaseAgent can emit live tool_called / tool_completed / cost_updated
-    // events during execution. The emitter relays straight into the
-    // SwarmGraph's own `agent:activity` event stream — which the workflow
-    // route already consumes and publishes to SSE + Redis pub/sub for
-    // cross-instance visibility. Cleaned up in the finally below.
-    registerActivityEmitter(workflowId, (ev: AgentActivityEvent) => {
-      this.graph.emit('agent:activity', { workflowId, ...ev });
-    });
+    // Activity emitter side-channel — agent nodes call getActivityEmitter
+    // and emit fine-grained events that flow through to the caller's
+    // onAgentActivity callback (which the SSE stream consumes).
+    if (params.onAgentActivity) {
+      registerActivityEmitter(workflowId, (ev: AgentActivityEvent) => {
+        try {
+          params.onAgentActivity!({ workflowId, ...ev });
+        } catch {
+          // Activity-emitter errors must never break workflow execution.
+        }
+      });
+    }
 
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
-    // Track listeners so we can remove them after workflow completes
-    const listeners: Array<{ event: string; fn: (...args: any[]) => void }> = [];
-
-    // Register state-change listener so callers can persist intermediate state
-    if (params.onStateChange) {
-      const fn = (data: { workflowId: string; state: unknown }) => {
-        params.onStateChange!(data.workflowId, data.state).catch((err) => {
-          logger.error({ workflowId: data.workflowId, err: err instanceof Error ? err.message : String(err) }, 'State change callback failed');
-        });
-      };
-      this.graph.on('state:updated', fn);
-      listeners.push({ event: 'state:updated', fn });
-    }
-
-    // Relay agent telemetry events to callers
-    if (params.onAgentActivity) {
-      const activityFn = (data: unknown) => {
-        params.onAgentActivity!(data);
-      };
-      this.graph.on('agent:activity', activityFn);
-      listeners.push({ event: 'agent:activity', fn: activityFn });
-
-      const enterFn = (data: unknown) => {
-        params.onAgentActivity!({ type: 'node_enter', ...(data as Record<string, unknown>) });
-      };
-      this.graph.on('node:enter', enterFn);
-      listeners.push({ event: 'node:enter', fn: enterFn });
-
-      const exitFn = (data: unknown) => {
-        params.onAgentActivity!({ type: 'node_exit', ...(data as Record<string, unknown>) });
-      };
-      this.graph.on('node:exit', exitFn);
-      listeners.push({ event: 'node:exit', fn: exitFn });
-    }
-
-    let finalState: SwarmState;
-
     try {
-      // Use parallel execution when available — independent tasks run concurrently.
-      // Falls back to sequential if runParallel encounters issues.
-      finalState = await this.runWithTimeout(
-        this.graph.runParallel
-          ? this.graph.runParallel(initialState)
-          : this.graph.run(initialState),
+      const result = await this.runWithTimeout(
+        this.runtime.start({
+          workflowId,
+          tenantId: params.tenantId,
+          userId: params.userId,
+          goal: params.goal,
+          ...(params.industry !== undefined ? { industry: params.industry } : {}),
+          ...(params.roleModes !== undefined ? { roleModes: params.roleModes } : {}),
+          ...(params.idempotencyKey !== undefined ? { idempotencyKey: params.idempotencyKey } : {}),
+          ...(params.maxCostUsd !== undefined ? { maxCostUsd: params.maxCostUsd } : {}),
+          ...(params.autoApproveEnabled !== undefined ? { autoApproveEnabled: params.autoApproveEnabled } : {}),
+          ...(params.approvalThreshold !== undefined ? { approvalThreshold: params.approvalThreshold } : {}),
+          ...(params.allowedDomains !== undefined ? { allowedDomains: params.allowedDomains } : {}),
+          ...(params.browserAutomationEnabled !== undefined ? { browserAutomationEnabled: params.browserAutomationEnabled } : {}),
+          ...(params.restrictedCategories !== undefined ? { restrictedCategories: params.restrictedCategories } : {}),
+          ...(params.disabledToolNames !== undefined ? { disabledToolNames: params.disabledToolNames } : {}),
+          ...(params.connectedProviders !== undefined ? { connectedProviders: params.connectedProviders } : {}),
+          ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
+          ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
+        }),
         timeoutMs,
         workflowId,
       );
-    } catch (err) {
-      // Remove event listeners to prevent memory leaks
-      for (const { event, fn } of listeners) {
-        this.graph.off(event, fn);
-      }
-      this.activeWorkflows.delete(workflowId);
-      unregisterBreakerFactory(workflowId);
-      clearActivityEmitter(workflowId);
 
+      // Persist final state via stateStore for backwards compat with
+      // any caller that reads it via getState() — including the legacy
+      // SwarmRunner integration tests and `Workflow.stateJson` consumers.
+      // We synthesize a SwarmState shape from the result + input params
+      // since LangGraph holds the canonical state in its checkpoint.
+      try {
+        const persistedState: SwarmState = {
+          goal: params.goal,
+          tenantId: params.tenantId,
+          userId: params.userId,
+          workflowId,
+          industry: params.industry,
+          roleModes: params.roleModes ?? [],
+          ...(params.idempotencyKey !== undefined ? { idempotencyKey: params.idempotencyKey } : {}),
+          missionBrief: undefined,
+          clarificationNeeded: result.clarificationNeeded,
+          ...(result.clarificationQuestion !== undefined ? { clarificationQuestion: result.clarificationQuestion } : {}),
+          plan: undefined,
+          routeMap: undefined,
+          currentTaskIndex: 0,
+          taskResults: {},
+          pendingApprovals: result.pendingApprovals,
+          guardrailResult: undefined,
+          blocked: false,
+          verificationResults: {},
+          completedTaskIds: [],
+          failedTaskIds: [],
+          taskRetryCount: {},
+          accumulatedCostUsd: 0,
+          ...(params.maxCostUsd !== undefined ? { maxCostUsd: params.maxCostUsd } : {}),
+          allowedDomains: params.allowedDomains ?? [],
+          browserAutomationEnabled: params.browserAutomationEnabled ?? false,
+          restrictedCategories: params.restrictedCategories ?? [],
+          disabledToolNames: params.disabledToolNames ?? [],
+          connectedProviders: params.connectedProviders ?? [],
+          ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
+          status: result.status,
+          ...(result.error !== undefined ? { error: result.error } : { error: undefined }),
+          outputs: result.outputs,
+          traces: result.traces,
+        } as SwarmState;
+        await this.stateStore.set(workflowId, persistedState);
+      } catch (err) {
+        logger.error({ workflowId, err: err instanceof Error ? err.message : String(err) }, 'Failed to persist final workflow state');
+      }
+
+      if (params.onStateChange) {
+        try {
+          await params.onStateChange(workflowId, result);
+        } catch (err) {
+          logger.error({ workflowId, err: err instanceof Error ? err.message : String(err) }, 'onStateChange callback failed');
+        }
+      }
+
+      const completedAt = new Date();
+      const durationMs = completedAt.getTime() - startedAt.getTime();
+
+      logger.info(
+        {
+          workflowId,
+          status: result.status,
+          outputCount: result.outputs.length,
+          traceCount: result.traces.length,
+          durationMs,
+        },
+        'Swarm workflow completed',
+      );
+
+      supervisorBus.publish('workflow:completed', {
+        type: 'workflow:completed',
+        tenantId: params.tenantId,
+        workflowId,
+        status: result.status,
+        durationMs,
+        taskCount: 0,
+        failedCount: 0,
+      });
+
+      return result;
+    } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.error({ workflowId, err: errorMessage }, 'Swarm workflow failed');
 
@@ -265,50 +379,12 @@ export class SwarmRunner {
         startedAt,
         completedAt,
       };
+    } finally {
+      this.activeWorkflows.delete(workflowId);
+      unregisterBreakerFactory(workflowId);
+      clearActivityEmitter(workflowId);
+      cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     }
-
-    // Remove event listeners to prevent memory leaks
-    for (const { event, fn } of listeners) {
-      this.graph.off(event, fn);
-    }
-    this.activeWorkflows.delete(workflowId);
-    unregisterBreakerFactory(workflowId);
-    clearActivityEmitter(workflowId);
-
-    // Persist state for resume/cancel
-    try {
-      await this.stateStore.set(workflowId, finalState);
-    } catch (err) {
-      logger.error({ workflowId, err: err instanceof Error ? err.message : String(err) }, 'Failed to persist final workflow state');
-    }
-
-    const completedAt = new Date();
-    const durationMs = completedAt.getTime() - startedAt.getTime();
-
-    logger.info(
-      {
-        workflowId,
-        status: finalState.status,
-        outputCount: finalState.outputs.length,
-        traceCount: finalState.traces.length,
-        durationMs,
-      },
-      'Swarm workflow completed',
-    );
-
-    // Publish completion event to SupervisorBus
-    supervisorBus.publish('workflow:completed', {
-      type: 'workflow:completed',
-      tenantId: finalState.tenantId,
-      workflowId,
-      status: finalState.status,
-      durationMs,
-      taskCount: finalState.plan?.tasks.length ?? 0,
-      failedCount: finalState.plan?.tasks.filter(t => t.status === 'FAILED').length ?? 0,
-    });
-
-    cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
-    return this.stateToResult(finalState, workflowId, startedAt, completedAt);
   }
 
   async resume(
@@ -316,61 +392,25 @@ export class SwarmRunner {
     approvalDecision: ApprovalDecision,
     options?: { loadState?: (id: string) => Promise<unknown | undefined> },
   ): Promise<SwarmResult> {
+    void options; // loadState is no longer needed — LangGraph rehydrates from checkpointer
     const startedAt = new Date();
 
     logger.info(
       { workflowId, decision: approvalDecision.status, reviewedBy: approvalDecision.reviewedBy },
-      'Resuming workflow after approval decision',
+      'Resuming workflow after approval decision (LangGraph runtime)',
     );
 
-    let savedState = await this.stateStore.get(workflowId);
-
-    // If not in store, try loading from external callback (e.g. DB)
-    if (!savedState && options?.loadState) {
-      const loaded = await options.loadState(workflowId);
-      if (loaded) {
-        savedState = loaded as SwarmState;
-        void this.stateStore.set(workflowId, savedState);
-      }
-    }
-
-    if (!savedState) {
-      return {
-        workflowId,
-        status: WorkflowStatus.FAILED,
-        outputs: [],
-        traces: [],
-        pendingApprovals: [],
-        clarificationNeeded: false,
-        error: `Workflow '${workflowId}' not found or already completed`,
-        durationMs: 0,
-        startedAt,
-        completedAt: new Date(),
-      };
-    }
-
-    if (savedState.status !== WorkflowStatus.AWAITING_APPROVAL) {
-      return {
-        workflowId,
-        status: savedState.status,
-        outputs: savedState.outputs,
-        traces: savedState.traces,
-        pendingApprovals: savedState.pendingApprovals,
-        clarificationNeeded: savedState.clarificationNeeded,
-        error: `Workflow is not awaiting approval (status: ${savedState.status})`,
-        durationMs: 0,
-        startedAt,
-        completedAt: new Date(),
-      };
-    }
-
-    let finalState: SwarmState;
     try {
-      finalState = await this.runWithTimeout(
-        this.graph.resume(savedState, approvalDecision),
+      const result = await this.runWithTimeout(
+        this.runtime.resume(workflowId, {
+          decision: approvalDecision.status === 'REJECTED' ? 'REJECTED' : 'APPROVED',
+          reviewedBy: approvalDecision.reviewedBy,
+          ...(approvalDecision.comment !== undefined ? { comment: approvalDecision.comment } : {}),
+        }),
         this.defaultTimeoutMs,
         workflowId,
       );
+      return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.error({ workflowId, err: errorMessage }, 'Workflow resume failed');
@@ -378,65 +418,50 @@ export class SwarmRunner {
       return {
         workflowId,
         status: WorkflowStatus.FAILED,
-        outputs: savedState.outputs,
-        traces: savedState.traces,
-        pendingApprovals: savedState.pendingApprovals,
+        outputs: [],
+        traces: [],
+        pendingApprovals: [],
         clarificationNeeded: false,
         error: errorMessage,
         durationMs: completedAt.getTime() - startedAt.getTime(),
         startedAt,
         completedAt,
       };
+    } finally {
+      cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     }
-
-    void this.stateStore.set(workflowId, finalState);
-
-    cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
-    const completedAt = new Date();
-    return this.stateToResult(finalState, workflowId, startedAt, completedAt);
   }
 
   async cancel(workflowId: string): Promise<void> {
-    const state = await this.stateStore.get(workflowId);
-    if (!state) {
-      logger.warn({ workflowId }, 'Cancel requested for unknown workflow');
-      return;
+    this.cancelledWorkflows.add(workflowId);
+    try {
+      await this.runtime.cancel(workflowId, 'user-cancelled');
+    } catch {
+      // Cancel is best-effort.
     }
-
-    const cancelledState: SwarmState = {
-      ...state,
-      status: WorkflowStatus.CANCELLED,
-      error: 'Cancelled by user',
-    };
-
-    void this.stateStore.set(workflowId, cancelledState);
-
+    // Update the persisted state so getState() reflects the cancellation
+    // even when no further node runs occur after the cancel.
+    try {
+      const existing = await this.stateStore.get(workflowId);
+      if (existing) {
+        await this.stateStore.set(workflowId, {
+          ...existing,
+          status: WorkflowStatus.CANCELLED,
+          error: existing.error ?? 'Cancelled by user',
+        });
+      }
+    } catch {
+      // Persistence is best-effort here.
+    }
     logger.info({ workflowId }, 'Workflow cancelled');
   }
 
   async getState(workflowId: string): Promise<SwarmState | undefined> {
-    return this.stateStore.get(workflowId);
-  }
-
-  private stateToResult(
-    state: SwarmState,
-    workflowId: string,
-    startedAt: Date,
-    completedAt: Date,
-  ): SwarmResult {
-    return {
-      workflowId,
-      status: state.status,
-      outputs: state.outputs,
-      traces: state.traces,
-      pendingApprovals: state.pendingApprovals,
-      clarificationNeeded: state.clarificationNeeded,
-      clarificationQuestion: state.clarificationQuestion,
-      error: state.error,
-      durationMs: completedAt.getTime() - startedAt.getTime(),
-      startedAt,
-      completedAt,
-    };
+    const stored = await this.stateStore.get(workflowId);
+    if (stored) return stored;
+    // Fallback: ask LangGraph for a snapshot built from the checkpoint.
+    const snapshot = await this.runtime.getState(workflowId);
+    return snapshot?.rawState;
   }
 
   private async runWithTimeout<T>(
