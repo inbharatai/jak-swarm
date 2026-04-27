@@ -1,23 +1,18 @@
 -- Migration 16 — Company Brain + Intent vocabulary + Workflow templates
 --
--- Additive only — no changes to existing tables (memory_items adds 4
--- nullable columns + 1 index; everything else is new tables).
+-- Additive only — creates 4 new tables (no changes to existing tables).
+--
+-- ORDERING NOTE: this migration is split from the original combined
+-- file because Prisma's sort places `16_*` BEFORE `3_memory_v2`
+-- (the lex+numeric-prefix sort applied by `prisma migrate deploy`
+-- yields: 0, 1, 10, 10, 10, 11, 12, 13, 14, 15, 16, 2, 3, ..., 9).
+-- The `memory_items` ALTERs that originally lived here were moved to
+-- migration `99_memory_item_status` so they sort after `3_memory_v2`
+-- creates the table. See packages/db/prisma/migrations/99_*.
 --
 -- See packages/db/prisma/schema.prisma `CompanyProfile`,
--- `CompanyKnowledgeSource`, `IntentRecord`, `WorkflowTemplate`,
--- `MemoryItem.status/suggestedBy/reviewedBy/reviewedAt` for full
--- field documentation.
-
--- ── memory_items: add approval-status fields ──────────────────────────
-
-ALTER TABLE "memory_items"
-  ADD COLUMN IF NOT EXISTS "status"      TEXT NOT NULL DEFAULT 'user_approved',
-  ADD COLUMN IF NOT EXISTS "suggestedBy" TEXT,
-  ADD COLUMN IF NOT EXISTS "reviewedBy"  TEXT,
-  ADD COLUMN IF NOT EXISTS "reviewedAt"  TIMESTAMP(3);
-
-CREATE INDEX IF NOT EXISTS "memory_items_tenantId_status_idx"
-  ON "memory_items"("tenantId", "status");
+-- `CompanyKnowledgeSource`, `IntentRecord`, `WorkflowTemplate` for
+-- full field documentation.
 
 -- ── company_profiles ──────────────────────────────────────────────────
 
