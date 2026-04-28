@@ -354,10 +354,27 @@ export default function HomePage() {
           100% { transform: rotate(360deg); }
         }
         .landing-root .landing-gradient-text {
+          /* Descender protection for gradient-clipped text (g, j, p, q, y).
+             0.22em > 0.12em because the hero H1 + final CTA hit text-6xl/7xl
+             where 0.12em was insufficient — "operating" + "control plane for"
+             both showed visible shear at the baseline. */
           display: inline-block;
-          padding-bottom: 0.12em;
-          line-height: 1.1;
+          padding-bottom: 0.22em;
+          line-height: 1.2;
           overflow: visible;
+        }
+        /* Display-font safety net: every H1/H2/H3 that uses Syne (font-display)
+           gets a bottom pad and a 1.18 minimum line-height so descenders
+           (g, j, p, q, y) never shear on the tightly-set landing headlines.
+           Tailwind's default text-3xl/text-5xl line-height is ~1.0-1.1, which
+           historically clipped letters like "g" in "operating" and "p" in
+           "snapshots". Override only inside .landing-root so app-shell
+           headings are not affected. */
+        .landing-root h1.font-display,
+        .landing-root h2.font-display,
+        .landing-root h3.font-display {
+          line-height: 1.18;
+          padding-bottom: 0.08em;
         }
         .gradient-bg {
           background: linear-gradient(135deg, #09090b, #0a1a15, #09090b, #1a150a);
@@ -513,7 +530,7 @@ export default function HomePage() {
                 on every viewport: "The trusted control plane for" /
                 "autonomous work."
               */}
-              <h1 className="mb-6 pb-2 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15] sm:leading-[1.1]">
+              <h1 className="mb-6 pb-3 text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.2] sm:leading-[1.15]">
                 <span className="block text-white">The trusted control plane for</span>
                 <span className="block mt-2 gradient-text landing-gradient-text">autonomous work.</span>
               </h1>
@@ -1239,7 +1256,7 @@ export default function HomePage() {
               </a>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {['TypeScript', 'Next.js 15', 'Fastify', 'Prisma', 'PostgreSQL', 'Redis', 'Playwright', 'Realtime Voice', 'SSE Streaming'].map(tech => (
+              {['TypeScript', 'Next.js 16', 'LangGraph', 'Fastify', 'Prisma', 'PostgreSQL', 'pgvector', 'Supabase', 'Playwright', 'SSE Streaming'].map(tech => (
                 <span key={tech} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-slate-500 font-sans">{tech}</span>
               ))}
             </div>

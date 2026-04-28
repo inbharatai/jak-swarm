@@ -135,12 +135,21 @@
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* New brand gradient text: emerald -> amber */
+  /* Brand gradient text: emerald -> amber -> pink.
+     `display: inline-block` + `padding-bottom` + `overflow: visible` are the
+     fix for descender clipping (g, j, p, q, y) caused by
+     `-webkit-text-fill-color: transparent` + `background-clip: text` —
+     without them the gradient mask hugs the line-box and shears the bottom
+     of every descender. Don't drop these without understanding why. */
   .gradient-text {
     background: linear-gradient(135deg, #34d399 0%, #fbbf24 60%, #f472b6 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    display: inline-block;
+    padding-bottom: 0.18em;
+    line-height: 1.2;
+    overflow: visible;
   }
 
   .gradient-text-vivid {
@@ -148,6 +157,10 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    display: inline-block;
+    padding-bottom: 0.18em;
+    line-height: 1.2;
+    overflow: visible;
   }
 
   .glass {

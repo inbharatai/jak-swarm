@@ -194,7 +194,7 @@ export default function PremiumCTA() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
-          <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.15]">
+          <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.2] pb-2">
             <span className="text-white/90">Stop stringing together tools.</span>
             <br />
             <span

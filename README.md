@@ -11,11 +11,21 @@
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Typecheck](https://img.shields.io/badge/Typecheck-23_packages_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Typecheck](https://img.shields.io/badge/Typecheck-15_workspaces_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-751%2F751_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**Operator-grade multi-agent control plane orchestrated by [LangGraph](https://langchain-ai.github.io/langgraphjs/). 38 specialist agents + 122 classified tools (honest maturity labels: real / heuristic / llm_passthrough / config_dependent / experimental — CI-enforced against the runtime registry). Durable workflow queue with worker-lease reclaim, risk-stratified approval gates, real-time DAG execution, MCP gateway, workflow scheduling, multi-modal vision, Vibe Coder durable app builder. Production Audit & Compliance Agent Pack (SOC 2 / HIPAA / ISO 27001) with 167 seeded controls, LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only External Auditor Portal for third-party reviewers. Company Brain (CompanyProfile + URL crawler + DOCX/XLSX/image ingestion). Source-grounded outputs with citation density verification. Runtime PII redaction in LLM prompts. OpenAI prompt-cache aware cost telemetry. Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed SDK. API keys are required for external LLM/integration providers unless using local models.**
+**The trusted control plane for autonomous work.** One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Native [LangGraph](https://langchain-ai.github.io/langgraphjs/) orchestration, Postgres-backed checkpoints, source-grounded verification, and runtime PII redaction. Build, operate, and verify autonomous work on infrastructure you control.
 
-> **Sprint 2.x + final hardening updates (Apr 2026):** native LangGraph orchestrator with Postgres checkpointer (no more custom state machine); URL crawler + DOCX/XLSX/image parsing; runtime PII auto-redaction in LLM prompts; OpenAI prompt-cache cost telemetry; source-grounded output verification; external auditor portal with SHA-256-hashed invite tokens **+ honest-status email send (`sent` / `not_configured` / `failed` — never fakes success) + scoped final-pack download endpoint**; **CEO super-orchestrator** that loads Company Brain, tags executive functions (CMO/CTO/CFO/COO), and emits a generated executive summary at workflow end; **cross-task auto-repair** with error classification + repair-policy decision tree (destructive actions never auto-retried); **retention sweep service** (dry-run-by-default, never deletes user-owned evidence). See [`qa/final-a-to-z-product-verification.md`](qa/final-a-to-z-product-verification.md) and [`qa/post-sprint-2-final-gap-audit.md`](qa/post-sprint-2-final-gap-audit.md) for the truthful per-feature classification.
+**What's inside:**
+- **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
+- **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
+- **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **167 seeded controls** (48 + 37 + 82), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
+- **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
+- **Trust layer** — source-grounded outputs with citation-density verification, runtime PII redaction at the LLM boundary, structured output via OpenAI Responses API + `json_schema` strict mode, prompt-cache-aware cost telemetry
+- **Cross-task auto-repair** with error-class decision tree (destructive actions never auto-retried), **CEO super-orchestrator** that loads Company Brain and emits an executive summary at workflow end, **retention sweep** service (dry-run by default, never touches user-owned evidence)
+- Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed `@jak-swarm/client` SDK
+
+> **Sprint 2.x + final hardening (Apr 2026):** native LangGraph cutover · URL crawler · DOCX/XLSX/image ingest · runtime PII redaction · prompt-cache cost telemetry · source-grounded output verification · external auditor portal · CEO super-orchestrator · cross-task auto-repair · retention sweep. See [`qa/a-to-z-human-level-product-audit.md`](qa/a-to-z-human-level-product-audit.md) for the truthful per-module rating and [`qa/post-sprint-2-final-gap-audit.md`](qa/post-sprint-2-final-gap-audit.md) for the per-feature classification.
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -599,8 +609,8 @@ flowchart TD
 
 | Template | Stack | Includes |
 |:---------|:------|:---------|
-| `nextjs-app` | Next.js 15 + Tailwind | App Router, TypeScript strict, responsive layout |
-| `nextjs-saas` | Next.js 15 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
+| `nextjs-app` | Next.js 14 + Tailwind | App Router, TypeScript strict, responsive layout |
+| `nextjs-saas` | Next.js 14 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
 | `react-spa` | React + Vite + Router | Single-page app, client-side routing, Tailwind |
 
 ---
