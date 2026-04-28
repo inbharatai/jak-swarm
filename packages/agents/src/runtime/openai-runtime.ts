@@ -33,7 +33,10 @@ import {
 import { responsesToChatCompletion } from './openai-response-parser.js';
 import { modelForTier, type ModelTier } from './model-resolver.js';
 
-const MAX_TOOL_LOOP_ITERATIONS_DEFAULT = 5;
+// Aligned with BaseAgent.executeWithTools default (10) so both runtime
+// paths bound tool loops identically. Was 5 — divergence noted in
+// qa/openai-multi-agent-runtime-audit.md §14 and fixed in audit Phase 17.
+const MAX_TOOL_LOOP_ITERATIONS_DEFAULT = 10;
 const DEFAULT_TIER: ModelTier = 3;
 
 /**

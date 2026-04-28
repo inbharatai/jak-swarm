@@ -1,0 +1,391 @@
+{
+  "runAt": "2026-04-24T07:25:42.722Z",
+  "site": "https://jakswarm.com",
+  "findings": [
+    {
+      "phase": 4,
+      "area": "Role/CEO",
+      "title": "\"Create a strategy plan for launching JAK to small businesses…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\ceo-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmockxx540013l41xkr1a28fy/stream",
+        "200 GET /workflows/cmockxx540013l41xkr1a28fy"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:19:33.332Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/CTO",
+      "title": "\"Review the technical architecture of a multi-agent orchestra…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\cto-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmockyhza001bl41x2r6cn1hc/stream",
+        "200 GET /workflows/cmockyhza001bl41x2r6cn1hc"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:19:57.633Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/CMO",
+      "title": "\"Create 5 LinkedIn posts for JAK Swarm and prepare a weekly s…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\cmo-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmockz0mc001jl41x465ai59z/stream",
+        "200 GET /workflows/cmockz0mc001jl41x465ai59z"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:20:21.930Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/Coding",
+      "title": "\"Write a Python script that accepts a CSV path, reads it with…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\coding-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmockzjgc001rl41xd3dt02sh/stream",
+        "200 GET /workflows/cmockzjgc001rl41xd3dt02sh"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:20:52.017Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/Research",
+      "title": "\"Research the current state of LangGraph vs CrewAI vs AutoGen…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\research-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl06wj001zl41xvywkwykf/stream",
+        "200 GET /workflows/cmocl06wj001zl41xvywkwykf"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:21:19.551Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/Design",
+      "title": "\"Design a simple 3-section landing page layout for an AI CMO …\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\design-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl0rxe0027l41x8iuwhf5z/stream",
+        "200 GET /workflows/cmocl0rxe0027l41x8iuwhf5z"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:21:46.864Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/Auto",
+      "title": "\"Automate a 3-step flow: fetch today's competitor posts, summ…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\auto-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl1d7a002fl41xosq3tf7b/stream",
+        "200 GET /workflows/cmocl1d7a002fl41xosq3tf7b"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:22:11.993Z"
+    },
+    {
+      "phase": 4,
+      "area": "Role/Marketing",
+      "title": "\"Create a 30-day campaign plan for launching JAK Swarm to sta…\" → stub final answer leaked (recovery layer miss)",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\marketing-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl1wbc002nl41xertklx4r/stream",
+        "200 GET /workflows/cmocl1wbc002nl41xertklx4r"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:22:44.704Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/CMO-schedule",
+      "title": "CMO → posts + schedule + approval: no substantive reply",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\cmo-final.png",
+      "apiCallsObserved": [
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl2lpc002vl41xu7rypjra/stream",
+        "200 GET /workflows/cmocl2lpc002vl41xu7rypjra"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:23:09.734Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/Schedules-persistence",
+      "title": "CMO \"schedule posts\" did NOT create a row in /schedules — plan generated but not persisted",
+      "severity": "High",
+      "verdict": "partial",
+      "evidence": "Schedules | Automate workflows on a recurring schedule | New Schedule | No schedules yet | Create a schedule to run workflows automatically | Create Schedule",
+      "url": "https://jakswarm.com/schedules",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\workflows\\schedules-after-cmo.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:23:14.807Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/Builder",
+      "title": "Project \"qa-atoz-1777015401043\" created, detail page has editor/prompt UI",
+      "severity": "Info",
+      "verdict": "partial",
+      "evidence": "qa-atoz-1777015401043\n\nnextjs · v0\n\nDraft\nGitHub\nDeploy\n\nFILES\n\nNo files yet. Describe your app to get started.\n\nCHECKPOINTS\nCode\nPreview\nSelect a file to view its code\n\nChat\n\nDescribe what you want to build.\n\ne.g. “Build a task manager with user auth, drag-and-drop boards, and dark mode”\n\nScreenshot",
+      "url": "https://jakswarm.com/builder/cmocl38bm0031l41xapu3logv",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\workflows\\builder-detail-landing.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "apiCallsObserved": [
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET /projects?",
+        "201 POST /projects",
+        "200 GET /projects?",
+        "200 GET /projects/cmocl38bm0031l41xapu3logv",
+        "200 GET /projects/cmocl38bm0031l41xapu3logv/checkpoints?limit=30"
+      ],
+      "timestamp": "2026-04-24T07:23:28.946Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/DocEval-entry",
+      "title": "File upload UI present + /files API fetched on page load",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "input=true apiCalls=6",
+      "url": "https://jakswarm.com/files",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\workflows\\files-before-upload.png",
+      "apiCallsObserved": [
+        "200 GET /files",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:23:34.181Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/LeadGen",
+      "title": "stub/no reply",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\auto-final.png",
+      "apiCallsObserved": [
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl3nr20037l41xw7nwyooe/stream",
+        "200 GET /workflows/cmocl3nr20037l41xw7nwyooe"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:23:58.239Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/BrowserQA",
+      "title": "no reply",
+      "severity": "High",
+      "verdict": "broken",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\auto-final.png",
+      "apiCallsObserved": [
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl467r003fl41x303v430j/stream",
+        "200 GET /workflows/cmocl467r003fl41x303v430j"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:24:20.117Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/ApprovalGate",
+      "title": "neither success nor approval framing — unclear",
+      "severity": "Medium",
+      "verdict": "partial",
+      "evidence": "Agents completed their work but did not produce a user-facing response. View the run in Traces for structured output.",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\roles\\auto-final.png",
+      "apiCallsObserved": [
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "200 GET https://ttrhawuqydfecndehdhx.supabase.co/auth/v1/user",
+        "202 POST /workflows",
+        "200 GET /workflows/cmocl4nak003nl41xekj32f20/stream",
+        "200 GET /workflows/cmocl4nak003nl41xekj32f20"
+      ],
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:24:44.272Z"
+    },
+    {
+      "phase": 5,
+      "area": "Workflow/AuditTrace",
+      "title": "22 rows; agent-details=true timing=true tool-calls=true",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "Swarm Inspector\n\nInspect agent runs, handoffs, tool calls, and timing\n\nRefresh\nAll\nActive\nCompleted\nFailed\nCompleted\ncmobsrgq…\n6s\n\nhello world test\n\nabout 13 hours ago · 1 agent traces\n\nCompleted\ncmobso8u…\n1m 18s\n\nWrite a Python script that takes a CSV file path as a CLI arg, reads it, and prints the top 5 rows by a column called \"revenue\" descending. Use pandas. Include error handling for missing file.\n\nabout 13 hours ago · 6 agent traces\n\nCompleted\ncmobsizx…\n4m 38s\n\nResearch the current state ",
+      "url": "https://jakswarm.com/swarm",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\workflows\\audit-trace-list.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:24:53.128Z"
+    },
+    {
+      "phase": 6,
+      "area": "Backend/Version",
+      "title": "API /version returned 200; gitCommit=ef68e75f516c6b27e78364cd63e7b0a2236c7a68 engine=legacy runtime=swarmgraph",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "{\"gitCommit\":\"ef68e75f516c6b27e78364cd63e7b0a2236c7a68\",\"gitBranch\":\"main\",\"buildId\":\"srv-d7eed8l8nd3s73bcjv30-6d795b5d66-6gl9r\",\"startedAt\":\"2026-04-24T06:01:45.796Z\",\"uptimeSeconds\":4987,\"executionEngine\":\"legacy\",\"workflowRuntime\":\"swarmgraph\",\"openaiRuntimeAgents\":[]}",
+      "url": "https://jak-swarm-api.onrender.com/version",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "apiCallsObserved": [],
+      "timestamp": "2026-04-24T07:24:53.461Z"
+    },
+    {
+      "phase": 6,
+      "area": "Backend/Health",
+      "title": "health=ok; db=ok redis=ok",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "{\"status\":\"ok\",\"timestamp\":\"2026-04-24T07:24:53.976Z\",\"version\":\"0.1.0\",\"environment\":\"production\",\"checks\":{\"database\":{\"status\":\"ok\",\"latencyMs\":500},\"redis\":{\"status\":\"ok\",\"latencyMs\":1}}}",
+      "url": "https://jak-swarm-api.onrender.com/health",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "apiCallsObserved": [],
+      "timestamp": "2026-04-24T07:24:54.320Z"
+    },
+    {
+      "phase": 7,
+      "area": "Failure/InvalidFileType",
+      "title": ".exe upload accepted or silently dropped",
+      "severity": "Medium",
+      "verdict": "partial",
+      "evidence": "Files\n\nUpload documents, spreadsheets, and images. Agents can reference them via the find_document tool — use a name, tag, or describe the contents.\n\n0 files · 0 indexed\n\nDrop files here or click to upload\n\nPDF, text, markdown, CSV, DOCX, XLSX, PNG, ",
+      "url": "https://jakswarm.com/files",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\failures\\invalid-filetype.png",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 415 ()"
+      ],
+      "networkErrors": [
+        "[415] https://jak-swarm-api.onrender.com/documents/upload"
+      ],
+      "timestamp": "2026-04-24T07:25:01.283Z"
+    },
+    {
+      "phase": 7,
+      "area": "Failure/MobileViewport",
+      "title": "Workspace renders on 390px mobile viewport",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "JAKSwarm\nRG\nResearch the current state of LangGraph vs CrewAI vs AutoGen for multi-agent orchestration. Compare 3 dimensions with sources where possible.\nCEO\n\nWorkflow started — processing your request...\n\nAI\n\n⏳ COMMANDER working on: commander phase…",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\failures\\mobile-workspace.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:25:05.290Z"
+    },
+    {
+      "phase": 7,
+      "area": "Failure/HugeInput",
+      "title": "100k-char input accepted without UI crash",
+      "severity": "Info",
+      "verdict": "working",
+      "evidence": "console=0 net=0",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\failures\\huge-input.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:25:25.871Z"
+    },
+    {
+      "phase": 7,
+      "area": "Failure/RefreshDuringTask",
+      "title": "Page reloads cleanly during running task (chat state may or may not resume)",
+      "severity": "Info",
+      "verdict": "partial",
+      "evidence": "JAKSwarm\nSearch or command...\n⌘K\nRG\nNew chat\nRECENT\nNew conversation\nNew conversation\nNew conversation\nNew conversation\nNew conversation\nCreate a 30-day campaign plan for launching JAK Swarm to sta\nNew conversation\nDesign a simple 3-section landing page layout for an AI CMO\nResearch the current stat",
+      "url": "https://jakswarm.com/workspace",
+      "screenshot": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\playwright-artifacts\\a-to-z\\failures\\refresh-after.png",
+      "consoleErrors": [],
+      "networkErrors": [],
+      "timestamp": "2026-04-24T07:25:42.706Z"
+    }
+  ]
+}
