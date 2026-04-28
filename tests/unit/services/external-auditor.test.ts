@@ -26,6 +26,10 @@ interface InviteRow {
   acceptedUserId: string | null;
   revokedAt: Date | null;
   revokedBy: string | null;
+  emailStatus?: string | null;
+  emailSentAt?: Date | null;
+  emailError?: string | null;
+  emailProvider?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -307,6 +311,128 @@ describe('ExternalAuditorService — invite token security', () => {
     found = await svc.findActiveEngagement(accepted.userId, accepted.auditRunId);
     expect(found).toBeUndefined();
   });
+});
+
+describe('ExternalAuditorService.sendInviteEmail — Gap C honest status', () => {
+  let svc: ExternalAuditorService;
+  let originalEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    const fake = makeFakeDb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    svc = new ExternalAuditorService(fake.db as any);
+    originalEnv = {
+      JAK_INVITE_EMAIL_HOST: process.env['JAK_INVITE_EMAIL_HOST'],
+      JAK_INVITE_EMAIL_USER: process.env['JAK_INVITE_EMAIL_USER'],
+      JAK_INVITE_EMAIL_PASS: process.env['JAK_INVITE_EMAIL_PASS'],
+    };
+    delete process.env['JAK_INVITE_EMAIL_HOST'];
+    delete process.env['JAK_INVITE_EMAIL_USER'];
+    delete process.env['JAK_INVITE_EMAIL_PASS'];
+  });
+
+  function restoreEnv() {
+    if (originalEnv['JAK_INVITE_EMAIL_HOST']) process.env['JAK_INVITE_EMAIL_HOST'] = originalEnv['JAK_INVITE_EMAIL_HOST'];
+    if (originalEnv['JAK_INVITE_EMAIL_USER']) process.env['JAK_INVITE_EMAIL_USER'] = originalEnv['JAK_INVITE_EMAIL_USER'];
+    if (originalEnv['JAK_INVITE_EMAIL_PASS']) process.env['JAK_INVITE_EMAIL_PASS'] = originalEnv['JAK_INVITE_EMAIL_PASS'];
+  }
+
+  it('returns status=not_configured when SMTP env vars missing', async () => {
+    const result = await svc.sendInviteEmail({
+      auditorEmail: 'auditor@firm.com',
+      acceptUrl: 'https://app.jak-swarm.com/auditor/accept/abc',
+      expiresAt: new Date(),
+    });
+    expect(result.status).toBe('not_configured');
+    expect(result.error).toBeUndefined();
+    restoreEnv();
+  });
+
+  it('returns status=not_configured when only HOST set (partial config)', async () => {
+    process.env['JAK_INVITE_EMAIL_HOST'] = 'smtp.example.com';
+    const result = await svc.sendInviteEmail({
+      auditorEmail: 'auditor@firm.com',
+      acceptUrl: 'https://app.jak-swarm.com/auditor/accept/abc',
+      expiresAt: new Date(),
+    });
+    expect(result.status).toBe('not_configured');
+    delete process.env['JAK_INVITE_EMAIL_HOST'];
+    restoreEnv();
+  });
+
+  it('returns status=failed when SMTP host unreachable (real connection attempt)', async () => {
+    // Set env to an unreachable SMTP server. The send will fail at
+    // connection time. This proves we DO actually try to send when
+    // configured — we don't fake-success.
+    process.env['JAK_INVITE_EMAIL_HOST'] = '127.0.0.1';
+    process.env['JAK_INVITE_EMAIL_PORT'] = '12345'; // unlikely to be in use
+    process.env['JAK_INVITE_EMAIL_USER'] = 'test@test.com';
+    process.env['JAK_INVITE_EMAIL_PASS'] = 'test-password';
+    const result = await svc.sendInviteEmail({
+      auditorEmail: 'auditor@firm.com',
+      acceptUrl: 'https://app.jak-swarm.com/auditor/accept/abc',
+      expiresAt: new Date(),
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBeDefined();
+    delete process.env['JAK_INVITE_EMAIL_HOST'];
+    delete process.env['JAK_INVITE_EMAIL_PORT'];
+    delete process.env['JAK_INVITE_EMAIL_USER'];
+    delete process.env['JAK_INVITE_EMAIL_PASS'];
+    restoreEnv();
+  }, 15_000);
+});
+
+describe('ExternalAuditorService.createInvite — Gap C email status persisted', () => {
+  let fake: ReturnType<typeof makeFakeDb>;
+  let svc: ExternalAuditorService;
+
+  beforeEach(() => {
+    fake = makeFakeDb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    svc = new ExternalAuditorService(fake.db as any);
+    delete process.env['JAK_INVITE_EMAIL_HOST'];
+    delete process.env['JAK_INVITE_EMAIL_USER'];
+    delete process.env['JAK_INVITE_EMAIL_PASS'];
+  });
+
+  it('createInvite returns emailStatus=not_configured when SMTP not set', async () => {
+    const result = await svc.createInvite({
+      tenantId: 'tenant_a',
+      auditRunId: 'run_a',
+      auditorEmail: 'auditor@firm.com',
+      createdBy: 'admin_1',
+    });
+    expect(result.emailStatus).toBe('not_configured');
+    // Persisted on the row
+    expect(fake.invites[0].emailStatus).toBe('not_configured');
+    expect(fake.invites[0].emailSentAt).toBeFalsy();
+  });
+
+  it('createInvite still creates the invite even when email fails to send', async () => {
+    process.env['JAK_INVITE_EMAIL_HOST'] = '127.0.0.1';
+    process.env['JAK_INVITE_EMAIL_PORT'] = '12346';
+    process.env['JAK_INVITE_EMAIL_USER'] = 'u';
+    process.env['JAK_INVITE_EMAIL_PASS'] = 'p';
+    const result = await svc.createInvite({
+      tenantId: 'tenant_a',
+      auditRunId: 'run_a',
+      auditorEmail: 'auditor@firm.com',
+      createdBy: 'admin_1',
+    });
+    // Invite was created
+    expect(result.inviteId).toBeTruthy();
+    expect(result.cleartextToken).toMatch(/^[0-9a-f]{64}$/);
+    // Email failed honestly
+    expect(result.emailStatus).toBe('failed');
+    expect(result.emailError).toBeDefined();
+    // Status persisted
+    expect(fake.invites[0].emailStatus).toBe('failed');
+    delete process.env['JAK_INVITE_EMAIL_HOST'];
+    delete process.env['JAK_INVITE_EMAIL_PORT'];
+    delete process.env['JAK_INVITE_EMAIL_USER'];
+    delete process.env['JAK_INVITE_EMAIL_PASS'];
+  }, 15_000);
 });
 
 describe('ExternalAuditorService — cross-tenant isolation', () => {

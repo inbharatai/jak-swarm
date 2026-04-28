@@ -18,6 +18,7 @@ import { COMPANY_OS_INTENTS, INTENT_REQUIRED_CONTEXT, type CompanyOSIntent } fro
 import { IntentRecordService } from './company-brain/intent-record.service.js';
 import { CompanyProfileService } from './company-brain/company-profile.service.js';
 import { WorkflowTemplateService } from './company-brain/workflow-template.service.js';
+import { CEOOrchestratorService, type CEOPreFlightResult } from './ceo-orchestrator.service.js';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
 import { detectPII, detectInjection, AuditLogger, AuditAction, classifyToolRisk } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
@@ -113,6 +114,15 @@ export interface ExecuteAsyncParams {
    * build-check + retry loop.
    */
   workflowKind?: 'standard' | 'vibe-coder';
+  /**
+   * Final-hardening Gap A — when 'ceo', the CEO super-orchestrator
+   * wraps the standard workflow with Company Brain context loading,
+   * executive-function tagging, and an LLM-generated executive
+   * summary at the end. When omitted, CEO mode is auto-detected from
+   * the goal text (see detectCEOTrigger). When 'standard', CEO mode
+   * is forced off even if the goal would have triggered it.
+   */
+  ceoMode?: 'ceo' | 'standard';
   /** Optional payload for vibe-coder workflows (app spec + builder inputs). */
   vibeCoderInput?: {
     description: string;
@@ -401,8 +411,13 @@ export class SwarmExecutionService extends EventEmitter {
   }
 
   private emitLifecycle(ev: WorkflowLifecycleEvent, tenantId: string, userId?: string): void {
-    // 1. Live SSE for the cockpit
-    this.emit(`workflow:${ev.workflowId}`, { ...ev, kind: 'lifecycle' });
+    // 1. Live SSE for the cockpit. Some events (e.g. retention sweep) are
+    //    workflow-agnostic and have an optional workflowId; only emit on
+    //    the SSE channel when one is present.
+    const wfId = (ev as { workflowId?: string }).workflowId;
+    if (wfId) {
+      this.emit(`workflow:${wfId}`, { ...ev, kind: 'lifecycle' });
+    }
 
     // 2. Durable audit row — fire-and-forget, never block the runtime
     const actionMap: Partial<Record<WorkflowLifecycleEvent['type'], AuditAction>> = {
@@ -436,21 +451,45 @@ export class SwarmExecutionService extends EventEmitter {
       company_memory_suggested: AuditAction.MEMORY_WRITTEN,
       company_memory_approved: AuditAction.APPROVAL_GRANTED,
       company_memory_rejected: AuditAction.APPROVAL_REJECTED,
+      // Final-hardening Gap A — CEO super-orchestrator events.
+      ceo_goal_understood: AuditAction.WORKFLOW_PLANNED,
+      ceo_context_loaded: AuditAction.MEMORY_READ,
+      ceo_workflow_selected: AuditAction.WORKFLOW_PLANNED,
+      ceo_agents_assigned: AuditAction.WORKFLOW_STEP_STARTED,
+      ceo_plan_created: AuditAction.WORKFLOW_PLANNED,
+      ceo_blocker_detected: AuditAction.WORKFLOW_PLANNED,
+      ceo_escalation_created: AuditAction.APPROVAL_REQUESTED,
+      ceo_final_summary_generated: AuditAction.WORKFLOW_COMPLETED,
+      // Final-hardening Gap B — auto-repair events.
+      repair_needed: AuditAction.WORKFLOW_STEP_FAILED,
+      repair_attempt_started: AuditAction.WORKFLOW_STEP_STARTED,
+      repair_attempt_completed: AuditAction.WORKFLOW_STEP_COMPLETED,
+      repair_attempt_failed: AuditAction.WORKFLOW_STEP_FAILED,
+      repair_escalated_to_human: AuditAction.APPROVAL_REQUESTED,
+      repair_limit_reached: AuditAction.WORKFLOW_FAILED,
+      // Final-hardening Gap E — retention sweep events.
+      retention_sweep_started: AuditAction.ADMIN_ACTION,
+      retention_candidate_found: AuditAction.ADMIN_ACTION,
+      retention_item_deleted: AuditAction.MEMORY_DELETED,
+      retention_item_skipped: AuditAction.ADMIN_ACTION,
+      retention_sweep_completed: AuditAction.ADMIN_ACTION,
+      retention_sweep_failed: AuditAction.ADMIN_ACTION,
     };
     const action = actionMap[ev.type];
     if (!action) return;
+    const auditWorkflowId = (ev as { workflowId?: string }).workflowId;
     void this.audit
       .log({
         action,
         tenantId,
         ...(userId ? { userId } : {}),
         resource: 'workflow',
-        resourceId: ev.workflowId,
+        ...(auditWorkflowId ? { resourceId: auditWorkflowId } : {}),
         details: ev as unknown as Record<string, unknown>,
       })
       .catch((err) => {
         this.log.warn(
-          { workflowId: ev.workflowId, err: err instanceof Error ? err.message : String(err) },
+          { workflowId: auditWorkflowId, err: err instanceof Error ? err.message : String(err) },
           '[lifecycle] audit log failed (non-fatal)',
         );
       });
@@ -896,6 +935,43 @@ export class SwarmExecutionService extends EventEmitter {
       const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
       const effectiveIndustry = (industry ?? tenant?.industry ?? Industry.GENERAL) as Industry;
       const industryPack = getIndustryPack(effectiveIndustry);
+
+      // ── CEO Super-Orchestrator pre-flight (final-hardening Gap A) ───
+      // Detects CEO mode (explicit or auto-from-goal-text), loads Company
+      // Brain, and emits ceo_* lifecycle events BEFORE the workflow
+      // runtime starts. Pre-flight result is used to drive an executive-
+      // summary generation after the workflow completes.
+      const ceoOrchestrator = new CEOOrchestratorService(this.db, this.log);
+      const ceoOnLifecycle = (ev: WorkflowLifecycleEvent) =>
+        this.emitLifecycle(ev, tenantId, userId);
+      let ceoPreFlight: CEOPreFlightResult | undefined;
+      try {
+        ceoPreFlight = await ceoOrchestrator.preFlight(
+          {
+            workflowId,
+            tenantId,
+            userId,
+            goal,
+            industry: effectiveIndustry,
+            onLifecycle: ceoOnLifecycle,
+          },
+          {
+            ...(params.ceoMode === 'ceo' ? { explicitMode: 'ceo' as const } : {}),
+          },
+        );
+      } catch (ceoErr) {
+        // CEO pre-flight failure must NEVER block the workflow. The
+        // log captures the error; the workflow proceeds without CEO
+        // wrapping.
+        this.log.warn(
+          { workflowId, err: ceoErr instanceof Error ? ceoErr.message : String(ceoErr) },
+          '[Swarm] CEO pre-flight failed; proceeding without CEO wrapping',
+        );
+      }
+      // Force-off when caller passed ceoMode='standard'.
+      if (params.ceoMode === 'standard' && ceoPreFlight) {
+        ceoPreFlight = { ...ceoPreFlight, isCEOMode: false };
+      }
       const connectedIntegrations = await this.db.integration.findMany({
         where: { tenantId, status: 'CONNECTED' },
         select: { provider: true },
@@ -1150,6 +1226,33 @@ export class SwarmExecutionService extends EventEmitter {
         }, tenantId, userId);
         // Keep legacy SSE event for older cockpit code.
         this.emit(`workflow:${workflowId}`, { type: 'completed', workflowId, status: dbStatus, timestamp: new Date().toISOString() });
+
+        // ── CEO Super-Orchestrator post-flight (final-hardening Gap A) ──
+        // When CEO mode was detected during pre-flight, generate the
+        // executive summary and emit ceo_final_summary_generated. Skipped
+        // when not in CEO mode (no extra LLM cost for normal workflows).
+        if (ceoPreFlight?.isCEOMode) {
+          try {
+            await ceoOrchestrator.generateExecutiveSummary(
+              {
+                workflowId,
+                tenantId,
+                goal,
+                intent: ceoPreFlight.intent,
+                executiveFunctions: ceoPreFlight.executiveFunctions,
+                outputs: result.outputs,
+                status: 'COMPLETED',
+                durationMs: result.durationMs,
+              },
+              ceoOnLifecycle,
+            );
+          } catch (summaryErr) {
+            this.log.warn(
+              { workflowId, err: summaryErr instanceof Error ? summaryErr.message : String(summaryErr) },
+              '[Swarm] CEO summary generation threw; workflow already completed',
+            );
+          }
+        }
       } else if (dbStatus === 'FAILED') {
         this.emitLifecycle({
           type: 'failed',

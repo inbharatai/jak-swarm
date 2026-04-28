@@ -85,7 +85,35 @@ export type WorkflowLifecycleEvent =
   // status='suggested' until the user approves; until then NOT loaded into prompts.
   | { type: 'company_memory_suggested'; workflowId: string; memoryId: string; key: string; suggestedBy: string; timestamp: string }
   | { type: 'company_memory_approved'; workflowId?: string; memoryId: string; reviewedBy: string; timestamp: string }
-  | { type: 'company_memory_rejected'; workflowId?: string; memoryId: string; reviewedBy: string; reason?: string; timestamp: string };
+  | { type: 'company_memory_rejected'; workflowId?: string; memoryId: string; reviewedBy: string; reason?: string; timestamp: string }
+  // ── CEO Super-Orchestrator events (final-hardening Gap A) ───────────
+  // Emitted by CEOOrchestratorService.run when wrapping a normal
+  // workflow with the executive-experience phases. The cockpit renders
+  // a dedicated CEO panel reading these events.
+  | { type: 'ceo_goal_understood'; workflowId: string; goal: string; intent: string; intentConfidence: number | null; timestamp: string }
+  | { type: 'ceo_context_loaded'; workflowId: string; profileFieldsLoaded: string[]; profileStatus: string; timestamp: string }
+  | { type: 'ceo_workflow_selected'; workflowId: string; workflow: string; templateId?: string; timestamp: string }
+  | { type: 'ceo_agents_assigned'; workflowId: string; executiveFunctions: string[]; agentRoles: string[]; timestamp: string }
+  | { type: 'ceo_plan_created'; workflowId: string; taskCount: number; estimatedDurationMs?: number; timestamp: string }
+  | { type: 'ceo_blocker_detected'; workflowId: string; blocker: string; missingFields?: string[]; timestamp: string }
+  | { type: 'ceo_escalation_created'; workflowId: string; reason: string; approvalId?: string; timestamp: string }
+  | { type: 'ceo_final_summary_generated'; workflowId: string; summary: string; nextActions: string[]; durationMs: number; timestamp: string }
+  // ── Cross-task auto-repair events (final-hardening Gap B) ───────────
+  // Emitted by RepairService when handling node/agent/tool failures.
+  | { type: 'repair_needed'; workflowId: string; stepId?: string; errorClass: string; reason: string; timestamp: string }
+  | { type: 'repair_attempt_started'; workflowId: string; stepId?: string; attempt: number; strategy: string; timestamp: string }
+  | { type: 'repair_attempt_completed'; workflowId: string; stepId?: string; attempt: number; succeeded: boolean; timestamp: string }
+  | { type: 'repair_attempt_failed'; workflowId: string; stepId?: string; attempt: number; reason: string; timestamp: string }
+  | { type: 'repair_escalated_to_human'; workflowId: string; stepId?: string; reason: string; approvalId?: string; timestamp: string }
+  | { type: 'repair_limit_reached'; workflowId: string; stepId?: string; attempts: number; finalError: string; timestamp: string }
+  // ── Retention sweep events (final-hardening Gap E) ──────────────────
+  // Emitted by RetentionSweepService for tenant data hygiene.
+  | { type: 'retention_sweep_started'; tenantId?: string; mode: 'dry_run' | 'execute'; timestamp: string }
+  | { type: 'retention_candidate_found'; tenantId: string; objectType: string; objectId: string; reason: string; timestamp: string }
+  | { type: 'retention_item_deleted'; tenantId: string; objectType: string; objectId: string; timestamp: string }
+  | { type: 'retention_item_skipped'; tenantId: string; objectType: string; objectId: string; reason: string; timestamp: string }
+  | { type: 'retention_sweep_completed'; tenantId?: string; mode: 'dry_run' | 'execute'; deletedCount: number; skippedCount: number; durationMs: number; timestamp: string }
+  | { type: 'retention_sweep_failed'; tenantId?: string; error: string; timestamp: string };
 
 /** Sink the runtime calls on every lifecycle transition. Must be infallible. */
 export type WorkflowLifecycleEmitter = (event: WorkflowLifecycleEvent) => void;

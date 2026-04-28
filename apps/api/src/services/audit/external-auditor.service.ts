@@ -27,6 +27,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import type { PrismaClient } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
+import nodemailer from 'nodemailer';
 
 const TOKEN_BYTE_LENGTH = 32;
 const DEFAULT_INVITE_TTL_DAYS = 14;
@@ -51,6 +52,15 @@ export interface CreateInviteResult {
   cleartextToken: string;
   expiresAt: Date;
   acceptUrl: string;
+  /**
+   * Final hardening / Gap C — honest email send status:
+   *   'sent'           — email was actually delivered to the SMTP server
+   *   'not_configured' — SMTP env vars not set; admin must copy the link
+   *   'failed'         — provider configured but send threw
+   *   'pending'        — never set in this response (see service for the row state)
+   */
+  emailStatus: 'sent' | 'not_configured' | 'failed';
+  emailError?: string;
 }
 
 export interface AcceptInviteResult {
@@ -129,12 +139,122 @@ export class ExternalAuditorService {
       '[ExternalAuditor] Invite created',
     );
 
+    const acceptUrl = `${this.portalBaseUrl.replace(/\/$/, '')}/auditor/accept/${cleartextToken}`;
+
+    // Final hardening / Gap C — attempt email send. Honest status
+    // returned in the response AND persisted on the row.
+    const emailResult = await this.sendInviteEmail({
+      auditorEmail: params.auditorEmail.toLowerCase().trim(),
+      ...(params.auditorName !== undefined ? { auditorName: params.auditorName } : {}),
+      acceptUrl,
+      expiresAt,
+    });
+
+    // Persist the email status on the invite row so admin UI can show
+    // it. Best-effort — never fail the invite creation if the status
+    // update fails.
+    try {
+      await this.db.externalAuditorInvite.update({
+        where: { id: invite.id },
+        data: {
+          emailStatus: emailResult.status,
+          ...(emailResult.status === 'sent' ? { emailSentAt: new Date(), emailProvider: 'smtp' } : {}),
+          ...(emailResult.error !== undefined ? { emailError: emailResult.error } : {}),
+        },
+      });
+    } catch (statusErr) {
+      this.logger?.warn?.(
+        { inviteId: invite.id, err: statusErr instanceof Error ? statusErr.message : String(statusErr) },
+        '[ExternalAuditor] Could not persist email status on invite row',
+      );
+    }
+
     return {
       inviteId: invite.id,
       cleartextToken,
       expiresAt,
-      acceptUrl: `${this.portalBaseUrl.replace(/\/$/, '')}/auditor/accept/${cleartextToken}`,
+      acceptUrl,
+      emailStatus: emailResult.status,
+      ...(emailResult.error !== undefined ? { emailError: emailResult.error } : {}),
     };
+  }
+
+  /**
+   * Send the invite email via SMTP. Honest behavior:
+   *   - When `JAK_INVITE_EMAIL_HOST` + `JAK_INVITE_EMAIL_USER` +
+   *     `JAK_INVITE_EMAIL_PASS` are all set, sends a real email and
+   *     returns { status: 'sent' }.
+   *   - When any required env var is missing, returns
+   *     { status: 'not_configured' } — the admin UI must show a
+   *     "copy invite link" affordance.
+   *   - When SMTP send throws, returns { status: 'failed', error: ... }.
+   *   - Never returns 'sent' unless the SMTP transport.sendMail()
+   *     resolved without error.
+   *   - Never silently falls back to a mock send.
+   */
+  async sendInviteEmail(input: {
+    auditorEmail: string;
+    auditorName?: string;
+    acceptUrl: string;
+    expiresAt: Date;
+  }): Promise<{ status: 'sent' | 'not_configured' | 'failed'; error?: string }> {
+    const host = process.env['JAK_INVITE_EMAIL_HOST']?.trim();
+    const user = process.env['JAK_INVITE_EMAIL_USER']?.trim();
+    const pass = process.env['JAK_INVITE_EMAIL_PASS']?.trim();
+    const port = Number(process.env['JAK_INVITE_EMAIL_PORT'] ?? 587);
+    const from = process.env['JAK_INVITE_EMAIL_FROM']?.trim() ?? 'noreply@jak-swarm.app';
+
+    if (!host || !user || !pass) {
+      return { status: 'not_configured' };
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      });
+
+      const recipient = input.auditorName
+        ? `${input.auditorName} <${input.auditorEmail}>`
+        : input.auditorEmail;
+
+      const expiryStr = input.expiresAt.toISOString().slice(0, 10);
+
+      await transporter.sendMail({
+        from,
+        to: recipient,
+        subject: 'JAK Swarm — External Auditor Invitation',
+        text:
+          `Hi${input.auditorName ? ` ${input.auditorName}` : ''},\n\n` +
+          `You have been invited to review an audit engagement on JAK Swarm.\n\n` +
+          `Click this link to accept the invite (expires ${expiryStr}):\n${input.acceptUrl}\n\n` +
+          `Your access is scoped to this single engagement — you will not see other tenant data.\n\n` +
+          `If you did not expect this invite, simply ignore this email.\n\n` +
+          `— JAK Swarm`,
+        html:
+          `<p>Hi${input.auditorName ? ` ${input.auditorName}` : ''},</p>` +
+          `<p>You have been invited to review an audit engagement on JAK Swarm.</p>` +
+          `<p><a href="${input.acceptUrl}">Click this link to accept the invite</a> (expires ${expiryStr}).</p>` +
+          `<p style="color:#666; font-size:12px;">Your access is scoped to this single engagement — you will not see other tenant data.</p>` +
+          `<p style="color:#666; font-size:12px;">If you did not expect this invite, simply ignore this email.</p>` +
+          `<p>— JAK Swarm</p>`,
+      });
+
+      this.logger?.info?.(
+        { auditorEmail: input.auditorEmail },
+        '[ExternalAuditor] Invite email sent',
+      );
+      return { status: 'sent' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger?.warn?.(
+        { auditorEmail: input.auditorEmail, err: msg },
+        '[ExternalAuditor] Invite email failed',
+      );
+      return { status: 'failed', error: msg };
+    }
   }
 
   async revokeInvite(params: { inviteId: string; tenantId: string; revokedBy: string }): Promise<void> {
@@ -176,6 +296,10 @@ export class ExternalAuditorService {
         acceptedAt: true,
         revokedAt: true,
         createdAt: true,
+        // Final hardening / Gap C — email send status fields
+        emailStatus: true,
+        emailSentAt: true,
+        emailError: true,
       },
     });
   }

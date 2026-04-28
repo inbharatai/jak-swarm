@@ -124,6 +124,56 @@ export default function AuditorRunReviewPage() {
 
   const canDecide = scopes.includes('decide_workpapers');
   const canComment = scopes.includes('comment');
+  const canViewFinalPack = scopes.includes('view_final_pack');
+
+  // Final-pack metadata + download (Final hardening / Gap D)
+  const [finalPackMeta, setFinalPackMeta] = useState<{
+    artifactId: string;
+    gate: 'available' | 'pending_approval' | 'rejected' | 'unknown';
+    fileName: string | null;
+    sizeBytes: number | null;
+    framework: string | null;
+  } | null>(null);
+  const [finalPackError, setFinalPackError] = useState<string>('');
+  useEffect(() => {
+    if (!auditRunId || !canViewFinalPack) return;
+    auditorFetch<{
+      artifactId: string;
+      gate: 'available' | 'pending_approval' | 'rejected' | 'unknown';
+      fileName: string | null;
+      sizeBytes: number | null;
+      framework: string | null;
+    }>(`/auditor/runs/${auditRunId}/final-pack/metadata`)
+      .then(setFinalPackMeta)
+      .catch((err: Error) => setFinalPackError(err.message));
+  }, [auditRunId, canViewFinalPack]);
+
+  const downloadFinalPack = async () => {
+    setFinalPackError('');
+    try {
+      const result = await auditorFetch<
+        | { kind: 'storage'; url: string; expiresAt: string }
+        | { kind: 'inline'; content: string; mimeType: string }
+      >(`/auditor/runs/${auditRunId}/final-pack/download`, { method: 'POST', body: JSON.stringify({}) });
+      if (result.kind === 'storage') {
+        // Open the signed URL in a new tab.
+        window.open(result.url, '_blank', 'noopener,noreferrer');
+      } else {
+        // Inline content fallback (small bundles): trigger download.
+        const blob = new Blob([result.content], { type: result.mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit-run-${auditRunId}-final-pack`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      setFinalPackError(err instanceof Error ? err.message : 'Download failed');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -209,6 +259,54 @@ export default function AuditorRunReviewPage() {
             </ul>
           )}
         </section>
+
+        {canViewFinalPack && (
+          <section className="mt-8">
+            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-3">Final Audit Pack</h2>
+            {finalPackError && (
+              <div className="mb-3 rounded-md border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+                {finalPackError}
+              </div>
+            )}
+            {!finalPackMeta && !finalPackError && (
+              <p className="text-zinc-500 text-sm">Loading final-pack metadata&hellip;</p>
+            )}
+            {finalPackMeta && finalPackMeta.gate === 'available' && (
+              <div className="rounded-md border border-emerald-900/40 bg-emerald-950/20 p-4">
+                <p className="text-sm">
+                  ✓ Final pack available
+                  {finalPackMeta.framework ? <> &middot; {finalPackMeta.framework}</> : null}
+                  {finalPackMeta.sizeBytes ? <> &middot; {(finalPackMeta.sizeBytes / 1024).toFixed(1)} KB</> : null}
+                </p>
+                <button
+                  onClick={downloadFinalPack}
+                  className="mt-3 px-4 py-2 text-xs rounded bg-emerald-700 hover:bg-emerald-600"
+                >
+                  Download HMAC-signed final pack
+                </button>
+                <p className="mt-2 text-xs text-zinc-500">
+                  Each download is logged to the engagement audit trail. Signed URL expires in 10 minutes.
+                </p>
+              </div>
+            )}
+            {finalPackMeta && finalPackMeta.gate === 'pending_approval' && (
+              <div className="rounded-md border border-amber-900/40 bg-amber-950/20 p-4">
+                <p className="text-sm text-amber-300">
+                  ⏳ Final pack exists but is awaiting reviewer approval. You will be able to
+                  download once a tenant reviewer (REVIEWER+) has approved the artifact.
+                </p>
+              </div>
+            )}
+            {finalPackMeta && finalPackMeta.gate === 'rejected' && (
+              <div className="rounded-md border border-red-900/40 bg-red-950/20 p-4">
+                <p className="text-sm text-red-300">
+                  ✗ Final pack was rejected by a reviewer. Contact the tenant administrator
+                  if you believe this was in error.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
 
         {canComment && (
           <section className="mt-8">

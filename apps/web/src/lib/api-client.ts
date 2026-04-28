@@ -1380,7 +1380,16 @@ export interface AuditorAction {
 export const externalAuditorApi = {
   // Admin (REVIEWER+) endpoints
   createInvite: (auditRunId: string, body: { auditorEmail: string; auditorName?: string; scopes?: string[]; expiresInDays?: number }) =>
-    apiDataFetch<{ inviteId: string; cleartextToken: string; acceptUrl: string; expiresAt: string }>(
+    apiDataFetch<{
+      inviteId: string;
+      cleartextToken: string;
+      acceptUrl: string;
+      expiresAt: string;
+      // Final hardening / Gap C — honest email status. UI shows
+      // "copy link" if status !== 'sent'.
+      emailStatus: 'sent' | 'not_configured' | 'failed';
+      emailError?: string;
+    }>(
       `/audit/runs/${encodeURIComponent(auditRunId)}/auditors/invite`,
       { method: 'POST', body },
     ),
@@ -1417,5 +1426,26 @@ export const externalAuditorApi = {
     apiDataFetch<{ logged: boolean }>(
       `/auditor/runs/${encodeURIComponent(auditRunId)}/comment`,
       { method: 'POST', body: { comment } },
+    ),
+
+  // Final-pack metadata + download (Final hardening / Gap D)
+  finalPackMetadata: (auditRunId: string) =>
+    apiDataFetch<{
+      artifactId: string;
+      mimeType: string;
+      sizeBytes: number | null;
+      approvalState: string;
+      gate: 'available' | 'pending_approval' | 'rejected' | 'unknown';
+      fileName: string | null;
+      createdAt: string;
+      framework: string | null;
+    }>(`/auditor/runs/${encodeURIComponent(auditRunId)}/final-pack/metadata`),
+  downloadFinalPack: (auditRunId: string) =>
+    apiDataFetch<
+      | { kind: 'storage'; url: string; expiresAt: string }
+      | { kind: 'inline'; content: string; mimeType: string }
+    >(
+      `/auditor/runs/${encodeURIComponent(auditRunId)}/final-pack/download`,
+      { method: 'POST', body: {} },
     ),
 };

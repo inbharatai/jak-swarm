@@ -39,6 +39,7 @@ import { z } from 'zod';
 import { ok, err } from '../types.js';
 import { ExternalAuditorService } from '../services/audit/external-auditor.service.js';
 import { AuthService } from '../services/auth.service.js';
+import { ArtifactService } from '../services/artifact.service.js';
 import type { AuthSession } from '../types.js';
 
 // ─── Validation schemas ─────────────────────────────────────────────────
@@ -135,6 +136,9 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
           cleartextToken: result.cleartextToken,
           acceptUrl: result.acceptUrl,
           expiresAt: result.expiresAt.toISOString(),
+          // Final hardening / Gap C — honest email send status
+          emailStatus: result.emailStatus,
+          ...(result.emailError !== undefined ? { emailError: result.emailError } : {}),
         }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'unknown';
@@ -395,6 +399,127 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
         comment: parsed.data.comment,
       });
       return reply.send(ok({ logged: true }));
+    },
+  );
+
+  // ── Final-pack metadata + download (Final hardening / Gap D) ─────────
+  // Auditor must have `view_final_pack` scope. Audit run must have a
+  // finalPackArtifactId. The artifact MUST be APPROVED (not REQUIRES_APPROVAL,
+  // not REJECTED). Download action is logged BEFORE the signed URL is
+  // returned so a forensic trail exists even if the auditor never
+  // actually downloads.
+
+  fastify.get(
+    '/auditor/runs/:auditRunId/final-pack/metadata',
+    { preHandler: [fastify.authenticate, requireAuditorEngagement(svc)] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = request.user as AuthSession;
+      const { auditRunId } = request.params as { auditRunId: string };
+      const engagement = (request as FastifyRequest & {
+        engagement: { id: string; tenantId: string; scopes: string[] };
+      }).engagement;
+
+      if (!engagement.scopes.includes('view_final_pack')) {
+        return reply.status(403).send(err('SCOPE_DENIED', 'view_final_pack scope required'));
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const auditRun = await (fastify.db as any).auditRun.findFirst({
+        where: { id: auditRunId, tenantId: engagement.tenantId },
+        select: { id: true, status: true, finalPackArtifactId: true, framework: true },
+      });
+      if (!auditRun) return reply.status(404).send(err('NOT_FOUND', 'Audit run not found'));
+      if (!auditRun.finalPackArtifactId) {
+        return reply.status(409).send(err('NO_FINAL_PACK', 'This audit run has no final pack yet. The pack is generated only after all workpapers are approved.'));
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const artifact = await (fastify.db as any).workflowArtifact.findFirst({
+        where: { id: auditRun.finalPackArtifactId, tenantId: engagement.tenantId },
+        select: { id: true, mimeType: true, sizeBytes: true, approvalState: true, status: true, createdAt: true, fileName: true },
+      });
+      if (!artifact) return reply.status(404).send(err('NOT_FOUND', 'Final pack artifact missing'));
+      // Honest gate report
+      const gate = artifact.approvalState === 'APPROVED' ? 'available' :
+                   artifact.approvalState === 'REQUIRES_APPROVAL' ? 'pending_approval' :
+                   artifact.approvalState === 'REJECTED' ? 'rejected' : 'unknown';
+      // Log view action
+      await svc.logAction({
+        tenantId: engagement.tenantId,
+        userId: user.userId,
+        auditorEmail: user.email ?? '',
+        auditRunId,
+        engagementId: engagement.id,
+        objectType: 'final_pack',
+        objectId: artifact.id,
+        action: 'view',
+        metadata: { gate, approvalState: artifact.approvalState },
+      });
+      return reply.send(ok({
+        artifactId: artifact.id,
+        mimeType: artifact.mimeType,
+        sizeBytes: artifact.sizeBytes,
+        approvalState: artifact.approvalState,
+        gate,
+        fileName: artifact.fileName,
+        createdAt: artifact.createdAt,
+        framework: auditRun.framework,
+      }));
+    },
+  );
+
+  fastify.post(
+    '/auditor/runs/:auditRunId/final-pack/download',
+    { preHandler: [fastify.authenticate, requireAuditorEngagement(svc)] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = request.user as AuthSession;
+      const { auditRunId } = request.params as { auditRunId: string };
+      const engagement = (request as FastifyRequest & {
+        engagement: { id: string; tenantId: string; scopes: string[] };
+      }).engagement;
+
+      if (!engagement.scopes.includes('view_final_pack')) {
+        return reply.status(403).send(err('SCOPE_DENIED', 'view_final_pack scope required'));
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const auditRun = await (fastify.db as any).auditRun.findFirst({
+        where: { id: auditRunId, tenantId: engagement.tenantId },
+        select: { id: true, finalPackArtifactId: true },
+      });
+      if (!auditRun) return reply.status(404).send(err('NOT_FOUND', 'Audit run not found'));
+      if (!auditRun.finalPackArtifactId) {
+        return reply.status(409).send(err('NO_FINAL_PACK', 'This audit run has no final pack yet.'));
+      }
+
+      // Log INTENT before generating signed URL — preserves forensic
+      // trail even if the URL generation fails.
+      await svc.logAction({
+        tenantId: engagement.tenantId,
+        userId: user.userId,
+        auditorEmail: user.email ?? '',
+        auditRunId,
+        engagementId: engagement.id,
+        objectType: 'final_pack',
+        objectId: auditRun.finalPackArtifactId,
+        action: 'download',
+      });
+
+      try {
+        const artifactSvc = new ArtifactService(fastify.db, fastify.log);
+        const result = await artifactSvc.requestSignedDownloadUrl({
+          artifactId: auditRun.finalPackArtifactId,
+          tenantId: engagement.tenantId,
+          requestedBy: user.userId,
+          expiresInSeconds: 600,
+        });
+        return reply.send(ok(result));
+      } catch (e) {
+        // ArtifactGatedError surfaces as 409 — the auditor sees the
+        // exact gate reason (REQUIRES_APPROVAL / REJECTED / DELETED).
+        const msg = e instanceof Error ? e.message : 'unknown';
+        if (/requires approval|rejected|deleted/i.test(msg)) {
+          return reply.status(409).send(err('ARTIFACT_GATED', msg));
+        }
+        return reply.status(500).send(err('FINAL_PACK_DOWNLOAD_FAILED', msg));
+      }
     },
   );
 };

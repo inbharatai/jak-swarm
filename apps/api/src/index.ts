@@ -80,6 +80,7 @@ import auditRoutes from './routes/audit.routes.js';
 import complianceRoutes from './routes/compliance.routes.js';
 import auditRunsRoutes from './routes/audit-runs.routes.js';
 import externalAuditorRoutes from './routes/external-auditor.routes.js';
+import adminRetentionRoutes from './routes/admin-retention.routes.js';
 import companyBrainRoutes from './routes/company-brain.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
@@ -251,6 +252,10 @@ async function buildApp() {
   // public route for accept, EXTERNAL_AUDITOR routes with engagement-
   // isolation middleware for review/comment/decide actions.
   await fastify.register(externalAuditorRoutes);
+  // Admin retention sweep (final hardening / Gap E) — dry-run-by-default
+  // cleanup of expired invites, revoked invites, revoked engagements.
+  // SYSTEM_ADMIN can sweep across tenants; TENANT_ADMIN scoped to own.
+  await fastify.register(adminRetentionRoutes);
   // Company Brain (Migration 16) — CompanyProfile + IntentRecord +
   // MemoryItem.status approval + WorkflowTemplate library.
   // Routes: /company/profile/*, /intents, /memory/:id/(approve|reject),

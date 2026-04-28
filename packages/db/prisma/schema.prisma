@@ -1498,6 +1498,11 @@ model ExternalAuditorInvite {
   acceptedUserId  String?   @map("accepted_user_id")
   revokedAt       DateTime? @map("revoked_at")
   revokedBy       String?   @map("revoked_by")
+  // Final hardening / Gap C — invite email send tracking.
+  emailStatus     String?   @map("email_status")  // pending | sent | not_configured | failed
+  emailSentAt     DateTime? @map("email_sent_at")
+  emailError      String?   @map("email_error")
+  emailProvider   String?   @map("email_provider")  // 'smtp' when configured
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
