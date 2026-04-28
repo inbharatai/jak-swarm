@@ -425,21 +425,30 @@ export function ChatWorkspace() {
             });
             setIsSending(false);
             setIsStuck(false);
-          // Workflow paused for approval — Stage 2.5 fix: surface a
-          // direct link inline so the user doesn't have to hunt for the
-          // Runs page. The full approve/reject UX lives at /workspace
-          // (ApprovalsInbox); we link straight there with the workflow
-          // pre-selected. Previously the message just said "Check the
-          // Runs page" which was a dead-end on a busy chat thread.
+          // Workflow paused for approval — P1-4 fix: surface inline
+          // Approve / Reject / Defer buttons in the chat bubble itself
+          // (instead of a markdown link to /workspace?tab=approvals).
+          // The buttons hit the existing approvalApi.decide /
+          // workflowApi.resume endpoints from inside the message
+          // component, so the user never has to leave chat. The SSE
+          // event sometimes carries an `approvalId` (when the approval
+          // row was already persisted server-side) and sometimes
+          // doesn't — in the latter case the inline component falls
+          // back to /workflows/:id/resume.
           } else if (evType === 'paused') {
             const reason = (ev.reason as string) ?? (ev.taskName as string) ?? 'a high-risk action';
+            const approvalId = (ev.approvalId as string | undefined) ?? (ev.approvalRequestId as string | undefined);
             addMessage(convId, {
               role: 'assistant',
               agentRole: null,
-              content:
-                `🔏 **Approval needed** — workflow paused before \`${reason}\`. ` +
-                `[Review and approve in the Approvals inbox →](/workspace?tab=approvals&workflow=${workflow.id})`,
+              content: `🔏 Approval needed — workflow paused before \`${reason}\`.`,
               executionTrace: { workflowId: workflow.id },
+              approvalAction: {
+                workflowId: workflow.id,
+                ...(approvalId ? { approvalId } : {}),
+                reason,
+                status: 'pending',
+              },
             });
             setCockpitByWorkflow((prev) =>
               prev[workflow.id]
@@ -570,6 +579,33 @@ export function ChatWorkspace() {
               with no chat input visible. Now the picker rides above the
               input on every load so the user can both type and switch
               roles without an extra click. */}
+          {/* P1-6: Live cost ticker. Renders only when there's an active
+              workflow with non-zero call count, so it stays out of the way
+              when the user is just typing. Shows "$0.0042 · 6 calls · 12k
+              tokens" updated in real time from cost_updated SSE events.
+              Source-of-truth is the same `cockpitByWorkflow[activeWorkflowId]`
+              the completion message reads, so the live ticker and the
+              final summary are guaranteed consistent. */}
+          {activeWorkflowId && cockpitByWorkflow[activeWorkflowId]?.calls && cockpitByWorkflow[activeWorkflowId]!.calls > 0 ? (
+            <div
+              className="border-t border-border bg-muted/30 px-4 py-1.5 text-[11px] font-mono text-muted-foreground flex items-center gap-2"
+              role="status"
+              aria-live="polite"
+              data-testid="live-cost-ticker"
+            >
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"
+                aria-hidden="true"
+              />
+              <span className="uppercase tracking-widest text-[10px] text-muted-foreground/70">
+                Cost so far
+              </span>
+              <span className="text-foreground tabular-nums">
+                {formatCostFooter(cockpitByWorkflow[activeWorkflowId]!)}
+              </span>
+            </div>
+          ) : null}
+
           <div className="border-t border-border px-4 pt-2" data-testid="role-picker-bar">
             <RolePicker compact />
           </div>

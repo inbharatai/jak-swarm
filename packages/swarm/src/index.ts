@@ -167,3 +167,20 @@ export {
   getActivityEmitter,
   clearActivityEmitter,
 } from './supervisor/activity-registry.js';
+
+// Recovery — auto-repair classifier + service used by worker-node on
+// task failure. `classifyError` is re-exported as `classifyRepairError`
+// because `coordination/execute-guarded.ts` already exports a
+// (different) `classifyError`. The apps/api shim re-aliases them.
+export {
+  classifyError as classifyRepairError,
+  decideRepair,
+  RepairService,
+  defaultRepairService,
+} from './recovery/repair-service.js';
+export type {
+  ErrorClass as RepairErrorClass,
+  RepairDecision,
+  ClassifyOptions as RepairClassifyOptions,
+  RepairContext,
+} from './recovery/repair-service.js';

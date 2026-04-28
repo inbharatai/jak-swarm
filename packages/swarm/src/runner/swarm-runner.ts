@@ -35,6 +35,10 @@ import {
   registerActivityEmitter,
   clearActivityEmitter,
 } from '../supervisor/activity-registry.js';
+import {
+  registerLifecycleEmitter,
+  clearLifecycleEmitter,
+} from '../workflow-runtime/lifecycle-registry.js';
 import type { AgentActivityEvent } from '@jak-swarm/agents';
 import { LangGraphRuntime } from '../workflow-runtime/langgraph-runtime.js';
 import type { CheckpointPrismaClient } from '../workflow-runtime/postgres-checkpointer.js';
@@ -256,6 +260,16 @@ export class SwarmRunner {
       });
     }
 
+    // P1-3: Lifecycle emitter side-channel — worker-node calls
+    // getLifecycleEmitter on failure to publish repair_* events to the
+    // RepairService decision tree. Registered here so the worker-node
+    // can find it without threading the emitter through SwarmState
+    // (which can't carry Function values across DB checkpoint
+    // serialization). Cleared in the finally block below.
+    if (params.onLifecycle) {
+      registerLifecycleEmitter(workflowId, params.onLifecycle);
+    }
+
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
     try {
@@ -383,6 +397,7 @@ export class SwarmRunner {
       this.activeWorkflows.delete(workflowId);
       unregisterBreakerFactory(workflowId);
       clearActivityEmitter(workflowId);
+      clearLifecycleEmitter(workflowId);
       cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     }
   }

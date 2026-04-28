@@ -19,6 +19,31 @@ export interface Message {
     workflowId?: string;
     steps?: { name: string; status: string; duration?: number }[];
   };
+  /**
+   * P1-4: When the workflow pauses for human approval, the cockpit
+   * surfaces inline Approve / Reject / Defer buttons on the chat
+   * message instead of forcing a navigation to /workspace?tab=approvals.
+   * `status` flips from 'pending' → 'approved' / 'rejected' / 'deferred'
+   * once the user clicks; the buttons hide on terminal states.
+   *
+   * `approvalId` may be undefined at the moment the `paused` SSE event
+   * fires (the approval row is sometimes created lazily server-side);
+   * the inline UI then falls back to the workflow-resume endpoint
+   * which the API exposes specifically for this case.
+   */
+  approvalAction?: {
+    workflowId: string;
+    approvalId?: string;
+    /** What the user is approving — surfaced verbatim from the SSE event. */
+    reason: string;
+    status: 'pending' | 'approved' | 'rejected' | 'deferred';
+    /** ISO timestamp of the user's decision (set once status leaves 'pending'). */
+    decidedAt?: string;
+    /** Free-text comment the user added (optional). */
+    comment?: string;
+    /** If the API call fails, surface the error so the user can retry. */
+    error?: string;
+  };
 }
 
 export interface Conversation {
@@ -51,6 +76,14 @@ export interface ConversationActions {
   setActiveRoles: (roles: RoleId[]) => void;
   toggleRole: (role: RoleId) => void;
   addMessage: (conversationId: string, message: Omit<Message, 'id' | 'conversationId' | 'createdAt'>) => void;
+  /**
+   * Patch an existing message in-place. Used for the inline-approval flow
+   * where the cockpit needs to flip the embedded `approvalAction.status`
+   * from 'pending' → 'approved'/'rejected' once the user clicks, without
+   * adding a new chat bubble for what's just a state change on an
+   * existing one.
+   */
+  updateMessage: (conversationId: string, messageId: string, patch: Partial<Message>) => void;
   updateConversationTitle: (id: string, title: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setDrawerOpen: (open: boolean) => void;
@@ -298,6 +331,21 @@ export const useConversationStore = create<ConversationState & ConversationActio
                   }
                 : c,
             ),
+          };
+        });
+      },
+
+      updateMessage: (conversationId, messageId, patch) => {
+        set((state) => {
+          const existing = state.messages[conversationId];
+          if (!existing) return state;
+          return {
+            messages: {
+              ...state.messages,
+              [conversationId]: existing.map((m) =>
+                m.id === messageId ? { ...m, ...patch } : m,
+              ),
+            },
           };
         });
       },

@@ -12,6 +12,8 @@ import {
   summarizeTaskResults,
   estimateTokens,
 } from '../../context/context-summarizer.js';
+import { defaultRepairService } from '../../recovery/repair-service.js';
+import { getLifecycleEmitter } from '../../workflow-runtime/lifecycle-registry.js';
 
 // ─── Public browser types + plan builder (preserved from pre-P5b worker-node.ts) ─
 //
@@ -124,18 +126,84 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
         ? breakerFactory(`worker:${task.agentRole}`, { failureThreshold: 5, resetTimeoutMs: 30_000 })
         : getCircuitBreaker(`worker:${task.agentRole}`, { failureThreshold: 5, resetTimeoutMs: 30_000, tenantId: state.tenantId });
 
-      try {
-        output = await breaker.call<unknown>(() => agent.execute(taskInput, context));
-      } catch (err) {
-        if (err instanceof CircuitOpenError || (err instanceof Error && err.message.includes('circuit breaker'))) {
-          taskFailed = true;
-          output = {
-            error: `Circuit breaker open for ${task.agentRole}: ${err.message}`,
-            taskId: task.id,
-          };
-        } else {
-          throw err;
+      // P1-3: RepairService is now wired into the worker-node failure path.
+      // Previously the service existed in apps/api/services/repair.service.ts
+      // but was never invoked by the orchestration layer — a phantom feature.
+      // Now: on failure, classify the error, emit repair_* lifecycle events,
+      // and either retry in-place (with backoff) or hand off to the verifier
+      // with a clean event trail. Destructive actions and unknown classes
+      // never auto-retry — they emit `repair_escalated_to_human` and let the
+      // verifier+approval gate take over. Retry budget is per-class
+      // (transient/tool_unavailable: up to 3; missing_input/parse: 1; etc.)
+      // matching the decision-tree in repair-service.ts.
+      const onLifecycle = getLifecycleEmitter(state.workflowId);
+      const MAX_REPAIR_LOOPS = 4; // belt-and-braces ceiling on retry attempts
+      let priorAttempts = 0;
+      let attemptOutcome: 'success' | 'circuit_open' | 'thrown' = 'success';
+      let lastError: Error | undefined;
+
+      for (let loop = 0; loop < MAX_REPAIR_LOOPS; loop += 1) {
+        try {
+          output = await breaker.call<unknown>(() => agent.execute(taskInput, context));
+          attemptOutcome = 'success';
+          if (loop > 0) {
+            // We just succeeded after a repair-driven retry — record it.
+            defaultRepairService.recordAttemptResult(
+              { workflowId: state.workflowId, stepId: task.id, ...(onLifecycle ? { onLifecycle } : {}) },
+              loop,
+              true,
+            );
+          }
+          break;
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          if (err instanceof CircuitOpenError || lastError.message.includes('circuit breaker')) {
+            attemptOutcome = 'circuit_open';
+          } else {
+            attemptOutcome = 'thrown';
+          }
+
+          // Ask the repair service: retry, escalate, or give up?
+          const { decision } = defaultRepairService.evaluate({
+            workflowId: state.workflowId,
+            stepId: task.id,
+            tenantId: state.tenantId,
+            errorMessage: lastError.message,
+            // requiresApproval flag on a task carries through to "is this
+            // a destructive action" — verifier/approval gate already use it.
+            isDestructive: task.requiresApproval === true,
+            priorAttempts,
+            ...(onLifecycle ? { onLifecycle } : {}),
+          });
+
+          if (decision.action === 'retry') {
+            // Backoff per the decision strategy, then loop.
+            await defaultRepairService.applyBackoff(decision.strategy);
+            priorAttempts += 1;
+            continue;
+          }
+
+          // escalate_to_human or give_up — record outcome and stop looping.
+          if (loop > 0) {
+            defaultRepairService.recordAttemptResult(
+              { workflowId: state.workflowId, stepId: task.id, ...(onLifecycle ? { onLifecycle } : {}) },
+              loop,
+              false,
+              lastError.message,
+            );
+          }
+          break;
         }
+      }
+
+      if (attemptOutcome !== 'success' && lastError) {
+        taskFailed = true;
+        output = {
+          error: attemptOutcome === 'circuit_open'
+            ? `Circuit breaker open for ${task.agentRole}: ${lastError.message}`
+            : lastError.message,
+          taskId: task.id,
+        };
       }
 
       // Self-correction: agent reviews its own output before the verifier sees it.
