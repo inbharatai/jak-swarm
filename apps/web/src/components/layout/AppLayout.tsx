@@ -3,6 +3,7 @@
 import React from 'react';
 import { TopBar } from './TopBar';
 import { ChatSidebar } from './ChatSidebar';
+import { CommandPalette } from './CommandPalette';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -23,6 +24,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </main>
       </div>
+      {/* Cmd+K palette — mounted once, listens globally. Replaces deep
+          sidebar navigation for the 17 dashboard routes. */}
+      <CommandPalette />
     </div>
   );
 }
