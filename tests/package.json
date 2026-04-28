@@ -24,7 +24,7 @@
     "@jak-swarm/workflows": "workspace:*"
   },
   "devDependencies": {
-    "@langchain/core": "^1.1.41",
+    "@langchain/core": "^1.1.42",
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint": "^1.0.1",
     "@playwright/test": "^1.50.1",
