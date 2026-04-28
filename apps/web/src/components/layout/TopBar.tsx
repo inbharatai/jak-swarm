@@ -66,20 +66,29 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Center: command palette trigger */}
+      {/* Center: command palette trigger.
+          Mobile-first fix (P1-7): the trigger used to be `hidden sm:flex`
+          which made the palette unreachable on phones — laymen on mobile
+          had no way to navigate beyond the 5 zone-rail icons. Now the
+          button is always visible: full search-bar form on tablet/desktop,
+          icon-only square on mobile. Both dispatch the same keydown event
+          the palette listens to, so behavior is identical across viewports. */}
       <button
         onClick={() => {
-          // Trigger the CommandPalette's keydown handler on window
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
         }}
         className={cn(
-          'hidden sm:flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground',
+          'flex items-center gap-2 rounded-lg border border-border bg-muted/50 text-xs text-muted-foreground',
           'hover:bg-muted hover:text-foreground transition-colors',
+          // Mobile: icon-only 36x36 square button
+          'p-2 sm:px-3 sm:py-1.5',
+          'sm:gap-2',
         )}
+        aria-label="Open command palette"
       >
-        <Search className="h-3 w-3" />
-        <span>Search or command...</span>
-        <kbd className="ml-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-mono border border-border">⌘K</kbd>
+        <Search className="h-4 w-4 sm:h-3 sm:w-3" />
+        <span className="hidden sm:inline">Search or command...</span>
+        <kbd className="hidden sm:inline-block ml-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-mono border border-border">⌘K</kbd>
       </button>
 
       {/* Right: theme + user */}

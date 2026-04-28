@@ -495,12 +495,15 @@ export default function HomePage() {
                     A SOC 2 audit you can actually finish.
                   </h2>
                   <p className="text-slate-300 font-sans mb-6">
-                    167 controls seeded across SOC 2, HIPAA, and ISO 27001. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs that verify byte-for-byte. Invite an external auditor through a SHA-256-hashed token portal.
+                    <span className="text-white font-semibold">182 controls seeded</span> across SOC 2, HIPAA, and ISO 27001 &mdash; <span className="text-white font-semibold">108 operationally backed</span> (auto-mapping rules pull evidence from system activity) and <span className="text-white font-semibold">74 require reviewer attestation</span> (policy / paperwork / physical). LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs that verify byte-for-byte. Invite an external auditor through a SHA-256-hashed token portal.
                   </p>
 
                   <div className="flex flex-wrap gap-2 mb-8">
                     {[
-                      { label: 'SOC 2 Type 2', count: 48, color: '#fb923c' },
+                      // Counts match packages/db/prisma/seed-data/compliance-frameworks.ts.
+                      // The truth-check CI gate (scripts/check-docs-truth.ts) cross-verifies
+                      // these numbers against the seeded arrays. Don't drift.
+                      { label: 'SOC 2 Type 2', count: 63, color: '#fb923c' },
                       { label: 'HIPAA Security Rule', count: 37, color: '#f472b6' },
                       { label: 'ISO/IEC 27001:2022', count: 82, color: '#c084fc' },
                     ].map((fw) => (

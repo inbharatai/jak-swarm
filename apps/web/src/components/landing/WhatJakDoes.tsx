@@ -63,7 +63,7 @@ const PILLARS: Array<{
     title: 'Approvals, audit pack, and risk checks.',
     body: 'Human approval on every high-risk action, a full SOC 2 / HIPAA / ISO 27001 audit-engagement workflow with HMAC-signed evidence packs, and four-layer fraud detection before your agents act.',
     points: [
-      '167 controls (SOC 2 / HIPAA / ISO 27001) + signed evidence bundles',
+      '182 controls seeded · 108 operationally backed (SOC 2 / HIPAA / ISO 27001)',
       'Reviewer-gated workpaper PDFs · final-pack approval gate',
       'Email / document / invoice / identity verification',
     ],

@@ -27,7 +27,7 @@ A periodic **attestation** materialises the per-control evidence count for a dat
 - **2 Confidentiality** anchors (C1.1, C1.2)
 - **5 Privacy** anchors (P1.1, P3.1, P4.1, P6.1, P8.1)
 
-Total: **48 controls**, 30 with auto-mapping rules, 18 reserved for human-curated mappings (organisational policies that audit logs cannot demonstrate).
+SOC 2 Type 2 total: **63 controls** (37 with auto-mapping rules, 26 require reviewer attestation). Across all three shipped frameworks (SOC 2 + HIPAA + ISO 27001) the totals are **182 seeded · 108 auto-mapped · 74 reviewer-attest** — derived in `FRAMEWORK_COUNTS` at the bottom of `compliance-frameworks.ts` so the split can never drift.
 
 ## Auto-mapping rules
 

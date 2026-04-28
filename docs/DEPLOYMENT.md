@@ -331,7 +331,7 @@ The SupervisorBus is currently in-process (Node EventEmitter). For multi-instanc
 After the first deploy with these set, run:
 ```bash
 pnpm db:migrate:deploy             # applies migration 15_audit_runs (additive)
-pnpm seed:compliance               # seeds 167 controls (idempotent)
+pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-mapped + 74 reviewer attest)
 ```
 
 ### Optional (enable features when set)

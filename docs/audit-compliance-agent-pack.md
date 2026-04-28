@@ -8,7 +8,7 @@ Production-grade audit engagement workflow built into JAK Swarm. Covers SOC 2, H
 |---|---|---|
 | Per-tenant audit engagements (`AuditRun`) | Real | `apps/api/src/services/audit/audit-run.service.ts` |
 | State machine: `PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED` | Real | `assertAuditTransition()` + per-action validation |
-| Per-control test rows seeded from framework (167 controls across SOC2/HIPAA/ISO27001) | Real | `AuditRunService.plan()` + existing framework seed |
+| Per-control test rows seeded from framework (182 controls across SOC2/HIPAA/ISO27001 — 108 auto-mapped + 74 reviewer-attest) | Real | `AuditRunService.plan()` + existing framework seed |
 | Auto-mapping evidence to controls | Real (reuses v1) | `ComplianceMapperService.runForTenant()` |
 | LLM-driven control test evaluation (with deterministic fallback when no key) | Real | `apps/api/src/services/audit/control-test.service.ts` |
 | Auto-create `AuditException` rows on fail/exception | Real | `AuditExceptionService.createFromTest()` |

@@ -1,14 +1,17 @@
 # Audit framework library
 
-JAK Swarm ships with three frameworks pre-seeded — 167 controls total. Each `AuditRun` references a framework by `frameworkSlug`; the `plan()` step seeds one `ControlTest` row per control.
+JAK Swarm ships with three frameworks pre-seeded — **182 controls total** (108 operationally backed + 74 require reviewer attestation). Each `AuditRun` references a framework by `frameworkSlug`; the `plan()` step seeds one `ControlTest` row per control.
 
 ## Frameworks shipped
 
-| Framework | Slug | Issuer | Version | Controls |
-|---|---|---|---|---|
-| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 48 |
-| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 |
-| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 |
+| Framework | Slug | Issuer | Version | Seeded | Auto-mapped | Reviewer attest |
+|---|---|---|---|---|---|---|
+| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 63 | 37 | 26 |
+| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 | 25 | 12 |
+| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 | 46 | 36 |
+| **Total** | | | | **182** | **108** | **74** |
+
+Counts derived at module load via `FRAMEWORK_COUNTS` in the seed file; cross-verified by `pnpm check:truth`.
 
 ## Per-control structure
 
@@ -49,7 +52,7 @@ Controls without an `autoRuleKey` are human-mapped only (admin policies, signed 
 
 ## Honesty notes
 
-- The 167 controls are real seeded rows, not placeholders. They were sourced from the published standards and can be inspected via `GET /compliance/frameworks/:slug`.
+- The 182 controls are real seeded rows, not placeholders. They were sourced from the published standards and can be inspected via `GET /compliance/frameworks/:slug`. Of those, 108 carry an `autoRuleKey` (auto-mapping rule pulls evidence from system activity) and 74 are policy / paperwork / physical and require reviewer attestation — the seed-time helper `withAttestationFlags()` derives `requiresHumanAttestation` from the absence of an `autoRuleKey` so the split can never drift.
 - Controls that lack an `autoRuleKey` are clearly classified — the framework summary endpoint reports `controlsWithoutRule` separately. JAK never claims auto-coverage for a control without a rule.
 - Sub-controls (`subControls` JSON) are populated for SOC 2 CC6.1's 11 sub-points and a handful of others. Most are still null pending catalog updates — sub-point routing is roadmap.
 

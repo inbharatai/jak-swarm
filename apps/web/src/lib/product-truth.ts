@@ -47,6 +47,29 @@ export const STATS = [
   { value: 6, label: 'AI Providers', suffix: '' },
 ] as const;
 
+// ─── Compliance framework counts ────────────────────────────────────────────
+// Marketing copy must use these numbers, not made-up totals. Source of truth
+// is `packages/db/prisma/seed-data/compliance-frameworks.ts` — the
+// `FRAMEWORK_COUNTS` derived export there is regenerated at module load
+// from the actual seeded arrays. The numbers below MUST match it; the
+// truth-check CI gate (scripts/check-docs-truth.ts) cross-verifies.
+//
+// Honest split as of 2026-04-28:
+//   total seeded            : 182 (63 SOC 2 + 37 HIPAA + 82 ISO 27001)
+//   operationally backed    : 108 (37 + 25 + 46) — autoRuleKey present
+//   requires reviewer attest:  74 (26 + 12 + 36) — policy/paperwork only
+
+export const COMPLIANCE_COUNTS = {
+  totalSeeded: 182,
+  operationallyBacked: 108,
+  requiresHumanAttestation: 74,
+  perFramework: [
+    { slug: 'soc2-type2', label: 'SOC 2 Type 2', seeded: 63, operationallyBacked: 37 },
+    { slug: 'hipaa-security-rule', label: 'HIPAA Security Rule', seeded: 37, operationallyBacked: 25 },
+    { slug: 'iso-27001-2022', label: 'ISO/IEC 27001:2022', seeded: 82, operationallyBacked: 46 },
+  ],
+} as const;
+
 // ─── Integration tiles ──────────────────────────────────────────────────────
 // Real, code-backed integrations only. Do not add a name here unless the
 // route + adapter actually exist in apps/api/src/routes/ or

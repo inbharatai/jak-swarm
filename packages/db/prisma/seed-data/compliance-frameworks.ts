@@ -30,6 +30,13 @@ export interface SeedControl {
   category: string;      // 'Common Criteria', 'Privacy', 'Availability', etc.
   title: string;
   description: string;
+  /**
+   * If present, references a rule in
+   * `packages/audit-compliance/src/auto-mapping-rules.ts` that pulls
+   * evidence from system activity (audit logs, approvals, artifacts).
+   * Controls without this key are policy / paperwork / physical and
+   * require human attestation — see `requiresHumanAttestation` below.
+   */
   autoRuleKey?: string;
   sortOrder: number;
   /**
@@ -40,6 +47,38 @@ export interface SeedControl {
    * controls in v1.6 — others can be added incrementally.
    */
   subControls?: SubControl[];
+  /**
+   * Derived (not hand-set): true iff `autoRuleKey` is absent. This flag
+   * is the source of truth for marketing copy that distinguishes
+   * "operationally backed" controls (which can pull evidence from system
+   * activity) from "policy-only" controls (which require a reviewer to
+   * attest manually). Populated by `withAttestationFlags()` at the
+   * bottom of this file before the seed publishes — DO NOT set it by
+   * hand on individual control entries; toggle the autoRuleKey instead.
+   */
+  requiresHumanAttestation?: boolean;
+}
+
+/**
+ * Aggregated counts an audit reviewer (or marketing copy) can cite without
+ * having to grep this file. Exported alongside FRAMEWORKS so the truth-check
+ * CI gate (scripts/check-docs-truth.ts) and product-truth.ts can read the
+ * canonical numbers without parsing source.
+ */
+export interface SeedFrameworkCounts {
+  /** Total controls seeded across all frameworks. */
+  totalSeeded: number;
+  /** Controls with an `autoRuleKey` — evidence drawn from system activity. */
+  operationallyBacked: number;
+  /** Controls without `autoRuleKey` — require reviewer attestation. */
+  requiresHumanAttestation: number;
+  /** Per-framework breakdown, in the same order as FRAMEWORKS. */
+  perFramework: Array<{
+    slug: string;
+    seeded: number;
+    operationallyBacked: number;
+    requiresHumanAttestation: number;
+  }>;
 }
 
 export interface SeedFramework {
@@ -228,11 +267,19 @@ const HIPAA_SECURITY_RULE_CONTROLS: SeedControl[] = [
 //   A.7  Physical controls (14)
 //   A.8  Technological controls (34)
 //
-// We seed the most operationally significant controls (54 of 93) — the
-// ones whose evidence can be drawn from the audit log, workflow records,
-// approval decisions, or artifacts. The remaining 39 are policy /
-// physical / paperwork controls that need human curation; they can be
-// added later if customer demand requires the full catalog.
+// We seed 82 of the 93 Annex A controls. Of those:
+//   46 carry an `autoRuleKey` and pull evidence from system activity
+//      (audit log, workflow records, approval decisions, artifacts).
+//   36 are policy / physical / paperwork controls that require a
+//      reviewer to attest manually — they are still seeded so reviewers
+//      can run a full ISO engagement, but the auto-mapping engine
+//      cannot satisfy them on its own. The 11 not seeded yet are pure-
+//      physical controls (A.7.x premises, badge readers, etc.) that
+//      have no software signal at all.
+// The post-process helper `withAttestationFlags()` below derives the
+// `requiresHumanAttestation` flag on every entry from the absence of
+// `autoRuleKey`, so marketing copy can cite the operationally-backed
+// vs attestation-required split honestly.
 
 const ISO_27001_2022_CONTROLS: SeedControl[] = [
   // ─── A.5 Organizational controls ────────────────────────────────────
@@ -326,35 +373,80 @@ const ISO_27001_2022_CONTROLS: SeedControl[] = [
   { code: 'A.8.34', series: 'A.8', category: 'Technological Controls', sortOrder: 82, title: 'Protection of information systems during audit testing', description: 'Audit tests and other assurance activities involving assessment of operational systems shall be planned and agreed between the tester and appropriate management.' },
 ];
 
+/**
+ * Sets `requiresHumanAttestation = true` on every control that doesn't have
+ * an `autoRuleKey`. This is the single source of truth for the
+ * "operationally backed vs policy-only" split — never set the flag by hand
+ * on individual control entries (it gets out of sync). Toggle the
+ * autoRuleKey instead.
+ */
+function withAttestationFlags(controls: SeedControl[]): SeedControl[] {
+  return controls.map((c) => ({
+    ...c,
+    requiresHumanAttestation: !c.autoRuleKey,
+  }));
+}
+
 export const FRAMEWORKS: SeedFramework[] = [
   {
     slug: 'soc2-type2',
     name: 'SOC 2 Type 2',
     shortName: 'SOC 2',
     issuer: 'AICPA',
-    description: 'AICPA Trust Services Criteria covering Security (Common Criteria CC1–CC9), Availability, Processing Integrity, Confidentiality, and Privacy. Type 2 reports demonstrate that controls operated effectively over a defined period (typically 6–12 months).',
+    description: 'AICPA Trust Services Criteria covering Security (Common Criteria CC1–CC9), Availability, Processing Integrity, Confidentiality, and Privacy. Type 2 reports demonstrate that controls operated effectively over a defined period (typically 6–12 months). 63 controls seeded; 37 carry auto-mapping rules, 26 require reviewer attestation.',
     version: '2017 TSC, revised 2022',
     active: true,
-    controls: SOC2_TYPE2_CONTROLS,
+    controls: withAttestationFlags(SOC2_TYPE2_CONTROLS),
   },
   {
     slug: 'hipaa-security-rule',
     name: 'HIPAA Security Rule',
     shortName: 'HIPAA',
     issuer: 'U.S. Department of Health and Human Services',
-    description: 'The HIPAA Security Rule (45 CFR §§ 164.302–318) establishes national standards to protect electronic protected health information (e-PHI). Covers administrative, physical, and technical safeguards for covered entities and business associates.',
+    description: 'The HIPAA Security Rule (45 CFR §§ 164.302–318) establishes national standards to protect electronic protected health information (e-PHI). Covers administrative, physical, and technical safeguards for covered entities and business associates. 37 controls seeded; 25 carry auto-mapping rules, 12 require reviewer attestation.',
     version: '45 CFR Part 164 Subpart C',
     active: true,
-    controls: HIPAA_SECURITY_RULE_CONTROLS,
+    controls: withAttestationFlags(HIPAA_SECURITY_RULE_CONTROLS),
   },
   {
     slug: 'iso-27001-2022',
     name: 'ISO/IEC 27001:2022',
     shortName: 'ISO 27001',
     issuer: 'ISO/IEC',
-    description: 'International standard for information security management systems (ISMS). Annex A contains 93 controls organized into Organizational, People, Physical, and Technological themes. This catalog seeds the 54 controls whose evidence can be drawn from system activity; the remaining 39 (policy/physical/paperwork) require human curation.',
+    description: 'International standard for information security management systems (ISMS). Annex A contains 93 controls organized into Organizational, People, Physical, and Technological themes. This catalog seeds 82 of the 93; 46 carry auto-mapping rules that pull evidence from system activity, 36 are policy / paperwork / physical controls that require reviewer attestation. The 11 not seeded are pure-physical (premises, badge readers) with no software signal.',
     version: 'ISO/IEC 27001:2022 (Annex A)',
     active: true,
-    controls: ISO_27001_2022_CONTROLS,
+    controls: withAttestationFlags(ISO_27001_2022_CONTROLS),
   },
 ];
+
+/**
+ * Aggregated counts derived from the seeded controls above. These are the
+ * NUMBERS marketing copy + the truth-check CI gate may cite. Recomputed
+ * at module load so they can never drift from the source-of-truth array.
+ *
+ * As of 2026-04-28:
+ *   total seeded            : 182 (63 SOC 2 + 37 HIPAA + 82 ISO 27001)
+ *   operationally backed    : 108 (37 + 25 + 46)
+ *   requires human attest.  :  74 (26 + 12 + 36)
+ */
+export const FRAMEWORK_COUNTS: SeedFrameworkCounts = (() => {
+  const perFramework = FRAMEWORKS.map((fw) => {
+    const seeded = fw.controls.length;
+    const operationallyBacked = fw.controls.filter((c) => !!c.autoRuleKey).length;
+    return {
+      slug: fw.slug,
+      seeded,
+      operationallyBacked,
+      requiresHumanAttestation: seeded - operationallyBacked,
+    };
+  });
+  const totalSeeded = perFramework.reduce((s, f) => s + f.seeded, 0);
+  const operationallyBacked = perFramework.reduce((s, f) => s + f.operationallyBacked, 0);
+  return {
+    totalSeeded,
+    operationallyBacked,
+    requiresHumanAttestation: totalSeeded - operationallyBacked,
+    perFramework,
+  };
+})();

@@ -188,7 +188,7 @@ Prisma Studio opens at `http://localhost:5555`.
 ### Seed Compliance Frameworks (required for the Audit & Compliance Agent Pack)
 
 ```bash
-pnpm seed:compliance         # seeds 167 controls across SOC 2 / HIPAA / ISO 27001
+pnpm seed:compliance         # seeds 182 controls across SOC 2 / HIPAA / ISO 27001 (108 auto-mapped + 74 reviewer attest)
 pnpm seed:audit-demo         # optional: seeds a demo audit run for end-to-end exercise
 ```
 

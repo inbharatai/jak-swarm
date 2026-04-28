@@ -224,11 +224,21 @@ export function ChatSidebar() {
                 </span>
               </Link>
 
-              {/* Recent-conversations popover, anchored next to the Chat icon */}
+              {/* Recent-conversations popover, anchored next to the Chat icon.
+                  On mobile the rail itself is a fixed-position drawer at the
+                  left edge — anchoring `left-full ml-2` would pop the popover
+                  partway off-screen. So on mobile we use a full-width fixed
+                  bottom-sheet pattern (centered, 90vw max), and on desktop the
+                  original rail-anchored popover. */}
               {zone.id === 'chat' && convoPopoverOpen && (
                 <div
                   ref={popoverRef}
-                  className="absolute left-full ml-2 top-0 z-[150] w-72 rounded-lg border border-border bg-card shadow-2xl"
+                  className={cn(
+                    'z-[150] rounded-lg border border-border bg-card shadow-2xl',
+                    isMobile
+                      ? 'fixed left-[68px] right-3 top-3 max-w-[90vw]'
+                      : 'absolute left-full ml-2 top-0 w-72',
+                  )}
                   role="dialog"
                   aria-label="Recent conversations"
                 >

@@ -12,14 +12,14 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Typecheck](https://img.shields.io/badge/Typecheck-15_workspaces_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tests](https://img.shields.io/badge/Tests-751%2F751_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-961_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
 **The trusted control plane for autonomous work.** One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Native [LangGraph](https://langchain-ai.github.io/langgraphjs/) orchestration, Postgres-backed checkpoints, source-grounded verification, and runtime PII redaction. Build, operate, and verify autonomous work on infrastructure you control.
 
 **What's inside:**
 - **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
 - **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
-- **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **167 seeded controls** (48 + 37 + 82), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
+- **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **182 seeded controls** (63 SOC 2 + 37 HIPAA + 82 ISO 27001) of which **108 are operationally backed** (auto-mapping rules pull evidence from system activity) and **74 require reviewer attestation** (policy / paperwork / physical), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
 - **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
 - **Trust layer** — source-grounded outputs with citation-density verification, runtime PII redaction at the LLM boundary, structured output via OpenAI Responses API + `json_schema` strict mode, prompt-cache-aware cost telemetry
 - **Cross-task auto-repair** with error-class decision tree (destructive actions never auto-retried), **CEO super-orchestrator** that loads Company Brain and emits an executive summary at workflow end, **retention sweep** service (dry-run by default, never touches user-owned evidence)
@@ -639,15 +639,16 @@ Third-party auditors get a dedicated portal scoped to the engagements they're in
 | Tests | 11 unit tests (`tests/unit/services/external-auditor.test.ts`) cover token format, cleartext-never-persisted, expired/revoked rejection, cross-tenant isolation. |
 | Security audit | [`qa/external-auditor-portal-security-audit.md`](qa/external-auditor-portal-security-audit.md) records the threat model + per-requirement implementation status. |
 
-### Frameworks shipped (167 controls total)
+### Frameworks shipped (182 controls total · 108 operationally backed · 74 require reviewer attestation)
 
-| Framework | Slug | Issuer | Version | Controls |
-|---|---|---|---|---|
-| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 48 |
-| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 |
-| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 |
+| Framework | Slug | Issuer | Version | Seeded | Auto-mapped | Reviewer attest |
+|---|---|---|---|---|---|---|
+| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 63 | 37 | 26 |
+| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 | 25 | 12 |
+| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 | 46 | 36 |
+| **Total** | | | | **182** | **108** | **74** |
 
-Each control is real-seeded from the published standard. 10 implemented `autoRuleKey` rules map evidence (audit log rows, approvals, workflow artifacts, signed bundles, PII detections, guardrail events, tool blocks, …) onto controls that have automation; controls without a rule are clearly classified as human-mapped only.
+Each control is real-seeded from the published standard. 10 implemented `autoRuleKey` rules pull evidence (audit log rows, approvals, workflow artifacts, signed bundles, PII detections, guardrail events, tool blocks, …) onto controls that have automation. Controls without an `autoRuleKey` carry `requiresHumanAttestation: true` (set automatically by `withAttestationFlags()` in the seed file) so reviewers know exactly which entries need their signature versus which the system can satisfy from activity. Counts are derived at module load via `FRAMEWORK_COUNTS` and cross-verified by the `pnpm check:truth` CI gate.
 
 ### Engagement flow
 
@@ -763,7 +764,7 @@ EVIDENCE_SIGNING_SECRET=$(openssl rand -base64 48)
 ```bash
 pnpm --filter @jak-swarm/db db:migrate
 pnpm --filter @jak-swarm/db db:seed         # optional: seed sample data
-pnpm seed:compliance                        # seeds 167 SOC 2 / HIPAA / ISO 27001 controls
+pnpm seed:compliance                        # seeds 182 SOC 2 / HIPAA / ISO 27001 controls (108 auto-mapped + 74 reviewer attest)
 pnpm seed:audit-demo                        # optional: seeds a demo audit run for end-to-end exercise
 ```
 
@@ -914,7 +915,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Browser control | **30 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
 | Self-correction | **4 layers** (heuristic) | Limited | Manual | Limited |
-| **SOC 2 / HIPAA / ISO 27001 audit pack** (167 controls + signed evidence bundles) | ✅ | ❌ | ❌ | ❌ |
+| **SOC 2 / HIPAA / ISO 27001 audit pack** (182 controls · 108 auto-mapped · signed evidence bundles) | ✅ | ❌ | ❌ | ❌ |
 | Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
 | Price | **Free** | Free | Free+$39 | $20/mo |
 

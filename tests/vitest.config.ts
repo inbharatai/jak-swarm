@@ -25,6 +25,19 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
+    // Vitest default `testTimeout` is 5000ms which is too tight for the
+    // integration tests in this suite — they hit a real Postgres
+    // (testcontainers), a real OpenAI Responses API in stub mode, real
+    // Playwright browser tooling, and the full LangGraph orchestrator end-
+    // to-end. Under CPU contention those tests routinely sit at 3-5s and
+    // hit the ceiling intermittently (we observed 2 flakes on a parallel
+    // turbo run that went green on retry). Bumping the budget to 30s
+    // gives integration tests headroom without masking real bugs — a test
+    // that takes longer than 30s genuinely has a problem worth fixing.
+    // Hooks (`beforeAll`/`afterAll`) get the same budget so DB setup +
+    // testcontainer boot don't flake on cold caches.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     // Coverage gate. Not enabled by default (keeps local `pnpm test` fast);
     // CI runs `pnpm vitest run --coverage` which picks up these thresholds
     // and fails the build if either package drops below floor.
