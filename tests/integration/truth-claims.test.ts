@@ -77,35 +77,35 @@ describe('Product truth claims', () => {
   // refactor that adds/removes agents/tools/integrations can't silently
   // drift the marketing copy — CI catches it.
 
-  it('landing page stat card count: 38 agents matches AgentRole enum', () => {
+  // After the 2026-04-28 simplification (commit d7bbf71) the landing page
+  // dropped the stats band + integration chip section. The product-claim
+  // constants moved to `apps/web/src/lib/product-truth.ts` — a canonical
+  // source-of-truth file the truth tests read from. Future landing redesigns
+  // do NOT need to re-encode these counts to keep CI green; they just need
+  // the registry file to stay accurate.
+  it('product-truth registry agent count matches AgentRole enum', () => {
     const agentRoleSrc = readRepoFile('packages/shared/src/types/agent.ts');
-    const landing = readRepoFile('apps/web/src/app/page.tsx');
+    const truth = readRepoFile('apps/web/src/lib/product-truth.ts');
 
-    // Count enum entries inside the AgentRole enum (not AgentStatus etc.)
-    // AgentRole enum block starts with `export enum AgentRole {` and ends at
-    // the first `}` on its own line.
     const roleBlock = agentRoleSrc.match(/export enum AgentRole \{([\s\S]*?)\n\}/);
     expect(roleBlock, 'AgentRole enum must exist in agent.ts').toBeTruthy();
     const entries = (roleBlock![1].match(/^\s+[A-Z_]+\s*=\s*'/gm) ?? []).length;
 
-    // Landing page stat card declares `{ value: 38, label: 'Specialist Agents' }`.
-    // Extract the numeric claim and assert it matches.
-    const agentsClaim = landing.match(/\{\s*value:\s*(\d+),\s*label:\s*'(?:AI\s*|Specialist\s*)?Agents'/);
-    expect(agentsClaim, 'landing page must declare an Agents stat card').toBeTruthy();
+    const agentsClaim = truth.match(/\{\s*value:\s*(\d+),\s*label:\s*'(?:AI\s*|Specialist\s*)?Agents'/);
+    expect(agentsClaim, 'product-truth must declare an Agents stat').toBeTruthy();
     expect(Number(agentsClaim![1])).toBe(entries);
   });
 
-  it('landing page stat card count: 119 tools matches toolRegistry.register() calls', () => {
+  it('product-truth registry tools count matches toolRegistry.register() calls', () => {
     const toolBuiltin = readRepoFile('packages/tools/src/builtin/index.ts');
-    const landing = readRepoFile('apps/web/src/app/page.tsx');
+    const truth = readRepoFile('apps/web/src/lib/product-truth.ts');
     const premiumCta = readRepoFile('apps/web/src/components/landing/PremiumCTA.tsx');
     const layout = readRepoFile('apps/web/src/app/layout.tsx');
 
     const toolCount = (toolBuiltin.match(/toolRegistry\.register\(/g) ?? []).length;
 
-    // Main landing stat card
-    const toolsClaim = landing.match(/\{\s*value:\s*(\d+),\s*label:\s*'Classified Tools'/);
-    expect(toolsClaim, 'landing page must declare a Classified Tools stat card').toBeTruthy();
+    const toolsClaim = truth.match(/\{\s*value:\s*(\d+),\s*label:\s*'Classified Tools'/);
+    expect(toolsClaim, 'product-truth must declare a Classified Tools stat').toBeTruthy();
     expect(Number(toolsClaim![1])).toBe(toolCount);
 
     // PremiumCTA footer — used to drift to stale "113"
@@ -117,21 +117,19 @@ describe('Product truth claims', () => {
     expect(layout).toContain(`${toolCount} classified tools`);
   });
 
-  it('landing page INTEGRATIONS tile count matches the Connectors stat card', () => {
-    const landing = readRepoFile('apps/web/src/app/page.tsx');
+  it('product-truth INTEGRATIONS tile count matches the Connectors stat', () => {
+    const truth = readRepoFile('apps/web/src/lib/product-truth.ts');
 
-    // Count entries in INTEGRATIONS_CORE and INTEGRATIONS_INFRA arrays
-    const coreBlock = landing.match(/const INTEGRATIONS_CORE = \[([\s\S]*?)\n\];/);
-    const infraBlock = landing.match(/const INTEGRATIONS_INFRA = \[([\s\S]*?)\n\];/);
+    const coreBlock = truth.match(/INTEGRATIONS_CORE = \[([\s\S]*?)\n\] as const;/);
+    const infraBlock = truth.match(/INTEGRATIONS_INFRA = \[([\s\S]*?)\n\] as const;/);
     expect(coreBlock, 'INTEGRATIONS_CORE array must exist').toBeTruthy();
     expect(infraBlock, 'INTEGRATIONS_INFRA array must exist').toBeTruthy();
     const coreCount = (coreBlock![1].match(/name:\s*'/g) ?? []).length;
     const infraCount = (infraBlock![1].match(/name:\s*'/g) ?? []).length;
     const totalTiles = coreCount + infraCount;
 
-    // Connectors stat card must match the sum
-    const connectorsClaim = landing.match(/\{\s*value:\s*(\d+),\s*label:\s*'Connectors'/);
-    expect(connectorsClaim, 'landing page must declare a Connectors stat card').toBeTruthy();
+    const connectorsClaim = truth.match(/\{\s*value:\s*(\d+),\s*label:\s*'Connectors'/);
+    expect(connectorsClaim, 'product-truth must declare a Connectors stat').toBeTruthy();
     expect(Number(connectorsClaim![1])).toBe(totalTiles);
 
     // PremiumCTA footer integration count must match too
@@ -141,24 +139,24 @@ describe('Product truth claims', () => {
     expect(Number(ctaIntegClaim![1])).toBe(totalTiles);
   });
 
-  it('WhatsApp is listed on landing (implementation at whatsapp.routes.ts exists)', () => {
-    const landing = readRepoFile('apps/web/src/app/page.tsx');
+  it('WhatsApp is listed in product-truth (whatsapp.routes.ts exists and is non-trivial)', () => {
+    const truth = readRepoFile('apps/web/src/lib/product-truth.ts');
     const whatsappRoute = readRepoFile('apps/api/src/routes/whatsapp.routes.ts');
 
     // WhatsApp route is real — more than a stub
     expect(whatsappRoute.length).toBeGreaterThan(1000);
-    // And it must appear in the landing page integrations list
-    expect(landing).toContain("name: 'WhatsApp'");
+    // And it must appear in the product-truth integrations list
+    expect(truth).toContain("name: 'WhatsApp'");
   });
 
   it('Sentry tile is labeled MCP (not implying SDK-level observability)', () => {
-    const landing = readRepoFile('apps/web/src/app/page.tsx');
+    const truth = readRepoFile('apps/web/src/lib/product-truth.ts');
     const apiIndex = readRepoFile('apps/api/src/index.ts');
 
     // We do NOT import @sentry/node — we haven't wired the SDK
     expect(apiIndex).not.toContain('@sentry/node');
     // So the tile MUST say "Sentry MCP", not "Sentry" (the MCP-only reality)
-    expect(landing).toContain("name: 'Sentry MCP'");
+    expect(truth).toContain("name: 'Sentry MCP'");
   });
 
   it('voice route does not leak a mock token in production', () => {

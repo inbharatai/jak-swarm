@@ -59,7 +59,16 @@ const manifest = toolRegistry.getManifest();
 // ─── Read docs ──────────────────────────────────────────────────────────────
 
 const readme = read('README.md');
+// `landing` is still read for the marketing-copy guards further down
+// (no-fake claims, MIT-license honesty, etc.) — those are still
+// verified against the actual rendered landing page.
 const landing = read('apps/web/src/app/page.tsx');
+// `productTruth` is the canonical source-of-truth registry that survived
+// the 2026-04-28 landing simplification (commit d7bbf71). The homepage
+// no longer surfaces stat cards or integration chips, but the registry
+// stays accurate so this CI gate keeps catching drift between marketing
+// claims and the live ToolRegistry/AgentRole truth.
+const productTruth = read('apps/web/src/lib/product-truth.ts');
 const matrix = read('docs/integration-maturity-matrix.md');
 
 // ─── Tool count ─────────────────────────────────────────────────────────────
@@ -86,16 +95,17 @@ if (readmeToolHeadlineMatch) {
   });
 }
 
-// Landing stats: { value: 119, label: 'Classified Tools' } (or legacy 'Production Tools')
-const landingToolMatch = landing.match(
+// Tools stat: { value: 122, label: 'Classified Tools' }
+// Reads from product-truth registry (post-2026-04-28 simplification).
+const landingToolMatch = productTruth.match(
   /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"](?:Classified|Production) Tools['"]/,
 );
 if (landingToolMatch) {
   expect({
-    claim: 'Landing tools stat',
+    claim: 'product-truth tools stat',
     expected: manifest.total,
     actual: Number(landingToolMatch[1]),
-    source: 'apps/web/src/app/page.tsx STATS',
+    source: 'apps/web/src/lib/product-truth.ts STATS',
   });
 }
 
@@ -115,15 +125,15 @@ if (readmeAgentMatch) {
   });
 }
 
-const landingAgentMatch = landing.match(
-  /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"](?:AI\s+)?Agents['"]/,
+const landingAgentMatch = productTruth.match(
+  /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"](?:AI\s+|Specialist\s+)?Agents['"]/,
 );
 if (landingAgentMatch) {
   expect({
-    claim: 'Landing Agents stat matches AgentRole enum',
+    claim: 'product-truth Agents stat matches AgentRole enum',
     expected: agentCount,
     actual: Number(landingAgentMatch[1]),
-    source: 'apps/web/src/app/page.tsx STATS vs packages/shared/src/types/agent.ts',
+    source: 'apps/web/src/lib/product-truth.ts STATS vs packages/shared/src/types/agent.ts',
   });
 }
 
@@ -142,35 +152,35 @@ if (landingAgentBadgeMatch) {
 
 // Matrix defines a specific count: 8 production-ready + 4 beta + 3 partial + 9 placeholder = 24
 // minus the 3 adapters not surfaced as UI tiles (Gmail, Google Calendar, CRM fallback) = 21.
-// We extract the landing-page claim and assert it matches the matrix's summary line.
-const landingConnectorMatch = landing.match(
+// Extract the registry claim and assert it matches the matrix summary.
+const landingConnectorMatch = productTruth.match(
   /\{\s*value:\s*(\d+)\s*,\s*label:\s*['"]Connectors['"]/,
 );
 const matrixConnectorTotalMatch = matrix.match(/\*\*(\d+)\s+Connectors\*\*/);
 
 if (landingConnectorMatch && matrixConnectorTotalMatch) {
   expect({
-    claim: 'Landing Connectors stat matches matrix summary',
+    claim: 'product-truth Connectors stat matches matrix summary',
     expected: Number(matrixConnectorTotalMatch[1]),
     actual: Number(landingConnectorMatch[1]),
-    source: 'apps/web/src/app/page.tsx STATS vs docs/integration-maturity-matrix.md',
+    source: 'apps/web/src/lib/product-truth.ts STATS vs docs/integration-maturity-matrix.md',
   });
 }
 
-// Also assert the Connectors stat card matches INTEGRATIONS_CORE +
-// INTEGRATIONS_INFRA tile counts in the landing file itself. This catches
+// Also assert the Connectors stat matches INTEGRATIONS_CORE +
+// INTEGRATIONS_INFRA tile counts in the registry itself. This catches
 // drift where the number is updated but the tiles aren't (or vice versa).
-const coreTilesMatch = landing.match(/const INTEGRATIONS_CORE\s*=\s*\[([\s\S]*?)\n\];/);
-const infraTilesMatch = landing.match(/const INTEGRATIONS_INFRA\s*=\s*\[([\s\S]*?)\n\];/);
+const coreTilesMatch = productTruth.match(/INTEGRATIONS_CORE\s*=\s*\[([\s\S]*?)\n\] as const;/);
+const infraTilesMatch = productTruth.match(/INTEGRATIONS_INFRA\s*=\s*\[([\s\S]*?)\n\] as const;/);
 if (coreTilesMatch && infraTilesMatch && landingConnectorMatch) {
   const coreCount = (coreTilesMatch[1].match(/name:\s*'/g) ?? []).length;
   const infraCount = (infraTilesMatch[1].match(/name:\s*'/g) ?? []).length;
   const tileTotal = coreCount + infraCount;
   expect({
-    claim: 'Landing Connectors stat matches INTEGRATIONS_CORE + INTEGRATIONS_INFRA tile count',
+    claim: 'product-truth Connectors stat matches INTEGRATIONS_CORE + INTEGRATIONS_INFRA tile count',
     expected: tileTotal,
     actual: Number(landingConnectorMatch[1]),
-    source: 'apps/web/src/app/page.tsx (Connectors stat vs tile arrays)',
+    source: 'apps/web/src/lib/product-truth.ts (Connectors stat vs tile arrays)',
   });
 }
 
@@ -217,12 +227,12 @@ if (ctaAgentsMatch) {
 
 try {
   const whatsappRoute = read('apps/api/src/routes/whatsapp.routes.ts');
-  if (whatsappRoute.length > 1000 && !landing.includes("name: 'WhatsApp'")) {
+  if (whatsappRoute.length > 1000 && !productTruth.includes("name: 'WhatsApp'")) {
     mismatches.push({
-      claim: 'WhatsApp is implemented but missing from landing integration tiles',
+      claim: 'WhatsApp is implemented but missing from product-truth integration tiles',
       expected: "WhatsApp tile in INTEGRATIONS_CORE",
       actual: 'absent',
-      source: 'apps/api/src/routes/whatsapp.routes.ts vs apps/web/src/app/page.tsx',
+      source: 'apps/api/src/routes/whatsapp.routes.ts vs apps/web/src/lib/product-truth.ts',
     });
   }
 } catch {
@@ -237,14 +247,16 @@ try {
 try {
   const apiIndex = read('apps/api/src/index.ts');
   const sentrySDKWired = apiIndex.includes('@sentry/node');
-  const landingHasSentry = landing.includes("name: 'Sentry'");
-  const landingHasSentryMCP = landing.includes("name: 'Sentry MCP'");
-  if (!sentrySDKWired && landingHasSentry && !landingHasSentryMCP) {
+  // Bare `name: 'Sentry'` (without "MCP") implies SDK-level observability.
+  // Use a strict regex so the "Sentry MCP" tile doesn't false-match.
+  const truthHasBareSentry = /name:\s*'Sentry'/.test(productTruth);
+  const truthHasSentryMCP = productTruth.includes("name: 'Sentry MCP'");
+  if (!sentrySDKWired && truthHasBareSentry && !truthHasSentryMCP) {
     mismatches.push({
       claim: 'Sentry tile implies SDK but @sentry/node is not wired',
       expected: "tile labeled 'Sentry MCP' (agent-query only)",
       actual: "tile labeled 'Sentry' (implies SDK observability)",
-      source: 'apps/web/src/app/page.tsx vs apps/api/src/index.ts',
+      source: 'apps/web/src/lib/product-truth.ts vs apps/api/src/index.ts',
     });
   }
 } catch {
