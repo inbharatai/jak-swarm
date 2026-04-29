@@ -19,6 +19,14 @@ COPY packages/verification/package.json packages/verification/
 COPY packages/voice/package.json packages/voice/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/industry-packs/package.json packages/industry-packs/
+# OpenClaw-inspired Phase 1, Item A — @jak-swarm/skills is a runtime
+# dependency of @jak-swarm/agents (BaseAgent.injectBundledSkills uses
+# `await import('@jak-swarm/skills')`). Missing this COPY makes
+# `pnpm install --frozen-lockfile` fail because the lockfile references
+# the workspace package, AND the agents build then errors with TS2307
+# "Cannot find module '@jak-swarm/skills'". Mirrors the dependency-
+# ordered build below + the .github/workflows/ci.yml fix at f1d16df.
+COPY packages/skills/package.json packages/skills/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY tests/package.json tests/
@@ -42,12 +50,17 @@ RUN find packages apps -name "*.tsbuildinfo" -delete 2>/dev/null || true
 # Generate Prisma client
 RUN pnpm --filter @jak-swarm/db exec prisma generate
 
-# Build all packages in dependency order
+# Build all packages in dependency order.
+# @jak-swarm/skills MUST come before @jak-swarm/agents — agents imports it
+# via dynamic import in BaseAgent.injectBundledSkills, and tsc needs the
+# .d.ts to resolve the dynamic-import type. (See ci.yml + apps/api
+# pretypecheck for the same ordering rationale.)
 RUN pnpm --filter @jak-swarm/shared build && \
     pnpm --filter @jak-swarm/db build && \
     pnpm --filter @jak-swarm/security build && \
     pnpm --filter @jak-swarm/verification build && \
     pnpm --filter @jak-swarm/tools build && \
+    pnpm --filter @jak-swarm/skills build && \
     pnpm --filter @jak-swarm/agents build && \
     pnpm --filter @jak-swarm/industry-packs build && \
     pnpm --filter @jak-swarm/swarm build && \
