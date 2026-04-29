@@ -1449,3 +1449,96 @@ export const externalAuditorApi = {
       { method: 'POST', body: {} },
     ),
 };
+
+// ─── Connector Runtime ─────────────────────────────────────────────────────
+// Read-only client for the /connectors REST surface added in the connector-
+// first launch (2026-04-29). The dashboard /connectors page consumes
+// list() + the resolver via this client.
+
+/**
+ * Lightweight type matching the API response shape — the canonical
+ * type lives in @jak-swarm/tools (ConnectorView). Frontend re-types it
+ * here so it doesn't need a server-package import.
+ */
+export type ConnectorStatusValue =
+  | 'available' | 'installed' | 'configured' | 'needs_user_setup'
+  | 'failed_validation' | 'unavailable' | 'disabled' | 'blocked_by_policy';
+
+export interface ConnectorViewClient {
+  manifest: {
+    id: string;
+    name: string;
+    category: 'creative' | 'coding' | 'research' | 'business' | 'media' | 'local' | 'cloud';
+    description: string;
+    runtimeType: string;
+    installMethod?: string;
+    installCommand?: string;
+    sourceAllowlist?: string[];
+    manualSetupSteps?: string[];
+    validationCommand?: string;
+    availableTools: string[];
+    riskLevel: string;
+    approvalRequired: boolean;
+    supportsAutoApproval: boolean;
+    supportsSandbox: boolean;
+    supportsCloud: boolean;
+    supportsLocal: boolean;
+    canModifyFiles: boolean;
+    canPublishExternalContent: boolean;
+    canAccessUserData: boolean;
+    defaultEnabled: boolean;
+    docsUrl?: string;
+    setupInstructions?: string;
+    source: 'mcp-providers' | 'manual';
+    packageStatus?: 'OFFICIAL' | 'ANTHROPIC' | 'COMMUNITY';
+  };
+  status: ConnectorStatusValue;
+  lastValidatedAt?: string;
+  installedToolCount?: number;
+  statusReason?: string;
+}
+
+export interface ConnectorListResponse {
+  connectors: ConnectorViewClient[];
+  total: number;
+  registered: number;
+  counts: Record<ConnectorStatusValue, number>;
+}
+
+export interface ConnectorCandidateClient {
+  connectorId: string;
+  confidence: number;
+  reason: string;
+  isReady: boolean;
+  nextStep?: string;
+}
+
+export interface ConnectorResolveResponseClient {
+  primary?: ConnectorCandidateClient;
+  alternatives: ConnectorCandidateClient[];
+  unavailable: ConnectorCandidateClient[];
+}
+
+export const connectorApi = {
+  /** GET /connectors?category=&status= */
+  list: (params?: { category?: string; status?: string }) => {
+    const qs = params
+      ? '?' +
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== '')
+          .map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`)
+          .join('&')
+      : '';
+    return apiDataFetch<ConnectorListResponse>(`/connectors${qs}`);
+  },
+
+  /** GET /connectors/:id */
+  get: (id: string) => apiDataFetch<ConnectorViewClient>(`/connectors/${encodeURIComponent(id)}`),
+
+  /** POST /connectors/resolve */
+  resolve: (task: string, opts?: { hintedRoles?: string[]; maxAlternatives?: number }) =>
+    apiDataFetch<ConnectorResolveResponseClient>('/connectors/resolve', {
+      method: 'POST',
+      body: { task, ...(opts ?? {}) },
+    }),
+};

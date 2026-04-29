@@ -69,7 +69,7 @@ const ZONES: Zone[] = [
   { id: 'chat', label: 'Chat', href: '/workspace', icon: MessageSquare, match: ['/workspace', '/home', '/inbox', '/social'] },
   { id: 'tasks', label: 'Tasks', href: '/swarm', icon: Network, match: ['/swarm', '/traces', '/analytics', '/schedules', '/calendar'] },
   { id: 'files', label: 'Files', href: '/files', icon: FileText, match: ['/files', '/knowledge'] },
-  { id: 'setup', label: 'Setup', href: '/integrations', icon: Plug, match: ['/integrations', '/skills', '/builder', '/settings', '/billing'] },
+  { id: 'setup', label: 'Setup', href: '/integrations', icon: Plug, match: ['/integrations', '/connectors', '/skills', '/builder', '/settings', '/billing'] },
   { id: 'audit', label: 'Audit', href: '/audit', icon: ScrollText, match: ['/audit', '/admin'], gate: 'reviewerOrAdmin' },
 ];
 

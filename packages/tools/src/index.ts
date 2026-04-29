@@ -2,6 +2,31 @@
 export { ToolRegistry, toolRegistry } from './registry/tool-registry.js';
 export type { RegisteredTool, ToolExecutor } from './registry/tool-registry.js';
 
+// Connector Runtime — unified manifest + status registry on top of the
+// existing tool/MCP/integration infrastructure. See packages/tools/src/
+// connectors/types.ts for the design rationale.
+export {
+  connectorRegistry,
+  bootstrapConnectorRegistry,
+  resolveConnectorsForTask,
+  REMOTION_MANIFEST,
+  BLENDER_MANIFEST,
+} from './connectors/index.js';
+export type {
+  ConnectorManifest,
+  ConnectorStatus,
+  ConnectorRuntimeType,
+  ConnectorView,
+  ConnectorCandidate,
+  ConnectorResolveResult,
+  ConnectorCredentialField,
+  ConnectorRegistry,
+  ResolveOptions,
+} from './connectors/index.js';
+// Re-export RiskLevel so connector consumers don't need a second import
+// from @jak-swarm/shared just to type-narrow a manifest.
+export { RiskLevel } from '@jak-swarm/shared';
+
 // Tenant-scoped registry
 export { TenantToolRegistry, getTenantToolRegistry, clearTenantToolRegistries } from './registry/tenant-tool-registry.js';
 export type { TenantToolRegistryOptions } from './registry/tenant-tool-registry.js';

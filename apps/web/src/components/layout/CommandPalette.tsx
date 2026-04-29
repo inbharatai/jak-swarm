@@ -93,6 +93,7 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
 
   // Setup zone — configuration
   { href: '/integrations', label: 'Integrations', description: 'Connect Slack, Gmail, GitHub, Notion, ...', icon: Plug, zone: 'Setup', keywords: ['oauth', 'connect'] },
+  { href: '/connectors', label: 'Connectors', description: 'Connector marketplace — Remotion, Blender, MCP servers, runtime status', icon: Plug, zone: 'Setup', keywords: ['marketplace', 'mcp', 'remotion', 'blender', 'runtime'] },
   { href: '/skills', label: 'Skills', description: 'Custom agent skills and tool toggles', icon: Sparkles, zone: 'Setup', keywords: ['tools', 'capabilities'] },
   { href: '/builder', label: 'Builder', description: 'No-code project builder (vibe coder)', icon: Hammer, zone: 'Setup', keywords: ['app', 'vibe', 'code'] },
   { href: '/settings', label: 'Settings', description: 'Approvals, voice, domains, account', icon: ShieldCheck, zone: 'Setup', keywords: ['preferences', 'account'] },

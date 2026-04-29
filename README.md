@@ -27,6 +27,8 @@
 
 > **Sprint 2.x + final hardening (Apr 2026):** native LangGraph cutover · URL crawler · DOCX/XLSX/image ingest · runtime PII redaction · prompt-cache cost telemetry · source-grounded output verification · external auditor portal · CEO super-orchestrator · cross-task auto-repair · retention sweep. See [`qa/a-to-z-human-level-product-audit.md`](qa/a-to-z-human-level-product-audit.md) for the truthful per-module rating and [`qa/post-sprint-2-final-gap-audit.md`](qa/post-sprint-2-final-gap-audit.md) for the per-feature classification.
 
+> **Connector Runtime Phase 1 (29 Apr 2026):** unified ConnectorRegistry on top of the existing tool/MCP/integration layers · 21 MCP providers auto-mapped + Remotion + Blender first-class · ConnectorResolver that picks connectors from natural-language tasks · `/connectors` dashboard with honest status badges (`available` / `installed` / `configured` / `needs_user_setup` / `failed_validation` / `unavailable` / `disabled` / `blocked_by_policy`) · 43 unit tests pinning the registry + resolver + manifest contract. **Honest about what's not shipped yet:** the installer service + auto-publish + cloud-render adapters land in Phase 2/3. See [`docs/connector-runtime.md`](docs/connector-runtime.md) for the full design + [`qa/connector-runtime-phase1-status.md`](qa/connector-runtime-phase1-status.md) for the bluntly-rated closing report.
+
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
 ---

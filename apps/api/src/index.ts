@@ -66,6 +66,7 @@ import llmSettingsRoutes from './routes/llm-settings.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
 import { onboardingRoutes } from './routes/onboarding.routes.js';
 import { integrationRoutes } from './routes/integrations.routes.js';
+import connectorsRoutes from './routes/connectors.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import layoutRoutes from './routes/layouts.routes.js';
 import usageRoutes from './routes/usage.routes.js';
@@ -214,6 +215,11 @@ async function buildApp() {
   await fastify.register(schedulesRoutes, { prefix: '/schedules' });
   await fastify.register(onboardingRoutes);
   await fastify.register(integrationRoutes);
+  // Connector Runtime — read-only listing + resolve. Mutations still
+  // flow through /integrations + /approvals (existing OAuth + audit
+  // log + approval gate). See packages/tools/src/connectors/types.ts
+  // for the design rationale.
+  await fastify.register(connectorsRoutes, { prefix: '/connectors' });
   await fastify.register(projectsRoutes, { prefix: '/projects' });
   await fastify.register(layoutRoutes, { prefix: '/layouts' });
   await fastify.register(usageRoutes, { prefix: '/usage' });
