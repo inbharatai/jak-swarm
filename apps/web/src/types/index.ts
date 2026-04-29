@@ -461,6 +461,32 @@ export interface WorkflowSchedule {
   updatedAt: string;
 }
 
+/**
+ * StandingOrder — autonomy boundary contract that bounds what a
+ * WorkflowSchedule (or a tenant globally) is allowed to do at fire
+ * time. Mirrors `apps/api/src/routes/standing-orders.routes.ts`
+ * `createBodySchema` exactly. Empty arrays mean "no boundary on that
+ * dimension" (default-allow + tenant policy applies); non-empty arrays
+ * are strict.
+ */
+export interface StandingOrder {
+  id: string;
+  tenantId: string;
+  userId: string;
+  workflowScheduleId: string | null;
+  name: string;
+  description: string | null;
+  allowedTools: string[];
+  blockedActions: string[];
+  approvalRequiredFor: string[];
+  allowedSources: string[];
+  budgetUsd: number | null;
+  expiresAt: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Filter / Query Types ─────────────────────────────────────────────────────
 
 export interface WorkflowFilters {

@@ -1273,6 +1273,39 @@ export const scheduleApi = {
   runNow: (id: string) => apiClient.post<unknown>(`/schedules/${id}/run`),
 };
 
+// ─── Standing Orders API ─────────────────────────────────────────────────────
+//
+// Mirrors the backend at apps/api/src/routes/standing-orders.routes.ts.
+// Backend Zod schema is the single source of truth for the request body
+// shape; this client just wraps the HTTP verbs. Empty arrays mean "no
+// boundary on that dimension" (default-allow + tenant policy applies);
+// non-empty arrays are strict.
+
+export interface CreateStandingOrderBody {
+  name: string;
+  description?: string;
+  workflowScheduleId?: string | null;
+  allowedTools?: string[];
+  blockedActions?: string[];
+  approvalRequiredFor?: string[];
+  allowedSources?: string[];
+  budgetUsd?: number | null;
+  expiresAt?: string | null;
+  enabled?: boolean;
+}
+
+export const standingOrdersApi = {
+  list: () => apiClient.get<unknown>('/standing-orders'),
+  get: (id: string) => apiClient.get<unknown>(`/standing-orders/${id}`),
+  create: (body: CreateStandingOrderBody) =>
+    apiClient.post<unknown>('/standing-orders', body),
+  update: (id: string, body: Partial<CreateStandingOrderBody>) =>
+    apiClient.patch<unknown>(`/standing-orders/${id}`, body),
+  delete: (id: string) => apiClient.delete<unknown>(`/standing-orders/${id}`),
+  /** Convenience shortcut to disable without a full PATCH body. */
+  disable: (id: string) => apiClient.post<unknown>(`/standing-orders/${id}/disable`),
+};
+
 // ─── Projects (Vibe Coding) ─────────────────────────────────────────
 
 export const projectApi = {

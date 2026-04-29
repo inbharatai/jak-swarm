@@ -25,6 +25,7 @@ const NAV_COMMANDS: CommandItem[] = [
   { id: 'traces', label: 'Trace Viewer', description: 'Agent execution logs', icon: <FileText className="h-4 w-4" />, href: '/traces', group: 'Navigation' },
   { id: 'analytics', label: 'Analytics', description: 'Usage & cost metrics', icon: <BarChart3 className="h-4 w-4" />, href: '/analytics', group: 'Navigation' },
   { id: 'schedules', label: 'Schedules', description: 'Recurring workflows', icon: <Clock className="h-4 w-4" />, href: '/schedules', group: 'Navigation' },
+  { id: 'standing-orders', label: 'Standing Orders', description: 'Autonomy boundaries', icon: <ShieldCheck className="h-4 w-4" />, href: '/standing-orders', group: 'Navigation' },
   { id: 'integrations', label: 'Integrations', description: 'Connected services', icon: <Plug className="h-4 w-4" />, href: '/integrations', group: 'Navigation' },
   { id: 'knowledge', label: 'Knowledge', description: 'Memory store', icon: <BookOpen className="h-4 w-4" />, href: '/knowledge', group: 'Navigation' },
   { id: 'admin', label: 'Admin Console', description: 'Settings & users', icon: <ShieldCheck className="h-4 w-4" />, href: '/admin', group: 'Navigation' },

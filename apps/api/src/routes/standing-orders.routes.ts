@@ -2,6 +2,10 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
+import {
+  withWorkspaceLockOrThrow,
+  WorkspaceLockHeldError,
+} from '../coordination/workspace-lock.js';
 
 /**
  * Item C (OpenClaw-inspired Phase 1) — Standing Orders routes.
@@ -158,37 +162,56 @@ const standingOrdersRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const data = parseResult.data;
       try {
-        const existing = await fastify.db.standingOrder.findFirst({
-          where: { id, tenantId: request.user.tenantId },
-        });
-        if (!existing) throw new NotFoundError('StandingOrder', id);
+        // Per-StandingOrder edit lock: serializes concurrent PATCHes from
+        // two admins editing the same order. 5s TTL is well past the
+        // typical Prisma update round-trip (<200ms); a stale lock
+        // releases automatically. We surface 409 + Retry-After 1s on
+        // contention so well-behaved clients back off cleanly.
+        const updated = await withWorkspaceLockOrThrow(
+          fastify.coordination.locks,
+          `tenant:${request.user.tenantId}:standing-order:${id}`,
+          'edit',
+          5_000,
+          async () => {
+            const existing = await fastify.db.standingOrder.findFirst({
+              where: { id, tenantId: request.user.tenantId },
+            });
+            if (!existing) throw new NotFoundError('StandingOrder', id);
 
-        const updated = await fastify.db.standingOrder.update({
-          where: { id },
-          data: {
-            ...(data.name !== undefined ? { name: data.name } : {}),
-            ...(data.description !== undefined ? { description: data.description } : {}),
-            ...(data.workflowScheduleId !== undefined
-              ? { workflowScheduleId: data.workflowScheduleId }
-              : {}),
-            ...(data.allowedTools !== undefined ? { allowedTools: data.allowedTools } : {}),
-            ...(data.blockedActions !== undefined ? { blockedActions: data.blockedActions } : {}),
-            ...(data.approvalRequiredFor !== undefined
-              ? { approvalRequiredFor: data.approvalRequiredFor }
-              : {}),
-            ...(data.allowedSources !== undefined ? { allowedSources: data.allowedSources } : {}),
-            ...(data.budgetUsd !== undefined ? { budgetUsd: data.budgetUsd } : {}),
-            ...(data.expiresAt !== undefined
-              ? { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }
-              : {}),
-            ...(data.enabled !== undefined ? { enabled: data.enabled } : {}),
+            return fastify.db.standingOrder.update({
+              where: { id },
+              data: {
+                ...(data.name !== undefined ? { name: data.name } : {}),
+                ...(data.description !== undefined ? { description: data.description } : {}),
+                ...(data.workflowScheduleId !== undefined
+                  ? { workflowScheduleId: data.workflowScheduleId }
+                  : {}),
+                ...(data.allowedTools !== undefined ? { allowedTools: data.allowedTools } : {}),
+                ...(data.blockedActions !== undefined ? { blockedActions: data.blockedActions } : {}),
+                ...(data.approvalRequiredFor !== undefined
+                  ? { approvalRequiredFor: data.approvalRequiredFor }
+                  : {}),
+                ...(data.allowedSources !== undefined ? { allowedSources: data.allowedSources } : {}),
+                ...(data.budgetUsd !== undefined ? { budgetUsd: data.budgetUsd } : {}),
+                ...(data.expiresAt !== undefined
+                  ? { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }
+                  : {}),
+                ...(data.enabled !== undefined ? { enabled: data.enabled } : {}),
+              },
+            });
           },
-        });
+        );
         await fastify.auditLog(request, 'STANDING_ORDER_UPDATED', 'StandingOrder', id, {
           changedFields: Object.keys(data),
         });
         return reply.status(200).send(ok(updated));
       } catch (e) {
+        if (e instanceof WorkspaceLockHeldError) {
+          return reply
+            .status(409)
+            .header('Retry-After', '1')
+            .send(err('CONFLICT', e.message));
+        }
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;
       }

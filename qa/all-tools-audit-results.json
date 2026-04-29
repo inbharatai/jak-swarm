@@ -1,0 +1,1987 @@
+{
+  "generatedAt": "2026-04-29T17:57:01.356Z",
+  "total": 122,
+  "passed": 66,
+  "warned": 56,
+  "failed": 0,
+  "entries": [
+    {
+      "name": "read_email",
+      "category": "EMAIL",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "draft_email",
+      "category": "EMAIL",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "send_email",
+      "category": "EMAIL",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "list_calendar_events",
+      "category": "CALENDAR",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "create_calendar_event",
+      "category": "CALENDAR",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "lookup_crm_contact",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "update_crm_record",
+      "category": "CRM",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "search_knowledge",
+      "category": "KNOWLEDGE",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "search_knowledge",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "ingest_document",
+      "category": "KNOWLEDGE",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "find_document",
+      "category": "KNOWLEDGE",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "summarize_document",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "extract_document_data",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "classify_text",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "web_search",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "web_search",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "web_fetch",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "web_fetch",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "parse_spreadsheet",
+      "category": "SPREADSHEET",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "compute_statistics",
+      "category": "SPREADSHEET",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "generate_report",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "browser_navigate",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_navigate",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_extract",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_extract",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_fill_form",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_fill_form",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_click",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_click",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_screenshot",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_screenshot",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_get_text",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_get_text",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_type_text",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_type_text",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_press_key",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_press_key",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_mouse_click",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_mouse_click",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_scroll",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_scroll",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_analyze_page",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "browser_wait_for",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_wait_for",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_select_option",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_select_option",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_upload_file",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_upload_file",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_evaluate_js",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_evaluate_js",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_hover",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_hover",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_get_cookies",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_get_cookies",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_set_cookies",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_set_cookies",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_save_as_pdf",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_save_as_pdf",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "browser_manage_tabs",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "browser_manage_tabs",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "pdf_extract_text",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "pdf_extract_text",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "pdf_analyze",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "gmail_read_inbox",
+      "category": "EMAIL",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "experimental",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "gmail_send_email",
+      "category": "EMAIL",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "send_webhook",
+      "category": "WEBHOOK",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "send_webhook",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "memory_store",
+      "category": "KNOWLEDGE",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "memory_store",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "memory_retrieve",
+      "category": "KNOWLEDGE",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "memory_retrieve",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "file_read",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "file_read",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "file_write",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "file_write",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "list_directory",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "list_directory",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "code_execute",
+      "category": "RESEARCH",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "code_execute",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "find_availability",
+      "category": "CALENDAR",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "search_deals",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "classify_ticket",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "lookup_customer",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "search_knowledge_base",
+      "category": "KNOWLEDGE",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "search_knowledge_base",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "enrich_contact",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "enrich_company",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "verify_email_deliverability",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "verify_email_deliverability",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "score_lead",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "deduplicate_contacts",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "audit_seo",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "audit_seo",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "research_keywords",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "research_keywords",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "analyze_serp",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "analyze_serp",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "monitor_rankings",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "monitor_rankings",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "create_email_sequence",
+      "category": "EMAIL",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "create_email_sequence",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "personalize_email",
+      "category": "EMAIL",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "schedule_email",
+      "category": "EMAIL",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "schedule_email",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "track_email_engagement",
+      "category": "EMAIL",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_email_engagement",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "analyze_engagement",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "predict_churn",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "generate_winback",
+      "category": "EMAIL",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "monitor_company_signals",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "monitor_company_signals",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "find_decision_makers",
+      "category": "CRM",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "generate_image",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "post_to_twitter",
+      "category": "BROWSER",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "post_to_linkedin",
+      "category": "BROWSER",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "post_to_reddit",
+      "category": "BROWSER",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "discover_posting_platforms",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "monitor_brand_mentions",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "auto_reply_reddit",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "auto_reply_twitter",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "generate_seo_report",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "generate_seo_report",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "track_content_performance",
+      "category": "KNOWLEDGE",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_content_performance",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "track_okrs",
+      "category": "KNOWLEDGE",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_okrs",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "monitor_competitors",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "monitor_competitors",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "generate_board_report",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "analyze_github_repo",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "check_dependencies",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "estimate_tech_debt",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "parse_financial_csv",
+      "category": "SPREADSHEET",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "track_budget",
+      "category": "KNOWLEDGE",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_budget",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "forecast_cashflow",
+      "category": "SPREADSHEET",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "screen_resume",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "post_job_listing",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "generate_offer_letter",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "heuristic",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "compare_contracts",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "extract_obligations",
+      "category": "DOCUMENT",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "monitor_regulations",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "monitor_regulations",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "auto_engage_reddit",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "auto_engage_twitter",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "auto_engage_linkedin",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "track_lead_pipeline",
+      "category": "CRM",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_lead_pipeline",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "track_customer_health",
+      "category": "CRM",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "track_customer_health",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "generate_qbr_deck",
+      "category": "DOCUMENT",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "llm_passthrough",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "sandbox_create",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_create",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_write_file",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_write_file",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_exec",
+      "category": "BROWSER",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_exec",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_install_deps",
+      "category": "BROWSER",
+      "riskClass": "WRITE",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "write",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_install_deps",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_start_dev_server",
+      "category": "BROWSER",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_start_dev_server",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_get_preview_url",
+      "category": "BROWSER",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_get_preview_url",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "sandbox_destroy",
+      "category": "BROWSER",
+      "riskClass": "DESTRUCTIVE",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "real",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "sandbox_destroy",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    },
+    {
+      "name": "analyze_email_risk",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "verify_document",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "verify_transaction",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "verify_identity",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "cross_verify",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "deploy_to_vercel",
+      "category": "WEBHOOK",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "github_create_repo",
+      "category": "RESEARCH",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "github_push_files",
+      "category": "RESEARCH",
+      "riskClass": "EXTERNAL_SIDE_EFFECT",
+      "riskLevel": null,
+      "requiresApproval": true,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "external",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "github_list_files",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "github_read_file",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "github_review_pr",
+      "category": "RESEARCH",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "config_dependent",
+      "sideEffectLevel": "read",
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [],
+      "status": "pass"
+    },
+    {
+      "name": "compile_executive_summary",
+      "category": "KNOWLEDGE",
+      "riskClass": "READ_ONLY",
+      "riskLevel": null,
+      "requiresApproval": false,
+      "maturity": "real",
+      "sideEffectLevel": null,
+      "hasInputSchema": true,
+      "hasOutputSchema": true,
+      "findings": [
+        {
+          "toolName": "compile_executive_summary",
+          "field": "maturity",
+          "severity": "warning",
+          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
+        }
+      ],
+      "status": "warn"
+    }
+  ]
+}
