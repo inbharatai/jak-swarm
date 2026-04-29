@@ -86,10 +86,27 @@ export interface ConversationState {
   sidebarCollapsed: boolean;
   /** Detail drawer open state */
   drawerOpen: boolean;
+  /**
+   * `true` once zustand-persist has finished rehydrating from
+   * localStorage. Components that depend on `activeConversationId`
+   * (notably the chat Send button) should disable themselves until
+   * this flips, or they risk firing a no-op send before the persisted
+   * conversation is restored. Set by `onRehydrateStorage` below; SSR
+   * always reads it as `false` (Next.js + zustand-persist contract).
+   */
+  _hasHydrated: boolean;
 }
 
 export interface ConversationActions {
   createConversation: (roles?: RoleId[]) => string;
+  /**
+   * Returns the active conversation id, creating one if none exists.
+   * Used by handleSend so a "Send" click that lands before persist
+   * has rehydrated cannot silently no-op — there's always a target
+   * conversation. Idempotent: when activeConversationId is already
+   * set, returns it without creating a new one.
+   */
+  ensureActiveConversation: (roles?: RoleId[]) => string;
   deleteConversation: (id: string) => void;
   switchConversation: (id: string) => void;
   setActiveRoles: (roles: RoleId[]) => void;
@@ -106,6 +123,10 @@ export interface ConversationActions {
   updateConversationTitle: (id: string, title: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setDrawerOpen: (open: boolean) => void;
+  /** Marks the persist layer as fully rehydrated. Internal — called only
+   *  from `onRehydrateStorage`. Tests can call it manually to skip the
+   *  hydration race. */
+  _setHasHydrated: (hydrated: boolean) => void;
 }
 
 type PersistedConversationState = Pick<
@@ -258,6 +279,7 @@ export const useConversationStore = create<ConversationState & ConversationActio
       activeRoles: DEFAULT_ACTIVE_ROLES,
       sidebarCollapsed: false,
       drawerOpen: false,
+      _hasHydrated: false,
 
       // Actions
       createConversation: (roles) => {
@@ -277,6 +299,25 @@ export const useConversationStore = create<ConversationState & ConversationActio
           activeRoles: selectedRoles,
         }));
         return id;
+      },
+
+      /**
+       * Returns the active conversation id, creating one if none exists.
+       * The Send button calls this so a click that lands before persist
+       * has rehydrated cannot silently no-op — there's always a target
+       * conversation. Idempotent: with an active id, returns it as-is
+       * without mutating state.
+       */
+      ensureActiveConversation: (roles) => {
+        const existing = get().activeConversationId;
+        if (existing) {
+          // Verify the conversation still exists (defensive — after a
+          // delete the activeConversationId can briefly point at a
+          // tombstone before the UI reads the next one).
+          const stillExists = get().conversations.some((c) => c.id === existing);
+          if (stillExists) return existing;
+        }
+        return get().createConversation(roles);
       },
 
       deleteConversation: (id) => {
@@ -379,6 +420,7 @@ export const useConversationStore = create<ConversationState & ConversationActio
 
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setDrawerOpen: (open) => set({ drawerOpen: open }),
+      _setHasHydrated: (hydrated) => set({ _hasHydrated: hydrated }),
     }),
     {
       name: 'jak-conversations',
@@ -394,6 +436,14 @@ export const useConversationStore = create<ConversationState & ConversationActio
         messages: state.messages,
         activeRoles: normalizeRoles(state.activeRoles),
       }),
+      // Flip `_hasHydrated` to true once persist has finished pulling
+      // from localStorage. Without this, the chat Send button can fire
+      // before the persisted `activeConversationId` is restored — the
+      // send used to silently no-op in that race. With this flag the
+      // input renders a "Loading workspace…" hint until ready.
+      onRehydrateStorage: () => (state) => {
+        state?._setHasHydrated(true);
+      },
     },
   ),
 );

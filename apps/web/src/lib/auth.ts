@@ -11,6 +11,32 @@ function getClient(): SupabaseClient {
   return _supabase;
 }
 
+/**
+ * DEV-ONLY auth bypass — when `NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS=1` the
+ * `useAuth` hook short-circuits to a synthetic AuthUser whose IDs
+ * match the dev tenant + user seeded by `scripts/seed-dev-bypass.ts`,
+ * and `isAuthenticated()` returns true. The dashboard layout's
+ * "redirect to /login when no user" check is automatically satisfied.
+ *
+ * Paired with the API-side bypass in apps/api/src/plugins/auth.plugin.ts;
+ * the same three-layer safety contract applies (NODE_ENV gate +
+ * env-flag opt-in + literal bypass token in api-client.ts).
+ */
+const DEV_BYPASS_ACTIVE = process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1';
+
+const DEV_BYPASS_USER: AuthUser = {
+  id: 'dev-user-id',
+  email: 'dev@local.test',
+  name: 'Local Dev User',
+  role: 'TENANT_ADMIN',
+  tenantId: 'dev-tenant-id',
+  tenantName: 'Local Dev Tenant',
+  // The web `Industry` type doesn't include 'GENERAL' (the API DB does);
+  // pick TECHNOLOGY since dev workflows are unlabeled and TECHNOLOGY
+  // imposes no restricted-tool list, matching GENERAL semantics.
+  industry: 'TECHNOLOGY',
+};
+
 // ─── Map Supabase user to JAK AuthUser ──────────────────────────────────────
 
 function mapSupabaseUser(user: SupabaseUser): AuthUser {
@@ -49,6 +75,7 @@ export function getRawToken(): string | null {
 
 export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false;
+  if (DEV_BYPASS_ACTIVE) return true;
   // Sync check: Supabase stores auth tokens in localStorage
   const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
   if (!storageKey) return false;
@@ -92,12 +119,20 @@ function buildAbsoluteUrl(path: string): string | undefined {
 
 export function useAuth(): UseAuthReturn {
   const [state, setState] = useState<AuthState>({
-    user: null,
-    isLoading: true,
+    // In dev-bypass mode, start with the synthetic user already populated
+    // so the dashboard layout's "redirect when no user" check is satisfied
+    // on the very first render. Skips the loading spinner entirely.
+    user: DEV_BYPASS_ACTIVE ? DEV_BYPASS_USER : null,
+    isLoading: !DEV_BYPASS_ACTIVE,
     error: null,
   });
 
   useEffect(() => {
+    // DEV-ONLY: in bypass mode the synthetic user is already in state;
+    // skip every Supabase round-trip to keep the cockpit responsive
+    // and avoid pinging Supabase with a non-existent session.
+    if (DEV_BYPASS_ACTIVE) return;
+
     // Get initial session
     getClient().auth.getUser().then((result) => {
       const user = result.data?.user;

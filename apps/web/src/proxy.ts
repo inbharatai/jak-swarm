@@ -28,7 +28,28 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+/**
+ * DEV-ONLY auth bypass — when `NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS=1` AND
+ * NODE_ENV is not production, the proxy short-circuits the entire
+ * Supabase round-trip. Every request passes through; the dashboard
+ * layout's client-side `useAuth` hook returns the synthetic dev user
+ * (apps/web/src/lib/auth.ts) so the cockpit renders without a real
+ * Supabase session.
+ *
+ * Three layers of safety match the API contract: env-flag opt-in +
+ * NODE_ENV gate + the API still validates the literal `Bearer
+ * jak-dev-bypass` token on every backend call. Any one of those
+ * disabled blocks the bypass.
+ */
+const DEV_BYPASS_ACTIVE =
+  process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1' &&
+  process.env['NODE_ENV'] !== 'production';
+
 export async function proxy(request: NextRequest) {
+  if (DEV_BYPASS_ACTIVE) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

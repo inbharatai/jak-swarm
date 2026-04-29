@@ -77,9 +77,14 @@ export function ChatWorkspace() {
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
   const createConversation = useConversationStore((s) => s.createConversation);
+  const ensureActiveConversation = useConversationStore((s) => s.ensureActiveConversation);
   const addMessage = useConversationStore((s) => s.addMessage);
   const drawerOpen = useConversationStore((s) => s.drawerOpen);
   const setDrawerOpen = useConversationStore((s) => s.setDrawerOpen);
+  // Hydration tracking — gates the Send button against the localStorage
+  // race where a click lands before zustand-persist has restored
+  // activeConversationId. See store comment for the contract.
+  const hasHydrated = useConversationStore((s) => s._hasHydrated);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -112,13 +117,35 @@ export function ChatWorkspace() {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     const readyAttachments = attachments.filter((a) => a.status === 'ready');
-    // Accept an empty text body if the user is sending attachments only
-    // ("look at this file") — but if BOTH text and attachments are empty,
-    // or if we're already sending, no-op.
-    if ((!text && readyAttachments.length === 0) || isSending) return;
 
-    // Capture or create conversation ID before any async work
-    const convId = conversation?.id ?? createConversation(activeRoles);
+    // Defensive: every silent-return path was a real bug we hit during
+    // local QA — store rehydration race + double-fire in flight + empty
+    // input. Each one now logs to console (so the developer console
+    // shows WHY the click did nothing) and the empty-input path runs
+    // even with hydration in flight (we self-heal by creating a
+    // conversation rather than bailing).
+    if (!hasHydrated) {
+      // Hydration race: persist hasn't restored yet. Disabling the
+      // button is the primary defense (ChatInput's `disabled` prop);
+      // this branch is the belt-and-suspenders log so a future bug
+      // in the disabled-prop path doesn't reproduce as a silent
+      // no-op.
+      console.warn('[ChatWorkspace] Send blocked: store still hydrating from localStorage. Try again in a moment.');
+      return;
+    }
+    if (!text && readyAttachments.length === 0) {
+      console.warn('[ChatWorkspace] Send blocked: empty input + no ready attachments.');
+      return;
+    }
+    if (isSending) {
+      console.warn('[ChatWorkspace] Send blocked: a previous send is still in flight.');
+      return;
+    }
+
+    // Auto-heal: ensureActiveConversation creates one when none exists,
+    // so even after a localStorage clear the first send creates a
+    // conversation rather than no-oping. Idempotent when already set.
+    const convId = ensureActiveConversation(activeRoles);
 
     // Build the user-facing message content (shows filenames in the chat
     // thread) and the workflow goal (adds an explicit hint so the Commander
@@ -165,9 +192,20 @@ export function ChatWorkspace() {
       abortRef.current = controller;
 
       const BASE_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').trim();
-      const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token ?? '';
+      // DEV-ONLY: when the auth bypass is on, skip Supabase entirely
+      // and use the literal bypass token. The API's stream route
+      // accepts it via the same `?token=` query path the legacy
+      // EventSource clients use. Same three-layer safety contract as
+      // every other bypass path (apps/web/src/lib/api-client.ts).
+      const DEV_BYPASS_ACTIVE = process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1';
+      let token = '';
+      if (DEV_BYPASS_ACTIVE) {
+        token = 'jak-dev-bypass';
+      } else {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        token = data?.session?.access_token ?? '';
+      }
 
       await connectSSE({
         url: `${BASE_URL}/workflows/${workflow.id}/stream`,
@@ -495,7 +533,7 @@ export function ChatWorkspace() {
     } finally {
       setIsSending(false);
     }
-  }, [inputValue, attachments, isSending, conversation, activeRoles, createConversation, addMessage]);
+  }, [inputValue, attachments, isSending, hasHydrated, activeRoles, ensureActiveConversation, addMessage]);
 
   const handleStartChat = useCallback(
     (prompt: string) => {
@@ -635,6 +673,13 @@ export function ChatWorkspace() {
             onSend={handleSend}
             attachments={attachments}
             onAttachmentsChange={setAttachments}
+            // Disable Send while the conversation store is rehydrating
+            // from localStorage. Without this, a click that lands during
+            // the hydration race silently no-oped — see
+            // conversation-store._hasHydrated for the contract. ChatInput
+            // adds an aria-busy="true" state internally so the disabled
+            // reason is exposed to assistive tech, not just visually.
+            disabled={!hasHydrated || isSending}
           />
         </div>
 

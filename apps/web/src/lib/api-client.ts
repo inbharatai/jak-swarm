@@ -7,8 +7,27 @@ let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
 const TOKEN_CACHE_TTL_MS = 30_000; // 30 seconds
 
+/**
+ * DEV-ONLY auth bypass — when `NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS=1`,
+ * `getToken` skips Supabase entirely and returns the literal bypass
+ * token the API recognizes (paired with `JAK_DEV_AUTH_BYPASS=1` on
+ * the API side — see apps/api/src/plugins/auth.plugin.ts).
+ *
+ * Three layers of safety match the API contract:
+ *   - The flag is `NEXT_PUBLIC_*` so it only ships when the developer
+ *     explicitly sets it; production builds don't carry it.
+ *   - Even if the flag accidentally ships, the API requires
+ *     `NODE_ENV !== 'production'` AND its own server-side flag set,
+ *     so the bypass token is rejected on any prod build.
+ *   - The token is the literal `jak-dev-bypass` — caller must know
+ *     the magic string, no random JWT will work.
+ */
+const DEV_BYPASS_ACTIVE = process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1';
+const DEV_BYPASS_TOKEN = 'jak-dev-bypass';
+
 async function getToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+  if (DEV_BYPASS_ACTIVE) return DEV_BYPASS_TOKEN;
   const now = Date.now();
   if (cachedToken && now < tokenExpiresAt) return cachedToken;
   try {
