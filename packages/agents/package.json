@@ -17,7 +17,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@jak-swarm/security": "workspace:^",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/skills": "workspace:^",
