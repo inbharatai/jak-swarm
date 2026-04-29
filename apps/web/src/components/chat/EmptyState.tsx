@@ -24,8 +24,11 @@ export function EmptyState({ onStartChat }: EmptyStateProps) {
           What do you want JAK to do?
         </h1>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-          Type your request in the box below — JAK will plan, execute, and verify.
-          Pick a role to focus the work, or leave it on Auto and JAK will route for you.
+          Describe a task in plain English. JAK plans the steps, runs the right specialists,
+          and asks your approval before anything risky leaves the cockpit.
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground/70 max-w-md mx-auto">
+          Tip: pick one of the starter tasks below to see the full loop in under a minute.
         </p>
 
         {/* Quick Combos */}
@@ -91,16 +94,16 @@ function getStarterPrompts(roles: RoleId[]): string[] {
     const role = ROLE_LIST.find((r) => r.id === roleId);
     if (role) pool.push(...role.examplePrompts);
   }
-  // If nothing selected, show the cross-functional examples the QA pass
-  // identified as the highest-clarity first prompts. These are concrete
-  // and match the user-requested set ("Act as CMO and …", etc.) so a
-  // first-time visitor sees a working menu of real things to try.
+  // YC-wedge starter prompts (2026-04-29). Each prompt maps to a real
+  // system template seeded by `WorkflowTemplateService.seedSystemTemplates`,
+  // so clicking one immediately exercises the full plan → execute → approve
+  // loop without a cold start. Order is "fastest-to-wow first".
   if (pool.length === 0) {
     return [
-      'Act as CMO and create 5 LinkedIn posts about our launch.',
-      'Act as CTO and review github.com/my-org/my-app for security issues.',
-      'Generate 10 leads for stock broker companies in India.',
-      'Create a landing page for my product.',
+      'Research my top 3 competitors and draft a LinkedIn post about how we are different.',
+      'Review my website (replace with your URL) and propose 5 specific fixes with file pointers.',
+      'Draft a cold-email sequence (initial + 3 follow-ups) for early-stage SaaS founders.',
+      'Multi-channel marketing campaign: audience, channel mix, and content drafts for our next launch.',
     ];
   }
   // Return up to 4 unique prompts

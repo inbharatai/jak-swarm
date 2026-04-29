@@ -23,7 +23,7 @@
 import { LandingIcon, type LandingIconName } from './landing-icons';
 
 const PILLARS: Array<{
-  key: 'build' | 'operate' | 'verify';
+  key: 'plan' | 'execute' | 'approve';
   eyebrow: string;
   title: string;
   body: string;
@@ -32,40 +32,40 @@ const PILLARS: Array<{
   iconName: LandingIconName;
 }> = [
   {
-    key: 'build',
-    eyebrow: 'Build',
-    title: 'Ship code, content, and workflows.',
-    body: 'Full-stack apps, automations, and durable code flows — with snapshots, diffs, and reversible deploys.',
+    key: 'plan',
+    eyebrow: 'Plan',
+    title: 'Plain English in. Workflow out.',
+    body: 'Type a task like "research my top 3 competitors and draft a LinkedIn post." JAK turns it into a multi-step plan you can review before anything runs.',
     points: [
-      'App Architect + Code Generator',
-      'Auto-Debug with 3-layer build check',
-      'Checkpoint + one-click revert',
+      'Natural language &rarr; structured plan',
+      'Pre-built templates for research, content, outreach, code review',
+      'Edit the plan before you approve it',
     ],
     color: '#34d399',
     iconName: 'bolt',
   },
   {
-    key: 'operate',
-    eyebrow: 'Operate',
-    title: '38 specialists, one control plane.',
-    body: 'Parallel DAG execution, persistent memory, self-healing retries, and full observability — without the glue code.',
+    key: 'execute',
+    eyebrow: 'Execute',
+    title: 'Specialist agents do the work.',
+    body: 'Research, content, code, design, ops — each task runs on the right specialist, using your connected tools. You watch every step in the cockpit, not a black box.',
     points: [
-      'Parallel workflow execution',
-      'Memory system + context engineering',
-      'Circuit breakers + loop detection',
+      'Live cockpit shows every agent step',
+      'Connects to Gmail, Slack, GitHub, Notion, HubSpot, and 20+ MCP servers',
+      'Self-healing retries when a tool fails',
     ],
     color: '#38bdf8',
     iconName: 'bolt',
   },
   {
-    key: 'verify',
-    eyebrow: 'Verify',
-    title: 'Approvals, audit pack, and risk checks.',
-    body: 'Human approval on every high-risk action, a full SOC 2 / HIPAA / ISO 27001 audit-engagement workflow with HMAC-signed evidence packs, and four-layer fraud detection before your agents act.',
+    key: 'approve',
+    eyebrow: 'Approve & Audit',
+    title: 'Nothing risky ships without you.',
+    body: 'Every external action (send email, post to Slack, deploy code, charge a card) pauses for your approval. The exact tool, files, and expected result are bound to your decision &mdash; replays with a different payload are rejected.',
     points: [
-      '182 controls seeded · 108 operationally backed (SOC 2 / HIPAA / ISO 27001)',
-      'Reviewer-gated workpaper PDFs · final-pack approval gate',
-      'Email / document / invoice / identity verification',
+      'Inline approval card shows tool + files + expected result',
+      'Tamper-evident audit trail on every workflow run',
+      'Optional SOC 2 / HIPAA / ISO 27001 evidence packs when you need them',
     ],
     color: '#f472b6',
     iconName: 'shield',
@@ -78,13 +78,13 @@ export default function WhatJakDoes() {
       <div className="mx-auto max-w-6xl">
         <div className="text-center mb-16 max-w-3xl mx-auto">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">
-            One Platform
+            How JAK Works
           </p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
-            Build. Operate. Verify.
+            Plan. Execute. Approve.
           </h2>
           <p className="mt-4 text-slate-300 font-sans">
-            Three pillars, one control plane. JAK is the single place autonomous work gets planned, executed, and verified &mdash; so it can be trusted.
+            Three steps from a task to a result you trust. Built so a solo founder can ship work that used to need an agency or a team of five.
           </p>
         </div>
 

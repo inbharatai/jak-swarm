@@ -35,32 +35,32 @@ const OUTCOMES: Array<{
   color: string;
 }> = [
   {
-    iconName: 'shield',
-    title: 'SOC 2 Type 2 evidence pack',
-    what: 'Plan controls, auto-map evidence, run LLM-driven control tests, generate per-control workpaper PDFs gated by reviewer approval, sign the final pack.',
-    badges: ['Reviewer-gated workpapers', 'HMAC-signed final pack'],
-    color: '#fb923c',
-  },
-  {
-    iconName: 'rocket',
-    title: 'Production-ready SaaS app',
-    what: 'Describe the app. JAK designs the architecture, generates every file (no stubs), runs a 3-layer build check, debugs failures, deploys.',
-    badges: ['3-layer build check', 'Per-tier model routing'],
-    color: '#34d399',
-  },
-  {
     iconName: 'search',
-    title: 'Market research brief',
-    what: 'Multi-agent research over web + your documents. Citation-density verification gates output. Evidence-backed claims only — uncited statements get flagged before delivery.',
+    title: 'Competitor + market research brief',
+    what: 'Multi-agent research over the web and your own documents. Every claim cites a source — uncited statements get flagged before delivery, not after a customer notices.',
     badges: ['Citation density ≥ 0.7', 'pgvector RAG'],
     color: '#38bdf8',
   },
   {
     iconName: 'mail',
-    title: 'Cold-email campaign',
-    what: 'Persona research, deliverability checks, A/B variants, send-time recommendations — with runtime PII redaction at the LLM boundary so customer data never leaves your control.',
-    badges: ['PII redacted at LLM boundary', 'CAN-SPAM aware'],
+    title: 'LinkedIn posts + outreach drafts',
+    what: 'Researches your company + audience, drafts a LinkedIn post, cold email, and follow-up sequence in your brand voice. Drafts only — nothing publishes or sends without your explicit approval.',
+    badges: ['Brand-voice grounded', 'Send-only-after-approval'],
     color: '#f472b6',
+  },
+  {
+    iconName: 'rocket',
+    title: 'Website / landing-page review + fixes',
+    what: 'Crawls your site, screenshots key pages, reviews design + copy + SEO, and proposes concrete fixes mapped to the source files in your repo. You approve each change before it lands.',
+    badges: ['Source-file pointers', 'Sandbox-only edits'],
+    color: '#34d399',
+  },
+  {
+    iconName: 'shield',
+    title: 'Audit-grade evidence pack (when you need it)',
+    what: 'Every workflow run leaves a tamper-evident audit trail. When you sell to enterprise, the same trail powers SOC 2 / HIPAA / ISO 27001 evidence packs — reviewer-gated, HMAC-signed, ready for an external auditor.',
+    badges: ['Reviewer-gated workpapers', 'HMAC-signed bundles'],
+    color: '#fb923c',
   },
 ];
 
