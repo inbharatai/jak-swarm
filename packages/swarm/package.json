@@ -23,7 +23,7 @@
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/tools": "workspace:^",
     "@jak-swarm/verification": "workspace:^",
-    "@langchain/core": "^1.1.41",
+    "@langchain/core": "^1.1.42",
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint": "^1.0.1",
     "pino": "^9.5.0",
