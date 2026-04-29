@@ -1520,15 +1520,21 @@ export interface ConnectorResolveResponseClient {
 }
 
 export const connectorApi = {
-  /** GET /connectors?category=&status= */
+  /**
+   * GET /connectors?category=&status=
+   *
+   * P2 audit fix: previously this built the query string by hand which
+   * was inconsistent with the rest of api-client.ts and would emit a
+   * trailing `?` for empty params. Now uses `URLSearchParams` (same
+   * pattern as `workflowApi.list`) so encoding edge cases (spaces,
+   * `&`, `=`) are handled by the platform.
+   */
   list: (params?: { category?: string; status?: string }) => {
-    const qs = params
-      ? '?' +
-        Object.entries(params)
-          .filter(([, v]) => v !== undefined && v !== '')
-          .map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`)
-          .join('&')
-      : '';
+    const filtered: Record<string, string> = {};
+    if (params?.category) filtered['category'] = params.category;
+    if (params?.status) filtered['status'] = params.status;
+    const search = new URLSearchParams(filtered).toString();
+    const qs = search ? `?${search}` : '';
     return apiDataFetch<ConnectorListResponse>(`/connectors${qs}`);
   },
 

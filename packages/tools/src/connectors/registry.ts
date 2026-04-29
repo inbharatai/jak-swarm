@@ -22,6 +22,31 @@ import type {
   ConnectorView,
 } from './types.js';
 
+/**
+ * Recursively freezes an object and every nested object/array so a
+ * caller can't mutate `manifest.availableTools[0]` or
+ * `manifest.credentialFields[0].label` after registration. `Object.freeze`
+ * is shallow by default — without this helper the immutable-after-
+ * registration contract would be a lie.
+ *
+ * Skips primitives + already-frozen objects to keep the cost bounded
+ * (manifest objects are small + frozen once at registration time).
+ */
+function deepFreeze<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (Object.isFrozen(obj)) return obj;
+  // Freeze nested values BEFORE freezing the outer object so we can still
+  // walk the tree (Object.freeze is non-recursive but `for…in` still works).
+  for (const key of Object.keys(obj)) {
+    const value = (obj as Record<string, unknown>)[key];
+    if (value && typeof value === 'object') {
+      deepFreeze(value);
+    }
+  }
+  return Object.freeze(obj);
+}
+
 class ConnectorRegistryImpl {
   /** id → manifest. Frozen once registered to prevent runtime mutation. */
   private readonly manifests = new Map<string, ConnectorManifest>();
@@ -43,9 +68,13 @@ class ConnectorRegistryImpl {
     if (this.manifests.has(manifest.id)) {
       throw new Error(`Connector "${manifest.id}" already registered`);
     }
-    // Defensively freeze so callers cannot reach in and mutate fields
-    // (especially riskLevel / canPublishExternalContent) post-registration.
-    this.manifests.set(manifest.id, Object.freeze({ ...manifest }));
+    // Deep-freeze: not just the top-level manifest, also `availableTools`,
+    // `credentialFields`, `manualSetupSteps`, `sourceAllowlist`, etc.
+    // Object.freeze() alone is shallow — without deepFreeze a caller
+    // could mutate `manifest.availableTools[0]` or
+    // `manifest.credentialFields[0].label` post-registration, breaking
+    // the "immutable after registration" honesty contract.
+    this.manifests.set(manifest.id, deepFreeze({ ...manifest }));
     // Default status: `available` for everything except connectors that
     // declare `manualSetupSteps` (those start as `needs_user_setup` so
     // the dashboard immediately tells the user what to do).
@@ -73,14 +102,41 @@ class ConnectorRegistryImpl {
       throw new Error(`Connector "${id}" not registered`);
     }
     const manifest = this.manifests.get(id)!;
+    const previous = this.statuses.get(id);
 
-    // Honesty rule: `installed` and `configured` require a real install
+    // Honesty rule 1: `installed` and `configured` require a real install
     // path. If the manifest declares no installable artifact (no install
     // method AND no MCP), only `available` / `unavailable` /
     // `needs_user_setup` / `disabled` / `blocked_by_policy` are legal.
     if ((status === 'installed' || status === 'configured') && !manifest.installMethod) {
       throw new Error(
         `Cannot set status="${status}" on connector "${id}": manifest declares no installMethod`,
+      );
+    }
+
+    // Honesty rule 2 (post-launch audit): for connectors that DO have an
+    // installable artifact, `configured` must have been preceded by
+    // `installed`. Skipping straight from `available` to `configured`
+    // would mean a caller persisted credentials without ever running the
+    // install command — the dashboard would lie. Pure-API connectors
+    // (no installMethod) are exempt: their lifecycle is
+    // `available → configured` once credentials are saved.
+    if (
+      status === 'configured' &&
+      manifest.installMethod &&
+      previous !== 'installed' &&
+      previous !== 'configured'
+    ) {
+      throw new Error(
+        `Cannot set status="configured" on connector "${id}" from previous="${previous}": installable connector must transition through "installed" first`,
+      );
+    }
+
+    // Honesty rule 3: `failed_validation` must have a reason for the
+    // dashboard to render. Empty strings are not reasons.
+    if (status === 'failed_validation' && (!reason || reason.trim() === '')) {
+      throw new Error(
+        `Cannot set status="failed_validation" on connector "${id}" without a non-empty reason`,
       );
     }
 

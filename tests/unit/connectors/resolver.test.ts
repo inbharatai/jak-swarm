@@ -96,6 +96,39 @@ describe('resolveConnectorsForTask', () => {
     expect(result.alternatives.length).toBeLessThanOrEqual(1);
   });
 
+  it('does NOT raise Slack as primary for generic "post in #general" without "slack" mention', () => {
+    // P2 audit fix: the old "post in channel" pattern would match
+    // "post in our Discord channel" and pick Slack as primary at 0.5
+    // confidence. Now the Slack pattern requires "slack" in the same
+    // sentence (or a Slack-specific intent). Discord-named tasks should
+    // route to Discord (or no primary if Discord isn't seeded with the
+    // matching pattern).
+    const result = resolveConnectorsForTask('Post a heads-up in our #general engineering channel');
+    expect(result.primary?.connectorId).not.toBe('mcp-slack');
+  });
+
+  it('still raises Slack when the task explicitly mentions Slack', () => {
+    const result = resolveConnectorsForTask('Post a heads-up in our Slack #general channel');
+    expect(result.primary?.connectorId).toBe('mcp-slack');
+  });
+
+  it('returns "Ready to use" nextStep for configured connectors (regression for missing switch case)', async () => {
+    // Bug: nextStepForStatus had no case for `configured` — fell
+    // through to the default branch and returned generic "See the
+    // Connectors page for next steps". A configured connector is
+    // ready to use; the resolver must say so.
+    //
+    // Configured requires a manifest with installMethod + a successful
+    // installed transition, then setStatus('configured').
+    connectorRegistry.setStatus('remotion', 'installed');
+    connectorRegistry.setStatus('remotion', 'configured');
+    const result = resolveConnectorsForTask('Render a Remotion video');
+    expect(result.primary?.connectorId).toBe('remotion');
+    expect(result.primary?.isReady).toBe(true);
+    // Reset for downstream tests in the same describe
+    connectorRegistry.setStatus('remotion', 'available');
+  });
+
   it('every candidate carries a non-empty reason for the dashboard', () => {
     const result = resolveConnectorsForTask('Create a YouTube short from our pitch deck');
     expect(result.primary).toBeDefined();

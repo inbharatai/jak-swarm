@@ -234,11 +234,19 @@ function ConnectorCard({ view }: { view: ConnectorViewClient }) {
         </div>
       )}
 
-      {/* Tool count */}
+      {/* Tool count.
+          P2 audit fix: the red "N live" banner used to render whenever
+          `installedToolCount !== availableTools.length`, but
+          `installedToolCount` is undefined for un-installed connectors
+          (every connector at boot today). That false-positive made every
+          card look broken. Now the divergence note only renders when
+          (a) we've recorded a real validation AND (b) the live count
+          actually differs. Otherwise we render a neutral count. */}
       {view.manifest.availableTools.length > 0 && (
         <div className="text-[10px] font-mono text-muted-foreground">
           Exposes {view.manifest.availableTools.length} tool{view.manifest.availableTools.length === 1 ? '' : 's'}
-          {view.installedToolCount !== undefined && view.installedToolCount !== view.manifest.availableTools.length && (
+          {typeof view.installedToolCount === 'number'
+            && view.installedToolCount !== view.manifest.availableTools.length && (
             <span className="text-rose-600 dark:text-rose-400"> · {view.installedToolCount} live</span>
           )}
         </div>

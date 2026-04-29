@@ -65,14 +65,24 @@ function mcpProviderToManifest(key: string, def: McpProviderDef): ConnectorManif
   };
 }
 
-/** Category inference: groups MCP providers into the same UI buckets the
-    handwritten manifests use. */
+/**
+ * Category inference: groups MCP providers into the same UI buckets the
+ * handwritten manifests use.
+ *
+ * P1 audit fix: GOOGLE_DRIVE used to be bucketed `local` because the
+ * filesystem-style MCP server lived next to it. Drive is a cloud SaaS
+ * — moved to `cloud` so the dashboard surfaces it correctly. Stripe /
+ * Salesforce / HubSpot / SendGrid are also SaaS that happen to involve
+ * code paths; they stay in the categories that match the user's mental
+ * model (devs reach for Stripe in `business`, not `cloud`).
+ */
 function inferCategory(key: string): ConnectorManifest['category'] {
   const k = key.toUpperCase();
-  if (['SLACK', 'NOTION', 'HUBSPOT', 'CLICKUP', 'AIRTABLE', 'SENDGRID', 'DISCORD', 'LINEAR'].includes(k)) return 'business';
-  if (['GITHUB', 'STRIPE', 'SUPABASE', 'POSTGRES', 'SENTRY', 'SALESFORCE'].includes(k)) return 'coding';
+  if (['SLACK', 'NOTION', 'HUBSPOT', 'CLICKUP', 'AIRTABLE', 'SENDGRID', 'DISCORD', 'LINEAR', 'STRIPE', 'SALESFORCE'].includes(k)) return 'business';
+  if (['GITHUB', 'SENTRY', 'SUPABASE', 'POSTGRES'].includes(k)) return 'coding';
   if (['BRAVE_SEARCH', 'FETCH', 'PUPPETEER'].includes(k)) return 'research';
-  if (['GOOGLE_DRIVE', 'FILESYSTEM', 'MEMORY', 'SEQUENTIAL_THINKING'].includes(k)) return 'local';
+  if (['GOOGLE_DRIVE'].includes(k)) return 'cloud';
+  if (['FILESYSTEM', 'MEMORY', 'SEQUENTIAL_THINKING'].includes(k)) return 'local';
   return 'business';
 }
 
@@ -102,15 +112,38 @@ function hasUserDataAccess(key: string): boolean {
   return ['HUBSPOT', 'SALESFORCE', 'SENDGRID', 'GMAIL', 'GOOGLE_DRIVE', 'SUPABASE', 'POSTGRES'].includes(key.toUpperCase());
 }
 
-/** Extract the npm package name out of an MCP buildConfig.args list.
-    Most are `['-y', '@scope/name']` — we want the @scope/name. */
+/**
+ * Extract the npm package name out of an MCP buildConfig.args list.
+ * Most are `['-y', '@scope/name']` — we want the @scope/name.
+ *
+ * P1 audit fix: previously this fell back to `cfg.command` (typically
+ * `'npx'` or `'pip'`) when no scoped/slashed package arg was present.
+ * That generic command was then written to the connector's
+ * `sourceAllowlist`, defeating the allowlist's purpose — any future
+ * install command using the same runner would pass the gate. Now we
+ * return a tagged sentinel that callers (and the install gate) can
+ * recognize as "extraction failed; reject the install". Never silently
+ * permissive.
+ */
+const MCP_PACKAGE_EXTRACTION_FAILED = '__mcp_package_extraction_failed__';
+
 function extractMcpPackage(def: McpProviderDef): string {
   try {
     const cfg = def.buildConfig({});
+    // Look for a scoped (`@org/pkg`) or path-shaped (`org/pkg`) arg first
+    // — those are real npm package identifiers.
     const pkgArg = cfg.args.find((a) => a.startsWith('@') || a.includes('/'));
-    return pkgArg ?? cfg.command;
+    if (pkgArg) return pkgArg;
+    // Some MCP servers ship as a single binary name in args[0] (rare).
+    // Accept that ONLY if it looks like a real package name (alpha + hyphens),
+    // not a generic runner like `npx` / `pip` / `node` / `python`.
+    const generic = new Set(['npx', 'npm', 'pnpm', 'yarn', 'pip', 'pip3', 'node', 'python', 'python3', '-y', '--yes']);
+    const candidate = cfg.args.find((a) => !generic.has(a) && /^[a-z][a-z0-9-]+$/i.test(a));
+    if (candidate) return candidate;
+    // No real package name extracted — fail closed.
+    return MCP_PACKAGE_EXTRACTION_FAILED;
   } catch {
-    return 'unknown-mcp-package';
+    return MCP_PACKAGE_EXTRACTION_FAILED;
   }
 }
 

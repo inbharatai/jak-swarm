@@ -123,6 +123,36 @@ describe('Connector manifests', () => {
     });
   });
 
+  describe('post-launch audit fixes', () => {
+    it('moves GOOGLE_DRIVE out of "local" category (Drive is SaaS, not local)', () => {
+      // Bug: GOOGLE_DRIVE was bucketed `local` because the filesystem
+      // MCP shipped as a sibling. Drive is a cloud SaaS; the dashboard
+      // shouldn't list it under local utilities.
+      const drive = connectorRegistry.get('mcp-google-drive');
+      expect(drive).toBeDefined();
+      expect(drive!.manifest.category).not.toBe('local');
+      expect(drive!.manifest.category).toBe('cloud');
+    });
+
+    it('does NOT pollute sourceAllowlist with generic command runners (npx/pip/node)', () => {
+      // Bug: when extractMcpPackage couldn't find a real package name
+      // it fell back to `cfg.command` (typically 'npx' or 'pip'), which
+      // was then written to sourceAllowlist — defeating the gate's
+      // purpose. Now it returns a sentinel that callers reject.
+      //
+      // Verify: no auto-mapped MCP connector has 'npx', 'pip', 'node',
+      // 'python' in its sourceAllowlist.
+      const all = connectorRegistry.list().filter((v) => v.manifest.source === 'mcp-providers');
+      const generic = new Set(['npx', 'npm', 'pnpm', 'yarn', 'pip', 'pip3', 'node', 'python', 'python3', '-y', '--yes']);
+      for (const view of all) {
+        const allowlist = view.manifest.sourceAllowlist ?? [];
+        for (const entry of allowlist) {
+          expect(generic.has(entry)).toBe(false);
+        }
+      }
+    });
+  });
+
   describe('truth invariant: marketing-mentioned connectors are all registered', () => {
     it('every product-truth INTEGRATIONS_CORE name has a corresponding registry entry', () => {
       // This guards the truth-check contract: if marketing claims a

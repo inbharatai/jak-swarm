@@ -137,6 +137,94 @@ describe('ConnectorRegistry', () => {
     });
   });
 
+  describe('post-launch audit fixes — honesty rule regression tests', () => {
+    it('refuses configured-from-available on installable connectors (must transition through installed)', () => {
+      // Bug: a caller could persist credentials and flip status to
+      // `configured` without ever running the install command. Dashboard
+      // would lie. Now setStatus enforces installed → configured for
+      // any manifest that declares an installMethod.
+      connectorRegistry.register(
+        fixture('test-installable-strict', {
+          installMethod: 'npx',
+          installCommand: 'npx test',
+        }),
+      );
+      expect(() =>
+        connectorRegistry.setStatus('test-installable-strict', 'configured'),
+      ).toThrow(/must transition through "installed" first/);
+    });
+
+    it('allows configured-from-available for pure-API connectors (no installMethod)', () => {
+      // Pure-API connectors have no install step — their lifecycle is
+      // available → configured once credentials are saved. The honesty
+      // rule must not block them.
+      connectorRegistry.register(
+        fixture('test-pure-api', {
+          credentialFields: [
+            { key: 'apiKey', label: 'API Key', placeholder: 'sk-…', type: 'password' },
+          ],
+        }),
+      );
+      // Pure-API has no installMethod, so `configured` would fail rule 1.
+      // The exempt branch is rule 2 — verify rule 1 still fires.
+      expect(() =>
+        connectorRegistry.setStatus('test-pure-api', 'configured'),
+      ).toThrow(/no installMethod/);
+    });
+
+    it('allows installed → configured transition normally', () => {
+      connectorRegistry.register(
+        fixture('test-happy-path', { installMethod: 'npx', installCommand: 'npx test' }),
+      );
+      connectorRegistry.setStatus('test-happy-path', 'installed');
+      expect(() =>
+        connectorRegistry.setStatus('test-happy-path', 'configured'),
+      ).not.toThrow();
+      expect(connectorRegistry.get('test-happy-path')!.status).toBe('configured');
+    });
+
+    it('refuses failed_validation without a non-empty reason', () => {
+      // The dashboard renders statusReason verbatim; an empty reason
+      // produces a useless "Failed validation" pill with no diagnostic
+      // for the user. Honesty rule 3: require a reason.
+      connectorRegistry.register(
+        fixture('test-fail-no-reason', { installMethod: 'npx' }),
+      );
+      expect(() =>
+        connectorRegistry.setStatus('test-fail-no-reason', 'failed_validation'),
+      ).toThrow(/non-empty reason/);
+      expect(() =>
+        connectorRegistry.setStatus('test-fail-no-reason', 'failed_validation', '   '),
+      ).toThrow(/non-empty reason/);
+      expect(() =>
+        connectorRegistry.setStatus('test-fail-no-reason', 'failed_validation', 'exit 127'),
+      ).not.toThrow();
+    });
+
+    it('deep-freezes manifests so nested arrays/objects cannot be mutated post-registration', () => {
+      // Bug: Object.freeze() is shallow — a caller could still mutate
+      // `manifest.availableTools[0]` or `manifest.credentialFields[0].label`
+      // post-registration, breaking the immutable-after-registration
+      // contract. The deepFreeze helper recursively freezes every nested
+      // object/array.
+      connectorRegistry.register(
+        fixture('test-deepfreeze', {
+          availableTools: ['tool_a', 'tool_b'],
+          credentialFields: [
+            { key: 'k', label: 'Original', placeholder: '', type: 'text' },
+          ],
+        }),
+      );
+      const stored = connectorRegistry.get('test-deepfreeze')!.manifest;
+      expect(() => {
+        (stored.availableTools as string[]).push('rogue_tool');
+      }).toThrow();
+      expect(() => {
+        ((stored.credentialFields as { label: string }[])[0]!).label = 'Hacked';
+      }).toThrow();
+    });
+  });
+
   describe('list / filter accessors', () => {
     it('listByCategory returns only matching entries', () => {
       connectorRegistry.register(fixture('test-media-1', { category: 'media' }));

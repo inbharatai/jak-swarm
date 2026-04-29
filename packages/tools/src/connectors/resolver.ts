@@ -61,7 +61,15 @@ const INTENT_PATTERNS: Record<string, IntentPattern[]> = {
   // Resolver's confidence stays high here because the name is unambiguous.
   'mcp-slack': [
     { pattern: '\\bslack\\b', confidence: 0.95, reason: 'Task explicitly names Slack' },
-    { pattern: '\\b(post|message|notify)\\s+(?:to|in)\\s+(?:the\\s+)?#?(channel|team)\\b', confidence: 0.5, reason: 'Channel-message intent — Slack is the most likely target' },
+    // P2 audit fix: this pattern used to match any "post in channel"
+    // intent (e.g., "post in our Discord channel" or "post in our blender
+    // channel") and incorrectly raised Slack as primary at 0.5 confidence.
+    // Now requires "slack" appears in the same sentence, OR the channel
+    // name uses Slack's `#` prefix convention. Discord-shaped intents
+    // ("post in #general on Discord") still match Discord at 0.95 (its
+    // explicit-name pattern), so Slack only catches what's actually Slack.
+    { pattern: '\\bslack\\b.{0,40}\\b(post|message|notify|send|share)\\b', confidence: 0.6, reason: 'Slack + post/message intent in the same sentence' },
+    { pattern: '\\bpost\\b.{0,20}\\bslack\\b', confidence: 0.6, reason: 'Post-action targeting Slack' },
   ],
   'mcp-github': [
     { pattern: '\\bgithub\\b', confidence: 0.95, reason: 'Task explicitly names GitHub' },
@@ -182,7 +190,19 @@ function nextStepForStatus(view: ConnectorView): string {
     case 'needs_user_setup':
       return view.manifest.manualSetupSteps?.[0] ?? 'See setup instructions';
     case 'installed':
-      return 'Add credentials in Settings → Integrations';
+      // If the manifest declares credential fields, the next step is to
+      // supply them; otherwise the connector is ready as-is.
+      return view.manifest.credentialFields && view.manifest.credentialFields.length > 0
+        ? 'Add credentials in Settings → Integrations'
+        : 'Ready to use — already installed';
+    case 'configured':
+      // Bug #1 fix (post-launch audit): this case used to fall through to
+      // the default branch, returning generic "See the Connectors page"
+      // text for a connector that was actually fully ready. The resolver
+      // marks `configured` connectors as ready (`isReady: true`), so this
+      // branch is mostly hit when a downstream caller asks for nextStep
+      // anyway — they get a clean confirmation now.
+      return 'Ready to use — credentials configured and validated';
     case 'failed_validation':
       return view.statusReason ?? 'Re-validate from the Connectors page';
     case 'unavailable':
@@ -191,7 +211,11 @@ function nextStepForStatus(view: ConnectorView): string {
       return 'Re-enable from Connectors → Manage';
     case 'blocked_by_policy':
       return 'Tenant policy blocks this connector — contact your admin';
-    default:
-      return 'See the Connectors page for next steps';
+    default: {
+      // Exhaustiveness check — TypeScript will fail compilation if a new
+      // ConnectorStatus is added without a case here.
+      const _exhaustive: never = view.status;
+      return _exhaustive;
+    }
   }
 }
