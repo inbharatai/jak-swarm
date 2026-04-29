@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ github.sha }}
           path: coverage/
@@ -316,7 +316,7 @@ jobs:
           upload-release-assets: false
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
           path: sbom.json
@@ -366,7 +366,7 @@ jobs:
 
       - name: Upload truth report artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: truth-report
           path: docs/_generated/truth-report.json
