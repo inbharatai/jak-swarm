@@ -5,6 +5,99 @@ export enum ToolRiskClass {
   EXTERNAL_SIDE_EFFECT = 'EXTERNAL_SIDE_EFFECT',
 }
 
+/**
+ * Six-level tool-capability risk lattice (Item D of the OpenClaw-inspired
+ * Phase 1). The 4-class `ToolRiskClass` lumps too many operations into
+ * `WRITE` and `EXTERNAL_SIDE_EFFECT`, which forces the approval gate into
+ * over-conservative behavior. The 6-level lattice gives the policy engine
+ * a per-tool capability description that the approval-node can map to a
+ * specific gate without losing precision.
+ *
+ * Ordering (lowest risk first — used for threshold comparison):
+ *   READ_ONLY              < DRAFT_ONLY
+ *   < SANDBOX_EDIT
+ *   < LOCAL_EXEC_ALLOWLIST
+ *   < EXTERNAL_ACTION_APPROVAL
+ *   < CRITICAL_MANUAL_ONLY
+ *
+ * `ToolRiskClass` stays exported for back-compat — every existing tool
+ * registration continues to compile. The runtime maps the old value to
+ * a level via `RISK_CLASS_TO_LEVEL` below; new tool registrations may
+ * use `riskLevel` directly via the optional `ToolMetadata.riskLevel`
+ * field.
+ *
+ * Note on scope: this is a TOOL-capability lattice. The four-tier
+ * task-level `RiskLevel` enum in `workflow.ts` (LOW/MEDIUM/HIGH/CRITICAL)
+ * stays — that one is for approval-threshold comparison. Different
+ * axis, different lattice.
+ */
+export enum ToolRiskLevel {
+  /** No side effects. Reading public APIs, fetching documents the
+      tenant already has access to, summarizing in-memory data. */
+  READ_ONLY = 'READ_ONLY',
+  /** Produces a drafted artifact (email draft, social post draft,
+      generated code). The artifact is materialized somewhere the user
+      can review, but no external action has been taken. */
+  DRAFT_ONLY = 'DRAFT_ONLY',
+  /** Mutates files inside a sandbox or workspace copy only. The tenant's
+      production state is untouched. Generated SaaS apps + Remotion
+      project scaffolding land here. */
+  SANDBOX_EDIT = 'SANDBOX_EDIT',
+  /** Runs a local subprocess from an allowlisted package (e.g. Remotion
+      CLI render). Requires `sourceAllowlist` in the connector manifest. */
+  LOCAL_EXEC_ALLOWLIST = 'LOCAL_EXEC_ALLOWLIST',
+  /** Sends, posts, or deploys to a third party (Slack message, email
+      send, Vercel deploy, Stripe charge create). ALWAYS requires an
+      approval — auto-approve only for tenants that have explicitly
+      opted in for this exact tool name. */
+  EXTERNAL_ACTION_APPROVAL = 'EXTERNAL_ACTION_APPROVAL',
+  /** Destructive on production state (DELETE on prod DB, payment
+      refund, mass message, secret rotation). NEVER auto-approves
+      regardless of tenant settings. */
+  CRITICAL_MANUAL_ONLY = 'CRITICAL_MANUAL_ONLY',
+}
+
+/**
+ * Numeric ordering for threshold comparison (smaller = lower risk).
+ * Mirrors `RISK_ORDER` in `approval-node.ts` so a single comparison
+ * works for both task-risk and tool-risk axes.
+ */
+export const TOOL_RISK_LEVEL_ORDER: Record<ToolRiskLevel, number> = {
+  [ToolRiskLevel.READ_ONLY]: 1,
+  [ToolRiskLevel.DRAFT_ONLY]: 2,
+  [ToolRiskLevel.SANDBOX_EDIT]: 3,
+  [ToolRiskLevel.LOCAL_EXEC_ALLOWLIST]: 4,
+  [ToolRiskLevel.EXTERNAL_ACTION_APPROVAL]: 5,
+  [ToolRiskLevel.CRITICAL_MANUAL_ONLY]: 6,
+};
+
+/**
+ * Back-compat map: every existing tool registered with `ToolRiskClass`
+ * gets a default `ToolRiskLevel`. Conservative — when the old enum is
+ * ambiguous (e.g. WRITE could mean DRAFT_ONLY or SANDBOX_EDIT), we pick
+ * the SAFER option (SANDBOX_EDIT > DRAFT_ONLY by ordering) so an
+ * unannotated tool can never accidentally auto-approve more than it
+ * could before.
+ */
+export const RISK_CLASS_TO_LEVEL: Record<ToolRiskClass, ToolRiskLevel> = {
+  [ToolRiskClass.READ_ONLY]: ToolRiskLevel.READ_ONLY,
+  [ToolRiskClass.WRITE]: ToolRiskLevel.SANDBOX_EDIT,
+  [ToolRiskClass.DESTRUCTIVE]: ToolRiskLevel.CRITICAL_MANUAL_ONLY,
+  [ToolRiskClass.EXTERNAL_SIDE_EFFECT]: ToolRiskLevel.EXTERNAL_ACTION_APPROVAL,
+};
+
+/**
+ * Resolves the canonical `ToolRiskLevel` for a tool, preferring an
+ * explicit `riskLevel` if the registration has one (new code path),
+ * falling back to the back-compat map of the legacy `riskClass`.
+ */
+export function resolveToolRiskLevel(
+  riskClass: ToolRiskClass,
+  explicitRiskLevel?: ToolRiskLevel,
+): ToolRiskLevel {
+  return explicitRiskLevel ?? RISK_CLASS_TO_LEVEL[riskClass];
+}
+
 export enum ToolCategory {
   EMAIL = 'EMAIL',
   CALENDAR = 'CALENDAR',
@@ -48,7 +141,17 @@ export interface ToolMetadata {
   name: string;
   description: string;
   category: ToolCategory;
+  /** Legacy 4-class capability label. Preserved for back-compat. New
+      tool registrations may set `riskLevel` directly; the back-compat
+      map in `RISK_CLASS_TO_LEVEL` resolves the level when only
+      `riskClass` is set. */
   riskClass: ToolRiskClass;
+  /** New 6-level capability lattice (Item D of the OpenClaw-inspired
+      Phase 1). When present, takes precedence over the legacy
+      `riskClass` for approval-gate comparisons. Use
+      `resolveToolRiskLevel(riskClass, riskLevel)` in code that needs
+      the canonical value. */
+  riskLevel?: ToolRiskLevel;
   requiresApproval: boolean;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;

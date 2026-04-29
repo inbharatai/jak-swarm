@@ -282,6 +282,58 @@ ${lines.join('\n')}
   }
 
   /**
+   * Inject bundled SKILL.md packs into the message array — Item A of the
+   * OpenClaw-inspired Phase 1.
+   *
+   * For each bundled skill pack whose `allowed-tools` overlaps with the
+   * tools this agent has declared for this run, append the skill's
+   * system-prompt block AFTER the agent's primary system prompt. The
+   * resulting block reads as additional guidance, not primary
+   * instructions.
+   *
+   * Non-blocking: any failure (filesystem absent, parse failure, no
+   * matching skill) returns the messages unchanged. The cockpit doesn't
+   * need to know whether skills fired — the trace records the full
+   * system message so an operator can confirm post-hoc.
+   *
+   * Lazy-loaded so a stripped-down test environment that doesn't link
+   * `@jak-swarm/skills` doesn't blow up on import. The Phase 1 plan ships
+   * only the bundled tier; the full precedence cascade (workspace > project
+   * > org > tenant > user > bundled) composes by passing additional
+   * directories into `loadSkills()`.
+   */
+  protected async injectBundledSkills(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    declaredToolNames: Set<string>,
+  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
+    if (declaredToolNames.size === 0) return messages;
+    try {
+      const skillsModule = await import('@jak-swarm/skills');
+      const formatBundledSkillsForAgent = (
+        skillsModule as { formatBundledSkillsForAgent?: (tools: string[]) => string }
+      ).formatBundledSkillsForAgent;
+      if (typeof formatBundledSkillsForAgent !== 'function') return messages;
+
+      const block = formatBundledSkillsForAgent([...declaredToolNames]);
+      if (!block) return messages;
+
+      const skillBlock: OpenAI.ChatCompletionMessageParam = {
+        role: 'system',
+        content: block,
+      };
+      const result = [...messages];
+      const sysIdx = result.findIndex((m) => m.role === 'system');
+      // Insert AFTER any company-context block (which is already at sysIdx+1
+      // by injectCompanyContext convention) so skills sit below it.
+      const insertAt = sysIdx === -1 ? 0 : Math.min(sysIdx + 2, result.length);
+      result.splice(insertAt, 0, skillBlock);
+      return result;
+    } catch {
+      return messages;
+    }
+  }
+
+  /**
    * Inject tenant memories into the message array.
    * Inserts a <memory> block after the system message with ranked, token-budgeted facts.
    * Non-blocking — memory fetch failures never break the LLM call.
@@ -594,7 +646,14 @@ ${lines.join('\n')}
     // level (swarm-execution.persistIntentAndContext); agent-level emit
     // is intentionally omitted to avoid double-counting.
     const grounded = await this.injectCompanyContext(messages, context);
-    const conversation = [...grounded.messages];
+    // Item A (OpenClaw-inspired Phase 1) — inject bundled skills BEFORE the
+    // tool loop starts so the system prompt the LLM sees is the same on
+    // every iteration. Skills fire only when at least one declared tool
+    // overlaps with the pack's `allowed-tools`, so non-matching agents
+    // pay no token overhead.
+    const declaredToolNamesForSkills = new Set(tools.map((t) => t.function.name));
+    const enriched = await this.injectBundledSkills(grounded.messages, declaredToolNamesForSkills);
+    const conversation = [...enriched];
     const toolCallFingerprints: ToolCallFingerprints = new Map();
 
     // Sprint 2.4 / Item G — PII auto-redaction in LLM prompts.

@@ -69,3 +69,30 @@ export class WorkflowStateError extends AppError {
     this.name = 'WorkflowStateError';
   }
 }
+
+/**
+ * Approval payload-binding violation — Item B of the OpenClaw-inspired
+ * Phase 1. Raised when the canonical hash of an approval's proposedData
+ * at decide-time differs from the hash captured at create-time.
+ *
+ * In practice this means the proposedData was mutated between create
+ * and decide (whether via a buggy code path or a tampered DB row). The
+ * approver may have looked at one payload and unintentionally approved
+ * a different one, so the route layer rejects the decision rather than
+ * letting the resume proceed under stale assumptions.
+ *
+ * The 409 status keeps the `WorkflowStateError` peer's HTTP shape;
+ * `details.expectedHash` + `details.observedHash` give operators the
+ * forensic context to diff what changed.
+ */
+export class ApprovalPayloadMismatchError extends AppError {
+  constructor(expectedHash: string, observedHash: string) {
+    super(
+      409,
+      'APPROVAL_PAYLOAD_MISMATCH',
+      'Approval payload has changed since the request was created — re-create the approval rather than reusing the prior approvalId',
+      { expectedHash, observedHash },
+    );
+    this.name = 'ApprovalPayloadMismatchError';
+  }
+}

@@ -1282,12 +1282,29 @@ export class SwarmExecutionService extends EventEmitter {
             timestamp: new Date().toISOString(),
           }, tenantId, userId);
         }
+        // Item B (OpenClaw-inspired Phase 1): the cockpit's inline approval
+        // card needs the SPECIFIC tool / files / external service / expected
+        // result that the reviewer is binding their decision to. Surface
+        // them on the same `paused` event the cockpit already consumes —
+        // pulling from the FIRST pending approval (the one the workflow is
+        // blocked on right now). Keeps the legacy event shape additive: old
+        // clients ignore the extra fields.
+        const primary = pendingApprovals[0];
         this.emit(`workflow:${workflowId}`, {
           type: 'paused',
           workflowId,
           reason: 'awaiting_approval',
           pendingApprovalIds: pendingIds,
           timestamp: new Date().toISOString(),
+          ...(primary?.id ? { approvalId: primary.id } : {}),
+          ...(primary?.action ? { taskName: primary.action } : {}),
+          ...(primary?.toolName ? { toolName: primary.toolName } : {}),
+          ...(primary?.filesAffected && primary.filesAffected.length > 0
+            ? { filesAffected: primary.filesAffected }
+            : {}),
+          ...(primary?.externalService ? { externalService: primary.externalService } : {}),
+          ...(primary?.expectedResult ? { expectedResult: primary.expectedResult } : {}),
+          ...(primary?.proposedDataHash ? { proposedDataHash: primary.proposedDataHash } : {}),
         });
       }
 
@@ -1905,6 +1922,14 @@ export class SwarmExecutionService extends EventEmitter {
           rationale: approval.rationale,
           proposedDataJson: approval.proposedData as Record<string, unknown>,
           riskLevel: String(approval.riskLevel),
+          // Item B (OpenClaw-inspired Phase 1) — reviewer-context surface.
+          // Pass through whatever the approval-node populated; the
+          // create method computes the canonical-hash + persists.
+          toolName: approval.toolName,
+          filesAffected: approval.filesAffected,
+          externalService: approval.externalService,
+          idempotencyKey: approval.idempotencyKey,
+          expectedResult: approval.expectedResult,
         });
       } catch (err) {
         this.log.warn(

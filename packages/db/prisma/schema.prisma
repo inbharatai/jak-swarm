@@ -46,6 +46,7 @@ model Tenant {
   whatsappLinks  WhatsappLink[]
   onboardingState OnboardingState?
   schedules       WorkflowSchedule[]
+  standingOrders  StandingOrder[]
   projects        Project[]
   vectorDocuments VectorDocument[]
   tenantDocuments TenantDocument[]
@@ -303,12 +304,55 @@ model ApprovalRequest {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // Item B fields (OpenClaw-inspired Phase 1) — give the approval card
+  // enough context for a reviewer to make an informed decision AND bind
+  // the approval to a specific payload so a caller can't replay the same
+  // approvalId for a different proposedData.
+  //
+  // proposedDataHash is sha256 of the canonicalised proposedDataJson at
+  // approval-creation time. The decide route compares the hash of the
+  // CURRENTLY-stored proposedData to this value and returns 409 if they
+  // differ — preventing the "approve once, replay with different
+  // payload" exploit.
+  proposedDataHash String?
+  toolName         String?   // The tool the action will invoke (e.g. "send_email", "stripe_charge")
+  filesAffected    String[]  // Files this action will write to / overwrite
+  externalService  String?   // External system this action targets (e.g. "Slack", "Stripe", "GitHub")
+  idempotencyKey   String?   // Dedup key — retrying the decide for the same key is a no-op
+  expectedResult   String?   // 1-line preview of what success looks like, surfaced in the card
+
   workflow         Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   reviewer         User?     @relation("reviewer", fields: [reviewedBy], references: [id])
+  approvalScopes   ApprovalScope[]
 
   @@index([workflowId, status])
   @@index([tenantId, status])
+  @@index([proposedDataHash])
   @@map("approval_requests")
+}
+
+// Item B: ApprovalScope — one row per approval decision, persists the
+// payload-hash that was decided. The decide route writes this row inside
+// the same transaction as the ApprovalRequest status update. Subsequent
+// retries with a different proposedDataHash are rejected because the
+// route looks up the canonical hash from this table.
+//
+// The (approvalId, proposedDataHash) composite is unique — replaying the
+// SAME hash is an idempotent no-op (returns the original decision);
+// replaying a DIFFERENT hash triggers APPROVAL_PAYLOAD_MISMATCH.
+model ApprovalScope {
+  id               String    @id @default(cuid())
+  approvalId       String
+  proposedDataHash String
+  decidedAt        DateTime  @default(now())
+  decision         String    // APPROVED | REJECTED | DEFERRED
+  approverId       String?
+
+  approval         ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalId, proposedDataHash])
+  @@index([approvalId])
+  @@map("approval_scopes")
 }
 
 // Append-only audit log of every approval decision ever made, including
@@ -662,10 +706,88 @@ model WorkflowSchedule {
   updatedAt       DateTime  @updatedAt
 
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Item C (OpenClaw-inspired Phase 1) — at most one StandingOrder per
+  // schedule. The relation is optional on both sides: a schedule can fire
+  // without a standing-order boundary, and a standing-order can apply to
+  // a tenant globally without being attached to a specific schedule.
+  standingOrders  StandingOrder[]
 
   @@index([tenantId, enabled])
   @@index([nextRunAt])
   @@map("workflow_schedules")
+}
+
+// Item C (OpenClaw-inspired Phase 1) — Standing Orders.
+//
+// A StandingOrder is a per-tenant policy contract that bounds the
+// autonomy of one (or more) WorkflowSchedules: it can ALLOWLIST the
+// tools the schedule may use, BLOCKLIST specific actions or risk
+// levels, set a per-fire budget, and impose an expiry after which the
+// schedule stops firing.
+//
+// We deliberately keep the policy on a separate model rather than
+// folding the fields into WorkflowSchedule directly:
+//   - Schedules stay "dumb" (cron + goal + maxCostUsd) and reusable
+//   - A standing order can exist WITHOUT a schedule (e.g. tenant-wide
+//     "approval required for any external action ever") via
+//     `workflowScheduleId = null`
+//   - The model mirrors the `ScheduledAttestation` pattern already used
+//     for compliance: a contract that the scheduler enforces at fire time.
+//
+// Hard rules enforced at fire time (apps/api/src/services/scheduler.service.ts):
+//   - `expiresAt < now`: schedule does NOT fire (stale rows expire on
+//     fetch even if they haven't been disabled)
+//   - `budgetUsd`: takes precedence over WorkflowSchedule.maxCostUsd
+//     when LOWER (never raises the cap)
+//   - `allowedTools`: passed through to disabledToolNames inversion
+//     (whitelist → block-everything-else)
+//   - `blockedActions`: appended to disabledToolNames
+//   - `approvalRequiredFor`: forces tasks at these tool/risk levels
+//     through the approval gate even when auto-approve is on
+model StandingOrder {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  userId              String
+  /// Optional FK — null means the order applies globally to the tenant
+  /// (e.g. "approve nothing destructive ever"); a string FK means the
+  /// order is scoped to that one schedule's fires.
+  workflowScheduleId  String?
+  name                String
+  description         String?
+
+  /// Tool names the schedule MAY invoke. Empty = no whitelist (all tools
+  /// allowed except those in blockedActions). Non-empty = strict
+  /// whitelist (only listed tools allowed).
+  allowedTools        String[]  @default([])
+  /// Tool names the schedule MAY NOT invoke under any circumstance.
+  /// Wins over allowedTools when both list a tool.
+  blockedActions      String[]  @default([])
+  /// ToolRiskLevel / RiskLevel values that ALWAYS require human approval
+  /// regardless of the tenant's auto-approve setting. e.g. ["EXTERNAL_ACTION_APPROVAL",
+  /// "CRITICAL_MANUAL_ONLY"]. Empty = use the tenant's default threshold.
+  approvalRequiredFor String[]  @default([])
+  /// Optional source allowlist (e.g. for connector manifests that fan
+  /// out across providers). Empty = no source restriction.
+  allowedSources      String[]  @default([])
+  /// Per-fire USD budget. When set, overrides WorkflowSchedule.maxCostUsd
+  /// IF LOWER. Never raises the cap.
+  budgetUsd           Float?
+  /// Hard expiry. Once `now > expiresAt`, the schedule stops firing.
+  /// Independent of `enabled` so a stale order that someone forgot to
+  /// disable still expires honestly.
+  expiresAt           DateTime?
+  enabled             Boolean   @default(true)
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflowSchedule    WorkflowSchedule? @relation(fields: [workflowScheduleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, enabled])
+  @@index([workflowScheduleId])
+  @@index([expiresAt])
+  @@map("standing_orders")
 }
 
 // ─── Vibe Coding: Project Models ────────────────────────────────────────────

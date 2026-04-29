@@ -8,7 +8,7 @@
     "dev": "tsx watch --env-file=.env src/index.ts",
     "worker": "tsx --env-file=.env src/worker-entry.ts",
     "start": "node --env-file=.env dist/index.js",
-    "pretypecheck": "pnpm -w --filter @jak-swarm/shared --filter @jak-swarm/verification --filter @jak-swarm/swarm --filter !jak-swarm build",
+    "pretypecheck": "pnpm -w --filter @jak-swarm/shared --filter @jak-swarm/skills --filter @jak-swarm/verification --filter @jak-swarm/swarm --filter !jak-swarm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "tsc --noEmit"
@@ -27,6 +27,7 @@
     "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/security": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
+    "@jak-swarm/skills": "workspace:*",
     "@jak-swarm/swarm": "workspace:*",
     "@jak-swarm/tools": "workspace:*",
     "@opentelemetry/auto-instrumentations-node": "^0.72.0",

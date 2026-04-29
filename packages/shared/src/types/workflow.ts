@@ -88,4 +88,27 @@ export interface ApprovalRequest {
   reviewedBy?: string;
   reviewedAt?: Date;
   createdAt: Date;
+  /**
+   * OpenClaw-inspired Phase 1, Item B — reviewer-context fields.
+   * Surface the SPECIFIC tool / files / external service / expected result
+   * the approver is binding their decision to, so the inline approval card
+   * can show "Send email via Gmail to alice@…, attaches /reports/q1.pdf"
+   * instead of just "Send email". All optional — older approvals (and
+   * approvals for tasks that don't bind to a single tool) leave these
+   * unset and the UI falls back to `action` + `rationale`.
+   */
+  toolName?: string;
+  filesAffected?: string[];
+  externalService?: string;
+  idempotencyKey?: string;
+  expectedResult?: string;
+  /**
+   * Canonical sha256 of `proposedData` at the moment the approval was
+   * created. The decide endpoint re-hashes the stored proposedData and
+   * compares; if it differs, the route returns 409
+   * `APPROVAL_PAYLOAD_MISMATCH` and refuses to apply the decision.
+   * Legacy approvals predating Item B leave this undefined; the route
+   * computes + persists it on first decide.
+   */
+  proposedDataHash?: string;
 }

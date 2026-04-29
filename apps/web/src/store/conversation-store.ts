@@ -43,6 +43,25 @@ export interface Message {
     comment?: string;
     /** If the API call fails, surface the error so the user can retry. */
     error?: string;
+    /**
+     * Item B (OpenClaw-inspired Phase 1) — reviewer-context surface.
+     * The inline approval card renders these BELOW `reason` so the
+     * approver can see the SPECIFIC tool / files / external service /
+     * expected result they're binding their decision to. All optional
+     * — older approvals (pre-Item B) leave them undefined and the UI
+     * gracefully shows just `reason`.
+     *
+     * `runSandboxFirst` is a UI-only flag that flips a "Run sandbox
+     * first" placeholder button on the card; the route it would call
+     * (`POST /approvals/:id/sandbox-test`) is Phase 2 work, so the
+     * button is wired but reports a "coming soon" toast for now.
+     */
+    toolName?: string;
+    filesAffected?: string[];
+    externalService?: string;
+    expectedResult?: string;
+    proposedDataHash?: string;
+    runSandboxFirst?: boolean;
   };
 }
 

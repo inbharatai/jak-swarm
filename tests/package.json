@@ -17,6 +17,7 @@
     "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/security": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
+    "@jak-swarm/skills": "workspace:*",
     "@jak-swarm/swarm": "workspace:*",
     "@jak-swarm/tools": "workspace:*",
     "@jak-swarm/verification": "workspace:*",

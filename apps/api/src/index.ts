@@ -64,6 +64,7 @@ import tracesRoutes from './routes/traces.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import llmSettingsRoutes from './routes/llm-settings.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
+import standingOrdersRoutes from './routes/standing-orders.routes.js';
 import { onboardingRoutes } from './routes/onboarding.routes.js';
 import { integrationRoutes } from './routes/integrations.routes.js';
 import connectorsRoutes from './routes/connectors.routes.js';
@@ -213,6 +214,7 @@ async function buildApp() {
   await fastify.register(analyticsRoutes, { prefix: '/analytics' });
   await fastify.register(llmSettingsRoutes, { prefix: '/settings/llm' });
   await fastify.register(schedulesRoutes, { prefix: '/schedules' });
+  await fastify.register(standingOrdersRoutes, { prefix: '/standing-orders' });
   await fastify.register(onboardingRoutes);
   await fastify.register(integrationRoutes);
   // Connector Runtime — read-only listing + resolve. Mutations still

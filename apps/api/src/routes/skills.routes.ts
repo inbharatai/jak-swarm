@@ -24,6 +24,56 @@ const proposeSkillBodySchema = z.object({
 
 const skillsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
+   * GET /skills/packs
+   *
+   * Item A (OpenClaw-inspired Phase 1) — list bundled SKILL.md packs.
+   * These are file-system-only packs that ship in `packages/skills/public`
+   * and live below tenant-managed skills in the precedence cascade. The
+   * dashboard surfaces them under a "Bundled" tier so operators can see
+   * what their agents are auto-loading.
+   *
+   * Returns the parsed manifests (no SKILL.md body) — the body is the
+   * agent-prompt content, not user-facing copy. Authenticated callers
+   * only because this exposes the tenant's full bundled-skill graph.
+   */
+  fastify.get(
+    '/packs',
+    { preHandler: [fastify.authenticate] },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Lazy import — keeps the route compile clean even if the
+        // skills workspace isn't built (e.g. running just one test).
+        const skillsModule: unknown = await import('@jak-swarm/skills');
+        const loadBundledSkills = (
+          skillsModule as { loadBundledSkills?: () => unknown[] }
+        ).loadBundledSkills;
+        const packs: unknown[] =
+          typeof loadBundledSkills === 'function' ? loadBundledSkills() : [];
+
+        // Strip the markdown body (it's agent-prompt content, not UX
+        // copy) and the absolute filePath (operator info-leak risk).
+        const sanitized = packs.map((p) => {
+          const { body: _body, filePath: _filePath, ...rest } = p as {
+            body?: string;
+            filePath?: string;
+            [k: string]: unknown;
+          };
+          return rest;
+        });
+
+        return reply.status(200).send(ok({
+          tier: 'bundled',
+          count: sanitized.length,
+          packs: sanitized,
+        }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
    * GET /skills
    * List skills — global built-ins and tenant-specific skills.
    * Supports filtering by tier and status.

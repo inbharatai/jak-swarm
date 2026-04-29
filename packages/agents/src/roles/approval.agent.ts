@@ -8,6 +8,39 @@ export interface ApprovalInput {
   task: WorkflowTask;
   proposedData: unknown;
   affectedEntities?: string[];
+  /** Item B (OpenClaw-inspired Phase 1) — reviewer-context fields the
+   * approval card surfaces so the reviewer can see the SPECIFIC
+   * tool / files / service / expected result they're binding their
+   * decision to. All optional. The approval-node populates what it
+   * can derive from the task; the agent passes them through. */
+  toolName?: string;
+  filesAffected?: string[];
+  externalService?: string;
+  idempotencyKey?: string;
+}
+
+/**
+ * Coarse mapping from tool name patterns to the user-visible external
+ * service label that the approval card shows. Conservative — when the
+ * tool name doesn't match a known pattern, the field is left undefined
+ * so the UI falls back to the tool name itself.
+ */
+function deriveExternalService(toolName?: string): string | undefined {
+  if (!toolName) return undefined;
+  const t = toolName.toLowerCase();
+  if (t.startsWith('gmail') || t.includes('email')) return 'Gmail';
+  if (t.startsWith('slack')) return 'Slack';
+  if (t.startsWith('whatsapp')) return 'WhatsApp';
+  if (t.startsWith('twitter') || t.startsWith('x_')) return 'Twitter/X';
+  if (t.startsWith('linkedin')) return 'LinkedIn';
+  if (t.startsWith('hubspot')) return 'HubSpot';
+  if (t.startsWith('salesforce')) return 'Salesforce';
+  if (t.startsWith('notion')) return 'Notion';
+  if (t.startsWith('github')) return 'GitHub';
+  if (t.startsWith('vercel')) return 'Vercel';
+  if (t.startsWith('stripe')) return 'Stripe';
+  if (t.startsWith('paddle')) return 'Paddle';
+  return undefined;
 }
 
 const APPROVAL_SUPPLEMENT = `You are an approval agent that explains risky actions clearly to non-technical reviewers.
@@ -38,7 +71,15 @@ export class ApprovalAgent extends BaseAgent {
 
   async execute(input: unknown, context: AgentContext): Promise<ApprovalRequest> {
     const startedAt = new Date();
-    const { task, proposedData, affectedEntities } = input as ApprovalInput;
+    const {
+      task,
+      proposedData,
+      affectedEntities,
+      toolName: explicitToolName,
+      filesAffected: explicitFilesAffected,
+      externalService: explicitExternalService,
+      idempotencyKey: explicitIdempotencyKey,
+    } = input as ApprovalInput;
 
     this.logger.info(
       { runId: context.runId, taskId: task.id, riskLevel: task.riskLevel },
@@ -97,6 +138,15 @@ export class ApprovalAgent extends BaseAgent {
       this.logger.warn({ err }, 'Approval agent LLM call failed, using task metadata');
     }
 
+    // Item B (OpenClaw-inspired Phase 1) — reviewer-context defaults.
+    // Prefer fields explicitly passed in by the caller (they have the
+    // freshest task input); fall back to deriving from task.toolsRequired
+    // and the LLM's `consequences` line when available.
+    const toolName = explicitToolName ?? task.toolsRequired?.[0];
+    const externalService = explicitExternalService ?? deriveExternalService(toolName);
+    const filesAffected = explicitFilesAffected ?? [];
+    const idempotencyKey = explicitIdempotencyKey;
+
     const approvalRequest: ApprovalRequest = {
       id: this.generateId('apr_'),
       workflowId: context.workflowId,
@@ -108,6 +158,13 @@ export class ApprovalAgent extends BaseAgent {
       riskLevel: task.riskLevel,
       status: 'PENDING',
       createdAt: new Date(),
+      // New reviewer-context surface (Item B). All optional — the UI
+      // gracefully falls back to action+rationale when these are absent.
+      toolName,
+      filesAffected,
+      externalService,
+      idempotencyKey,
+      expectedResult: consequences,
     };
 
     this.recordTrace(context, input, approvalRequest, [], startedAt);

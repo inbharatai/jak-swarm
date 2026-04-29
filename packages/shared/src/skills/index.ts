@@ -4,4 +4,4 @@ export {
   loadSkills,
   formatSkillsForPrompt,
 } from './skill-md-parser.js';
-export type { SkillManifest } from './skill-md-parser.js';
+export type { SkillManifest, SkillRiskLevel } from './skill-md-parser.js';

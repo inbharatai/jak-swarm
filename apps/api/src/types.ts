@@ -164,6 +164,21 @@ export interface ApprovalRequest {
   decidedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Item B (OpenClaw-inspired Phase 1) — reviewer-context surface.
+   * The original `proposedData` payload (so the inline approval card can
+   * render diffs / file lists / API params), the canonical hash that
+   * binds the decision to that specific payload, and the optional
+   * tool/files/service/idempotency-key/expected-result fields the
+   * approval card surfaces for human review.
+   */
+  proposedDataJson: Record<string, unknown> | null;
+  proposedDataHash: string | null;
+  toolName: string | null;
+  filesAffected: string[];
+  externalService: string | null;
+  idempotencyKey: string | null;
+  expectedResult: string | null;
 }
 
 /** Skill domain object */

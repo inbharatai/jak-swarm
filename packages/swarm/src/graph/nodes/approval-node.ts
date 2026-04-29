@@ -1,10 +1,30 @@
-import { WorkflowStatus, generateId } from '@jak-swarm/shared';
+import { WorkflowStatus, generateId, TOOL_RISK_LEVEL_ORDER } from '@jak-swarm/shared';
 import { ApprovalAgent, AgentContext } from '@jak-swarm/agents';
 import type { ApprovalInput } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 
-const RISK_ORDER: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
+/**
+ * Numeric ordering for both task-level RiskLevel (LOW/MEDIUM/HIGH/CRITICAL)
+ * AND tool-level ToolRiskLevel (READ_ONLY/DRAFT_ONLY/SANDBOX_EDIT/...). The
+ * map merges both vocabularies so a single comparison works regardless of
+ * which lattice the caller used. Tool-level entries come from
+ * TOOL_RISK_LEVEL_ORDER; task-level entries kept inline for the historical
+ * 4-tier comparison the approval gate has always used.
+ *
+ * If a future caller passes an unknown risk label, the lookup returns
+ * undefined and the gate falls back to the safest assumption (high risk),
+ * preserving the "fail closed" honesty contract.
+ */
+const RISK_ORDER: Record<string, number> = {
+  // Task-level (RiskLevel from workflow.ts)
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+  CRITICAL: 4,
+  // Tool-level (ToolRiskLevel from tool.ts) — Item D of OpenClaw-inspired Phase 1
+  ...TOOL_RISK_LEVEL_ORDER,
+};
 
 export async function approvalNode(state: SwarmState): Promise<Partial<SwarmState>> {
   // Auto-approve only if the tenant has EXPLICITLY opted in via
@@ -69,6 +89,12 @@ export async function approvalNode(state: SwarmState): Promise<Partial<SwarmStat
       previousResults: state.taskResults,
     },
     affectedEntities: task.toolsRequired,
+    // Item B (OpenClaw-inspired Phase 1) — reviewer-context fields.
+    // The approval card needs to show the SPECIFIC tool the reviewer is
+    // approving + an idempotency key so a duplicate decide is a no-op
+    // rather than a second external action.
+    toolName: task.toolsRequired?.[0],
+    idempotencyKey: state.idempotencyKey,
   };
 
   const approvalRequest = await agent.execute(approvalInput, context);

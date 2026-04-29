@@ -11,8 +11,8 @@
 [![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Typecheck](https://img.shields.io/badge/Typecheck-15_workspaces_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tests](https://img.shields.io/badge/Tests-1020_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Typecheck](https://img.shields.io/badge/Typecheck-16_workspaces_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-1088_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
 **The trusted control plane for autonomous work.** One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Native [LangGraph](https://langchain-ai.github.io/langgraphjs/) orchestration, Postgres-backed checkpoints, source-grounded verification, and runtime PII redaction. Build, operate, and verify autonomous work on infrastructure you control.
 

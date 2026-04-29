@@ -33,6 +33,32 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+/**
+ * Skill `risk-level` accepts EITHER vocabulary:
+ *   - Task-level (`LOW` | `MEDIUM` | `HIGH` | `CRITICAL`) for back-compat
+ *     with packs that pre-date Item D
+ *   - Tool-level (`READ_ONLY` | `DRAFT_ONLY` | `SANDBOX_EDIT` |
+ *     `LOCAL_EXEC_ALLOWLIST` | `EXTERNAL_ACTION_APPROVAL` |
+ *     `CRITICAL_MANUAL_ONLY`) for new packs that want precise capability
+ *     declarations
+ *
+ * The parser validates against the union; downstream consumers (agent
+ * prompt injector, dashboard) treat the value as opaque metadata. The
+ * approval-node ALREADY merges both vocabularies via TOOL_RISK_LEVEL_ORDER
+ * spread into RISK_ORDER, so threshold comparisons work for either.
+ */
+export type SkillRiskLevel =
+  | 'LOW'
+  | 'MEDIUM'
+  | 'HIGH'
+  | 'CRITICAL'
+  | 'READ_ONLY'
+  | 'DRAFT_ONLY'
+  | 'SANDBOX_EDIT'
+  | 'LOCAL_EXEC_ALLOWLIST'
+  | 'EXTERNAL_ACTION_APPROVAL'
+  | 'CRITICAL_MANUAL_ONLY';
+
 export interface SkillManifest {
   name: string;
   description: string;
@@ -40,7 +66,7 @@ export interface SkillManifest {
   author: string;
   license: string;
   allowedTools: string[];
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  riskLevel: SkillRiskLevel;
   permissions: string[];
   tags: string[];
   /** The markdown body (instructions) */
@@ -144,10 +170,21 @@ export function parseSkillMd(content: string, filePath: string): SkillManifest |
   };
 }
 
-function validateRiskLevel(level: string): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-  const valid = new Set(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
-  const upper = level.toUpperCase();
-  return valid.has(upper) ? upper as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' : 'LOW';
+function validateRiskLevel(level: string): SkillRiskLevel {
+  const valid = new Set<SkillRiskLevel>([
+    'LOW',
+    'MEDIUM',
+    'HIGH',
+    'CRITICAL',
+    'READ_ONLY',
+    'DRAFT_ONLY',
+    'SANDBOX_EDIT',
+    'LOCAL_EXEC_ALLOWLIST',
+    'EXTERNAL_ACTION_APPROVAL',
+    'CRITICAL_MANUAL_ONLY',
+  ]);
+  const upper = level.toUpperCase() as SkillRiskLevel;
+  return valid.has(upper) ? upper : 'LOW';
 }
 
 /**

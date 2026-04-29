@@ -13,6 +13,7 @@ export default defineConfig({
       '@jak-swarm/db': path.resolve(__dirname, '../packages/db/src/index.ts'),
       '@jak-swarm/agents': path.resolve(__dirname, '../packages/agents/src/index.ts'),
       '@jak-swarm/tools': path.resolve(__dirname, '../packages/tools/src/index.ts'),
+      '@jak-swarm/skills': path.resolve(__dirname, '../packages/skills/src/index.ts'),
       '@jak-swarm/swarm': path.resolve(__dirname, '../packages/swarm/src/index.ts'),
       '@jak-swarm/voice': path.resolve(__dirname, '../packages/voice/src/index.ts'),
       '@jak-swarm/verification': path.resolve(__dirname, '../packages/verification/src/index.ts'),

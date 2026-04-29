@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Check, X, Clock, AlertTriangle } from 'lucide-react';
+import { Check, X, Clock, AlertTriangle, FileText, Wrench, Cloud, Beaker, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ROLES, getRoleColor } from '@/lib/role-config';
 import type { Message } from '@/store/conversation-store';
@@ -222,53 +222,132 @@ function InlineApprovalControls({
     );
   }
 
+  // Item B (OpenClaw-inspired Phase 1) — reviewer-context fields. We
+  // render only those that are populated so legacy approvals (pre-Item B)
+  // show a clean card with just the rationale + buttons.
+  const hasContext =
+    Boolean(approvalAction.toolName) ||
+    Boolean(approvalAction.externalService) ||
+    (approvalAction.filesAffected?.length ?? 0) > 0 ||
+    Boolean(approvalAction.expectedResult);
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="inline-approval-controls">
-      <button
-        type="button"
-        onClick={() => dispatch('APPROVED')}
-        disabled={busy !== null}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold',
-          'bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors',
+    <div className="mt-3 flex flex-col gap-2" data-testid="inline-approval-controls">
+      {hasContext && (
+        <div
+          className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-foreground/80 space-y-1"
+          data-testid="approval-context-panel"
+        >
+          {approvalAction.toolName && (
+            <div className="flex items-center gap-1.5">
+              <Wrench className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+              <span className="font-medium text-foreground">Tool:</span>
+              <span className="font-mono">{approvalAction.toolName}</span>
+            </div>
+          )}
+          {approvalAction.externalService && (
+            <div className="flex items-center gap-1.5">
+              <Cloud className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+              <span className="font-medium text-foreground">Service:</span>
+              <span>{approvalAction.externalService}</span>
+            </div>
+          )}
+          {approvalAction.filesAffected && approvalAction.filesAffected.length > 0 && (
+            <div className="flex items-start gap-1.5">
+              <FileText className="h-3 w-3 mt-0.5 text-muted-foreground" aria-hidden="true" />
+              <div>
+                <span className="font-medium text-foreground">Files:</span>{' '}
+                <span className="font-mono">
+                  {approvalAction.filesAffected.slice(0, 5).join(', ')}
+                  {approvalAction.filesAffected.length > 5
+                    ? ` (+${approvalAction.filesAffected.length - 5} more)`
+                    : ''}
+                </span>
+              </div>
+            </div>
+          )}
+          {approvalAction.expectedResult && (
+            <div className="flex items-start gap-1.5">
+              <Sparkles className="h-3 w-3 mt-0.5 text-muted-foreground" aria-hidden="true" />
+              <div>
+                <span className="font-medium text-foreground">Expected:</span>{' '}
+                <span>{approvalAction.expectedResult}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => dispatch('APPROVED')}
+          disabled={busy !== null}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold',
+            'bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors',
+          )}
+          aria-label="Approve workflow"
+        >
+          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          {busy === 'approved' ? 'Approving…' : 'Approve'}
+        </button>
+        <button
+          type="button"
+          onClick={() => dispatch('REJECTED')}
+          disabled={busy !== null}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold',
+            'bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 transition-colors',
+          )}
+          aria-label="Reject workflow"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+          {busy === 'rejected' ? 'Rejecting…' : 'Reject'}
+        </button>
+        <button
+          type="button"
+          onClick={() => dispatch('DEFERRED')}
+          disabled={busy !== null}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
+            'border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 transition-colors',
+          )}
+          aria-label="Defer decision"
+        >
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {busy === 'deferred' ? 'Deferring…' : 'Defer'}
+        </button>
+        {/* Item B — "Run sandbox first" placeholder. Wires the existing
+            E2B/Docker sandbox adapters in Phase 2 (POST /approvals/:id/sandbox-test);
+            for now the button reports the deferral honestly so reviewers
+            know it's coming, not silently broken. */}
+        {hasContext && (
+          <button
+            type="button"
+            disabled
+            title="Sandbox dry-run is Phase 2 — wires the existing E2B/Docker adapters"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
+              'border border-dashed border-border bg-background/40 text-muted-foreground cursor-not-allowed',
+            )}
+            aria-label="Run in sandbox first (coming soon)"
+            data-testid="run-sandbox-first-btn"
+          >
+            <Beaker className="h-3.5 w-3.5" aria-hidden="true" />
+            Run sandbox first
+            <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              Soon
+            </span>
+          </button>
         )}
-        aria-label="Approve workflow"
-      >
-        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-        {busy === 'approved' ? 'Approving…' : 'Approve'}
-      </button>
-      <button
-        type="button"
-        onClick={() => dispatch('REJECTED')}
-        disabled={busy !== null}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold',
-          'bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 transition-colors',
-        )}
-        aria-label="Reject workflow"
-      >
-        <X className="h-3.5 w-3.5" aria-hidden="true" />
-        {busy === 'rejected' ? 'Rejecting…' : 'Reject'}
-      </button>
-      <button
-        type="button"
-        onClick={() => dispatch('DEFERRED')}
-        disabled={busy !== null}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
-          'border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 transition-colors',
-        )}
-        aria-label="Defer decision"
-      >
-        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-        {busy === 'deferred' ? 'Deferring…' : 'Defer'}
-      </button>
-      {approvalAction.error ? (
-        <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400">
-          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-          {approvalAction.error}
-        </span>
-      ) : null}
+        {approvalAction.error ? (
+          <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400">
+            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+            {approvalAction.error}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

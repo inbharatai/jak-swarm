@@ -13,9 +13,11 @@ import {
   NotFoundError,
   WorkflowStateError,
   ForbiddenError,
+  ApprovalPayloadMismatchError,
 } from '../errors.js';
 import { assertTransition, IllegalTransitionError } from '@jak-swarm/swarm';
 import { WorkflowStatus as SharedWorkflowStatus } from '@jak-swarm/shared';
+import { canonicalHash } from '../utils/canonical-hash.js';
 
 const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
 
@@ -78,6 +80,12 @@ export interface CreateApprovalInput {
   rationale: string;
   proposedDataJson?: Record<string, unknown>;
   riskLevel: string;
+  // OpenClaw-inspired Phase 1, Item B — reviewer-context fields.
+  toolName?: string;
+  filesAffected?: string[];
+  externalService?: string;
+  idempotencyKey?: string;
+  expectedResult?: string;
 }
 
 export class WorkflowService {
@@ -298,6 +306,14 @@ export class WorkflowService {
    * Create a human-in-the-loop approval request.
    */
   async createApprovalRequest(input: CreateApprovalInput): Promise<ApprovalRequest> {
+    // Item B (OpenClaw-inspired Phase 1) — bind the approval to the EXACT
+    // `proposedData` object the reviewer will see. The canonical hash is
+    // re-checked on every decide to reject replays where proposedData has
+    // been mutated between create and decide.
+    const proposedDataHash = input.proposedDataJson
+      ? canonicalHash(input.proposedDataJson)
+      : null;
+
     const approval = await this.db.approvalRequest.create({
       data: {
         workflowId: input.workflowId,
@@ -309,11 +325,17 @@ export class WorkflowService {
         proposedDataJson: input.proposedDataJson ? (input.proposedDataJson as object) : undefined,
         riskLevel: input.riskLevel,
         status: 'PENDING',
+        proposedDataHash,
+        toolName: input.toolName ?? null,
+        filesAffected: input.filesAffected ?? [],
+        externalService: input.externalService ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+        expectedResult: input.expectedResult ?? null,
       },
     });
 
     this.log.info(
-      { approvalId: approval.id, workflowId: input.workflowId },
+      { approvalId: approval.id, workflowId: input.workflowId, proposedDataHash },
       'Approval request created',
     );
 
@@ -322,6 +344,18 @@ export class WorkflowService {
 
   /**
    * Resolve an approval with a decision.
+   *
+   * Item B (OpenClaw-inspired Phase 1): payload binding.
+   *   - Re-hashes the CURRENT `proposedDataJson` and compares to the hash
+   *     captured at create time. A mismatch means the proposed payload
+   *     was mutated between create and decide; the route layer surfaces
+   *     this as 409 APPROVAL_PAYLOAD_MISMATCH and the reviewer must
+   *     re-create the approval rather than reuse the prior approvalId.
+   *   - Legacy approvals predating Item B carry no stored hash. The first
+   *     decide initializes it from the current proposedDataJson so the
+   *     ApprovalScope row + audit trail are still correct going forward.
+   *   - The status update + ApprovalScope insert run in a single
+   *     transaction so the audit log can never disagree with the row.
    */
   async resolveApproval(
     tenantId: string,
@@ -348,17 +382,66 @@ export class WorkflowService {
       );
     }
 
-    const updated = await this.db.approvalRequest.update({
-      where: { id: approvalId },
-      data: {
-        status: decision,
-        reviewedBy,
-        comment: comment ?? null,
-        reviewedAt: new Date(),
-      },
+    // Item B — payload-binding gate. Re-hash the persisted proposedData
+    // and reject if it differs from the hash captured at create time.
+    const currentHash = canonicalHash(
+      (existing as Record<string, unknown>)['proposedDataJson'] ?? null,
+    );
+    const storedHash =
+      ((existing as Record<string, unknown>)['proposedDataHash'] as string | null | undefined) ??
+      null;
+
+    if (storedHash && storedHash !== currentHash) {
+      this.log.warn(
+        { approvalId, expected: storedHash, observed: currentHash },
+        'Approval payload mismatch — refusing to apply decision',
+      );
+      throw new ApprovalPayloadMismatchError(storedHash, currentHash);
+    }
+
+    // Persist the decision + write the ApprovalScope row in a single
+    // transaction. The unique (approvalId, proposedDataHash) constraint
+    // means a second decide for the same hash is a no-op (idempotent
+    // for a benign retry); a different hash would have been blocked
+    // above already.
+    const updated = await this.db.$transaction(async (tx) => {
+      const updatedRow = await tx.approvalRequest.update({
+        where: { id: approvalId },
+        data: {
+          status: decision,
+          reviewedBy,
+          comment: comment ?? null,
+          reviewedAt: new Date(),
+          // Initialize hash for legacy rows on first decide so future
+          // decides have a binding to compare against.
+          ...(storedHash ? {} : { proposedDataHash: currentHash }),
+        },
+      });
+
+      try {
+        await tx.approvalScope.create({
+          data: {
+            approvalId,
+            proposedDataHash: currentHash,
+            decision,
+            approverId: reviewedBy,
+          },
+        });
+      } catch (e) {
+        // The unique (approvalId, proposedDataHash) means a duplicate
+        // decide for the SAME hash is acceptable (idempotent). Anything
+        // else is unexpected and should bubble up.
+        const code = (e as { code?: string }).code;
+        if (code !== 'P2002') throw e;
+      }
+
+      return updatedRow;
     });
 
-    this.log.info({ approvalId, decision, reviewedBy }, 'Approval resolved');
+    this.log.info(
+      { approvalId, decision, reviewedBy, proposedDataHash: currentHash },
+      'Approval resolved',
+    );
     return this.mapApproval(updated);
   }
 
@@ -478,5 +561,13 @@ export class WorkflowService {
     decidedAt: (row['reviewedAt'] as Date | null) ?? null,
     createdAt: row['createdAt'] as Date,
     updatedAt: row['updatedAt'] as Date,
+    // Item B (OpenClaw-inspired Phase 1) — reviewer-context surface.
+    proposedDataJson: (row['proposedDataJson'] as Record<string, unknown> | null) ?? null,
+    proposedDataHash: (row['proposedDataHash'] as string | null) ?? null,
+    toolName: (row['toolName'] as string | null) ?? null,
+    filesAffected: ((row['filesAffected'] as string[] | null) ?? []) as string[],
+    externalService: (row['externalService'] as string | null) ?? null,
+    idempotencyKey: (row['idempotencyKey'] as string | null) ?? null,
+    expectedResult: (row['expectedResult'] as string | null) ?? null,
   });
 }

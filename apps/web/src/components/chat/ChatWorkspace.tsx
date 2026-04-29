@@ -438,6 +438,20 @@ export function ChatWorkspace() {
           } else if (evType === 'paused') {
             const reason = (ev.reason as string) ?? (ev.taskName as string) ?? 'a high-risk action';
             const approvalId = (ev.approvalId as string | undefined) ?? (ev.approvalRequestId as string | undefined);
+            // Item B (OpenClaw-inspired Phase 1) — reviewer-context fields.
+            // The `paused` SSE event carries the same fields stored on
+            // ApprovalRequest so the inline approval card can render
+            // tool / files / service / expected-result without a
+            // round-trip. All optional — older payloads omit them and
+            // the card falls back to just `reason`.
+            const toolName = ev.toolName as string | undefined;
+            const filesAffectedRaw = ev.filesAffected;
+            const filesAffected = Array.isArray(filesAffectedRaw)
+              ? (filesAffectedRaw.filter((s): s is string => typeof s === 'string'))
+              : undefined;
+            const externalService = ev.externalService as string | undefined;
+            const expectedResult = ev.expectedResult as string | undefined;
+            const proposedDataHash = ev.proposedDataHash as string | undefined;
             addMessage(convId, {
               role: 'assistant',
               agentRole: null,
@@ -448,6 +462,11 @@ export function ChatWorkspace() {
                 ...(approvalId ? { approvalId } : {}),
                 reason,
                 status: 'pending',
+                ...(toolName ? { toolName } : {}),
+                ...(filesAffected && filesAffected.length > 0 ? { filesAffected } : {}),
+                ...(externalService ? { externalService } : {}),
+                ...(expectedResult ? { expectedResult } : {}),
+                ...(proposedDataHash ? { proposedDataHash } : {}),
               },
             });
             setCockpitByWorkflow((prev) =>
