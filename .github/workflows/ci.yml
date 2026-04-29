@@ -47,6 +47,11 @@ jobs:
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/security build
+          # @jak-swarm/skills MUST build before @jak-swarm/agents — agents
+          # imports it via `await import('@jak-swarm/skills')` in
+          # `BaseAgent.injectBundledSkills` and TS needs the .d.ts to resolve
+          # the dynamic-import type. (OpenClaw-inspired Phase 1, Item A.)
+          pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
 
@@ -118,6 +123,9 @@ jobs:
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
           pnpm --filter @jak-swarm/security build
+          # @jak-swarm/skills before @jak-swarm/agents — see Build & Typecheck
+          # job for rationale (BaseAgent.injectBundledSkills dynamic import).
+          pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
 
       - name: Run unit tests with coverage (blocking)
