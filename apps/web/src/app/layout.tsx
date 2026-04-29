@@ -62,13 +62,13 @@ export default function RootLayout({
         <meta name="theme-color" content="#09090b" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap" rel="stylesheet" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js')})}`,
-          }}
-        />
       </head>
       <body>
+        {/* Service-worker registration is co-located inside `AppShell`
+            (a Client Component) via useEffect. Next.js 16 + App Router
+            emits a "Encountered a script tag while rendering" warning
+            for ANY `<script>` element in render output, including
+            `next/script`. useEffect renders zero DOM markup. */}
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

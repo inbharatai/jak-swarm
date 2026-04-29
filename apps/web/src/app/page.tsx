@@ -127,7 +127,7 @@ const PRICING = [
     price: '$29',
     period: '/mo',
     description: 'Hosted runtime with approvals built in.',
-    features: ['3,000 credits / month', '200 credits / day', 'All 38 agents', '5 vibe coding projects', 'Premium AI models (Claude, GPT-4o)', '500 premium credits', 'Email support'],
+    features: ['3,000 credits / month', '200 credits / day', 'All 38 specialist agents', '5 vibe coding projects', 'Premium OpenAI model routing (GPT-4o tier)', '500 premium credits', 'Email support'],
     cta: 'Go Pro',
     href: '/register',
     highlighted: true,
@@ -138,7 +138,7 @@ const PRICING = [
     price: '$99',
     period: '/mo',
     description: 'Higher limits and priority model access for teams.',
-    features: ['15,000 credits / month', '600 credits / day', 'All agents + custom skills', 'Unlimited projects', '3,000 premium credits', 'BYO API keys option', 'Priority support'],
+    features: ['15,000 credits / month', '600 credits / day', 'All agents + custom skills', 'Unlimited projects', '3,000 premium credits', 'Managed OpenAI runtime', 'Priority support'],
     cta: 'Start Team',
     href: '/register',
     highlighted: false,
@@ -370,12 +370,12 @@ export default function HomePage() {
             </div>
 
             <h1 className="mb-6 pb-3 mx-auto text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15]">
-              <span className="block text-white">Run AI workflows for your business&mdash;</span>
-              <span className="block mt-2 gradient-text landing-gradient-text">with human approval on every action.</span>
+              <span className="block text-white">Your AI operations team&mdash;</span>
+              <span className="block mt-2 gradient-text landing-gradient-text">visible, controlled, approval-gated.</span>
             </h1>
 
             <p className="mb-10 max-w-2xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              Today's AI agents can chat, but they cannot safely <em>do</em> company work. JAK turns natural-language tasks like &ldquo;research my competitors and draft a LinkedIn post&rdquo; into planned, approved, auditable workflows. Built for founders running marketing, research, content, and outreach without a full team.
+              Give JAK a business task in plain English &mdash; &ldquo;research my competitors and draft a LinkedIn post,&rdquo; or &ldquo;review my website and propose 5 fixes.&rdquo; JAK plans the work, routes it to specialist agents, pauses before anything risky, and gives you a complete audit trail. Not another chatbot. A cockpit for getting real work done.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

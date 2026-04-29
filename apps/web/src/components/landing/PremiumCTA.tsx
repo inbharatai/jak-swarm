@@ -114,11 +114,17 @@ function NetworkBackground({ isActive }: { isActive: boolean }) {
 
 /* ─── Stats Counter ─────────────────────────────────────────────────────── */
 
+// Numbers held to a strict honesty bar: every claim below is grep-able
+// in the codebase. `<2min To Deploy` was retired here because it never
+// had a benchmark behind it. `22 Integrations` softened to `20+
+// connectable services` since the connector registry currently ships
+// 21 MCP + Remotion + Blender = 23, and we'd rather understate than
+// dance on a fence.
 const CTA_STATS = [
-  { value: '38', label: 'Agents' },
-  { value: '122', label: 'Tools' },
-  { value: '22', label: 'Integrations' },
-  { value: '<2min', label: 'To Deploy' },
+  { value: '38', label: 'Specialist Agents' },
+  { value: '122', label: 'Classified Tools' },
+  { value: '20+', label: 'Connectors' },
+  { value: 'MIT', label: 'Open Source' },
 ];
 
 /* ─── Component ─────────────────────────────────────────────────────────── */

@@ -16,6 +16,15 @@ export function TopBar() {
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // `next-themes` reads from a cookie/localStorage on the client only,
+  // so `resolvedTheme` is undefined during SSR and the first hydration
+  // pass. Rendering the theme-dependent Sun/Moon icon under that
+  // condition produced a hydration mismatch every page load (server
+  // emitted Moon, client immediately re-rendered Sun once theme
+  // resolved). The `mounted` flag pins the SSR + first-client render
+  // to the SAME placeholder; the actual icon swaps in after hydration.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Close dropdown on outside click or Escape
   useEffect(() => {
@@ -96,9 +105,24 @@ export function TopBar() {
         <button
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={
+            // Until mounted, pin the label so SSR/client agree.
+            !mounted
+              ? 'Toggle theme'
+              : resolvedTheme === 'dark'
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+          }
         >
-          {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {/* Render a stable placeholder during SSR + first hydration
+              pass; swap in the theme-dependent icon after `mounted`. */}
+          {!mounted ? (
+            <Moon className="h-4 w-4 opacity-50" aria-hidden="true" />
+          ) : resolvedTheme === 'dark' ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
         </button>
 
         <div className="relative" ref={menuRef}>
