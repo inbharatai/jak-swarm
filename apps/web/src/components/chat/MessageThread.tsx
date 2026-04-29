@@ -163,6 +163,36 @@ function InlineApprovalControls({
 }) {
   const updateMessage = useConversationStore((s) => s.updateMessage);
   const [busy, setBusy] = useState<null | 'approved' | 'rejected' | 'deferred'>(null);
+  const [sandboxBusy, setSandboxBusy] = useState(false);
+  // Sandbox-test result rendered inline below the action buttons.
+  const [sandboxResult, setSandboxResult] = useState<null | {
+    inputValid: boolean;
+    inputIssues: string[];
+    sandboxOutcome: 'ok' | 'not_configured' | 'failed';
+    note?: string;
+  }>(null);
+
+  const runSandboxTest = async () => {
+    if (sandboxBusy || !approvalAction.approvalId || approvalAction.status !== 'pending') return;
+    setSandboxBusy(true);
+    try {
+      const result = await approvalApi.sandboxTest(approvalAction.approvalId);
+      setSandboxResult({
+        inputValid: Boolean(result.inputValid),
+        inputIssues: Array.isArray(result.inputIssues) ? result.inputIssues : [],
+        sandboxOutcome: (result.sandboxOutcome ?? 'failed') as 'ok' | 'not_configured' | 'failed',
+        ...(typeof result.note === 'string' ? { note: result.note } : {}),
+      });
+    } catch (err) {
+      setSandboxResult({
+        inputValid: false,
+        inputIssues: [err instanceof Error ? err.message : 'Sandbox test failed'],
+        sandboxOutcome: 'failed',
+      });
+    } finally {
+      setSandboxBusy(false);
+    }
+  };
 
   const dispatch = async (decision: 'APPROVED' | 'REJECTED' | 'DEFERRED') => {
     if (busy || approvalAction.status !== 'pending') return;
@@ -318,28 +348,57 @@ function InlineApprovalControls({
           <Clock className="h-3.5 w-3.5" aria-hidden="true" />
           {busy === 'deferred' ? 'Deferring…' : 'Defer'}
         </button>
-        {/* Item B — "Run sandbox first" placeholder. Wires the existing
-            E2B/Docker sandbox adapters in Phase 2 (POST /approvals/:id/sandbox-test);
-            for now the button reports the deferral honestly so reviewers
-            know it's coming, not silently broken. */}
-        {hasContext && (
+        {/* Item B — Phase 1 deferral CLOSED.
+            "Run sandbox first" calls POST /approvals/:id/sandbox-test which:
+            (a) re-hashes proposedDataJson and surfaces any payload-binding
+                drift,
+            (b) lints common red flags (e.g. malformed recipient addresses),
+            (c) exercises the existing E2B/Docker sandbox adapter when one
+                is configured (returns `not_configured` honestly otherwise).
+            The pending approval is NEVER mutated — pure dry-run preview. */}
+        {hasContext && approvalAction.approvalId && (
           <button
             type="button"
-            disabled
-            title="Sandbox dry-run is Phase 2 — wires the existing E2B/Docker adapters"
+            disabled={sandboxBusy}
+            onClick={runSandboxTest}
+            title="Dry-run preview — re-hashes the payload, lints inputs, runs in sandbox if available. Never executes the real action."
             className={cn(
               'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
-              'border border-dashed border-border bg-background/40 text-muted-foreground cursor-not-allowed',
+              'border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 transition-colors',
             )}
-            aria-label="Run in sandbox first (coming soon)"
+            aria-label="Run sandbox dry-run before approving"
             data-testid="run-sandbox-first-btn"
           >
             <Beaker className="h-3.5 w-3.5" aria-hidden="true" />
-            Run sandbox first
-            <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              Soon
-            </span>
+            {sandboxBusy ? 'Testing…' : 'Run sandbox first'}
           </button>
+        )}
+        {sandboxResult && (
+          <div
+            className={cn(
+              'mt-2 w-full rounded-md border px-3 py-2 text-[11px] leading-relaxed',
+              sandboxResult.inputValid
+                ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
+                : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400',
+            )}
+            data-testid="sandbox-test-result"
+          >
+            <div className="font-semibold">
+              Sandbox dry-run: {sandboxResult.inputValid ? 'inputs look OK' : `${sandboxResult.inputIssues.length} issue(s)`}
+              {' · '}
+              <span className="font-mono">sandbox: {sandboxResult.sandboxOutcome}</span>
+            </div>
+            {sandboxResult.inputIssues.length > 0 && (
+              <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                {sandboxResult.inputIssues.map((iss, i) => (
+                  <li key={i}>{iss}</li>
+                ))}
+              </ul>
+            )}
+            {sandboxResult.note && (
+              <p className="mt-1 text-foreground/60">{sandboxResult.note}</p>
+            )}
+          </div>
         )}
         {approvalAction.error ? (
           <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400">

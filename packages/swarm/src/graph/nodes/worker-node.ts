@@ -65,6 +65,9 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     allowedDomains: state.allowedDomains,
     restrictedCategories: state.restrictedCategories,
     disabledToolNames: state.disabledToolNames,
+    // Item C (OpenClaw-inspired Phase 1) — StandingOrder whitelist
+    // propagation. Empty array = no whitelist; non-empty = strict.
+    allowedToolNames: state.allowedToolNames,
     connectedProviders: state.connectedProviders,
     subscriptionTier: state.subscriptionTier,
     ...(onActivity ? { onActivity } : {}),

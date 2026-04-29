@@ -63,6 +63,12 @@ export interface RunParams {
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
+  /**
+   * Item C (OpenClaw-inspired Phase 1) — StandingOrder allowedTools
+   * whitelist. Non-empty array enforces strict whitelist; empty/unset
+   * preserves the legacy default-allow + blocklist semantics.
+   */
+  allowedToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
   loadState?: (id: string) => Promise<unknown | undefined>;
@@ -289,6 +295,7 @@ export class SwarmRunner {
           ...(params.browserAutomationEnabled !== undefined ? { browserAutomationEnabled: params.browserAutomationEnabled } : {}),
           ...(params.restrictedCategories !== undefined ? { restrictedCategories: params.restrictedCategories } : {}),
           ...(params.disabledToolNames !== undefined ? { disabledToolNames: params.disabledToolNames } : {}),
+          ...(params.allowedToolNames !== undefined ? { allowedToolNames: params.allowedToolNames } : {}),
           ...(params.connectedProviders !== undefined ? { connectedProviders: params.connectedProviders } : {}),
           ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
           ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
@@ -331,6 +338,7 @@ export class SwarmRunner {
           browserAutomationEnabled: params.browserAutomationEnabled ?? false,
           restrictedCategories: params.restrictedCategories ?? [],
           disabledToolNames: params.disabledToolNames ?? [],
+          allowedToolNames: params.allowedToolNames ?? [],
           connectedProviders: params.connectedProviders ?? [],
           ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
           status: result.status,

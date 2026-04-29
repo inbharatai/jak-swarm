@@ -227,12 +227,22 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
         params.goal,
         params.industry,
       );
+      // Item C (OpenClaw-inspired Phase 1) — pass StandingOrder boundary
+      // fields through to the executor. The executor plumbs each into
+      // the SwarmState + AgentContext so TenantToolRegistry enforces
+      // allowedToolNames + disabledToolNames at every tool call.
       swarmService.enqueueExecution({
         workflowId: workflow.id,
         tenantId: params.tenantId,
         userId: params.userId,
         goal: params.goal,
         industry: params.industry,
+        ...(params.maxCostUsd !== undefined ? { maxCostUsd: params.maxCostUsd } : {}),
+        ...(params.allowedToolNames ? { allowedToolNames: params.allowedToolNames } : {}),
+        ...(params.disabledToolNames ? { disabledToolNames: params.disabledToolNames } : {}),
+        ...(params.approvalRequiredFor ? { approvalRequiredFor: params.approvalRequiredFor } : {}),
+        ...(params.triggeredBy ? { triggeredBy: params.triggeredBy } : {}),
+        ...(params.standingOrderId ? { standingOrderId: params.standingOrderId } : {}),
       });
       return workflow.id;
     },

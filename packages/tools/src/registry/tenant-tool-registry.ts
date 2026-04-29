@@ -21,6 +21,20 @@ export interface TenantToolRegistryOptions {
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
+  /**
+   * Item C (OpenClaw-inspired Phase 1) — StandingOrder allowedTools
+   * whitelist support. When set AND non-empty, ONLY tools whose name
+   * appears in this set are permitted regardless of any other allow
+   * signal. When empty/unset, the registry falls back to the legacy
+   * default-allow + blocklist semantics.
+   *
+   * Whitelist takes precedence over `disabledToolNames` for the
+   * permitted set, but `disabledToolNames` still trumps within: a tool
+   * in BOTH `allowedToolNames` and `disabledToolNames` stays blocked
+   * (paranoid: explicit deny wins). This mirrors the merge logic in
+   * scheduler.service.ts when multiple StandingOrders apply.
+   */
+  allowedToolNames?: string[];
 }
 
 export class TenantToolRegistry {
@@ -29,6 +43,7 @@ export class TenantToolRegistry {
   private browserAutomationEnabled: boolean;
   private restrictedCategories: Set<ToolCategory>;
   private disabledToolNames: Set<string>;
+  private allowedToolNames: Set<string> | null;
 
   constructor(tenantId: string, connectedProviders: string[], options?: TenantToolRegistryOptions) {
     this.tenantId = tenantId;
@@ -36,6 +51,11 @@ export class TenantToolRegistry {
     this.browserAutomationEnabled = options?.browserAutomationEnabled ?? false;
     this.restrictedCategories = new Set(options?.restrictedCategories ?? []);
     this.disabledToolNames = new Set(options?.disabledToolNames ?? []);
+    // null = whitelist NOT active (default-allow); non-null = whitelist active
+    this.allowedToolNames =
+      options?.allowedToolNames && options.allowedToolNames.length > 0
+        ? new Set(options.allowedToolNames)
+        : null;
   }
 
   /** Check if a tool is available to this tenant. */
@@ -102,6 +122,12 @@ export class TenantToolRegistry {
     if (options.disabledToolNames) {
       this.disabledToolNames = new Set(options.disabledToolNames);
     }
+    if (options.allowedToolNames !== undefined) {
+      this.allowedToolNames =
+        options.allowedToolNames.length > 0
+          ? new Set(options.allowedToolNames)
+          : null;
+    }
   }
 
   private isAllowed(metadata: ToolMetadata): boolean {
@@ -121,11 +147,29 @@ export class TenantToolRegistry {
       );
       return false;
     }
-    // Block tools explicitly disabled by the tenant admin
+    // Block tools explicitly disabled by the tenant admin.
+    // Note: this check runs BEFORE the whitelist gate so an explicit
+    // deny always wins. A tool listed in BOTH allowedToolNames and
+    // disabledToolNames stays blocked — the merge logic in
+    // scheduler.service.ts (StandingOrder boundary application) relies
+    // on this paranoid ordering.
     if (this.disabledToolNames.has(metadata.name)) {
       logger.debug(
         { tenantId: this.tenantId, tool: metadata.name, reason: 'admin_disabled' },
         'Tool blocked by tenant admin toggle',
+      );
+      return false;
+    }
+    // Item C (OpenClaw-inspired Phase 1) — StandingOrder allowedTools
+    // whitelist gate. When a whitelist is active, ONLY tools in the
+    // set are permitted regardless of any other allow signal (provider
+    // connection, browser flag, etc.). The whitelist is null when not
+    // active, which preserves the legacy default-allow path for every
+    // tenant that hasn't created a StandingOrder.
+    if (this.allowedToolNames !== null && !this.allowedToolNames.has(metadata.name)) {
+      logger.debug(
+        { tenantId: this.tenantId, tool: metadata.name, reason: 'not_in_whitelist' },
+        'Tool blocked by StandingOrder allowedTools whitelist',
       );
       return false;
     }

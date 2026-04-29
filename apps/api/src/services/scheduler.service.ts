@@ -22,6 +22,8 @@ export interface SchedulerExecuteParams {
   // the workflow; the workflow service applies them to the run's tool
   // policy + audit metadata.
   disabledToolNames?: string[];
+  /** StandingOrder.allowedTools (whitelist). Non-empty = strict whitelist. */
+  allowedToolNames?: string[];
   approvalRequiredFor?: string[];
   triggeredBy?: 'schedule' | 'standing_order' | 'manual';
   standingOrderId?: string;
@@ -215,13 +217,14 @@ export class SchedulerService {
               ? Math.min(orderBudget, schedule.maxCostUsd)
               : orderBudget ?? schedule.maxCostUsd ?? undefined;
 
-          // disabledToolNames combines the explicit blocklist with the
-          // inverse of the whitelist. We compute a "permit list" the
-          // workflow service can use, but for now we surface only the
-          // blocklist (the workflow service already understands
-          // disabledToolNames; allowedTools as an inversion would need
-          // a richer policy hook, so for Phase 1 the whitelist is
-          // recorded in audit metadata + applied in a follow-up pass).
+          // Item C — Phase 1 deferral CLOSED.
+          // The disabledToolNames + allowedToolNames pair is now a real,
+          // end-to-end-enforced boundary: TenantToolRegistry.isAllowed
+          // checks both. Empty allowedTools = no whitelist (default-
+          // allow); non-empty = strict whitelist (only listed tools
+          // permitted). Explicit deny in disabledToolNames still wins
+          // over a permit in allowedToolNames (paranoid: deny over
+          // allow is the safer default for a policy contract).
           const disabledToolNames = blockedActions;
 
           const scopedOrder = activeOrders.find(
@@ -238,6 +241,7 @@ export class SchedulerService {
             industry: schedule.industry ?? undefined,
             maxCostUsd: effectiveMaxCostUsd,
             disabledToolNames: disabledToolNames.length > 0 ? disabledToolNames : undefined,
+            allowedToolNames: allowedTools.length > 0 ? allowedTools : undefined,
             approvalRequiredFor: approvalRequiredFor.length > 0 ? approvalRequiredFor : undefined,
             triggeredBy,
             ...(scopedOrder ? { standingOrderId: scopedOrder.id } : {}),

@@ -75,6 +75,14 @@ export interface SwarmState {
   browserAutomationEnabled: boolean;
   restrictedCategories: ToolCategory[];
   disabledToolNames: string[];
+  /**
+   * Item C (OpenClaw-inspired Phase 1) — StandingOrder allowedTools
+   * whitelist. Non-empty = strict whitelist (only these tools allowed
+   * regardless of any other policy). Empty = no whitelist (default-
+   * allow + blocklist via disabledToolNames). Plumbed from the
+   * scheduler when a StandingOrder is active for the run.
+   */
+  allowedToolNames: string[];
   connectedProviders: string[];
   /**
    * Coarse plan tier for gating paid external services (Serper, Tavily).
@@ -113,6 +121,7 @@ export function createInitialSwarmState(params: {
   browserAutomationEnabled?: boolean;
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
+  allowedToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
 }): SwarmState {
@@ -146,6 +155,7 @@ export function createInitialSwarmState(params: {
     browserAutomationEnabled: params.browserAutomationEnabled ?? false,
     restrictedCategories: params.restrictedCategories ?? [],
     disabledToolNames: params.disabledToolNames ?? [],
+    allowedToolNames: params.allowedToolNames ?? [],
     connectedProviders: params.connectedProviders ?? [],
     subscriptionTier: params.subscriptionTier,
     status: WS.PENDING,

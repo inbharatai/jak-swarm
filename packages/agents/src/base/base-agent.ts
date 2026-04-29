@@ -679,6 +679,10 @@ ${lines.join('\n')}
         browserAutomationEnabled: context.browserAutomationEnabled,
         restrictedCategories: context.restrictedCategories,
         disabledToolNames: context.disabledToolNames,
+        // Item C (OpenClaw-inspired Phase 1) — when a StandingOrder
+        // restricts the run to a specific tool whitelist, the registry
+        // refuses anything not in the list. Empty array = no whitelist.
+        allowedToolNames: context.allowedToolNames,
       },
     );
 

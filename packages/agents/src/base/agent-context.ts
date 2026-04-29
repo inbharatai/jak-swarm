@@ -157,6 +157,15 @@ export interface AgentContextParams {
   restrictedCategories?: ToolCategory[];
   disabledToolNames?: string[];
   /**
+   * Item C (OpenClaw-inspired Phase 1) — StandingOrder allowedTools
+   * whitelist. When set AND non-empty, ONLY the named tools are
+   * permitted regardless of any other allow signal. When empty/unset,
+   * the registry falls back to the default-allow + blocklist semantics.
+   * Plumbed from `WorkflowExecuteParams.allowedToolNames` (set by the
+   * scheduler when a StandingOrder is active).
+   */
+  allowedToolNames?: string[];
+  /**
    * Coarse plan tier for gating paid external services. Propagated to every
    * ToolExecutionContext the agent creates so search adapters can pick
    * between the paid Serper/Tavily chain vs the free DDG fallback.
@@ -185,6 +194,7 @@ export class AgentContext {
   readonly allowedDomains: string[];
   readonly restrictedCategories: ToolCategory[];
   readonly disabledToolNames: string[];
+  readonly allowedToolNames: string[];
   readonly subscriptionTier: SubscriptionTier | undefined;
   readonly onActivity: AgentActivityEmitter | undefined;
   private steps: AgentTrace[] = [];
@@ -203,6 +213,7 @@ export class AgentContext {
     this.allowedDomains = params.allowedDomains ?? [];
     this.restrictedCategories = params.restrictedCategories ?? [];
     this.disabledToolNames = params.disabledToolNames ?? [];
+    this.allowedToolNames = params.allowedToolNames ?? [];
     this.subscriptionTier = params.subscriptionTier;
     this.onActivity = params.onActivity;
   }
@@ -238,6 +249,7 @@ export class AgentContext {
       allowedDomains: this.allowedDomains,
       restrictedCategories: this.restrictedCategories,
       disabledToolNames: this.disabledToolNames,
+      allowedToolNames: this.allowedToolNames,
       subscriptionTier: this.subscriptionTier,
       ...(this.onActivity ? { onActivity: this.onActivity } : {}),
       ...overrides,

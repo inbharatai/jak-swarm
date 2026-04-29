@@ -27,6 +27,10 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
     allowedDomains: state.allowedDomains,
     restrictedCategories: state.restrictedCategories,
     disabledToolNames: state.disabledToolNames,
+    // Item C — StandingOrder whitelist propagation. Router doesn't
+    // call tools, but the AgentContext type carries it for consistency
+    // with worker-node + downstream agents that may.
+    allowedToolNames: state.allowedToolNames,
     connectedProviders: state.connectedProviders,
   });
 

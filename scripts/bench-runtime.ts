@@ -28,6 +28,7 @@ import {
   HARDENING_PASS_SCENARIOS,
   partitionByMode,
 } from '../packages/agents/src/benchmarks/scenarios/hardening-pass.js';
+import { YC_WEDGE_SCENARIOS } from '../packages/agents/src/benchmarks/scenarios/yc-wedge.js';
 import { renderMarkdownReport } from '../packages/agents/src/benchmarks/report.js';
 import { OpenAIRuntime } from '../packages/agents/src/runtime/openai-runtime.js';
 import { AgentContext } from '../packages/agents/src/base/agent-context.js';
@@ -41,6 +42,7 @@ const outMarkdown = resolve(repoRoot, 'qa/benchmark-results-openai-first.md');
 const args = new Set(process.argv.slice(2));
 const useLegacy = args.has('--legacy');
 const useCore = args.has('--core');
+const useYcWedge = args.has('--yc-wedge');
 
 if (!process.env['OPENAI_API_KEY']) {
   console.error('FAIL: OPENAI_API_KEY is not set. The OpenAIRuntime cannot construct without it.');
@@ -49,17 +51,29 @@ if (!process.env['OPENAI_API_KEY']) {
 }
 
 async function main() {
+  // Mode resolution: explicit --yc-wedge wins, then --core, then default
+  // hardening-pass. The flags are mutually exclusive — if more than one
+  // is set, --yc-wedge takes precedence (designed for the YC application
+  // demo measurement), then --core (the broader 7-scenario persona set).
+  const mode = useYcWedge ? 'yc-wedge' : useCore ? 'persona-core' : 'hardening-pass';
+
   console.log(`[bench-runtime] starting at ${new Date().toISOString()}`);
-  console.log(`  mode: ${useCore ? 'persona-core' : 'hardening-pass'}`);
+  console.log(`  mode: ${mode}`);
   console.log(`  runtimes: openai${useLegacy ? ' + legacy' : ''}`);
   console.log('');
 
-  const allScenarios = useCore ? PERSONA_CORE_SCENARIOS : HARDENING_PASS_SCENARIOS;
-  // partitionByMode only exists for hardening-pass scenarios — persona-core
-  // is a flat list so treat all as 'llm'.
-  const partitioned = useCore
-    ? { llm: allScenarios, integration: [] }
-    : partitionByMode(allScenarios as never);
+  const allScenarios =
+    mode === 'yc-wedge'
+      ? YC_WEDGE_SCENARIOS
+      : mode === 'persona-core'
+      ? PERSONA_CORE_SCENARIOS
+      : HARDENING_PASS_SCENARIOS;
+  // partitionByMode only exists for hardening-pass scenarios — the other
+  // two are flat lists so treat all as 'llm'.
+  const partitioned =
+    mode === 'hardening-pass'
+      ? partitionByMode(allScenarios as never)
+      : { llm: allScenarios, integration: [] };
 
   console.log(`  llm scenarios: ${partitioned.llm.length}`);
   console.log(`  integration scenarios (deferred): ${partitioned.integration.length}`);

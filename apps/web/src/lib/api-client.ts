@@ -267,6 +267,25 @@ export const approvalApi = {
   /** POST /approvals/:id/defer */
   defer: (id: string, comment?: string) =>
     apiDataFetch<ApprovalRequest>(`/approvals/${id}/defer`, { method: 'POST', body: { comment } }),
+
+  /**
+   * POST /approvals/:id/sandbox-test — Item B (OpenClaw-inspired Phase 1)
+   * dry-run preview. Returns structural validation + (optional) sandbox
+   * exec output. Never mutates the approval row.
+   */
+  sandboxTest: (id: string) =>
+    apiDataFetch<{
+      approvalId: string;
+      toolName: string | null;
+      externalService: string | null;
+      inputValid: boolean;
+      inputIssues: string[];
+      inputSummary: Record<string, unknown>;
+      sandboxOutcome: 'ok' | 'not_configured' | 'failed';
+      sandboxLog?: string;
+      proposedDataHashEcho: string;
+      note?: string;
+    }>(`/approvals/${id}/sandbox-test`, { method: 'POST' }),
 };
 
 export const traceApi = {

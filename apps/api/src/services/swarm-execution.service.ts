@@ -123,6 +123,22 @@ export interface ExecuteAsyncParams {
    * is forced off even if the goal would have triggered it.
    */
   ceoMode?: 'ceo' | 'standard';
+  /**
+   * Item C (OpenClaw-inspired Phase 1) — StandingOrder boundary fields.
+   * The scheduler resolves the active StandingOrder(s) for the schedule
+   * + tenant and passes the merged boundary in. The executor then plumbs
+   * each through to SwarmState → AgentContext → TenantToolRegistry.
+   */
+  /** Tools the run is restricted to (whitelist). Empty = no whitelist. */
+  allowedToolNames?: string[];
+  /** Additional tool blocklist on top of tenant + industry-pack blocks. */
+  disabledToolNames?: string[];
+  /** Risk levels that ALWAYS require human approval regardless of auto-approve. */
+  approvalRequiredFor?: string[];
+  /** Audit-trail label: who/what triggered this run. */
+  triggeredBy?: 'manual' | 'schedule' | 'standing_order';
+  /** Optional FK back to the StandingOrder that produced the boundary. */
+  standingOrderId?: string;
   /** Optional payload for vibe-coder workflows (app spec + builder inputs). */
   vibeCoderInput?: {
     description: string;
@@ -1036,13 +1052,18 @@ export class SwarmExecutionService extends EventEmitter {
         browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),
         restrictedCategories: industryPack.restrictedTools,
         // Merge tenant-admin disabled tools (at-admin blocklist) with
-        // industry-pack per-name blocks (compliance-driven blocklist).
-        // Both go into TenantToolRegistry.disabledToolNames — at isAllowed()
-        // time a tool blocked by EITHER source is rejected.
+        // industry-pack per-name blocks (compliance-driven blocklist)
+        // and the per-run StandingOrder blocklist (Item C). All three
+        // go into TenantToolRegistry.disabledToolNames — at isAllowed()
+        // time a tool blocked by ANY source is rejected.
         disabledToolNames: [
           ...(tenant?.disabledToolNames ?? []),
           ...(industryPack.restrictedToolNames ?? []),
+          ...(params.disabledToolNames ?? []),
         ],
+        // Item C — StandingOrder allowedTools whitelist. Non-empty =
+        // strict whitelist enforced by TenantToolRegistry.isAllowed.
+        allowedToolNames: params.allowedToolNames ?? [],
         connectedProviders,
         onAgentActivity: (data: unknown) => {
           this.emit(`workflow:${workflowId}`, data);
