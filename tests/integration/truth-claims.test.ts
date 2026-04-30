@@ -108,9 +108,12 @@ describe('Product truth claims', () => {
     expect(toolsClaim, 'product-truth must declare a Classified Tools stat').toBeTruthy();
     expect(Number(toolsClaim![1])).toBe(toolCount);
 
-    // PremiumCTA footer — used to drift to stale "113"
-    const ctaToolsClaim = premiumCta.match(/\{\s*value:\s*'(\d+)',\s*label:\s*'Tools'/);
-    expect(ctaToolsClaim, 'PremiumCTA must declare a Tools counter').toBeTruthy();
+    // PremiumCTA footer — used to drift to stale "113". Label was
+    // softened from 'Tools' to 'Classified Tools' for honesty (matches
+    // product-truth.ts) — the regex now accepts either form so a
+    // future rename in either direction stays caught.
+    const ctaToolsClaim = premiumCta.match(/\{\s*value:\s*'(\d+)',\s*label:\s*'(?:Classified )?Tools'/);
+    expect(ctaToolsClaim, 'PremiumCTA must declare a (Classified) Tools counter').toBeTruthy();
     expect(Number(ctaToolsClaim![1])).toBe(toolCount);
 
     // layout.tsx site metadata narrative
@@ -132,11 +135,20 @@ describe('Product truth claims', () => {
     expect(connectorsClaim, 'product-truth must declare a Connectors stat').toBeTruthy();
     expect(Number(connectorsClaim![1])).toBe(totalTiles);
 
-    // PremiumCTA footer integration count must match too
+    // PremiumCTA footer integration count must match too. Label was
+    // softened from 'Integrations' to 'Connectors' and the value uses
+    // a soft floor like '20+' (the connector registry currently ships
+    // 23 = 21 MCP + Remotion + Blender, but PremiumCTA understates to
+    // avoid overclaiming). Regex accepts both label spellings, AND a
+    // soft `+` suffix; the digit prefix must be a non-overclaiming
+    // floor (≤ totalTiles).
     const premiumCta = readRepoFile('apps/web/src/components/landing/PremiumCTA.tsx');
-    const ctaIntegClaim = premiumCta.match(/\{\s*value:\s*'(\d+)',\s*label:\s*'Integrations'/);
-    expect(ctaIntegClaim, 'PremiumCTA must declare an Integrations counter').toBeTruthy();
-    expect(Number(ctaIntegClaim![1])).toBe(totalTiles);
+    const ctaIntegClaim = premiumCta.match(/\{\s*value:\s*'(\d+)\+?',\s*label:\s*'(?:Integrations|Connectors)'/);
+    expect(ctaIntegClaim, 'PremiumCTA must declare an Integrations/Connectors counter').toBeTruthy();
+    expect(
+      Number(ctaIntegClaim![1]),
+      `PremiumCTA Connectors floor (${ctaIntegClaim![1]}) must not overclaim — must be ≤ totalTiles (${totalTiles})`,
+    ).toBeLessThanOrEqual(totalTiles);
   });
 
   it('WhatsApp is listed in product-truth (whatsapp.routes.ts exists and is non-trivial)', () => {
