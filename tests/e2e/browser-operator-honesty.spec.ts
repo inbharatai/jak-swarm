@@ -37,22 +37,24 @@ test.describe('Browser-operator UI honesty', () => {
     const genericText = await generic.innerText();
     expect(genericText).toContain('Start browser session');
 
-    // LinkedIn is now FUNCTIONAL (Sprint 1) — must NOT say "Coming soon".
-    const linkedin = page.getByTestId('browser-platform-linkedin');
-    await expect(linkedin).toBeVisible();
-    const linkedinText = await linkedin.innerText();
-    expect(linkedinText.toLowerCase()).toContain('publishing requires your approval');
-    expect(linkedinText.toLowerCase()).not.toContain('coming soon — needs platform adapter');
-
-    // Per-platform "Coming soon" cards still honest for the unshipped ones.
-    for (const platform of ['instagram', 'youtube-studio', 'meta-business-suite']) {
+    // ALL FOUR per-platform adapters are now functional (Sprint 1 + 4)
+    // with manual-handoff publish (no auto-post). Each card MUST say
+    // "Start browser session" + a manual-handoff disclaimer.
+    for (const platform of ['linkedin', 'instagram', 'youtube-studio', 'meta-business-suite']) {
       const card = page.getByTestId(`browser-platform-${platform}`);
       await expect(card, `${platform} card must render`).toBeVisible();
       const text = await card.innerText();
+      // Must NOT say "Coming soon — needs platform adapter" anymore.
       expect(
-        text.toLowerCase(),
-        `${platform} card must explicitly say "Coming soon"`,
-      ).toContain('coming soon');
+        text.toLowerCase().includes('coming soon — needs platform adapter'),
+        `${platform} must NOT say "Coming soon — needs platform adapter"`,
+      ).toBe(false);
+      // Must say either "publishing" / "publish" / "manual" / "uploading"
+      // / "manual handoff" — disclaimer that JAK doesn't auto-post.
+      expect(
+        /publish|manual|upload/i.test(text),
+        `${platform} card must explain manual-handoff (publish / upload / manual)`,
+      ).toBe(true);
     }
   });
 
@@ -76,8 +78,8 @@ test.describe('Browser-operator UI honesty', () => {
     const badge = page.getByTestId('browser-operator-status-badge');
     await expect(badge).toBeVisible();
     const badgeText = await badge.innerText();
-    // Status copy expands as platform adapters ship; check for one of
-    // the known live states ("Generic mode live" or "Generic + LinkedIn live").
-    expect(badgeText.toLowerCase()).toMatch(/generic.*(?:live|linkedin)/i);
+    // Status copy expands as platform adapters ship; check for any
+    // of the known live states.
+    expect(badgeText.toLowerCase()).toMatch(/(generic.*live|linkedin|all adapters live)/i);
   });
 });

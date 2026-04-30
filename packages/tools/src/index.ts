@@ -70,6 +70,9 @@ export type {
 // safest correct behavior is to record the approval + return a
 // manualHandoffRequired result for the user to publish themselves.
 export { LinkedInBrowserAdapter, linkedInAdapter, redactSensitiveValues } from './browser-operator/linkedin-adapter.js';
+export { InstagramBrowserAdapter, instagramAdapter } from './browser-operator/instagram-adapter.js';
+export { YouTubeStudioBrowserAdapter, youtubeAdapter } from './browser-operator/youtube-adapter.js';
+export { MetaBusinessBrowserAdapter, metaAdapter } from './browser-operator/meta-adapter.js';
 export type {
   PlatformAdapter,
   PlatformId,

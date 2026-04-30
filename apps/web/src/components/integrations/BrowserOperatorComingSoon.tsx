@@ -52,9 +52,11 @@ const BROWSER_PLATFORMS: BrowserPlatform[] = [
     id: 'INSTAGRAM',
     name: 'Instagram',
     emoji: '\u{1F4F8}',
-    description: 'Review your profile, posts, and engagement. Draft growth plans.',
+    description:
+      'Active for browser-assisted review and caption draft prep. Publishing is manual handoff — JAK never auto-posts. Login / 2FA must be completed by you.',
     agents: ['CMO Agent'],
-    functional: false,
+    functional: true,
+    defaultUrl: 'https://www.instagram.com/',
   },
   {
     id: 'LINKEDIN',
@@ -70,17 +72,21 @@ const BROWSER_PLATFORMS: BrowserPlatform[] = [
     id: 'YOUTUBE_STUDIO',
     name: 'YouTube Studio',
     emoji: '\u{1F4FA}',
-    description: 'Review channel performance, top videos, and content gaps.',
+    description:
+      'Active for browser-assisted channel review + title/description/tag drafts. Uploading videos is always manual — JAK never auto-uploads.',
     agents: ['CMO Agent'],
-    functional: false,
+    functional: true,
+    defaultUrl: 'https://studio.youtube.com/',
   },
   {
     id: 'META_BUSINESS_SUITE',
     name: 'Meta Business Suite',
     emoji: '\u{1F308}',
-    description: 'Cross-platform Meta page review and ad-account health check.',
+    description:
+      'Active for browser-assisted page review + post-draft prep. Publishing + ad-spend changes are manual handoff — JAK never auto-publishes.',
     agents: ['CMO Agent'],
-    functional: false,
+    functional: true,
+    defaultUrl: 'https://business.facebook.com/',
   },
 ];
 
@@ -122,7 +128,7 @@ export function BrowserOperatorComingSoon() {
           className="rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
           data-testid="browser-operator-status-badge"
         >
-          Generic + LinkedIn live
+          All adapters live (publish manual)
         </span>
       </div>
       <p className="text-xs text-muted-foreground mb-4 max-w-2xl">
