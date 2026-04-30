@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { Card, CardContent, Button, StatusDot } from '@/components/ui';
 import type { Integration, IntegrationProvider } from '@/types';
 
@@ -74,7 +74,17 @@ interface IntegrationCardProps {
   integration?: Integration;
   onConnect: (provider: IntegrationProvider) => void;
   onDisconnect: (id: string) => void;
+  /**
+   * Phase 2 — fires when the user clicks "Run audit" on a connected
+   * card. Wired from page.tsx to the existing `workflowApi.create`
+   * with a layman-friendly per-provider goal. Optional so the card
+   * keeps working in places that don't yet wire the audit button
+   * (e.g., onboarding previews).
+   */
+  onRunAudit?: (provider: IntegrationProvider) => void;
   isLoading?: boolean;
+  /** True while the parent is creating the audit workflow. */
+  auditLoading?: boolean;
 }
 
 export function IntegrationCard({
@@ -82,7 +92,9 @@ export function IntegrationCard({
   integration,
   onConnect,
   onDisconnect,
+  onRunAudit,
   isLoading,
+  auditLoading,
 }: IntegrationCardProps) {
   const meta = PROVIDER_META[provider];
   const isConnected = integration?.status === 'CONNECTED';
@@ -139,17 +151,42 @@ export function IntegrationCard({
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-col gap-2">
           {isConnected ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              disabled={isLoading}
-              onClick={() => integration && onDisconnect(integration.id)}
-            >
-              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Disconnect'}
-            </Button>
+            <>
+              {/* Phase 2 — primary "Run audit" CTA on connected cards.
+                  Optional: only renders when a parent wires onRunAudit.
+                  Layman copy ("Run audit") matches the brief; the
+                  underlying call is the existing workflow API. */}
+              {onRunAudit && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full gap-1.5"
+                  disabled={auditLoading}
+                  onClick={() => onRunAudit(provider)}
+                  data-testid={`run-audit-${provider.toLowerCase()}`}
+                >
+                  {auditLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Run audit
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={isLoading}
+                onClick={() => integration && onDisconnect(integration.id)}
+              >
+                {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Disconnect'}
+              </Button>
+            </>
           ) : needsReauth ? (
             <Button
               variant="default"

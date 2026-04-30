@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import { Plug } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { dataFetcher, integrationApi } from '@/lib/api-client';
+import { dataFetcher, integrationApi, workflowApi } from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
 import { WhatsAppControl } from '@/components/integrations/WhatsAppControl';
+import { BrowserOperatorComingSoon } from '@/components/integrations/BrowserOperatorComingSoon';
+import { getAuditGoal } from '@/lib/connector-audit-goals';
 import type { Integration, IntegrationProvider } from '@/types';
 
 // Full integration roster surfaced on /integrations. Every provider here is
@@ -27,6 +30,7 @@ const ALL_PROVIDERS: IntegrationProvider[] = [
 
 export default function IntegrationsPage() {
   const toast = useToast();
+  const router = useRouter();
   const { data, mutate } = useSWR<Integration[]>(
     '/integrations',
     dataFetcher,
@@ -35,6 +39,8 @@ export default function IntegrationsPage() {
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<IntegrationProvider | null>(null);
+  /** Provider currently in the middle of a "Run audit" workflow create. */
+  const [auditingProvider, setAuditingProvider] = useState<IntegrationProvider | null>(null);
 
   const integrations = data ?? [];
 
@@ -61,6 +67,30 @@ export default function IntegrationsPage() {
       toast.error('Failed to disconnect', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setLoadingId(null);
+    }
+  };
+
+  /**
+   * Phase 2 — "Run audit" CTA on a connected card.
+   *
+   * Creates a workflow with a layman-friendly per-provider goal
+   * (CONNECTOR_AUDIT_GOALS) and navigates the user into the cockpit so
+   * they see the agent working. The workflow goes through the existing
+   * Commander → Planner → Worker → Verifier pipeline. NO external
+   * action runs without an approval gate (the prompts explicitly say
+   * "Do not… only generate a report").
+   */
+  const handleRunAudit = async (provider: IntegrationProvider) => {
+    setAuditingProvider(provider);
+    try {
+      const goal = getAuditGoal(provider);
+      const result = await workflowApi.create(goal);
+      toast.success('Audit started', `${PROVIDER_META[provider].name}: agents are working on your report.`);
+      router.push(`/workspace?workflowId=${result.id}`);
+    } catch (err) {
+      toast.error('Could not start audit', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setAuditingProvider(null);
     }
   };
 
@@ -92,6 +122,8 @@ export default function IntegrationsPage() {
                 integration={integrationByProvider(provider)}
                 onConnect={handleConnect}
                 onDisconnect={handleDisconnect}
+                onRunAudit={handleRunAudit}
+                auditLoading={auditingProvider === provider}
                 isLoading={
                   loadingId === provider ||
                   loadingId === integrationByProvider(provider)?.id
@@ -119,6 +151,11 @@ export default function IntegrationsPage() {
         </div>
       </section>
 
+
+      {/* Browser-operator platforms — Phase 3 honest scaffold.
+          NOT live; cards display "Coming soon" until the operator
+          runtime ships. */}
+      <BrowserOperatorComingSoon />
 
       {/* Connect Modal */}
       {connectingProvider && meta && (
