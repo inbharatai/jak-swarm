@@ -34,7 +34,7 @@
     "automation:vercel-env": "bash scripts/automation/configure-vercel-env.sh"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
+    "@types/node": "^25.6.0",
     "prettier": "^3.4.2",
     "prisma": "^6.19.3",
     "turbo": "^2.3.3",
