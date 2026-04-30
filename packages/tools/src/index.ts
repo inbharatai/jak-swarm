@@ -14,12 +14,24 @@ export type {
   AutoApproveCategoryMap,
 } from './registry/approval-policy.js';
 
-// Tool installer skeleton (Phase 6 — dry-run only; real install in Sprint 2)
+// Tool installer (Sprint 2 — real subprocess execution with allowlist)
 export {
   ToolRequirementDetector,
   DryRunOnlyInstaller,
   TRUSTED_INSTALL_ADAPTERS,
 } from './installer/tool-installer.js';
+export {
+  SandboxedInstaller,
+  sandboxedInstaller,
+  SANDBOX_ADAPTERS,
+  InstallApprovalRequiredError,
+  InstallNotAllowedError,
+} from './installer/sandboxed-installer.js';
+export type {
+  SandboxedAdapter,
+  InstallSafetyClass,
+  SandboxedInstallOptions,
+} from './installer/sandboxed-installer.js';
 export type {
   ToolRequirement,
   ToolInstallRequest,
