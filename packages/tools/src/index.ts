@@ -51,6 +51,21 @@ export type {
   StartSessionInput,
 } from './browser-operator/types.js';
 
+// Per-platform browser adapters (Sprint 1+). Each adapter implements
+// the `PlatformAdapter` contract: URL allowlist + login-state
+// detection + draft generation + approval-gated manual-handoff
+// publish path. Adapters NEVER auto-post in this generation — the
+// safest correct behavior is to record the approval + return a
+// manualHandoffRequired result for the user to publish themselves.
+export { LinkedInBrowserAdapter, linkedInAdapter, redactSensitiveValues } from './browser-operator/linkedin-adapter.js';
+export type {
+  PlatformAdapter,
+  PlatformId,
+  PlatformDraft,
+  PlatformLoginState,
+  PlatformPublishResult,
+} from './browser-operator/platform-adapter.js';
+
 // Connector Runtime — unified manifest + status registry on top of the
 // existing tool/MCP/integration infrastructure. See packages/tools/src/
 // connectors/types.ts for the design rationale.

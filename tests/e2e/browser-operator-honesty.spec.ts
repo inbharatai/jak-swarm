@@ -37,8 +37,15 @@ test.describe('Browser-operator UI honesty', () => {
     const genericText = await generic.innerText();
     expect(genericText).toContain('Start browser session');
 
-    // Per-platform "Coming soon" cards exist + are honest.
-    for (const platform of ['instagram', 'linkedin', 'youtube-studio', 'meta-business-suite']) {
+    // LinkedIn is now FUNCTIONAL (Sprint 1) — must NOT say "Coming soon".
+    const linkedin = page.getByTestId('browser-platform-linkedin');
+    await expect(linkedin).toBeVisible();
+    const linkedinText = await linkedin.innerText();
+    expect(linkedinText.toLowerCase()).toContain('publishing requires your approval');
+    expect(linkedinText.toLowerCase()).not.toContain('coming soon — needs platform adapter');
+
+    // Per-platform "Coming soon" cards still honest for the unshipped ones.
+    for (const platform of ['instagram', 'youtube-studio', 'meta-business-suite']) {
       const card = page.getByTestId(`browser-platform-${platform}`);
       await expect(card, `${platform} card must render`).toBeVisible();
       const text = await card.innerText();
@@ -69,6 +76,8 @@ test.describe('Browser-operator UI honesty', () => {
     const badge = page.getByTestId('browser-operator-status-badge');
     await expect(badge).toBeVisible();
     const badgeText = await badge.innerText();
-    expect(badgeText.toLowerCase()).toContain('generic mode live');
+    // Status copy expands as platform adapters ship; check for one of
+    // the known live states ("Generic mode live" or "Generic + LinkedIn live").
+    expect(badgeText.toLowerCase()).toMatch(/generic.*(?:live|linkedin)/i);
   });
 });

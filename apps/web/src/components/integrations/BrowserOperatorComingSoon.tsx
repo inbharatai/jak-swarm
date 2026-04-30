@@ -60,9 +60,11 @@ const BROWSER_PLATFORMS: BrowserPlatform[] = [
     id: 'LINKEDIN',
     name: 'LinkedIn',
     emoji: '\u{1F4BC}',
-    description: 'Review profile, draft posts, and prepare a content calendar.',
+    description:
+      'Active for browser-assisted review and draft preparation. Publishing requires your approval AND a manual click — JAK never auto-posts. Login / 2FA must be completed by you.',
     agents: ['CMO Agent'],
-    functional: false,
+    functional: true,
+    defaultUrl: 'https://www.linkedin.com/feed/',
   },
   {
     id: 'YOUTUBE_STUDIO',
@@ -120,7 +122,7 @@ export function BrowserOperatorComingSoon() {
           className="rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
           data-testid="browser-operator-status-badge"
         >
-          Generic mode live
+          Generic + LinkedIn live
         </span>
       </div>
       <p className="text-xs text-muted-foreground mb-4 max-w-2xl">
