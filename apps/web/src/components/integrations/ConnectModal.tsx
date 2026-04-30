@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { integrationApi } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import type { IntegrationMaturity, IntegrationProvider } from '@/types';
+import { useAuth } from '@/lib/auth';
+import { getConnectorPermissions } from '@/lib/connector-permissions';
 
 interface CredentialField {
   key: string;
@@ -24,6 +26,15 @@ interface ConnectModalProps {
 }
 
 export function ConnectModal({ provider, providerName, providerEmoji, onClose, onConnected }: ConnectModalProps) {
+  const { user } = useAuth();
+  // Token-paste form is admin-only. Normal users see only the OAuth
+  // "Sign in with X" button or a "Coming soon" empty state — never raw
+  // credential placeholders like `xoxb-…` or `GOCSPX-…`. Defense in
+  // depth: even an admin must explicitly toggle the form open.
+  const isAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SYSTEM_ADMIN';
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const permissions = getConnectorPermissions(provider);
+
   const [fields, setFields] = useState<CredentialField[]>([]);
   const [instructions, setInstructions] = useState('');
   const [maturity, setMaturity] = useState<IntegrationMaturity | null>(null);
@@ -253,26 +264,45 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             </div>
           )}
 
-          {/* OAuth quick-connect — registry-driven per audit §20 + Phase A.
-              Any provider registered in the backend OAUTH_PROVIDERS map
-              renders this block. `oauthConfigured` reflects whether the
-              deployment has the provider's CLIENT_ID + CLIENT_SECRET env
-              vars set; when false we show a disabled button + explanation
-              so operators know what to configure. */}
-          {supportsOAuth && status !== 'connected' && status !== 'loading' && (
-            <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <div>
-                <p className="text-sm font-medium">Sign in with {oauthLabel}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {oauthConfigured
-                    ? `Recommended. Authorize through ${oauthLabel}'s consent screen — no tokens to paste, refresh handled automatically.`
-                    : `${oauthLabel} OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set the provider's CLIENT_ID / CLIENT_SECRET env vars.`}
-                </p>
+          {/* Plain-English permissions — what JAK can do, what needs
+              approval. NEVER mentions OAuth scopes, tokens, or
+              developer concepts. */}
+          {status !== 'connected' && status !== 'loading' && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" aria-hidden />
+                <div className="text-xs">
+                  <p className="font-semibold text-foreground mb-0.5">JAK can</p>
+                  <p className="text-muted-foreground">{permissions.jakCan}</p>
+                </div>
               </div>
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" aria-hidden />
+                <div className="text-xs">
+                  <p className="font-semibold text-foreground mb-0.5">Approval required before</p>
+                  <p className="text-muted-foreground">{permissions.approvalRequiredBefore}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Primary connect path — layman-first. Three branches:
+              1. OAuth configured → big "Sign in with X" button
+              2. OAuth supported but not configured → "Coming soon" empty
+                 state for normal users; admins can toggle Advanced setup
+              3. OAuth not supported → admins see Advanced setup; users
+                 see "Coming soon" */}
+          {status !== 'connected' && status !== 'loading' && supportsOAuth && oauthConfigured && (
+            <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-medium">Sign in with {oauthLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                You'll be sent to {oauthLabel} to allow access. JAK never sees your password.
+              </p>
               <Button
                 onClick={handleOAuthConnect}
-                disabled={status === 'testing' || !oauthConfigured}
+                disabled={status === 'testing'}
                 className="w-full"
+                data-testid="oauth-connect-btn"
               >
                 {status === 'testing' ? (
                   <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Redirecting to {oauthLabel}...</>
@@ -280,46 +310,79 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
                   <>Sign in with {oauthLabel}</>
                 )}
               </Button>
-              {fields.length > 0 && (
-                <p className="text-[11px] text-muted-foreground text-center pt-1">
-                  Or paste credentials below
-                </p>
-              )}
             </div>
           )}
 
-          {/* Credential fields */}
-          {status !== 'connected' && status !== 'loading' && (
-            <div className="space-y-3">
-              {fields.map(field => (
-                <div key={field.key}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium">{field.label}</label>
-                    {field.helpUrl && (
-                      <a
-                        href={field.helpUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
-                      >
-                        Get this <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    )}
-                  </div>
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    value={credentials[field.key] ?? ''}
-                    onChange={e => setCredentials(prev => ({ ...prev, [field.key]: e.target.value }))}
-                    className={cn(
-                      'w-full rounded-md border bg-background px-3 py-2 text-sm',
-                      'placeholder:text-muted-foreground',
-                      'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                    )}
-                    autoComplete="off"
-                  />
+          {/* Coming-soon empty state — shown to normal (non-admin) users
+              when OAuth isn't configured for this provider. Honest copy:
+              we don't pretend to be ready when we're not. */}
+          {status !== 'connected' && status !== 'loading' &&
+            (!supportsOAuth || !oauthConfigured) && !isAdmin && (
+            <div className="rounded-lg border bg-muted/30 p-6 text-center space-y-2" data-testid="coming-soon-empty-state">
+              <p className="text-sm font-medium">Coming soon</p>
+              <p className="text-xs text-muted-foreground">
+                {providerName} needs additional setup by your workspace admin before it can be connected.
+                Ping your admin or check back soon.
+              </p>
+            </div>
+          )}
+
+          {/* Admin-only Advanced setup toggle — token-paste form lives
+              behind this. Default collapsed even for admins so a casual
+              click doesn't surface developer credentials. */}
+          {status !== 'connected' && status !== 'loading' && isAdmin && fields.length > 0 && (
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                data-testid="admin-advanced-toggle"
+                aria-expanded={showAdvanced}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                {showAdvanced ? 'Hide' : 'Show'} advanced setup (admin only)
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-3" data-testid="admin-token-paste-form">
+                  <p className="text-[11px] text-muted-foreground">
+                    Manual credential setup. For OAuth, ask your platform team to set
+                    the deployment's <code className="rounded bg-muted px-1">CLIENT_ID</code>
+                    {' / '}
+                    <code className="rounded bg-muted px-1">CLIENT_SECRET</code> env vars,
+                    then refresh.
+                  </p>
+                  {fields.map(field => (
+                    <div key={field.key}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-sm font-medium">{field.label}</label>
+                        {field.helpUrl && (
+                          <a
+                            href={field.helpUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                          >
+                            Get this <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type={field.type}
+                        placeholder={field.placeholder}
+                        value={credentials[field.key] ?? ''}
+                        onChange={e => setCredentials(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        className={cn(
+                          'w-full rounded-md border bg-background px-3 py-2 text-sm',
+                          'placeholder:text-muted-foreground',
+                          'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                        )}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -332,21 +395,26 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — Cancel always shown. Connect button only when admin
+            has the advanced token-paste form open (normal users use the
+            big OAuth button or see Coming Soon). */}
         {status !== 'connected' && status !== 'loading' && (
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/30">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button
-              size="sm"
-              onClick={handleConnect}
-              disabled={!allFieldsFilled || status === 'testing'}
-            >
-              {status === 'testing' ? (
-                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Connecting...</>
-              ) : (
-                <>Connect {providerName}</>
-              )}
-            </Button>
+            {isAdmin && showAdvanced && fields.length > 0 && (
+              <Button
+                size="sm"
+                onClick={handleConnect}
+                disabled={!allFieldsFilled || status === 'testing'}
+                data-testid="admin-connect-btn"
+              >
+                {status === 'testing' ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Connecting...</>
+                ) : (
+                  <>Connect {providerName}</>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </div>

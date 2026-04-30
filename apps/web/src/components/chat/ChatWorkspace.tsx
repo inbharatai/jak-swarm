@@ -13,6 +13,7 @@ import { connectSSE } from '@/lib/sse-fetch';
 import { createClient } from '@/lib/supabase';
 import type { RoleId } from '@/lib/role-config';
 import type { WorkflowPlan, WorkflowPlanStep, AgentRole, TaskStatus, RiskLevel } from '@/types';
+import { getAgentFriendlyLabel } from '@/lib/agent-friendly-names';
 import { TaskList } from '@/components/workspace/TaskList';
 import { WorkflowDAG } from '@/components/graph/WorkflowDAG';
 import {
@@ -215,12 +216,14 @@ export function ChatWorkspace() {
           const ev = event as Record<string, unknown>;
           const evType = ev.type as string;
 
-          // Agent started a task — show progress + flip cockpit status
+          // Agent started a task — show progress + flip cockpit status.
+          // Layman friendly name surfaced ("CMO Agent" not "WORKER_MARKETING").
           if (evType === 'worker_started' || evType === 'node_enter') {
+            const friendlyLabel = getAgentFriendlyLabel(ev.agentRole as string | undefined);
             addMessage(convId, {
               role: 'assistant',
               agentRole: (ev.agentRole as RoleId) ?? activeRoles[0] ?? null,
-              content: `⏳ ${(ev.agentRole as string) ?? 'Agent'} working on: ${(ev.taskName as string) ?? 'task'}…`,
+              content: `⏳ ${friendlyLabel} working on: ${(ev.taskName as string) ?? 'task'}…`,
               executionTrace: { workflowId: workflow.id },
             });
             const role = ev.agentRole as string | undefined;
@@ -231,10 +234,11 @@ export function ChatWorkspace() {
           } else if (evType === 'worker_completed' || evType === 'node_exit') {
             const success = ev.success !== false;
             const duration = ev.durationMs ? ` (${((ev.durationMs as number) / 1000).toFixed(1)}s)` : '';
+            const friendlyLabel = getAgentFriendlyLabel(ev.agentRole as string | undefined);
             addMessage(convId, {
               role: 'assistant',
               agentRole: (ev.agentRole as RoleId) ?? activeRoles[0] ?? null,
-              content: `${success ? '✓' : '✗'} ${(ev.agentRole as string) ?? 'Agent'}: ${(ev.taskName as string) ?? 'task'} ${success ? 'completed' : 'failed'}${duration}`,
+              content: `${success ? '✓' : '✗'} ${friendlyLabel}: ${(ev.taskName as string) ?? 'task'} ${success ? 'completed' : 'failed'}${duration}`,
               executionTrace: { workflowId: workflow.id },
             });
             const role = ev.agentRole as string | undefined;

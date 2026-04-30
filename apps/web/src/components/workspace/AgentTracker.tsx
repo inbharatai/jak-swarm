@@ -3,6 +3,7 @@
 import React from 'react';
 import { useWorkflowStream, type WorkflowEvent } from '@/hooks/useWorkflowStream';
 import { cn } from '@/lib/cn';
+import { getAgentFriendlyName } from '@/lib/agent-friendly-names';
 
 const ROLE_EMOJIS: Record<string, string> = {
   COMMANDER: '\u{1F3AF}', PLANNER: '\u{1F4CB}', ROUTER: '\u{1F500}', VERIFIER: '\u2705', GUARDRAIL: '\u{1F6E1}\uFE0F',
@@ -18,8 +19,13 @@ const ROLE_EMOJIS: Record<string, string> = {
   WORKER_APP_DEPLOYER: '\u{1F680}', WORKER_SCREENSHOT_TO_CODE: '\u{1F4F8}',
 };
 
+/**
+ * Layman-friendly name. Brief: users see "CMO Agent" not
+ * "WORKER_MARKETING". Internal codes stay in lifecycle events; this
+ * only translates them at render time.
+ */
 function formatRole(role: string): string {
-  return (role ?? '').replace('WORKER_', '').replace(/_/g, ' ');
+  return getAgentFriendlyName(role).label;
 }
 
 // Extended event with optional agent telemetry fields
@@ -72,9 +78,14 @@ export function AgentTracker({ workflowId, className }: AgentTrackerProps) {
         <span className="text-[10px] text-muted-foreground">{completedCount} completed</span>
       </div>
 
-      {/* Current agent */}
+      {/* Current agent — layman-friendly name + role tooltip on hover. */}
       {latestAgent?.agentRole && (
-        <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20">
+        <div
+          className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20"
+          title={getAgentFriendlyName(latestAgent.agentRole).description}
+          data-testid="agent-tracker-current"
+          data-agent-role={latestAgent.agentRole}
+        >
           <span className="text-lg">{ROLE_EMOJIS[latestAgent.agentRole] ?? '\u{1F916}'}</span>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-primary">{formatRole(latestAgent.agentRole)}</p>
