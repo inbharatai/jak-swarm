@@ -1154,6 +1154,62 @@ export class SwarmExecutionService extends EventEmitter {
               tokensAfter: typeof ev['estimatedTokensAfter'] === 'number' ? (ev['estimatedTokensAfter'] as number) : 0,
               timestamp: nowIso,
             }, tenantId, userId);
+          } else if (t === 'tool_approval_required') {
+            // Phase 2 (full-fledged JAK) — close the loop:
+            // BaseAgent emitted this when ToolRegistry.execute returned
+            // outcome:'approval_required'. Persist a real ApprovalRequest
+            // row + emit the canonical lifecycle 'approval_required'
+            // event so the cockpit's existing inbox UI surfaces it.
+            // The user's decision flows through /approvals/:id/decide
+            // and the WorkflowService.resolveApproval pipeline.
+            const toolName = String(ev['toolName'] ?? 'unknown_tool');
+            const category = String(ev['category'] ?? 'WRITE');
+            const reason = String(ev['reason'] ?? 'Approval required.');
+            const inputSummary = String(ev['inputSummary'] ?? '');
+            // Treat per-tool gates as HIGH risk by default for the audit
+            // trail; the actual category drives the approval card copy.
+            const riskLevel =
+              category === 'DESTRUCTIVE'
+                ? 'CRITICAL'
+                : category === 'EXTERNAL_POST' || category === 'CREDENTIAL' || category === 'INSTALL'
+                  ? 'HIGH'
+                  : 'MEDIUM';
+            // Best-effort persist. If the DB call fails we log + continue
+            // — the cockpit still gets the lifecycle event below so the
+            // user sees the gate fired even when persistence is briefly
+            // unavailable.
+            void this.workflowService
+              .createApprovalRequest({
+                workflowId,
+                tenantId,
+                taskId: (ev['agentRole'] as string) ?? 'tool_call',
+                agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+                action: `tool:${toolName}`,
+                rationale: reason,
+                riskLevel,
+                proposedDataJson: { toolName, category, inputSummary },
+                toolName,
+                ...(category === 'EXTERNAL_POST' ? { externalService: toolName } : {}),
+              })
+              .then((approval) => {
+                this.emitLifecycle(
+                  {
+                    type: 'approval_required',
+                    workflowId,
+                    approvalId: approval.id,
+                    riskLevel,
+                    timestamp: nowIso,
+                  },
+                  tenantId,
+                  userId,
+                );
+              })
+              .catch((approvalErr) => {
+                this.log.warn(
+                  { workflowId, toolName, err: approvalErr },
+                  '[Swarm] Failed to persist tool_approval_required ApprovalRequest (non-fatal)',
+                );
+              });
           }
         },
       });
