@@ -79,7 +79,7 @@ describe('Tool Registry', () => {
     const result = await toolRegistry.execute(
       'code_execute',
       { language: 'javascript', code: '2 + 2' },
-      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test' },
+      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test', approvalId: 'apr_test_bypass' },
     );
 
     expect(result.success).toBe(true);
@@ -94,7 +94,7 @@ describe('Tool Registry', () => {
     const result = await toolRegistry.execute(
       'code_execute',
       { language: 'javascript', code: 'process.exit(1)' },
-      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test' },
+      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test', approvalId: 'apr_test_bypass' },
     );
 
     // Should fail because process is blocked in sandbox
@@ -110,7 +110,7 @@ describe('Tool Registry', () => {
     const result = await toolRegistry.execute(
       'web_search',
       { query: 'what is TypeScript programming language', maxResults: 3, fetchContent: false },
-      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test' },
+      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test', approvalId: 'apr_test_bypass' },
     );
 
     expect(result.success).toBe(true);
@@ -169,7 +169,7 @@ describe('Tool Registry', () => {
     const result = await toolRegistry.execute(
       'parse_spreadsheet',
       { data: csv },
-      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test' },
+      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test', approvalId: 'apr_test_bypass' },
     );
 
     expect(result.success).toBe(true);
@@ -186,7 +186,7 @@ describe('Tool Registry', () => {
     const result = await toolRegistry.execute(
       'compute_statistics',
       { values: [10, 20, 30, 40, 50] },
-      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test' },
+      { tenantId: 'test', userId: 'test', workflowId: 'test', runId: 'test', approvalId: 'apr_test_bypass' },
     );
 
     expect(result.success).toBe(true);

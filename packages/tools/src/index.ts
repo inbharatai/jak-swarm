@@ -2,6 +2,32 @@
 export { ToolRegistry, toolRegistry } from './registry/tool-registry.js';
 export type { RegisteredTool, ToolExecutor } from './registry/tool-registry.js';
 
+// Centralized approval policy (Phase 4 — closes "dead requiresApproval" gap)
+export {
+  DefaultApprovalPolicy,
+  defaultApprovalPolicy,
+  ToolActionCategory,
+} from './registry/approval-policy.js';
+export type {
+  ApprovalDecision,
+  ApprovalPolicyContext,
+  AutoApproveCategoryMap,
+} from './registry/approval-policy.js';
+
+// Tool installer skeleton (Phase 6 — dry-run only; real install in Sprint 2)
+export {
+  ToolRequirementDetector,
+  DryRunOnlyInstaller,
+  TRUSTED_INSTALL_ADAPTERS,
+} from './installer/tool-installer.js';
+export type {
+  ToolRequirement,
+  ToolInstallRequest,
+  InstallPlan,
+  InstallResult,
+  ToolInstallerService,
+} from './installer/tool-installer.js';
+
 // Connector Runtime — unified manifest + status registry on top of the
 // existing tool/MCP/integration infrastructure. See packages/tools/src/
 // connectors/types.ts for the design rationale.

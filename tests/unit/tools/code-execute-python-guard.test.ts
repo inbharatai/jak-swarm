@@ -7,7 +7,10 @@ const ctx: ToolExecutionContext = {
   tenantId: 'test-tenant',
   userId: 'test-user',
   workflowId: 'test-wf',
-  taskId: 'test-task',
+  runId: 'test-run',
+  // approvalId bypasses the per-tool gate (Phase 4) — these tests
+  // exercise the Python sandbox guard, not the approval policy.
+  approvalId: 'apr_test_bypass',
 };
 
 beforeAll(() => {

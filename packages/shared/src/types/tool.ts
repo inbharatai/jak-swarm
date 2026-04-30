@@ -224,6 +224,15 @@ export type ToolOutcome =
   | 'mock_provider'
   | 'not_configured'
   | 'blocked_requires_config'
+  /**
+   * The tool was blocked by the centralized ApprovalPolicy because the
+   * action category (EXTERNAL_POST / DESTRUCTIVE / CREDENTIAL / INSTALL)
+   * requires explicit approval and the call did not include an
+   * approvalId. Caller should pause the workflow, emit an
+   * ApprovalRequest with the proposed input, and re-issue the tool call
+   * with `context.approvalId` after the user decides.
+   */
+  | 'approval_required'
   | 'failed';
 
 export interface ToolResult<T = unknown> {

@@ -16,7 +16,10 @@ beforeAll(async () => {
   if (toolRegistry.list().length === 0) registerBuiltinTools();
 });
 
-const ctx = { tenantId: 'tnt_test', userId: 'usr_test', workflowId: 'wf_test', runId: 'run_test' };
+// approvalId bypasses the per-tool approval gate shipped Phase 4 — these
+// tests exercise tool BEHAVIOR assuming approval was granted upstream.
+// The gate itself is exercised by tests/unit/api/approval-policy.test.ts.
+const ctx = { tenantId: 'tnt_test', userId: 'usr_test', workflowId: 'wf_test', runId: 'run_test', approvalId: 'apr_test_bypass' };
 
 describe('Tool Registry — Behavioral', () => {
   it('registers 70+ real tools with executable handlers', () => {

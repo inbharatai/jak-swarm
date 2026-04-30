@@ -593,20 +593,38 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// Layman-friendly connection status taxonomy enforced at the DB level.
+/// Migration `105_integration_status_enum` converts the prior free-form
+/// String column to this enum. Backfill: legacy 'DISCONNECTED' →
+/// NOT_CONNECTED; anything unrecognised → NOT_CONNECTED.
+///
+/// Front-end normalizer at `apps/web/src/lib/connection-status.ts` maps
+/// these to user-facing labels (Connected / Reconnect needed /
+/// Permission needed / Coming soon). The enum is the source of truth;
+/// the normalizer is the UI translation only.
+enum ConnectionStatus {
+  CONNECTED
+  NOT_CONNECTED
+  NEEDS_REAUTH
+  EXPIRED
+  ERROR
+  PENDING
+}
+
 model Integration {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   tenantId    String
   provider    String
-  status      String    @default("CONNECTED")
+  status      ConnectionStatus @default(CONNECTED)
   displayName String?
-  scopes      String[]  @default([])
+  scopes      String[]         @default([])
   metadata    Json?
   lastUsedAt  DateTime?
   connectedBy String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   credentials IntegrationCredential?
 
   @@unique([tenantId, provider])

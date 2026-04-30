@@ -51,8 +51,19 @@ export function normalizeConnectionStatus(
   if (v === 'CONNECTED' || v === 'ACTIVE' || v === 'AUTHORIZED') {
     return { status: 'CONNECTED', label: 'Connected', tone: 'success' };
   }
-  if (v === 'EXPIRED' || v === 'TOKEN_EXPIRED' || v === 'REFRESH_FAILED') {
+  if (
+    v === 'EXPIRED' ||
+    v === 'TOKEN_EXPIRED' ||
+    v === 'REFRESH_FAILED' ||
+    // NEEDS_REAUTH is the canonical Prisma-enum value for "you've
+    // connected before, the token rotated/expired, please reconnect".
+    // Same layman copy as EXPIRED — user's action is identical.
+    v === 'NEEDS_REAUTH'
+  ) {
     return { status: 'EXPIRED', label: 'Reconnect needed', tone: 'warning' };
+  }
+  if (v === 'PENDING') {
+    return { status: 'NOT_CONNECTED', label: 'Connecting…', tone: 'info' };
   }
   if (
     v === 'PERMISSION_NEEDED' ||

@@ -8,6 +8,7 @@ import type {
   ToolRiskClass,
   ToolMaturity,
 } from '@jak-swarm/shared';
+import { defaultApprovalPolicy, type ApprovalPolicyContext } from './approval-policy.js';
 
 /**
  * Honest outcome inference for a tool that returned (didn't throw).
@@ -237,6 +238,15 @@ export class ToolRegistry {
    * a non-empty inputSchema. Output validation is advisory by default — a mismatch attaches
    * an `outputSchemaWarning` to the successful result. Set `JAK_TOOL_OUTPUT_STRICT=1` to
    * make output mismatches a hard failure (for staging / contract-test environments).
+   *
+   * Approval gate: BEFORE the executor runs, the centralized
+   * `DefaultApprovalPolicy` classifies the action. When approval is
+   * required and `context.approvalId` is absent, returns
+   * `outcome: 'approval_required'` WITHOUT executing — the caller
+   * (BaseAgent / worker-node) is responsible for emitting an
+   * `ApprovalRequest` and re-issuing the call with the approvalId.
+   * This closes the "dead requiresApproval flag" gap from
+   * qa/no-half-measures-gap-audit-2026-04-30.md §3.
    */
   async execute<TOutput = unknown>(
     name: string,
@@ -265,6 +275,26 @@ export class ToolRegistry {
           durationMs: Date.now() - startedAt,
         };
       }
+    }
+
+    // ── Approval gate (centralized policy) ───────────────────────────
+    const approvalDecision = defaultApprovalPolicy.requiresApprovalFor(
+      registered.metadata,
+      context as ApprovalPolicyContext,
+    );
+    if (approvalDecision.required) {
+      return {
+        success: false,
+        outcome: 'approval_required',
+        error: approvalDecision.reason,
+        durationMs: Date.now() - startedAt,
+        data: {
+          toolName: registered.metadata.name,
+          category: approvalDecision.category,
+          reason: approvalDecision.reason,
+          proposedInput: input,
+        } as TOutput,
+      };
     }
 
     try {
