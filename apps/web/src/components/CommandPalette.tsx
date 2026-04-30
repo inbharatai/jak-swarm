@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Home, LayoutDashboard, Network, FileText, BarChart3, BookOpen,
-  ShieldCheck, Plug, Clock, Code2, Search, ArrowRight,
+  ShieldCheck, Plug, Clock, Code2, Search, ArrowRight, Megaphone, Wrench,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -26,6 +26,8 @@ const NAV_COMMANDS: CommandItem[] = [
   { id: 'analytics', label: 'Analytics', description: 'Usage & cost metrics', icon: <BarChart3 className="h-4 w-4" />, href: '/analytics', group: 'Navigation' },
   { id: 'schedules', label: 'Schedules', description: 'Recurring workflows', icon: <Clock className="h-4 w-4" />, href: '/schedules', group: 'Navigation' },
   { id: 'standing-orders', label: 'Standing Orders', description: 'Autonomy boundaries', icon: <ShieldCheck className="h-4 w-4" />, href: '/standing-orders', group: 'Navigation' },
+  { id: 'social-drafts', label: 'Social Drafts', description: 'LinkedIn / IG / YouTube / Meta drafts (manual publish)', icon: <Megaphone className="h-4 w-4" />, href: '/social-drafts', group: 'Navigation' },
+  { id: 'tool-installer', label: 'Tool Installer', description: 'Detect & install missing tools (admin)', icon: <Wrench className="h-4 w-4" />, href: '/tool-installer', group: 'Navigation' },
   { id: 'integrations', label: 'Integrations', description: 'Connected services', icon: <Plug className="h-4 w-4" />, href: '/integrations', group: 'Navigation' },
   { id: 'knowledge', label: 'Knowledge', description: 'Memory store', icon: <BookOpen className="h-4 w-4" />, href: '/knowledge', group: 'Navigation' },
   { id: 'admin', label: 'Admin Console', description: 'Settings & users', icon: <ShieldCheck className="h-4 w-4" />, href: '/admin', group: 'Navigation' },

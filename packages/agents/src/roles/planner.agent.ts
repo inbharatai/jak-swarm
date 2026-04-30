@@ -9,6 +9,7 @@ import {
   PlannerResponseSchema,
   type PlannerResponseT,
 } from '../runtime/schemas/index.js';
+import { decomposeGoal, summarizePlan } from '../coordination/subgoal-coordinator.js';
 
 export interface PlannerOutput {
   plan: WorkflowPlan;
@@ -184,11 +185,48 @@ export class PlannerAgent extends BaseAgent {
       'Planner decomposing mission brief',
     );
 
+    // Sprint 6 Part A — wire SubgoalCoordinator into the planner.
+    // Run the deterministic domain decomposer FIRST. When the goal
+    // matches multiple domains (e.g., "review my repo and draft a
+    // LinkedIn post"), the coordinator returns subgoals + parallel
+    // groups + a CEO summary. We pass that decomposition to the LLM
+    // as a grounded starting point so the produced plan reflects the
+    // multi-agent fan-out the user expected. When the goal matches a
+    // single domain or none, the coordinator falls through to a
+    // single CEO subgoal — the LLM still produces tasks freely.
+    let coordinatorHint: string | null = null;
+    try {
+      const coord = decomposeGoal(missionBrief.goal);
+      // Only include the hint when the decomposition is genuinely
+      // multi-domain (more than one specialist). For single-agent
+      // goals the LLM is already optimal; the hint adds noise.
+      const specialistCount = coord.subgoals.filter(
+        (sg) => sg.agentLabel !== 'CEO Agent',
+      ).length;
+      if (specialistCount >= 2) {
+        coordinatorHint = summarizePlan(coord);
+      }
+    } catch {
+      // Empty / malformed goal — let the LLM handle it.
+    }
+
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
         content: this.buildSystemMessage(PLANNER_SUPPLEMENT),
       },
+      ...(coordinatorHint
+        ? [
+            {
+              role: 'system' as const,
+              content:
+                'SUBGOAL COORDINATOR HINT — the user goal touches multiple domains. ' +
+                'Use this decomposition as the starting structure for your plan. ' +
+                'Each subgoal should map to at least one task in the plan.\n\n' +
+                coordinatorHint,
+            },
+          ]
+        : []),
       {
         role: 'user',
         content: JSON.stringify({

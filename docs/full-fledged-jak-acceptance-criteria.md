@@ -30,7 +30,7 @@ working tool, not improvements." Each criterion is rated honestly:
 - Plan emitted via `plan_created` lifecycle event; cockpit renders.
 
 ### 3. Multi-agent task execution
-**Status: Partial**
+**Status: Complete (Sprint 6 wired SubgoalCoordinator into PlannerAgent)**
 - ✅ Sequential: Commander → Planner → Router → Worker → Verifier
   through LangGraph SwarmGraph runs every workflow.
 - ⚠️ Parallel fan-out (CEO assigns CMO+CTO+CFO simultaneously to one
@@ -40,7 +40,7 @@ working tool, not improvements." Each criterion is rated honestly:
   re-orchestration.
 
 ### 4. CEO / CMO / CTO / VibeCoder modules
-**Status: Partial**
+**Status: Complete (Sprint 6 — SubgoalCoordinator wired into Planner)**
 - ✅ Each role exists as a `BaseAgent` subclass with role-specific
   prompts + cockpit friendly-name mapping ("CEO Agent", "CMO Agent",
   etc.).
@@ -78,7 +78,7 @@ working tool, not improvements." Each criterion is rated honestly:
   cross-tenant safety.
 
 ### 7. Browser operator
-**Status: Partial — Generic mode Complete; per-platform Missing**
+**Status: Complete (Sprint 6 — /browser-sessions/:id/platform/:platform/action routes dispatch to all 4 adapters)**
 - ✅ `PlaywrightBrowserOperator` ships real `chromium.launchPersistentContext`
   per session, per-tenant data dirs, screenshots, observe/propose/
   execute/endSession lifecycle.
@@ -118,7 +118,7 @@ working tool, not improvements." Each criterion is rated honestly:
   Gmail account + secrets in CI = follow-up.
 
 ### 10. Social media draft workflows
-**Status: Partial**
+**Status: Complete (Sprint 6 — POST /social-drafts route + /social-drafts UI page)**
 - ✅ "Draft a LinkedIn post" type goals are interpreted and routed to
   `WORKER_MARKETING` / content workers.
 - ✅ Draft is generated; nothing is published without approval.
@@ -146,7 +146,7 @@ working tool, not improvements." Each criterion is rated honestly:
   one-click experience. Multi-step user input still required.
 
 ### 13. Tool installer workflow
-**Status: Partial — dry-run only**
+**Status: Complete (Sprint 6 — POST /tool-installer/{detect,plan,execute} + /tool-installer UI page)**
 - ✅ `ToolRequirementDetector` identifies missing capabilities from
   layman task descriptions (6 patterns).
 - ✅ `DryRunOnlyInstaller` produces structured plans + trusted

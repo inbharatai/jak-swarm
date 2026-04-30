@@ -66,6 +66,8 @@ import llmSettingsRoutes from './routes/llm-settings.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
 import standingOrdersRoutes from './routes/standing-orders.routes.js';
 import browserOperatorRoutes from './routes/browser-operator.routes.js';
+import socialDraftsRoutes from './routes/social-drafts.routes.js';
+import toolInstallerRoutes from './routes/tool-installer.routes.js';
 import ycMetricsRoutes from './routes/yc-metrics.routes.js';
 import { onboardingRoutes } from './routes/onboarding.routes.js';
 import { integrationRoutes } from './routes/integrations.routes.js';
@@ -218,6 +220,8 @@ async function buildApp() {
   await fastify.register(schedulesRoutes, { prefix: '/schedules' });
   await fastify.register(standingOrdersRoutes, { prefix: '/standing-orders' });
   await fastify.register(browserOperatorRoutes, { prefix: '/browser-sessions' });
+  await fastify.register(socialDraftsRoutes, { prefix: '/social-drafts' });
+  await fastify.register(toolInstallerRoutes, { prefix: '/tool-installer' });
   await fastify.register(ycMetricsRoutes, { prefix: '/metrics' });
   await fastify.register(onboardingRoutes);
   await fastify.register(integrationRoutes);

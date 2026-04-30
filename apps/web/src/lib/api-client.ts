@@ -187,6 +187,44 @@ export const browserSessionsApi = {
     approvalId: string,
   ) => apiClient.post<unknown>(`/browser-sessions/${sessionId}/execute`, { action, approvalId }),
   end: (sessionId: string) => apiClient.delete<unknown>(`/browser-sessions/${sessionId}`),
+  /**
+   * Sprint 6 Part C — platform-specific adapter dispatch. Drives the
+   * underlying LinkedIn / Instagram / YouTube / Meta adapter methods.
+   */
+  platformAction: (
+    sessionId: string,
+    platform: string,
+    body:
+      | { action: 'detect_login' }
+      | { action: 'build_draft'; topic: string; tone?: 'professional' | 'casual' | 'enthusiastic' }
+      | { action: 'record_publish'; draft: Record<string, unknown>; approvalId: string },
+  ) => apiClient.post<unknown>(`/browser-sessions/${sessionId}/platform/${platform}/action`, body),
+};
+
+/**
+ * Sprint 6 Part D — Social drafts API.
+ * Backend: apps/api/src/routes/social-drafts.routes.ts. Stateless;
+ * uses the platform adapters' buildDraft() methods. NEVER publishes.
+ */
+export const socialDraftsApi = {
+  generate: (body: {
+    platform: 'LINKEDIN' | 'INSTAGRAM' | 'YOUTUBE_STUDIO' | 'META_BUSINESS_SUITE';
+    topic: string;
+    tone?: 'professional' | 'casual' | 'enthusiastic';
+  }) => apiClient.post<unknown>('/social-drafts', body),
+};
+
+/**
+ * Sprint 6 Part E — Tool installer API.
+ * Backend: apps/api/src/routes/tool-installer.routes.ts. Real
+ * subprocess execution via SandboxedInstaller; allowlisted only.
+ */
+export const toolInstallerApi = {
+  detect: (task: string) => apiClient.post<unknown>('/tool-installer/detect', { task }),
+  plan: (toolName: string, purpose: string) =>
+    apiClient.post<unknown>('/tool-installer/plan', { toolName, purpose }),
+  execute: (toolName: string, purpose: string, approvalId: string) =>
+    apiClient.post<unknown>('/tool-installer/execute', { toolName, purpose, approvalId }),
 };
 
 /** SWR-compatible fetcher that unwraps { success: true, data } envelopes. */
