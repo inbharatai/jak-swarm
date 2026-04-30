@@ -5,6 +5,13 @@ export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent, extractFirstJsonBlob } from './base/base-agent.js';
 export type { ToolLoopResult, MemoryProvider, CompanyContextProvider } from './base/base-agent.js';
 
+// Multi-agent coordination (Sprint 3 — full-fledged JAK)
+export {
+  decomposeGoal,
+  summarizePlan,
+} from './coordination/subgoal-coordinator.js';
+export type { Subgoal, SubgoalCoordinatorResult } from './coordination/subgoal-coordinator.js';
+
 // LLM Providers
 export type { LLMProvider, LLMResponse, TextContent, ImageContent, MessageContent } from './base/llm-provider.js';
 export { OpenAIProvider } from './base/providers/openai-provider.js';
