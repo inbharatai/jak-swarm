@@ -170,6 +170,25 @@ export function fetcher<T>(url: string): Promise<T> {
   return apiClient.get<T>(url);
 }
 
+/**
+ * Browser-operator API — real Playwright-backed sessions.
+ * Backend at apps/api/src/routes/browser-operator.routes.ts.
+ */
+export const browserSessionsApi = {
+  list: () => apiClient.get<unknown>('/browser-sessions'),
+  start: (body: { platform: string; initialUrl: string; workflowId?: string }) =>
+    apiClient.post<unknown>('/browser-sessions', body),
+  observe: (sessionId: string) => apiClient.get<unknown>(`/browser-sessions/${sessionId}`),
+  propose: (sessionId: string, action: { kind: string; description: string; payload: Record<string, unknown> }) =>
+    apiClient.post<unknown>(`/browser-sessions/${sessionId}/propose`, { action }),
+  execute: (
+    sessionId: string,
+    action: { kind: string; description: string; payload: Record<string, unknown> },
+    approvalId: string,
+  ) => apiClient.post<unknown>(`/browser-sessions/${sessionId}/execute`, { action, approvalId }),
+  end: (sessionId: string) => apiClient.delete<unknown>(`/browser-sessions/${sessionId}`),
+};
+
 /** SWR-compatible fetcher that unwraps { success: true, data } envelopes. */
 export function dataFetcher<T>(url: string): Promise<T> {
   return requestData<T>('GET', url);

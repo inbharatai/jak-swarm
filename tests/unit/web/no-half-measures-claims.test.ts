@@ -26,23 +26,36 @@ function read(relPath: string): string {
 }
 
 describe('No-half-measures truth lock', () => {
-  it('Browser-operator section UI honestly says "not live yet" / "Coming soon"', () => {
+  it('Browser-operator section UI honestly distinguishes functional GENERIC from per-platform Coming soon', () => {
     const ui = read('apps/web/src/components/integrations/BrowserOperatorComingSoon.tsx');
-    // Honest framing must be present.
+    // The GENERIC platform IS now functional (real Playwright runtime
+    // shipped in packages/tools/src/browser-operator/).
+    expect(ui).toMatch(/Generic browser session/);
+    expect(ui).toMatch(/Start browser session/);
+    // Per-platform cards still say Coming soon honestly.
     expect(ui).toContain('Coming soon');
-    expect(ui.toLowerCase()).toMatch(/not live yet|not.*active|needs browser-operator mode/);
-    // Must not pretend to be functional.
-    expect(ui).not.toMatch(/\bavailable now\b/i);
+    expect(ui).toMatch(/needs platform adapter/);
+    // Honest password disclaimer (JSX may wrap the text with <strong>
+    // tags; allow whitespace + tags between words).
+    expect(ui).toMatch(/JAK never[\s\S]{0,40}stores your password/);
+    // Must not over-claim autonomous posting.
+    expect(ui).not.toMatch(/\bAuto[- ]post\b/i);
     expect(ui).not.toMatch(/\bproduction[- ]ready\b/i);
   });
 
-  it('Browser-operator service ships a NotImplementedBrowserOperator stub that throws', () => {
-    const svc = read('apps/api/src/services/browser-operator/browser-operator.service.ts');
-    expect(svc).toContain('class NotImplementedBrowserOperator');
-    expect(svc).toContain('throw new Error');
-    expect(svc).toContain('not implemented');
-    // The default export must point at the stub, not a fake impl.
-    expect(svc).toMatch(/browserOperator.*NotImplementedBrowserOperator/);
+  it('PlaywrightBrowserOperator is the real exported impl (no fake stub)', () => {
+    const impl = read(
+      'packages/tools/src/browser-operator/playwright-browser-operator.ts',
+    );
+    // Must use the real Playwright API.
+    expect(impl).toContain("from 'playwright'");
+    expect(impl).toContain('chromium.launchPersistentContext');
+    // Must enforce the approval gate at execute().
+    expect(impl).toMatch(/ApprovalRequiredError/);
+    expect(impl).toMatch(/!input\.approvalId/);
+    // Tenant isolation must be enforced via requireSession.
+    expect(impl).toContain('SessionAccessError');
+    expect(impl).toContain('wrong_tenant');
   });
 
   it('Every connector audit goal explicitly forbids external action', () => {

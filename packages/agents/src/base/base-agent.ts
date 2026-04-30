@@ -901,7 +901,47 @@ ${lines.join('\n')}
             // can render a real/draft/mock/not_configured badge instead of
             // guessing from substring matches.
             toolOutcome = result.outcome;
-            if (result.success) {
+
+            // Phase 4 follow-up — Centralized ApprovalPolicy gate. The
+            // tool registry returns outcome:'approval_required' when a
+            // sensitive tool was called without an approvalId in
+            // context. The executor was NOT invoked — we surface a
+            // structured stop signal to the LLM AND emit a
+            // tool_approval_required activity event so the worker-node
+            // / API layer can create an ApprovalRequest row + pause
+            // the workflow. This closes the "registry returns the
+            // outcome but nothing pauses" gap.
+            if (!result.success && result.outcome === 'approval_required') {
+              const data = (result.data ?? {}) as Record<string, unknown>;
+              const category = (data['category'] as string | undefined) ?? 'WRITE';
+              const reason = result.error ?? 'Approval required.';
+              context.emitActivity({
+                type: 'tool_approval_required',
+                agentRole: this.role,
+                toolName,
+                category,
+                reason,
+                inputSummary,
+                timestamp: toolStartedAt.toISOString(),
+              });
+              resultStr = JSON.stringify({
+                _approvalRequired: true,
+                toolName,
+                category,
+                reason,
+                message:
+                  `Tool '${toolName}' requires user approval before it can run. ` +
+                  `An approval request has been created — wait for the user to decide. ` +
+                  `Do not retry this tool without an approvalId.`,
+              });
+              // Mark this iteration as paused-by-approval. The agent
+              // sees the result and should NOT keep calling the same
+              // tool — the loop-detection guard will also catch a
+              // pathological retry.
+              toolError = `approval_required: ${reason}`;
+              // Skip the regular success/failure branches below by
+              // jumping past the response-handling block.
+            } else if (result.success) {
               const data = result.data as Record<string, unknown> | string | undefined;
               // Detect mock/demo data — inform the agent honestly
               if (data && typeof data === 'object' && (data as Record<string, unknown>)._mock) {

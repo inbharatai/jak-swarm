@@ -133,6 +133,29 @@ export type AgentActivityEvent =
       /** Heuristic token count after compression. */
       estimatedTokensAfter: number;
       timestamp: string;
+    }
+  // Phase 4 follow-up — emitted by BaseAgent.executeWithTools when
+  // ToolRegistry.execute returns outcome:'approval_required'. The
+  // worker-node / API layer subscribes and (a) creates an
+  // ApprovalRequest row for the user, (b) pauses the workflow at
+  // AWAITING_APPROVAL, (c) re-issues the tool call once approved with
+  // approvalId in context. The chokepoint is the tool registry; this
+  // event is the contract between the agent and the API layer.
+  | {
+      type: 'tool_approval_required';
+      agentRole: string;
+      /** Internal tool name (the executor that was blocked). */
+      toolName: string;
+      /** ToolActionCategory from the centralized policy: SAFE_READ /
+       *  WRITE / EXTERNAL_POST / DESTRUCTIVE / CREDENTIAL / INSTALL. */
+      category: string;
+      /** Layman-friendly reason the gate fired. */
+      reason: string;
+      /** Truncated proposed input — same shape as inputSummary above. */
+      inputSummary: string;
+      /** Hash of the proposed input for ApprovalRequest payload binding. */
+      proposedDataHash?: string;
+      timestamp: string;
     };
 
 /**

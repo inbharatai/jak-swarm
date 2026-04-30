@@ -28,6 +28,29 @@ export type {
   ToolInstallerService,
 } from './installer/tool-installer.js';
 
+// Browser-operator runtime (real Playwright-backed per-tenant sessions).
+// Replaces the prior crash-loud `NotImplementedBrowserOperator` stub.
+export { PlaywrightBrowserOperator } from './browser-operator/playwright-browser-operator.js';
+export type {
+  BrowserAuditEmitter,
+  PlaywrightBrowserOperatorOptions,
+} from './browser-operator/playwright-browser-operator.js';
+export {
+  ApprovalRequiredError as BrowserApprovalRequiredError,
+  SessionAccessError,
+} from './browser-operator/types.js';
+export type {
+  BrowserOperatorService,
+  BrowserPlatform,
+  BrowserSessionInfo,
+  ExecutionResult as BrowserExecutionResult,
+  PageObservation,
+  ProposedAction,
+  ProposedActionKind,
+  ProposedActionPreview,
+  StartSessionInput,
+} from './browser-operator/types.js';
+
 // Connector Runtime — unified manifest + status registry on top of the
 // existing tool/MCP/integration infrastructure. See packages/tools/src/
 // connectors/types.ts for the design rationale.
