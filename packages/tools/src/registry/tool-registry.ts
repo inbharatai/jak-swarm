@@ -389,6 +389,7 @@ export class ToolRegistry {
   } {
     const byMaturity: Record<ToolMaturity, number> = {
       real: 0,
+      real_external: 0,
       config_dependent: 0,
       heuristic: 0,
       llm_passthrough: 0,

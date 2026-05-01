@@ -35,10 +35,12 @@ describe('ToolRegistry.getManifest()', () => {
       ['send_email', 'config_dependent'],
       ['github_create_repo', 'config_dependent'],
       ['analyze_email_risk', 'config_dependent'],
-      ['verify_email_deliverability', 'real'],
-      ['browser_navigate', 'real'],
-      ['code_execute', 'real'],
-      ['web_search', 'real'],
+      // Migrated to canonical 'real_external' name as part of audit:tools cleanup.
+      // The legacy alias 'real' is still in the ToolMaturity union for back-compat.
+      ['verify_email_deliverability', 'real_external'],
+      ['browser_navigate', 'real_external'],
+      ['code_execute', 'real_external'],
+      ['web_search', 'real_external'],
       ['score_lead', 'heuristic'],
     ];
     for (const [name, expected] of expectations) {

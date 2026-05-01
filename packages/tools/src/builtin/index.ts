@@ -323,7 +323,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.KNOWLEDGE,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -835,7 +835,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       // 'real' across all chain tiers. Materially better quality with SERPER_API_KEY or TAVILY_API_KEY.
       // liveTested: Serper has tests/integration/serper-live.test.ts gated by RUN_LIVE_SEARCH=1.
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: true,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -921,7 +921,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -1161,7 +1161,7 @@ export function registerBuiltinTools(): void {
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
       // 'real' Playwright; depends on tenant allowedDomains policy (enforced via context).
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -1195,7 +1195,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1235,7 +1235,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -1274,7 +1274,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -1313,7 +1313,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1351,7 +1351,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1394,7 +1394,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1435,7 +1435,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1471,7 +1471,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1511,7 +1511,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1622,7 +1622,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1658,7 +1658,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1696,7 +1696,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1734,7 +1734,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1768,7 +1768,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1802,7 +1802,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -1848,7 +1848,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1882,7 +1882,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1919,7 +1919,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -1982,7 +1982,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.DOCUMENT,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -2309,7 +2309,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.WEBHOOK,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -2358,7 +2358,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.KNOWLEDGE,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -2426,7 +2426,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.KNOWLEDGE,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -2485,7 +2485,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.DOCUMENT,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -2521,7 +2521,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.DOCUMENT,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -2563,7 +2563,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.DOCUMENT,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -2623,7 +2623,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: true,
       // 'real' for JS (vm-sandboxed). Python path is host-only and gated by NODE_ENV;
       // production Python should route through sandbox_exec (Docker / E2B adapters).
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -2822,7 +2822,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.KNOWLEDGE,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
@@ -2949,7 +2949,7 @@ export function registerBuiltinTools(): void {
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       // Real DNS lookup + regex; no external API key needed.
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -3145,7 +3145,7 @@ export function registerBuiltinTools(): void {
         required: ['url'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3236,7 +3236,7 @@ export function registerBuiltinTools(): void {
         required: ['seed_keyword'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -3292,7 +3292,7 @@ export function registerBuiltinTools(): void {
         required: ['keyword'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3347,7 +3347,7 @@ export function registerBuiltinTools(): void {
         required: ['keyword', 'targetUrl'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3411,7 +3411,7 @@ export function registerBuiltinTools(): void {
         required: ['name', 'steps'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3494,7 +3494,7 @@ export function registerBuiltinTools(): void {
         required: ['to', 'subject', 'body'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3535,7 +3535,7 @@ export function registerBuiltinTools(): void {
         required: ['emailId', 'event'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -3733,7 +3733,7 @@ export function registerBuiltinTools(): void {
         required: ['company'],
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4278,7 +4278,7 @@ export function registerBuiltinTools(): void {
         required: ['url'],
       },
       outputSchema: { type: 'object', properties: { audit: { type: 'object' }, keywords: { type: 'object' }, serp: { type: 'object' }, recommendations: { type: 'array' }, score: { type: 'number' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4325,7 +4325,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { tracked: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4367,7 +4367,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { okrs: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -4417,7 +4417,7 @@ export function registerBuiltinTools(): void {
         required: ['competitors'],
       },
       outputSchema: { type: 'object', properties: { competitors: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -4712,7 +4712,7 @@ export function registerBuiltinTools(): void {
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { budget: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5081,7 +5081,7 @@ Date: _______________`;
         required: ['industry'],
       },
       outputSchema: { type: 'object', properties: { updates: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
@@ -5278,7 +5278,7 @@ Date: _______________`;
         required: ['action'],
       },
       outputSchema: { type: 'object', properties: { pipeline: { type: 'array' }, stageBreakdown: { type: 'object' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5334,7 +5334,7 @@ Date: _______________`;
         required: ['action', 'customerId'],
       },
       outputSchema: { type: 'object', properties: { current: { type: 'object' }, history: { type: 'array' } } },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {
@@ -5424,7 +5424,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -5452,7 +5452,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -5484,7 +5484,7 @@ Date: _______________`;
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       // FIX #8: Require approval for arbitrary command execution
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -5523,7 +5523,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
       inputSchema: {
@@ -5555,7 +5555,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -5586,7 +5586,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -5616,7 +5616,7 @@ Date: _______________`;
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.DESTRUCTIVE,
       requiresApproval: true,
-      maturity: 'real',
+      maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -6315,7 +6315,7 @@ Date: _______________`;
         },
       },
       outputSchema: { type: 'object' },
-      maturity: 'real',
+      maturity: 'real_external',
       version: '1.0.0',
     },
     async (input: unknown, context: ToolExecutionContext) => {

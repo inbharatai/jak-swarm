@@ -53,7 +53,8 @@ export function computeSession7Counts(): Session7CountReport {
  * update this table in the same PR as the classification change.
  */
 export const EXPECTED_SESSION_7_BUCKETS = {
-  real: 17,
+  // Renamed from `real` to canonical `real_external` (audit:tools cleanup).
+  real_external: 17,
   heuristic: 12,
   llm_passthrough: 8,
   config_dependent: 2,

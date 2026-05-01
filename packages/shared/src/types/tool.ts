@@ -126,7 +126,12 @@ export enum ToolCategory {
  * - unclassified:   not yet labeled — treated as opaque by the manifest until classified
  */
 export type ToolMaturity =
+  // Legacy alias — kept for back-compat; new tools should use 'real_external'.
+  // The audit:tools script (scripts/audit-all-tools.ts) treats both as equivalent.
   | 'real'
+  // Canonical name. Indicates a tool that hits a real external system
+  // (Gmail / GitHub / Slack / browser etc.) when configured.
+  | 'real_external'
   | 'config_dependent'
   | 'heuristic'
   | 'llm_passthrough'

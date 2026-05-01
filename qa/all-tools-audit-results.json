@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-29T17:57:01.356Z",
+  "generatedAt": "2026-05-01T08:56:19.054Z",
   "total": 122,
-  "passed": 66,
-  "warned": 56,
+  "passed": 122,
+  "warned": 0,
   "failed": 0,
   "entries": [
     {
@@ -102,19 +102,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "search_knowledge",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "ingest_document",
@@ -187,19 +180,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "web_search",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "web_fetch",
@@ -207,19 +193,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "web_fetch",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "parse_spreadsheet",
@@ -266,19 +245,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_navigate",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_extract",
@@ -286,19 +258,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_extract",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_fill_form",
@@ -306,19 +271,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_fill_form",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_click",
@@ -326,19 +284,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_click",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_screenshot",
@@ -346,19 +297,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_screenshot",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_get_text",
@@ -366,19 +310,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_get_text",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_type_text",
@@ -386,19 +323,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_type_text",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_press_key",
@@ -406,19 +336,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_press_key",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_mouse_click",
@@ -426,19 +349,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_mouse_click",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_scroll",
@@ -446,19 +362,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_scroll",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_analyze_page",
@@ -479,19 +388,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_wait_for",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_select_option",
@@ -499,19 +401,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_select_option",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_upload_file",
@@ -519,19 +414,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_upload_file",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_evaluate_js",
@@ -539,19 +427,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_evaluate_js",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_hover",
@@ -559,19 +440,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_hover",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_get_cookies",
@@ -579,19 +453,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_get_cookies",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_set_cookies",
@@ -599,19 +466,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_set_cookies",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_save_as_pdf",
@@ -619,19 +479,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_save_as_pdf",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "browser_manage_tabs",
@@ -639,19 +492,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "browser_manage_tabs",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "pdf_extract_text",
@@ -659,19 +505,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "pdf_extract_text",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "pdf_analyze",
@@ -718,19 +557,12 @@
       "riskClass": "EXTERNAL_SIDE_EFFECT",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "external",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "send_webhook",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "memory_store",
@@ -738,19 +570,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "memory_store",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "memory_retrieve",
@@ -758,19 +583,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "memory_retrieve",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "file_read",
@@ -778,19 +596,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "file_read",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "file_write",
@@ -798,19 +609,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "file_write",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "list_directory",
@@ -818,19 +622,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "list_directory",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "code_execute",
@@ -838,19 +635,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "code_execute",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "find_availability",
@@ -910,19 +700,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "search_knowledge_base",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "enrich_contact",
@@ -956,19 +739,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "verify_email_deliverability",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "score_lead",
@@ -1002,19 +778,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "audit_seo",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "research_keywords",
@@ -1022,19 +791,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "research_keywords",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "analyze_serp",
@@ -1042,19 +804,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "analyze_serp",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "monitor_rankings",
@@ -1062,19 +817,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "monitor_rankings",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "create_email_sequence",
@@ -1082,19 +830,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "create_email_sequence",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "personalize_email",
@@ -1115,19 +856,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "schedule_email",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "track_email_engagement",
@@ -1135,19 +869,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_email_engagement",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "analyze_engagement",
@@ -1194,19 +921,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "monitor_company_signals",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "find_decision_makers",
@@ -1331,19 +1051,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "generate_seo_report",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "track_content_performance",
@@ -1351,19 +1064,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_content_performance",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "track_okrs",
@@ -1371,19 +1077,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_okrs",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "monitor_competitors",
@@ -1391,19 +1090,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "monitor_competitors",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "generate_board_report",
@@ -1476,19 +1168,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_budget",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "forecast_cashflow",
@@ -1574,19 +1259,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "monitor_regulations",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "auto_engage_reddit",
@@ -1633,19 +1311,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_lead_pipeline",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "track_customer_health",
@@ -1653,19 +1324,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "track_customer_health",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "generate_qbr_deck",
@@ -1686,19 +1350,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_create",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_write_file",
@@ -1706,19 +1363,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_write_file",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_exec",
@@ -1726,19 +1376,12 @@
       "riskClass": "EXTERNAL_SIDE_EFFECT",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_exec",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_install_deps",
@@ -1746,19 +1389,12 @@
       "riskClass": "WRITE",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "write",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_install_deps",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_start_dev_server",
@@ -1766,19 +1402,12 @@
       "riskClass": "EXTERNAL_SIDE_EFFECT",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_start_dev_server",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_get_preview_url",
@@ -1786,19 +1415,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_get_preview_url",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "sandbox_destroy",
@@ -1806,19 +1428,12 @@
       "riskClass": "DESTRUCTIVE",
       "riskLevel": null,
       "requiresApproval": true,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": "read",
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "sandbox_destroy",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     },
     {
       "name": "analyze_email_risk",
@@ -1969,19 +1584,12 @@
       "riskClass": "READ_ONLY",
       "riskLevel": null,
       "requiresApproval": false,
-      "maturity": "real",
+      "maturity": "real_external",
       "sideEffectLevel": null,
       "hasInputSchema": true,
       "hasOutputSchema": true,
-      "findings": [
-        {
-          "toolName": "compile_executive_summary",
-          "field": "maturity",
-          "severity": "warning",
-          "message": "maturity='real' is a legacy alias — normalize to 'real_external' when convenient"
-        }
-      ],
-      "status": "warn"
+      "findings": [],
+      "status": "pass"
     }
   ]
 }

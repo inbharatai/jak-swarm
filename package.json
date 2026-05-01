@@ -6,6 +6,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "test": "turbo run test",
+    "test:unit": "vitest run",
+    "test:e2e": "pnpm --filter @jak-swarm/tests exec playwright test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "prisma": "node scripts/prisma-guard.js",
