@@ -1,35 +1,35 @@
 /**
- * HumanQATester — Playwright helper that drives the page like a careful
- * human QA reviewer, not like a fast selector-checking bot.
+ * HumanQATester — a Playwright orchestrator that behaves like a careful
+ * human QA reviewer + product manager + UX critic + honest buyer.
  *
- * Designed in response to the Round-2 QA feedback that AI testers fail
- * because they treat Playwright as automation, not as quality assurance.
+ * Replaces the Sprint-2 structural-only helper with a proper
+ * interaction + claim-verification + buyer-trust framework.
  *
- * The loop this helper enforces:
- *   1. Observe FIRST  — screenshot + a11y snapshot before any action.
- *   2. Interact slowly — short pauses + per-action screenshots.
- *   3. Check health   — console errors + network failures + hydration warns.
- *   4. Check truth    — claims on page vs observable behaviour.
- *   5. Check responsive — mobile + tablet + desktop.
- *   6. Produce evidence — structured findings, never opinions.
+ * Design principles:
+ *   1. **Observe before you touch.** Screenshot + a11y snapshot before any
+ *      action. The "before" image is the proof of the page state the user
+ *      reviewer would see; the "after" image proves what changed.
+ *   2. **Slow, human-paced interaction.** Hover → wait → screenshot →
+ *      click → wait for layout settle → screenshot → verify. No fast
+ *      robotic clicks.
+ *   3. **Four-state findings, not boolean pass/fail.** A finding is one
+ *      of: working / partially-working / present-but-not-wired /
+ *      not-implemented. The boolean "passed selector visible" is the
+ *      weakest possible evidence.
+ *   4. **Compare claim to behaviour.** A landing-page promise that
+ *      isn't observable in the dashboard is a `product-truth` finding,
+ *      regardless of test pass.
+ *   5. **Test like a buyer.** Trust signals (pricing visible, contact
+ *      info, audit pack links), onboarding clarity, mobile trust.
+ *   6. **Evidence, not opinion.** Every finding carries: page, section,
+ *      expected, actual, severity, category, status, suggestedFix,
+ *      screenshot path, retest hint.
  *
- * Philosophy:
- *   - Findings carry severity, category, expected, actual, suggested fix.
- *   - "Implemented but not user-facing" is its own category — code grep
- *     does not equal product behaviour.
- *   - Never claim a flow works unless observed end-to-end.
- *
- * Usage:
- *   const qa = new HumanQATester(page, { name: 'landing', screenshotsDir: 'qa/screenshots/landing' });
- *   await qa.start();
- *   await qa.observeSection('hero', { selector: 'section.gradient-bg', expectedText: /Give JAK/ });
- *   await qa.checkHealth();
- *   await qa.checkResponsive();
- *   const report = await qa.finalize();
- *
- * The helper does NOT decide pass/fail at the test level. The Playwright
- * test still asserts what it cares about. This helper is the EVIDENCE
- * COLLECTOR — it tells you *why* a test is or isn't trustworthy.
+ * What this CANNOT do (honest scope):
+ *   - LLM-based visual judgement of screenshots (would need a vision
+ *     model + per-frame analysis cost). Heuristic-coded checks only.
+ *   - Cross-browser parity beyond what Playwright's project matrix gives.
+ *   - True empathy. A human still has to read the report.
  */
 
 import type { Page, ConsoleMessage, Request as PWRequest } from '@playwright/test';
@@ -47,7 +47,20 @@ export type Category =
   | 'accessibility'
   | 'console'
   | 'network'
-  | 'mobile';
+  | 'mobile'
+  | 'copy'
+  | 'trust';
+
+/**
+ * Four-state finding status — captures the gap between "selector exists"
+ * and "real user can complete this flow".
+ */
+export type FindingStatus =
+  | 'working'                 // observable + complete + matches claim
+  | 'partially-working'       // observable but with caveats / missing edge cases
+  | 'present-but-not-wired'   // UI is rendered but the action does nothing real
+  | 'not-implemented'         // claimed in landing/copy but absent from product
+  | 'observation';            // an evidence-only note (severity INFO)
 
 export interface Finding {
   page: string;
@@ -56,17 +69,20 @@ export interface Finding {
   actual: string;
   severity: Severity;
   category: Category;
+  status?: FindingStatus;
   suggestedFix: string;
   screenshot?: string;
+  /** Hint the next QA run can use to confirm a fix landed. */
+  retestHint?: string;
 }
 
 export interface HumanQAOptions {
-  /** Logical name of this run — folders + report use it. */
   name: string;
-  /** Where to drop screenshots. Created if missing. */
   screenshotsDir: string;
-  /** Pause between observations to mimic a human reviewer. Default 250ms. */
+  /** Pause between observations to mimic a human reviewer. Default 350ms. */
   paceMs?: number;
+  /** Per-character typing delay for fillSlowly. Default 30ms. */
+  typingDelayMs?: number;
 }
 
 export class HumanQATester {
@@ -82,12 +98,14 @@ export class HumanQATester {
     opts: HumanQAOptions,
   ) {
     this.opts = {
-      paceMs: 250,
+      paceMs: 350,
+      typingDelayMs: 30,
       ...opts,
     };
   }
 
-  /** Wire console + network listeners. Call once per test before any navigation. */
+  // ─── Lifecycle ────────────────────────────────────────────────────────
+
   async start(): Promise<void> {
     await fs.mkdir(this.opts.screenshotsDir, { recursive: true });
     this.page.on('console', (msg) => {
@@ -96,11 +114,7 @@ export class HumanQATester {
       }
     });
     this.page.on('requestfailed', (req: PWRequest) => {
-      this.failedRequests.push({
-        url: req.url(),
-        status: 0,
-        method: req.method(),
-      });
+      this.failedRequests.push({ url: req.url(), status: 0, method: req.method() });
     });
     this.page.on('response', (resp) => {
       if (resp.status() >= 400) {
@@ -113,14 +127,22 @@ export class HumanQATester {
     });
   }
 
+  // ─── Section observation (Step 1: Observe first) ──────────────────────
+
   /**
-   * Observe a section: scroll to it, pause, screenshot, optionally check
-   * for expected text + alignment. Records a finding if anything looks
-   * off (cropped text, missing element, contrast issues).
+   * Scroll to a section, pause, screenshot, optionally check for expected
+   * text + content density. Records a finding if anything looks off
+   * (cropped text, missing element).
    */
   async observeSection(
     name: string,
-    opts: { selector?: string; expectedText?: RegExp; expectMinChars?: number } = {},
+    opts: {
+      selector?: string;
+      expectedText?: RegExp;
+      expectMinChars?: number;
+      // NEW — cropped-text guards
+      checkDescenderClipping?: boolean;
+    } = {},
   ): Promise<void> {
     this.currentSection = name;
     if (opts.selector) {
@@ -134,83 +156,239 @@ export class HumanQATester {
           actual: 'selector not found / not visible',
           severity: 'HIGH',
           category: 'UI',
+          status: 'not-implemented',
           suggestedFix: `Verify ${opts.selector} exists on this page after build`,
+          retestHint: `Re-run this test; the selector should be visible.`,
         });
         return;
       }
       await this.pace();
 
-      if (opts.expectedText) {
-        const text = (await el.innerText().catch(() => '')) || '';
-        if (!opts.expectedText.test(text)) {
-          this.add({
-            section: name,
-            expected: `text matches ${opts.expectedText}`,
-            actual: text.slice(0, 120),
-            severity: 'MEDIUM',
-            category: 'product-truth',
-            suggestedFix: 'Update copy or update the test expectation',
-          });
-        }
+      const text = (await el.innerText().catch(() => '')) || '';
+      if (opts.expectedText && !opts.expectedText.test(text)) {
+        this.add({
+          section: name,
+          expected: `text matches ${opts.expectedText}`,
+          actual: text.slice(0, 120),
+          severity: 'MEDIUM',
+          category: 'product-truth',
+          status: 'present-but-not-wired',
+          suggestedFix: 'Update copy or update the test expectation',
+        });
       }
-      if (opts.expectMinChars && (await el.innerText().catch(() => '')).length < opts.expectMinChars) {
+      if (opts.expectMinChars && text.length < opts.expectMinChars) {
         this.add({
           section: name,
           expected: `>= ${opts.expectMinChars} characters of content`,
-          actual: 'section is sparse / nearly empty',
+          actual: `${text.length} chars (sparse)`,
           severity: 'MEDIUM',
           category: 'UX',
+          status: 'partially-working',
           suggestedFix: 'Section may be incomplete or content not loaded',
         });
+      }
+      if (opts.checkDescenderClipping) {
+        await this.checkDescenderClipping(name, opts.selector);
       }
     }
     await this.screenshot(`${name}`);
   }
 
   /**
-   * Slow human-style click: scroll to button, screenshot before, click,
-   * wait for any layout settle, screenshot after. Returns the after URL
-   * so callers can compare expected vs actual navigation.
+   * Heuristic for descender clipping on gradient-clipped headlines:
+   * if any heading inside the section has overflow=hidden + line-height
+   * < 1.15 + a font-size ≥ 24px, the descender of g/p/y is at risk.
+   * Not a perfect check, but catches the common Tailwind-default-gotcha.
    */
-  async slowClick(selectorOrName: string, expectNav?: RegExp): Promise<string> {
+  private async checkDescenderClipping(name: string, selector: string): Promise<void> {
+    const issues = await this.page.locator(`${selector} :is(h1,h2,h3)`).evaluateAll((nodes) =>
+      nodes
+        .map((n) => {
+          const el = n as HTMLElement;
+          const cs = getComputedStyle(el);
+          const lh = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize);
+          return {
+            text: (el.textContent ?? '').slice(0, 50),
+            fontSize: parseFloat(cs.fontSize),
+            lineHeightRatio: lh,
+            overflow: cs.overflow,
+            paddingBottom: cs.paddingBottom,
+          };
+        })
+        .filter((h) => h.fontSize >= 24 && h.lineHeightRatio < 1.15 && h.overflow === 'hidden'),
+    );
+    for (const i of issues) {
+      this.add({
+        section: name,
+        expected: `headline has line-height >= 1.15 OR overflow visible (descender safety)`,
+        actual: `"${i.text}" font-size ${i.fontSize}px, line-height-ratio ${i.lineHeightRatio.toFixed(2)}, overflow ${i.overflow}`,
+        severity: 'MEDIUM',
+        category: 'UI',
+        status: 'partially-working',
+        suggestedFix: `Add overflow:visible + padding-bottom: 0.22em + line-height: 1.18 (the .landing-gradient-text rule)`,
+      });
+    }
+  }
+
+  // ─── Slow human interactions (Step 2) ────────────────────────────────
+
+  /**
+   * Hover before click, pause, screenshot, click, wait for layout settle.
+   * Records a finding if the target is not actionable.
+   */
+  async hoverThenClick(
+    locatorOrName: string,
+    opts: { expectNav?: RegExp; expectStateChange?: RegExp; expectInDOMAfter?: string } = {},
+  ): Promise<{ ok: boolean; afterUrl: string }> {
     const beforeUrl = this.page.url();
     await this.screenshot(`${this.currentSection}-before-click`);
-    const target = this.page.getByRole('button', { name: selectorOrName }).first().or(
-      this.page.locator(selectorOrName).first(),
-    );
+    const target = this.page
+      .getByRole('button', { name: locatorOrName })
+      .first()
+      .or(this.page.locator(locatorOrName).first());
+
+    try {
+      await target.hover({ timeout: 3000 });
+      await this.pace();
+    } catch {
+      // hover failed — element may be off-screen or blocked
+    }
+
     try {
       await target.click({ timeout: 5000 });
     } catch (e) {
       this.add({
         section: this.currentSection,
-        expected: `clickable target ${selectorOrName}`,
+        expected: `clickable target ${locatorOrName}`,
         actual: `not clickable: ${e instanceof Error ? e.message.slice(0, 80) : 'unknown'}`,
         severity: 'HIGH',
         category: 'functionality',
-        suggestedFix: 'Selector may be wrong or element disabled',
+        status: 'present-but-not-wired',
+        suggestedFix: 'Selector may be wrong, element disabled, or blocked by an overlay',
       });
-      return beforeUrl;
+      return { ok: false, afterUrl: beforeUrl };
     }
+
     await this.pace(this.opts.paceMs * 4);
     await this.screenshot(`${this.currentSection}-after-click`);
     const afterUrl = this.page.url();
-    if (expectNav && !expectNav.test(afterUrl)) {
+
+    if (opts.expectNav && !opts.expectNav.test(afterUrl)) {
       this.add({
         section: this.currentSection,
-        expected: `nav to ${expectNav}`,
+        expected: `nav matches ${opts.expectNav}`,
         actual: afterUrl,
         severity: 'HIGH',
         category: 'functionality',
+        status: 'present-but-not-wired',
         suggestedFix: 'CTA href may be broken or middleware redirect mis-configured',
       });
+      return { ok: false, afterUrl };
     }
-    return afterUrl;
+
+    if (opts.expectStateChange) {
+      const bodyText = (await this.page.locator('body').innerText().catch(() => '')) || '';
+      if (!opts.expectStateChange.test(bodyText)) {
+        this.add({
+          section: this.currentSection,
+          expected: `page text after click matches ${opts.expectStateChange}`,
+          actual: bodyText.slice(0, 200),
+          severity: 'HIGH',
+          category: 'functionality',
+          status: 'present-but-not-wired',
+          suggestedFix: 'Click registered but expected UI change did not occur',
+        });
+        return { ok: false, afterUrl };
+      }
+    }
+
+    if (opts.expectInDOMAfter) {
+      const visible = await this.page.locator(opts.expectInDOMAfter).first().isVisible().catch(() => false);
+      if (!visible) {
+        this.add({
+          section: this.currentSection,
+          expected: `${opts.expectInDOMAfter} visible after click`,
+          actual: 'expected element absent / not visible',
+          severity: 'HIGH',
+          category: 'functionality',
+          status: 'present-but-not-wired',
+          suggestedFix: 'Click handler did not surface the expected element',
+        });
+        return { ok: false, afterUrl };
+      }
+    }
+    return { ok: true, afterUrl };
   }
 
-  /** Snapshot console + network state. Records HIGH-severity findings for any error. */
+  /** Type into an input with realistic per-character delay. */
+  async fillSlowly(selector: string, value: string): Promise<void> {
+    const el = this.page.locator(selector).first();
+    try {
+      await el.click({ timeout: 3000 });
+      await this.pace(80);
+      await el.fill('');
+      await el.pressSequentially(value, { delay: this.opts.typingDelayMs });
+      await this.pace(120);
+    } catch (e) {
+      this.add({
+        section: this.currentSection,
+        expected: `fill ${selector} with ${value.length} chars`,
+        actual: `fill failed: ${e instanceof Error ? e.message.slice(0, 80) : 'unknown'}`,
+        severity: 'HIGH',
+        category: 'functionality',
+        status: 'present-but-not-wired',
+        suggestedFix: 'Input may be missing, disabled, or readonly',
+      });
+    }
+  }
+
+  /**
+   * Run an action that should produce a network request, observe both
+   * the response code and the post-action UI state.
+   */
+  async observeNetworkAfter(
+    action: () => Promise<void>,
+    opts: { urlMatch: RegExp; methodMatch?: 'GET' | 'POST' | 'PUT' | 'DELETE'; expectedStatusOk?: boolean },
+  ): Promise<{ url?: string; status?: number; bodySnippet?: string }> {
+    const responseP = this.page.waitForResponse(
+      (r) => opts.urlMatch.test(r.url()) && (!opts.methodMatch || r.request().method() === opts.methodMatch),
+      { timeout: 15_000 },
+    );
+    await action();
+    try {
+      const resp = await responseP;
+      const status = resp.status();
+      const body = (await resp.text().catch(() => '')).slice(0, 500);
+      if (opts.expectedStatusOk && status >= 400) {
+        this.add({
+          section: this.currentSection,
+          expected: `${opts.urlMatch} returns < 400`,
+          actual: `HTTP ${status}: ${body.slice(0, 200)}`,
+          severity: 'HIGH',
+          category: 'backend-wiring',
+          status: 'present-but-not-wired',
+          suggestedFix: 'API call failed — verify route, auth, payload shape',
+        });
+      }
+      return { url: resp.url(), status, bodySnippet: body };
+    } catch {
+      this.add({
+        section: this.currentSection,
+        expected: `network request matching ${opts.urlMatch}`,
+        actual: 'no matching request observed within 15s',
+        severity: 'HIGH',
+        category: 'backend-wiring',
+        status: 'present-but-not-wired',
+        suggestedFix: 'UI action may not be triggering the API call. Check console for errors.',
+      });
+      return {};
+    }
+  }
+
+  // ─── Health (Step 3) ──────────────────────────────────────────────────
+
   async checkHealth(): Promise<void> {
     if (this.consoleErrors.length > 0) {
-      // Group identical messages so the report doesn't drown in 100x of the same warn.
       const seen = new Set<string>();
       let recorded = 0;
       for (const msg of this.consoleErrors) {
@@ -224,9 +402,10 @@ export class HumanQATester {
           actual: `${msg.type()}: ${msg.text().slice(0, 200)}`,
           severity: msg.type() === 'error' ? 'HIGH' : 'MEDIUM',
           category: 'console',
-          suggestedFix: 'Inspect the source — hydration, unhandled promise, or third-party script',
+          status: 'partially-working',
+          suggestedFix: 'Inspect the source — hydration, unhandled promise, third-party script',
         });
-        if (recorded >= 5) break; // cap noise
+        if (recorded >= 5) break;
       }
     }
     if (this.failedRequests.length > 0) {
@@ -239,15 +418,20 @@ export class HumanQATester {
           section: this.currentSection,
           expected: `${r.method} ${r.url} returns < 400`,
           actual: r.status === 0 ? 'request failed (no response)' : `HTTP ${r.status}`,
-          severity: r.url.includes('/_next/') || r.url.includes('chrome-extension') ? 'LOW' : 'HIGH',
+          severity:
+            r.url.includes('/_next/') || r.url.includes('chrome-extension') || r.url.includes('hot-update')
+              ? 'LOW'
+              : 'HIGH',
           category: 'network',
+          status: 'present-but-not-wired',
           suggestedFix: 'Verify the API endpoint exists + client URL is correct',
         });
       }
     }
   }
 
-  /** Check that the page renders cleanly at mobile + tablet + desktop. */
+  // ─── Responsive (Step 4) ─────────────────────────────────────────────
+
   async checkResponsive(): Promise<void> {
     const viewports = [
       { w: 375, h: 812, label: 'mobile' as const },
@@ -256,7 +440,7 @@ export class HumanQATester {
     ];
     for (const v of viewports) {
       await this.page.setViewportSize({ width: v.w, height: v.h });
-      await this.pace(this.opts.paceMs);
+      await this.pace();
       await this.page.evaluate(() => window.scrollTo(0, 0));
       const overflow = await this.page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -268,20 +452,20 @@ export class HumanQATester {
           actual: `${overflow}px overflow`,
           severity: 'HIGH',
           category: 'mobile',
-          suggestedFix: `Add min-w-0 to flex children or grid-cols-1 explicit at this breakpoint`,
+          status: 'partially-working',
+          suggestedFix: 'Add min-w-0 to flex children or grid-cols-1 explicit at this breakpoint',
         });
       }
       await this.screenshot(`responsive-${v.label}`);
     }
-    // Reset to desktop for any subsequent checks
     await this.page.setViewportSize({ width: 1280, height: 800 });
   }
 
+  // ─── Claim verification (Step 5) ─────────────────────────────────────
+
   /**
-   * Compare a public claim against an observable behaviour. The claim
-   * is what the marketing site says ("122 tools"); the observed is what
-   * the user-facing surface actually proves. Mismatch = product-truth
-   * finding (the most damaging kind for trust).
+   * Cheap version: a public claim either matches or it doesn't.
+   * Used for static-stat assertions.
    */
   compareClaim(opts: { claim: string; observed: string; matches: boolean; section?: string }): void {
     if (opts.matches) return;
@@ -291,11 +475,177 @@ export class HumanQATester {
       actual: opts.observed,
       severity: 'HIGH',
       category: 'product-truth',
+      status: 'present-but-not-wired',
       suggestedFix: 'Either fix the public claim or wire the user-facing surface to back it',
     });
   }
 
-  /** Add a manual finding from inside the test. */
+  /**
+   * Full claim-vs-behaviour: a marketing claim like "122 tools" must be
+   * observable somewhere in the dashboard / API. The caller passes a
+   * verifier function that returns true if the dashboard backs the claim.
+   */
+  async verifyLandingClaim(opts: {
+    claim: string;
+    landingSelector?: string;
+    landingTextRegex?: RegExp;
+    dashboardCheck: () => Promise<{ ok: boolean; evidence: string }>;
+  }): Promise<void> {
+    let landingSeen = true;
+    if (opts.landingSelector && opts.landingTextRegex) {
+      const text = (await this.page.locator(opts.landingSelector).first().innerText().catch(() => '')) || '';
+      landingSeen = opts.landingTextRegex.test(text);
+    }
+    const dash = await opts.dashboardCheck();
+    if (landingSeen && !dash.ok) {
+      this.add({
+        section: 'claim-vs-behaviour',
+        expected: `Landing claims "${opts.claim}" — dashboard should back it (${dash.evidence})`,
+        actual: 'Dashboard / API did not surface evidence for the claim',
+        severity: 'HIGH',
+        category: 'product-truth',
+        status: 'present-but-not-wired',
+        suggestedFix: 'Either remove the public claim or wire the user-facing surface to back it',
+        retestHint: 'Re-run after fixing wiring; the dashboardCheck() should return ok:true',
+      });
+    } else if (landingSeen && dash.ok) {
+      this.add({
+        section: 'claim-vs-behaviour',
+        expected: opts.claim,
+        actual: `Backed by dashboard evidence: ${dash.evidence}`,
+        severity: 'INFO',
+        category: 'product-truth',
+        status: 'working',
+        suggestedFix: '(no action — claim verified)',
+      });
+    }
+  }
+
+  // ─── Test like a buyer (Step 5 continued) ────────────────────────────
+
+  /**
+   * Trust signals a real buyer scans for in the first 30 seconds.
+   * Each missing signal is a finding; each present signal is an INFO
+   * observation so the report shows what's good too.
+   */
+  async inspectTrustSignals(opts: {
+    requirePricingLink?: boolean;
+    requireGitHubLink?: boolean;
+    requireContactLink?: boolean;
+    requireSecurityLink?: boolean;
+    requireAuditLink?: boolean;
+  } = {}): Promise<void> {
+    const checks: Array<{ key: string; required: boolean; finder: () => Promise<boolean> }> = [
+      {
+        key: 'pricing link visible',
+        required: opts.requirePricingLink ?? true,
+        finder: () => this.page.locator('a[href*="pricing"], a:has-text("Pricing")').first().isVisible().catch(() => false),
+      },
+      {
+        key: 'GitHub link visible',
+        required: opts.requireGitHubLink ?? true,
+        finder: () => this.page.locator('a[href*="github.com"]').first().isVisible().catch(() => false),
+      },
+      {
+        key: 'contact / email link visible',
+        required: opts.requireContactLink ?? true,
+        finder: () => this.page.locator('a[href^="mailto:"], a:has-text("Contact")').first().isVisible().catch(() => false),
+      },
+      {
+        key: 'security / privacy link visible',
+        required: opts.requireSecurityLink ?? false,
+        finder: () => this.page.locator('a[href*="privacy"], a[href*="security"], a:has-text("Privacy"), a:has-text("Security")').first().isVisible().catch(() => false),
+      },
+      {
+        key: 'audit / compliance link visible',
+        required: opts.requireAuditLink ?? false,
+        finder: () => this.page.locator('a[href*="audit"], a:has-text("Audit")').first().isVisible().catch(() => false),
+      },
+    ];
+    for (const c of checks) {
+      const present = await c.finder();
+      if (!present && c.required) {
+        this.add({
+          section: 'trust-signals',
+          expected: c.key,
+          actual: 'absent',
+          severity: 'MEDIUM',
+          category: 'trust',
+          status: 'not-implemented',
+          suggestedFix: `A buyer scanning for trust signals expects this link in the nav or footer`,
+        });
+      } else if (present) {
+        this.add({
+          section: 'trust-signals',
+          expected: c.key,
+          actual: 'present',
+          severity: 'INFO',
+          category: 'trust',
+          status: 'working',
+          suggestedFix: '(no action — trust signal present)',
+        });
+      }
+    }
+  }
+
+  /**
+   * Onboarding clarity check: in the first fold can a buyer answer
+   * "what does this do" + "what do I do next"?
+   */
+  async inspectOnboardingClarity(): Promise<void> {
+    const h1 = (await this.page.locator('h1').first().innerText().catch(() => '')) || '';
+    const subText = (await this.page.locator('h1 ~ p, h1 + p').first().innerText().catch(() => '')) || '';
+    const ctas = await this.page.locator('a[href="/register"], a[href="/login"], a:has-text("Get Started"), a:has-text("Start Free")').count();
+
+    if (h1.length < 10) {
+      this.add({
+        section: 'first-fold-clarity',
+        expected: 'Hero h1 explains what the product does',
+        actual: `h1 length ${h1.length} chars`,
+        severity: 'CRITICAL',
+        category: 'copy',
+        status: 'not-implemented',
+        suggestedFix: 'Add a clear value-prop headline as the hero h1',
+      });
+    }
+    if (subText.length < 20) {
+      this.add({
+        section: 'first-fold-clarity',
+        expected: 'Hero subhead expands on the headline',
+        actual: `subhead length ${subText.length} chars`,
+        severity: 'HIGH',
+        category: 'copy',
+        status: 'partially-working',
+        suggestedFix: 'Add a 1-2 sentence subhead immediately after the h1',
+      });
+    }
+    if (ctas === 0) {
+      this.add({
+        section: 'first-fold-clarity',
+        expected: 'At least one primary CTA visible above the fold',
+        actual: '0 CTAs found',
+        severity: 'CRITICAL',
+        category: 'UX',
+        status: 'not-implemented',
+        suggestedFix: 'Add a Start Free / Get Started CTA in the hero',
+      });
+    }
+  }
+
+  // ─── Note an observation without a hard assertion ────────────────────
+
+  note(opts: { observation: string; category?: Category }): void {
+    this.add({
+      section: this.currentSection,
+      expected: '(observation only)',
+      actual: opts.observation,
+      severity: 'INFO',
+      category: opts.category ?? 'UX',
+      status: 'observation',
+      suggestedFix: '(none — observation only)',
+    });
+  }
+
   add(f: Omit<Finding, 'page' | 'screenshot'> & { screenshot?: string }): void {
     this.findings.push({
       page: this.opts.name,
@@ -310,7 +660,7 @@ export class HumanQATester {
     try {
       await this.page.screenshot({ path: fullpath, fullPage: false });
     } catch {
-      // Screenshot failures are non-fatal — keep going.
+      // non-fatal
     }
     return fullpath;
   }
@@ -320,12 +670,22 @@ export class HumanQATester {
   }
 
   /**
-   * Produce a markdown report + JSON artifact. Returns the markdown
-   * text so the caller can also assert/log it.
+   * Produce the report. Status counts are now tracked alongside severity
+   * because a buyer cares about "is this real" as much as "is this loud".
    */
   async finalize(): Promise<{ markdown: string; jsonPath: string; mdPath: string }> {
-    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 } as Record<Severity, number>;
-    for (const f of this.findings) counts[f.severity]++;
+    const sevCounts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+    const statusCounts: Record<FindingStatus, number> = {
+      'working': 0,
+      'partially-working': 0,
+      'present-but-not-wired': 0,
+      'not-implemented': 0,
+      'observation': 0,
+    };
+    for (const f of this.findings) {
+      sevCounts[f.severity]++;
+      if (f.status) statusCounts[f.status]++;
+    }
 
     const lines: string[] = [];
     lines.push(`# Human QA Report — ${this.opts.name}`);
@@ -333,33 +693,41 @@ export class HumanQATester {
     lines.push(`Generated: ${new Date().toISOString()}`);
     lines.push(`Screenshots: \`${this.opts.screenshotsDir}\` (${this.screenshotIndex} captured)`);
     lines.push('');
-    lines.push('## Summary');
+    lines.push('## Severity summary');
     lines.push('');
-    lines.push(
-      `| Severity | Count |\n|---|---|\n| CRITICAL | ${counts.CRITICAL} |\n| HIGH | ${counts.HIGH} |\n| MEDIUM | ${counts.MEDIUM} |\n| LOW | ${counts.LOW} |\n| INFO | ${counts.INFO} |`,
-    );
+    lines.push('| Severity | Count |');
+    lines.push('|---|---|');
+    for (const k of Object.keys(sevCounts) as Severity[]) lines.push(`| ${k} | ${sevCounts[k]} |`);
     lines.push('');
+    lines.push('## Status summary');
+    lines.push('');
+    lines.push('| Status | Count |');
+    lines.push('|---|---|');
+    for (const k of Object.keys(statusCounts) as FindingStatus[]) lines.push(`| ${k} | ${statusCounts[k]} |`);
+    lines.push('');
+
     if (this.findings.length === 0) {
       lines.push('## Findings');
       lines.push('');
-      lines.push('No findings recorded — this run only captured evidence (screenshots above).');
+      lines.push('No findings recorded.');
     } else {
       lines.push('## Findings');
       lines.push('');
-      lines.push('| # | Severity | Category | Section | Expected | Actual | Suggested fix |');
-      lines.push('|---|---|---|---|---|---|---|');
+      lines.push('| # | Severity | Status | Category | Section | Expected | Actual | Suggested fix |');
+      lines.push('|---|---|---|---|---|---|---|---|');
       this.findings.forEach((f, i) => {
-        const cell = (s: string) => s.replace(/\|/g, '\\|').slice(0, 120);
+        const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ').slice(0, 140);
         lines.push(
-          `| ${i + 1} | ${f.severity} | ${f.category} | ${cell(f.section ?? '-')} | ${cell(f.expected)} | ${cell(f.actual)} | ${cell(f.suggestedFix)} |`,
+          `| ${i + 1} | ${f.severity} | ${f.status ?? '-'} | ${f.category} | ${cell(f.section ?? '-')} | ${cell(f.expected)} | ${cell(f.actual)} | ${cell(f.suggestedFix)} |`,
         );
       });
     }
+
     lines.push('');
     lines.push('## Disclosure');
     lines.push('');
     lines.push(
-      'This report is **evidence-based**. Findings come from observed page behaviour, console state, network state, and viewport-overflow measurements — not from opinions about visual style. Where a marketing claim could not be verified through user-facing behaviour, the finding is tagged `product-truth`. Absence of findings in a category does NOT mean that category was tested deeply — it means the helper found nothing notable in the explicit checks the test author wired.',
+      'This report uses the Human QA Tester framework: observe-first, slow-interact, claim-vs-behaviour, four-state status. Status meanings: **working** = observable + complete; **partially-working** = observable but with caveats; **present-but-not-wired** = UI rendered but action does nothing real; **not-implemented** = claimed but absent; **observation** = INFO only. Absence of findings does NOT mean a category was tested deeply — it means the explicit checks the test author wired returned clean.',
     );
 
     const markdown = lines.join('\n');
@@ -375,7 +743,8 @@ export class HumanQATester {
           generatedAt: new Date().toISOString(),
           screenshotsDir: this.opts.screenshotsDir,
           screenshotsCount: this.screenshotIndex,
-          counts,
+          severityCounts: sevCounts,
+          statusCounts,
           findings: this.findings,
         },
         null,

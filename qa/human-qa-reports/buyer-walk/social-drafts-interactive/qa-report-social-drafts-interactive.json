@@ -1,0 +1,21 @@
+{
+  "name": "social-drafts-interactive",
+  "generatedAt": "2026-05-01T13:56:37.937Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\buyer-walk\\social-drafts-interactive\\shots",
+  "screenshotsCount": 5,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 0
+  },
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": []
+}
