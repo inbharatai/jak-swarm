@@ -15,9 +15,17 @@ export type { PIIMatch, PIIDetectionResult } from './guardrails/pii-detector.js'
 
 // Runtime PII redaction (Sprint 2.4 / Item G) — wraps detectPII with a
 // placeholder-restoration layer so PII can be redacted before LLM calls
-// and restored before the trace is persisted.
+// and restored before tools run.
 export { RuntimePIIRedactor } from './guardrails/runtime-pii-redactor.js';
 export type { RedactionStats } from './guardrails/runtime-pii-redactor.js';
+
+// One-way persistence redactor (P0-B fix). Used by WorkflowService.saveTrace
+// to scrub PII out of inputJson / outputJson / toolCallsJson BEFORE the
+// row is written to the AgentTrace table. Replaces the prior design
+// where the runtime redactor restored originals into the trace before
+// persistence — original PII never reaches durable storage now.
+export { redactJsonForPersistence, isPersistenceRedactionDisabled }
+  from './guardrails/persistence-redactor.js';
 
 // Injection Detection
 export { detectInjection, isInjectionAttempt } from './guardrails/injection-detector.js';

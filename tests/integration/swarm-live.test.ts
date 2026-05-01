@@ -7,7 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import { SwarmRunner } from '@jak-swarm/swarm';
 
-const LIVE = !!process.env['OPENAI_API_KEY'];
+// Skip when only the test-harness placeholder is present (vitest.setup.ts
+// seeds `sk-test-not-real-...` so the OpenAI SDK constructor doesn't throw
+// at import time; we MUST NOT treat that as a real key for live tests).
+const OPENAI_KEY = process.env['OPENAI_API_KEY'] ?? '';
+const LIVE = !!OPENAI_KEY && !OPENAI_KEY.startsWith('sk-test-not-real');
 
 describe.skipIf(!LIVE)('SwarmRunner — live OpenAI execution', () => {
   it('executes a simple single-step research goal', async () => {

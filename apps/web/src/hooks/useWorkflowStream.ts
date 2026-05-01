@@ -46,7 +46,9 @@ export function useWorkflowStream(workflowId: string | null) {
       const token = await getToken();
       if (!token || cancelled) return;
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+      // P0-A: centralized resolver throws/warns in production if URL missing.
+      const { getApiBaseUrl } = await import('@/lib/api-client');
+      const apiUrl = getApiBaseUrl();
       const url = `${apiUrl}/workflows/${workflowId}/stream`;
 
       abortController = new AbortController();

@@ -1,7 +1,80 @@
 import type { ApiError, ApprovalRequest, Integration, PaginatedResult, Workflow } from '@/types';
 import { createClient } from './supabase';
 
-const BASE_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').trim();
+/**
+ * Resolve the API base URL with a strict production guard (P0-A fix).
+ *
+ * Behavior:
+ *   - If `NEXT_PUBLIC_API_URL` is set, use it verbatim (trimmed).
+ *   - In development (`NODE_ENV !== 'production'`), default to
+ *     `http://localhost:4000` so the local dev loop keeps working.
+ *   - In production with `NEXT_PUBLIC_API_URL` missing OR pointing at
+ *     localhost / 127.0.0.1, surface the misconfiguration loudly:
+ *     console.error on every page load + every API call returns a
+ *     structured `MISCONFIGURED_API_URL` error. We deliberately do NOT
+ *     silently fall back — that's how jakswarm.com shipped looking like
+ *     a working product while every dashboard fetch was broken.
+ *
+ * This guard runs on the client. The dashboard wraps `request()` with
+ * a top-level catch that surfaces a "Backend not configured" banner
+ * instead of letting buttons silently fail.
+ */
+const ENV_API_URL = process.env['NEXT_PUBLIC_API_URL']?.trim();
+const IS_PROD = process.env['NODE_ENV'] === 'production';
+
+function isLocalhost(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(url);
+}
+
+function resolveBaseUrl(): { url: string; misconfigured: boolean; reason?: string } {
+  if (ENV_API_URL) {
+    if (IS_PROD && isLocalhost(ENV_API_URL)) {
+      return {
+        url: ENV_API_URL,
+        misconfigured: true,
+        reason: 'NEXT_PUBLIC_API_URL points at localhost in a production build',
+      };
+    }
+    return { url: ENV_API_URL, misconfigured: false };
+  }
+  if (IS_PROD) {
+    return {
+      url: 'http://localhost:4000',
+      misconfigured: true,
+      reason: 'NEXT_PUBLIC_API_URL is not set in production — set it in your Vercel project env vars to your deployed API URL (e.g. https://jak-swarm-api.onrender.com)',
+    };
+  }
+  // Development default — keeps the local dev loop working.
+  return { url: 'http://localhost:4000', misconfigured: false };
+}
+
+const RESOLVED = resolveBaseUrl();
+const BASE_URL = RESOLVED.url;
+export const API_MISCONFIGURED = RESOLVED.misconfigured;
+export const API_MISCONFIGURED_REASON = RESOLVED.reason ?? null;
+
+/**
+ * Single source of truth for the API base URL. Use this from EVERY
+ * place that needs to call the API — never re-implement the
+ * `NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'` fallback inline.
+ * Inline fallbacks bypass the production-misconfig guard above and
+ * were the root cause of the jakswarm.com dashboard silently calling
+ * localhost in production.
+ *
+ * Reads as a function (not a constant) so server-rendered + client-
+ * rendered components both pick up the same value at the right time.
+ */
+export function getApiBaseUrl(): string {
+  return BASE_URL;
+}
+
+if (RESOLVED.misconfigured && typeof window !== 'undefined') {
+  // eslint-disable-next-line no-console -- intentional surface for misconfig
+  console.error(
+    '[api-client] Production-build misconfiguration: ' + RESOLVED.reason +
+      '. Dashboard API calls will be rejected with MISCONFIGURED_API_URL.',
+  );
+}
 
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -70,6 +143,19 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  // P0-A fix — refuse to fire production fetches at localhost. The
+  // dashboard catches MISCONFIGURED_API_URL and surfaces a "Backend
+  // not configured" banner instead of letting buttons silently fail
+  // against a non-existent localhost API.
+  if (API_MISCONFIGURED) {
+    throw {
+      message:
+        'Backend API is not configured. ' + (API_MISCONFIGURED_REASON ?? ''),
+      code: 'MISCONFIGURED_API_URL',
+      status: 503,
+    } as ApiError;
+  }
+
   const url = `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   const token = await getToken();
 

@@ -38,12 +38,22 @@ export interface RetentionPolicy {
   revokedInviteAfterDays: number;
   /** Days after engagement.accessRevokedAt before deletion. Default 30. */
   revokedEngagementAfterDays: number;
+  /**
+   * Days after AgentTrace.startedAt before deletion. Default 90.
+   * Per-row JSON columns (input/output/toolCalls) are already PII-redacted
+   * at write time (see WorkflowService.saveTrace), so this retention is
+   * a defense-in-depth measure for forensic-tail size, not the primary
+   * PII safeguard. Set via JAK_AGENT_TRACE_RETENTION_DAYS env var or
+   * the policy override.
+   */
+  agentTraceAfterDays: number;
 }
 
 const DEFAULT_POLICY: RetentionPolicy = {
   expiredInviteAfterDays: 7,
   revokedInviteAfterDays: 30,
   revokedEngagementAfterDays: 30,
+  agentTraceAfterDays: Number(process.env['JAK_AGENT_TRACE_RETENTION_DAYS'] ?? 90),
 };
 
 export interface SweepParams {
@@ -68,16 +78,19 @@ export interface SweepReport {
     expiredInvites: number;
     revokedInvites: number;
     revokedEngagements: number;
+    agentTraces: number;
   };
   deleted: {
     expiredInvites: number;
     revokedInvites: number;
     revokedEngagements: number;
+    agentTraces: number;
   };
   skipped: {
     expiredInvites: number;
     revokedInvites: number;
     revokedEngagements: number;
+    agentTraces: number;
   };
   errors: string[];
 }
@@ -97,9 +110,9 @@ export class RetentionSweepService {
       startedAt: startedAt.toISOString(),
       completedAt: '',
       durationMs: 0,
-      candidates: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0 },
-      deleted: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0 },
-      skipped: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0 },
+      candidates: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0, agentTraces: 0 },
+      deleted: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0, agentTraces: 0 },
+      skipped: { expiredInvites: 0, revokedInvites: 0, revokedEngagements: 0, agentTraces: 0 },
       errors: [],
     };
 
@@ -114,6 +127,7 @@ export class RetentionSweepService {
       await this.sweepExpiredInvites(params, policy, report);
       await this.sweepRevokedInvites(params, policy, report);
       await this.sweepRevokedEngagements(params, policy, report);
+      await this.sweepAgentTraces(params, policy, report);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       report.errors.push(msg);
@@ -133,8 +147,16 @@ export class RetentionSweepService {
       type: 'retention_sweep_completed',
       ...(params.tenantId !== '*' ? { tenantId: params.tenantId } : {}),
       mode: params.mode,
-      deletedCount: report.deleted.expiredInvites + report.deleted.revokedInvites + report.deleted.revokedEngagements,
-      skippedCount: report.skipped.expiredInvites + report.skipped.revokedInvites + report.skipped.revokedEngagements,
+      deletedCount:
+        report.deleted.expiredInvites +
+        report.deleted.revokedInvites +
+        report.deleted.revokedEngagements +
+        report.deleted.agentTraces,
+      skippedCount:
+        report.skipped.expiredInvites +
+        report.skipped.revokedInvites +
+        report.skipped.revokedEngagements +
+        report.skipped.agentTraces,
       durationMs: report.durationMs,
       timestamp: completedAt.toISOString(),
     });
@@ -311,6 +333,68 @@ export class RetentionSweepService {
       } catch (err) {
         report.skipped.revokedEngagements++;
         report.errors.push(`Could not delete revoked engagement ${c.id}: ${err instanceof Error ? err.message : 'unknown'}`);
+      }
+    }
+  }
+
+  /**
+   * P0-B fix — sweep AgentTrace rows older than the configured window.
+   * The JSON columns are already PII-redacted at write time, so this
+   * sweep is a defense-in-depth bound on forensic-tail size, not the
+   * primary PII safeguard. Default window: 90 days.
+   */
+  private async sweepAgentTraces(
+    params: SweepParams,
+    policy: RetentionPolicy,
+    report: SweepReport,
+  ): Promise<void> {
+    if (policy.agentTraceAfterDays <= 0) return; // 0 / negative disables
+    const cutoff = new Date(Date.now() - policy.agentTraceAfterDays * 24 * 60 * 60 * 1000);
+    const where: Record<string, unknown> = {
+      startedAt: { lt: cutoff },
+    };
+    if (params.tenantId !== '*') where['tenantId'] = params.tenantId;
+
+    const candidates = await this.db.agentTrace.findMany({
+      where,
+      select: { id: true, tenantId: true, startedAt: true, agentRole: true },
+    });
+    report.candidates.agentTraces = candidates.length;
+
+    for (const c of candidates) {
+      this.emit(params.onLifecycle, {
+        type: 'retention_candidate_found',
+        tenantId: c.tenantId,
+        objectType: 'agent_trace',
+        objectId: c.id,
+        reason: `older than ${policy.agentTraceAfterDays}d`,
+        timestamp: new Date().toISOString(),
+      });
+      if (params.mode === 'dry_run') {
+        report.skipped.agentTraces++;
+        this.emit(params.onLifecycle, {
+          type: 'retention_item_skipped',
+          tenantId: c.tenantId,
+          objectType: 'agent_trace',
+          objectId: c.id,
+          reason: 'dry_run',
+          timestamp: new Date().toISOString(),
+        });
+        continue;
+      }
+      try {
+        await this.db.agentTrace.delete({ where: { id: c.id } });
+        report.deleted.agentTraces++;
+        this.emit(params.onLifecycle, {
+          type: 'retention_item_deleted',
+          tenantId: c.tenantId,
+          objectType: 'agent_trace',
+          objectId: c.id,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        report.skipped.agentTraces++;
+        report.errors.push(`Could not delete agent trace ${c.id}: ${err instanceof Error ? err.message : 'unknown'}`);
       }
     }
   }

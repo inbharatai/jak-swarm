@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { getApiBaseUrl } from '@/lib/api-client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -23,8 +24,10 @@ interface Engagement {
   accessGrantedAt: string;
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || 'http://localhost:4000';
+// P0-A: use centralized resolver. Was reading NEXT_PUBLIC_API_BASE_URL
+// (different name from the rest of the app) which never existed in any
+// env example, so it always silently fell back to localhost.
+const API_BASE_URL = getApiBaseUrl();
 
 async function auditorFetch<T>(path: string): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;

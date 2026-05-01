@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { connectSSE } from '@/lib/sse-fetch';
+import { getApiBaseUrl } from '@/lib/api-client';
 
-const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000';
+// P0-A: centralized so production-misconfig guard fires uniformly.
+const BASE_URL = getApiBaseUrl();
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY = 1000;
 

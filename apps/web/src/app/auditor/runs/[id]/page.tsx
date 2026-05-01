@@ -12,12 +12,14 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { getApiBaseUrl } from '@/lib/api-client';
 
 const STORAGE_KEY = 'jak_auditor_token';
 const ENGAGEMENT_KEY = 'jak_auditor_engagement';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || 'http://localhost:4000';
+// P0-A: centralized resolver. Was reading NEXT_PUBLIC_API_BASE_URL (different
+// var from the rest of the app) which silently fell back to localhost.
+const API_BASE_URL = getApiBaseUrl();
 
 interface Workpaper {
   id: string;

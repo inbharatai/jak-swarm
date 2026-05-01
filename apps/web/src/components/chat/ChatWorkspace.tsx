@@ -192,7 +192,12 @@ export function ChatWorkspace() {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const BASE_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').trim();
+      // P0-A: centralized resolver throws/warns in production if URL is missing
+      // or points at localhost. EventSource needs the URL synchronously, so we
+      // import the resolver function (statically bound) rather than the dynamic
+      // helper used in async paths.
+      const { getApiBaseUrl } = await import('@/lib/api-client');
+      const BASE_URL = getApiBaseUrl();
       // DEV-ONLY: when the auth bypass is on, skip Supabase entirely
       // and use the literal bypass token. The API's stream route
       // accepts it via the same `?token=` query path the legacy

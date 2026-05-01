@@ -24,6 +24,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Loaded once per worker before any test file. Sets test-only
+    // placeholder env vars (OPENAI_API_KEY etc.) so BaseAgent's
+    // OpenAI-client constructor doesn't throw at import time. See
+    // ./vitest.setup.ts for the full rationale.
+    setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
     // Vitest default `testTimeout` is 5000ms which is too tight for the

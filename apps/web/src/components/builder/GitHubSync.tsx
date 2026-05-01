@@ -24,8 +24,10 @@ export function GitHubSync({ projectId, currentRepo, open, onClose, onSynced }: 
     setSyncResult(null);
 
     try {
-      // Call the project API to sync with GitHub
-      const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000';
+      // Call the project API to sync with GitHub. Use centralized resolver
+      // so the production-misconfig guard fires uniformly (P0-A fix).
+      const { getApiBaseUrl } = await import('@/lib/api-client');
+      const BASE_URL = getApiBaseUrl();
       const { createClient } = await import('@/lib/supabase');
       const supabase = createClient();
       const { data } = await supabase.auth.getSession();

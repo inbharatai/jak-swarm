@@ -656,14 +656,41 @@ ${lines.join('\n')}
     const conversation = [...enriched];
     const toolCallFingerprints: ToolCallFingerprints = new Map();
 
-    // Sprint 2.4 / Item G — PII auto-redaction in LLM prompts.
+    // P0-D fix — scan user-role messages for prompt injection BEFORE the
+    // first LLM call. Catches the documented attack patterns
+    // (ignore-previous-instructions, role-override, fake-system-message,
+    // chat-template-injection, prompt-extraction, data-exfiltration,
+    // DAN/jailbreak). High-confidence HIGH-risk hits abort the run with
+    // a structured error; low-risk hits are logged but allowed through
+    // so legitimate requests like "ignore the failing test for now" are
+    // not blocked. Off-switch via JAK_INJECTION_GUARD_DISABLED=1 for
+    // operators who need raw passthrough during incident debugging.
+    if (process.env['JAK_INJECTION_GUARD_DISABLED'] !== '1') {
+      const { detectInjection } = await import('@jak-swarm/security');
+      for (const msg of conversation) {
+        if (msg.role !== 'user' || typeof msg.content !== 'string') continue;
+        const result = detectInjection(msg.content);
+        if (result.detected && result.risk === 'HIGH' && result.confidence >= 0.7) {
+          throw new Error(
+            `Input blocked for safety: prompt-injection patterns detected ` +
+            `(${result.patterns.slice(0, 3).join('; ')}). If this was a ` +
+            `legitimate request, rephrase without instruction-override ` +
+            `language.`,
+          );
+        }
+      }
+    }
+
+    // Sprint 2.4 / Item G + P0-B fix — PII auto-redaction in LLM prompts.
     // One redactor per executeWithTools call. Disabled via env when
     // operators want raw passthrough for debugging.
     // The redactor lives on the LLM boundary: messages are redacted just
     // before they cross to the model, the assistant response is restored
-    // before tool execution + before the trace records it. Tools see
-    // ORIGINAL values; the LLM sees PLACEHOLDER values. The trace shows
-    // ORIGINAL values (since restore happens pre-trace).
+    // before tool execution. Tools see ORIGINAL values; the LLM sees
+    // PLACEHOLDER values. Originals are NOT preserved into the persisted
+    // trace — `WorkflowService.saveTrace` runs `redactJsonForPersistence`
+    // on every JSON column at the DB-write boundary so raw PII never
+    // reaches the AgentTrace table even if restoration ran upstream.
     const redactor = process.env['JAK_PII_REDACTION_DISABLED'] === '1'
       ? null
       : new (await import('@jak-swarm/security')).RuntimePIIRedactor();

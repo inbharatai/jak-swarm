@@ -17,6 +17,7 @@ import {
 } from '../errors.js';
 import { assertTransition, IllegalTransitionError } from '@jak-swarm/swarm';
 import { WorkflowStatus as SharedWorkflowStatus } from '@jak-swarm/shared';
+import { redactJsonForPersistence } from '@jak-swarm/security';
 import { canonicalHash } from '../utils/canonical-hash.js';
 
 const TERMINAL_STATUSES: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
@@ -277,6 +278,18 @@ export class WorkflowService {
 
   /**
    * Persist an agent trace from a workflow execution.
+   *
+   * P0-B (PII safety): every JSON column the trace persists
+   * (inputJson / outputJson / toolCallsJson / handoffsJson / error
+   * string) goes through `redactJsonForPersistence` first so raw PII
+   * (emails, SSNs, phone numbers, credit cards, etc.) never reaches
+   * durable storage. tokenUsage is left untouched — it only carries
+   * numeric counters.
+   *
+   * This replaces the prior design where the runtime PII redactor
+   * restored originals into the trace before the DB write. Originals
+   * are still available transiently in the agent run for tool calls,
+   * but they don't survive the row insert.
    */
   async saveTrace(input: SaveTraceInput): Promise<AgentTrace> {
     const trace = await this.db.agentTrace.create({
@@ -290,12 +303,20 @@ export class WorkflowService {
         startedAt: input.startedAt,
         completedAt: input.completedAt ?? null,
         durationMs: input.durationMs ?? null,
-        inputJson: input.inputJson ? (input.inputJson as object) : undefined,
-        outputJson: input.outputJson ? (input.outputJson as object) : undefined,
-        toolCallsJson: input.toolCallsJson ? (input.toolCallsJson as object) : undefined,
-        handoffsJson: input.handoffsJson ? (input.handoffsJson as object) : undefined,
+        inputJson: input.inputJson
+          ? (redactJsonForPersistence(input.inputJson) as object)
+          : undefined,
+        outputJson: input.outputJson
+          ? (redactJsonForPersistence(input.outputJson) as object)
+          : undefined,
+        toolCallsJson: input.toolCallsJson
+          ? (redactJsonForPersistence(input.toolCallsJson) as object)
+          : undefined,
+        handoffsJson: input.handoffsJson
+          ? (redactJsonForPersistence(input.handoffsJson) as object)
+          : undefined,
         tokenUsage: input.tokenUsage ? (input.tokenUsage as object) : undefined,
-        error: input.error ?? null,
+        error: input.error ? redactJsonForPersistence(input.error) : null,
       },
     });
 
