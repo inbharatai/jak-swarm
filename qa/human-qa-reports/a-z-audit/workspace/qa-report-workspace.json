@@ -1,0 +1,32 @@
+{
+  "name": "workspace",
+  "generatedAt": "2026-05-01T14:23:21.117Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-audit\\workspace\\shots",
+  "screenshotsCount": 1,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 1
+  },
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 1
+  },
+  "findings": [
+    {
+      "page": "workspace",
+      "section": "(unset)",
+      "expected": "(observation only)",
+      "actual": "Workspace has 1 input element(s)",
+      "severity": "INFO",
+      "category": "UX",
+      "status": "observation",
+      "suggestedFix": "(none — observation only)"
+    }
+  ]
+}

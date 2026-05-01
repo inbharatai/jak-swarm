@@ -1,0 +1,32 @@
+{
+  "name": "social-drafts",
+  "generatedAt": "2026-05-01T14:23:29.350Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-audit\\social-drafts\\shots",
+  "screenshotsCount": 5,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 1
+  },
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 1
+  },
+  "findings": [
+    {
+      "page": "social-drafts",
+      "section": "social-drafts-initial",
+      "expected": "(observation only)",
+      "actual": "Result card rendered after Generate — full happy path works",
+      "severity": "INFO",
+      "category": "UX",
+      "status": "observation",
+      "suggestedFix": "(none — observation only)"
+    }
+  ]
+}

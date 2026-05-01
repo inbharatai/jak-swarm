@@ -1,0 +1,72 @@
+{
+  "name": "landing",
+  "generatedAt": "2026-05-01T14:23:07.810Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-audit\\landing\\shots",
+  "screenshotsCount": 11,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 5
+  },
+  "statusCounts": {
+    "working": 5,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": [
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "pricing link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "GitHub link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "contact / email link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "security / privacy link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "audit / compliance link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    }
+  ]
+}

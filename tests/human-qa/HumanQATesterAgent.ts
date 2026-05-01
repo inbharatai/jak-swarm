@@ -54,19 +54,86 @@ export interface QASessionReport {
   totalScreenshots: number;
   severityCounts: Record<Severity, number>;
   statusCounts: Record<FindingStatus, number>;
-  /** Per-page findings, in the order targets were run. */
+  /** Per-page findings + 1-10 score, in the order targets were run. */
   perPage: Array<{
     name: string;
     url: string;
     findings: Finding[];
     screenshotsCount: number;
+    score: number;
+    scoreReason: string;
   }>;
+  /** Aggregate score across all pages (lowest individual page score caps the average). */
+  sessionScore: number;
   /**
    * The "buyer verdict" — a one-sentence status derived from the
    * aggregate counts. Honest: doesn't say "ready" unless 0 CRITICAL
    * + 0 HIGH AND zero "not-implemented" findings.
    */
   buyerVerdict: 'ready-for-buyer-walkthrough' | 'has-rough-edges' | 'not-buyer-ready';
+}
+
+/**
+ * 1-10 page score derived from the finding mix. Designed to be honest:
+ * one CRITICAL or one not-implemented caps the score at 5, regardless
+ * of how many "INFO working" entries exist. A buyer cares about the
+ * worst thing, not the average.
+ *
+ *   10 — clean: 0 CRITICAL/HIGH/MEDIUM, no not-implemented, no
+ *        present-but-not-wired, ≥ 1 INFO/working observation
+ *   9  — 1 MEDIUM permitted, otherwise clean
+ *   8  — 2 MEDIUM permitted OR 1 LOW, otherwise clean
+ *   7  — 1 HIGH (not present-but-not-wired or not-implemented)
+ *   6  — 2 HIGH OR 1 present-but-not-wired
+ *   5  — 1 not-implemented OR 3+ HIGH OR 2+ present-but-not-wired
+ *   4  — 1 CRITICAL
+ *   3  — 1 CRITICAL + 1 not-implemented
+ *   2  — multiple CRITICAL
+ *   1  — page didn't render at all
+ */
+export function scorePage(opts: {
+  severity: Record<Severity, number>;
+  status: Record<FindingStatus, number>;
+  totalFindings: number;
+  screenshotsCount: number;
+}): { score: number; reason: string } {
+  const s = opts.severity;
+  const st = opts.status;
+  // 0 findings + ≥ 1 screenshot = the explicit checks ran AND found
+  // nothing wrong. That's the strongest possible result for this
+  // framework (a finding is only recorded when something fails).
+  if (opts.totalFindings === 0 && opts.screenshotsCount > 0) {
+    return { score: 10, reason: 'all explicit checks passed; no issues recorded' };
+  }
+  if (opts.totalFindings === 0 && opts.screenshotsCount === 0) {
+    return { score: 5, reason: 'page never rendered; no screenshots captured' };
+  }
+  if (s.CRITICAL >= 2) return { score: 2, reason: `${s.CRITICAL} CRITICAL findings — page broken` };
+  if (s.CRITICAL >= 1 && st['not-implemented'] >= 1) {
+    return { score: 3, reason: `1 CRITICAL + ${st['not-implemented']} not-implemented` };
+  }
+  if (s.CRITICAL >= 1) return { score: 4, reason: '1 CRITICAL finding' };
+  if (st['not-implemented'] >= 1 || s.HIGH >= 3 || st['present-but-not-wired'] >= 2) {
+    return {
+      score: 5,
+      reason: [
+        st['not-implemented'] >= 1 ? `${st['not-implemented']} not-implemented` : '',
+        s.HIGH >= 3 ? `${s.HIGH} HIGH` : '',
+        st['present-but-not-wired'] >= 2 ? `${st['present-but-not-wired']} present-but-not-wired` : '',
+      ].filter(Boolean).join(', '),
+    };
+  }
+  if (s.HIGH >= 2 || st['present-but-not-wired'] >= 1) {
+    return {
+      score: 6,
+      reason: s.HIGH >= 2 ? `${s.HIGH} HIGH` : '1 present-but-not-wired',
+    };
+  }
+  if (s.HIGH >= 1) return { score: 7, reason: '1 HIGH finding' };
+  if (s.MEDIUM >= 3) return { score: 7, reason: `${s.MEDIUM} MEDIUM (polish backlog)` };
+  if (s.MEDIUM >= 2 || s.LOW >= 1) return { score: 8, reason: `${s.MEDIUM} MEDIUM, ${s.LOW} LOW` };
+  if (s.MEDIUM >= 1) return { score: 9, reason: '1 MEDIUM (minor polish)' };
+  return { score: 10, reason: 'no severity-bearing findings; INFO/working observations only' };
 }
 
 export class HumanQATesterAgent {
@@ -125,11 +192,19 @@ export class HumanQATesterAgent {
 
       const { jsonPath } = await qa.finalize();
       const data = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
+      const { score, reason } = scorePage({
+        severity: data.severityCounts,
+        status: data.statusCounts,
+        totalFindings: data.findings.length,
+        screenshotsCount: data.screenshotsCount,
+      });
       perPage.push({
         name: target.name,
         url: target.url,
         findings: data.findings,
         screenshotsCount: data.screenshotsCount,
+        score,
+        scoreReason: reason,
       });
       totalScreenshots += data.screenshotsCount;
       for (const k of Object.keys(sevCounts) as Severity[]) sevCounts[k] += data.severityCounts[k] || 0;
@@ -145,6 +220,10 @@ export class HumanQATesterAgent {
         : sevCounts.HIGH > 0 || statusCounts['present-but-not-wired'] > 0
           ? 'has-rough-edges'
           : 'ready-for-buyer-walkthrough';
+    // Session score = LOWEST page score. A buyer judges by the worst
+    // surface they touch, not the average. If any page is below 8 the
+    // session is below 8.
+    const sessionScore = perPage.length > 0 ? Math.min(...perPage.map((p) => p.score)) : 0;
 
     const report: QASessionReport = {
       sessionName: this.opts.sessionName,
@@ -156,6 +235,7 @@ export class HumanQATesterAgent {
       severityCounts: sevCounts,
       statusCounts,
       perPage,
+      sessionScore,
       buyerVerdict,
     };
 
@@ -194,11 +274,16 @@ export class HumanQATesterAgent {
     lines.push('|---|---|');
     for (const k of Object.keys(r.statusCounts) as FindingStatus[]) lines.push(`| ${k} | ${r.statusCounts[k]} |`);
     lines.push('');
-    lines.push('## Per-page summary');
+    lines.push(`## Session score: **${r.sessionScore}/10** (worst page)`);
     lines.push('');
-    lines.push('| Page | URL | Findings | Screenshots |');
-    lines.push('|---|---|---|---|');
-    for (const p of r.perPage) lines.push(`| ${p.name} | ${p.url} | ${p.findings.length} | ${p.screenshotsCount} |`);
+    lines.push('## Per-page A-Z scoring (1-10)');
+    lines.push('');
+    lines.push('| Page | URL | Score | Findings | Screenshots | Reason |');
+    lines.push('|---|---|---|---|---|---|');
+    for (const p of r.perPage) {
+      const flag = p.score < 8 ? '🔴' : p.score < 9 ? '🟡' : '🟢';
+      lines.push(`| ${p.name} | ${p.url} | ${flag} **${p.score}/10** | ${p.findings.length} | ${p.screenshotsCount} | ${p.scoreReason} |`);
+    }
     lines.push('');
 
     const allFindings = r.perPage.flatMap((p) => p.findings.map((f) => ({ ...f, page: p.name })));

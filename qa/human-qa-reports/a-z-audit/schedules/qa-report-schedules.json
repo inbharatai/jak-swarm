@@ -1,0 +1,21 @@
+{
+  "name": "schedules",
+  "generatedAt": "2026-05-01T14:24:06.389Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-audit\\schedules\\shots",
+  "screenshotsCount": 1,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 0
+  },
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": []
+}
