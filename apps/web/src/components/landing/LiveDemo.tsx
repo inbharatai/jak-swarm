@@ -6,42 +6,52 @@ import { useStillMode } from './useStillMode';
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
 
+// Each scenario walks through a realistic JAK orchestration: Commander parses
+// intent → Planner decomposes → role-specific worker agents execute → Verifier
+// gates the output → Approval Gate pauses on risky actions → Audit ribbon
+// records every step. The role names map 1:1 to BaseAgent subclasses that
+// ship in /packages/agents (CEO/CMO/CTO/Research/Verifier/Approval).
 const DEMO_SCENARIOS = [
   {
-    command: 'Send a follow-up email to all leads from last week who didn\'t reply',
+    command: 'Map our top 3 competitors and draft a CMO-voice LinkedIn post',
     steps: [
-      { agent: 'Commander', action: 'Decomposing task into 3 subtasks', color: '#fbbf24', ms: 400 },
-      { agent: 'CRM Agent', action: 'Querying leads from last 7 days → 23 leads found', color: '#F59E0B', ms: 800 },
-      { agent: 'CRM Agent', action: 'Filtering no-reply leads → 14 leads matched', color: '#F59E0B', ms: 600 },
-      { agent: 'Email Agent', action: 'Generating personalized follow-ups (14 drafts)', color: '#EA4335', ms: 1200 },
-      { agent: 'Verification', action: 'Checking for phishing risk, tone, compliance → ✓ Clear', color: '#34d399', ms: 500 },
-      { agent: 'Email Agent', action: 'Sent 14 emails via IMAP · 0 bounced', color: '#EA4335', ms: 400 },
+      { agent: 'Commander', action: 'Parsed intent: competitor research + content draft', color: '#fbbf24', ms: 400 },
+      { agent: 'Planner', action: 'Decomposed into 4 ordered subtasks · risk: medium', color: '#fbbf24', ms: 500 },
+      { agent: 'Research Agent', action: 'Pulled 3 competitor pricing + positioning pages', color: '#38bdf8', ms: 1100 },
+      { agent: 'CEO Agent', action: 'Synthesized 5-point strategic angle for the post', color: '#34d399', ms: 800 },
+      { agent: 'CMO Agent', action: 'Drafted 248-word LinkedIn post in your brand voice', color: '#f472b6', ms: 1100 },
+      { agent: 'Verifier', action: 'Citation density 0.82 · tone match · safety ✓', color: '#34d399', ms: 500 },
+      { agent: 'Approval', action: 'Paused for your sign-off before publishing', color: '#fbbf24', ms: 600 },
+      { agent: 'Audit', action: 'Trail signed (HMAC-SHA256) · run #847 logged', color: '#fb923c', ms: 300 },
     ],
-    result: '14 personalized follow-ups sent. 0 flagged. Avg send time: 1.2s per email.',
+    result: 'Draft ready in your voice. JAK never published — your approval gates the LinkedIn handoff.',
   },
   {
-    command: 'Research top 5 AI code generation tools and create a comparison doc',
+    command: 'Review my landing page and propose 5 copy + design fixes',
     steps: [
-      { agent: 'Commander', action: 'Creating research → synthesis → document pipeline', color: '#fbbf24', ms: 400 },
-      { agent: 'Research Agent', action: 'Searching 5 targets: Cursor, Copilot, Bolt, v0, Windsurf', color: '#06B6D4', ms: 1000 },
-      { agent: 'Browser Agent', action: 'Fetching pricing, features, reviews (15 pages)', color: '#34d399', ms: 1500 },
-      { agent: 'CEO Agent', action: 'Synthesizing findings into structured comparison', color: '#34d399', ms: 800 },
-      { agent: 'Document Agent', action: 'Writing comparison doc (2,400 words)', color: '#8B5CF6', ms: 1000 },
-      { agent: 'Verification', action: 'Cross-referencing pricing data → ✓ Accurate', color: '#34d399', ms: 400 },
+      { agent: 'Commander', action: 'Parsed intent: website audit · sandbox-only edits', color: '#fbbf24', ms: 350 },
+      { agent: 'Planner', action: 'Crawl → screenshot → review → propose-fixes pipeline', color: '#fbbf24', ms: 450 },
+      { agent: 'Browser Agent', action: 'Crawled 4 pages · captured 12 screenshots', color: '#38bdf8', ms: 1300 },
+      { agent: 'Designer Agent', action: 'Found contrast, hierarchy, mobile-tap issues (3)', color: '#c084fc', ms: 900 },
+      { agent: 'CTO Agent', action: 'Mapped each fix to a source file + diff (2)', color: '#38bdf8', ms: 800 },
+      { agent: 'Verifier', action: 'Each fix points to a real file path · ✓ verified', color: '#34d399', ms: 500 },
+      { agent: 'Approval', action: 'Sandbox edits queued · awaiting your review', color: '#fbbf24', ms: 500 },
+      { agent: 'Audit', action: 'Trail signed · 5 fixes ready for one-click apply', color: '#fb923c', ms: 300 },
     ],
-    result: 'Comparison document ready. 5 tools analyzed. 12 criteria scored. Exported as PDF.',
+    result: '5 fixes proposed. Each one shows the file, the diff, and the screenshot. Nothing applied yet.',
   },
   {
-    command: 'Fix the login bug on staging, test it, and deploy to production',
+    command: 'Help me draft a SOC 2 readiness summary from our last audit run',
     steps: [
-      { agent: 'Commander', action: 'Debug → Test → Deploy pipeline created', color: '#fbbf24', ms: 300 },
-      { agent: 'Engineer Agent', action: 'Analyzing error logs → auth token expiry not handled', color: '#38bdf8', ms: 700 },
-      { agent: 'Engineer Agent', action: 'Generating fix: token refresh middleware (47 lines)', color: '#38bdf8', ms: 900 },
-      { agent: 'Browser Agent', action: 'Running E2E tests on staging → 23/23 passed', color: '#34d399', ms: 1200 },
-      { agent: 'Ops Agent', action: 'Deploying to production via CI/CD pipeline', color: '#fb923c', ms: 800 },
-      { agent: 'Verification', action: 'Post-deploy health check → ✓ All systems nominal', color: '#34d399', ms: 400 },
+      { agent: 'Commander', action: 'Parsed intent: audit summary · evidence-grounded', color: '#fbbf24', ms: 400 },
+      { agent: 'Planner', action: 'Pull AuditRun → fetch ControlTests → render PDF', color: '#fbbf24', ms: 500 },
+      { agent: 'Audit Commander', action: 'Loaded 63 SOC 2 controls · 47 passed · 16 noted', color: '#fb923c', ms: 1100 },
+      { agent: 'Workpaper Writer', action: 'Composed reviewer-gated summary · 3 pages', color: '#c084fc', ms: 1000 },
+      { agent: 'Verifier', action: 'Cross-checked findings against evidence ledger ✓', color: '#34d399', ms: 600 },
+      { agent: 'Approval', action: 'Workpaper held until reviewer approves it', color: '#fbbf24', ms: 500 },
+      { agent: 'Audit', action: 'Final pack refused: 2 workpapers still pending', color: '#fb923c', ms: 400 },
     ],
-    result: 'Bug fixed, tested, deployed. Zero downtime. Total time: 4m 12s.',
+    result: 'Summary drafted. Final pack signing is gated until reviewers approve every workpaper.',
   },
 ];
 
@@ -268,24 +278,23 @@ export default function LiveDemo() {
             )}
           </div>
 
-          {/* Bottom status bar */}
-          <div className="border-t border-white/5 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] font-mono text-slate-500 overflow-x-auto">
-            <span>scenario {scenarioIndex + 1}/{DEMO_SCENARIOS.length}</span>
-            <span className="text-slate-600">|</span>
-            <span>{visibleSteps}/{scenario.steps.length} steps</span>
-            <span className="text-slate-600">|</span>
-            <div className="flex-1 max-w-24 h-1 bg-white/5 rounded-full overflow-hidden">
+          {/* Bottom status bar — clean cockpit chrome only. The previous
+               "scenario 1/3 | 0/6 steps" labels were placeholder text that
+               read as a slideshow indicator, not a live execution surface.
+               Now: a thin progress fill + click-to-jump dots, nothing else. */}
+          <div className="border-t border-white/5 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-3">
+            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald-400 to-amber-400 rounded-full transition-all duration-500"
                 style={{ width: `${(visibleSteps / scenario.steps.length) * 100}%` }}
               />
             </div>
-            <div className="ml-auto flex gap-4">
+            <div className="flex gap-2">
               {DEMO_SCENARIOS.map((_, i) => (
                 <button
                   key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${
-                    i === scenarioIndex ? 'bg-emerald-400' : 'bg-white/10'
+                  className={`w-2 h-2 rounded-full transition-all hover:scale-110 ${
+                    i === scenarioIndex ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-white/10 hover:bg-white/20'
                   }`}
                   onClick={() => setScenarioIndex(i)}
                   aria-label={`View scenario ${i + 1}`}
@@ -294,6 +303,13 @@ export default function LiveDemo() {
             </div>
           </div>
         </motion.div>
+
+        {/* Subtle scenario caption below the cockpit so visitors know there
+             are 3 different real flows demoed, without us shoving a
+             "scenario 1/3" label into the cockpit chrome. */}
+        <p className="mt-4 text-center text-[11px] text-slate-500 font-sans">
+          Three real flows in rotation: <span className="text-slate-300">competitor research + LinkedIn draft</span> · <span className="text-slate-300">website review + fixes</span> · <span className="text-slate-300">SOC 2 readiness summary</span>
+        </p>
       </div>
 
       <style>{`

@@ -201,7 +201,7 @@ export default function PremiumCTA() {
           transition={{ duration: 0.7, delay: 0.2 }}
         >
           <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.2] pb-2">
-            <span className="text-white/90">Stop stringing together tools.</span>
+            <span className="text-white/90">Stop chatting with AI.</span>
             <br />
             <span
               className="landing-gradient-text"
@@ -211,12 +211,12 @@ export default function PremiumCTA() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Start operating.
+              Start operating with it.
             </span>
           </h2>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
-            JAK Swarm runs on your infrastructure, with your approvals, under your audit trail. Open-source core. Self-hostable. Production-ready.
+            Run workflows with visibility, approval, and audit from day one. Open-source core. Self-hostable. OpenAI-first runtime.
           </p>
 
           {/* CTA buttons */}

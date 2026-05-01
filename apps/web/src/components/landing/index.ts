@@ -1,12 +1,24 @@
-// The narrow set of components rendered on the homepage today. The
-// homepage was simplified from ~18 sections down to 8 (hero, pillars,
-// outcomes, workflow, audit tile, live demo, pricing, final CTA), so
-// OrchestrationEngine / ExecutionFlow / CapabilityMap / SupervisorSection
-// are intentionally NOT re-exported — they remain in the folder for use
-// on /docs or marketing sub-pages but should not be re-added to the
-// homepage without explicit owner approval.
-export { default as LiveDemo } from './LiveDemo';
+// The set of components rendered on the homepage. The page was rebuilt
+// 2026-04-30 around a new 9-section structure:
+//
+//   Hero (with HeroCockpit)
+//   PainSection          — "AI chat gives answers. JAK gets work done."
+//   HowItWorks           — 7-step pipeline
+//   ProductCockpit       — premium dashboard mockup
+//   ShowTheWork          — 4 outcome proof cards
+//   TrustLayer           — 6 trust guarantees
+//   Audit (in page.tsx)  — compliance, moved below the trust layer
+//   Pricing (in page.tsx)
+//   PremiumCTA
+//
+// LiveDemo + WhatJakDoes are intentionally NOT re-exported. Their roles
+// are now covered by HeroCockpit + ProductCockpit + HowItWorks. The files
+// remain in this folder for reuse on /docs or marketing sub-pages.
+export { default as HeroCockpit } from './HeroCockpit';
+export { default as HowItWorks } from './HowItWorks';
+export { default as PainSection } from './PainSection';
 export { default as PremiumCTA } from './PremiumCTA';
+export { default as ProductCockpit } from './ProductCockpit';
 export { default as ShowTheWork } from './ShowTheWork';
-export { default as WhatJakDoes } from './WhatJakDoes';
+export { default as TrustLayer } from './TrustLayer';
 export { LandingIcon, type LandingIconName } from './landing-icons';

@@ -1,31 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LiveDemo, PremiumCTA, ShowTheWork, WhatJakDoes, LandingIcon, type LandingIconName } from '@/components/landing';
-
-/* ─── Fade-in on scroll Hook ─────────────────────────────────────────────── */
-
-function useFadeIn() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) setVisible(true);
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, visible };
-}
+import {
+  HeroCockpit,
+  HowItWorks,
+  PainSection,
+  PremiumCTA,
+  ProductCockpit,
+  ShowTheWork,
+  TrustLayer,
+} from '@/components/landing';
 
 /* ─── SVG Logo Component ─────────────────────────────────────────────────── */
 
@@ -102,21 +88,25 @@ function GitHubIcon({ className }: { className?: string }) {
 
 /* ─── Data ────────────────────────────────────────────────────────────────── */
 
-const WORKFLOW_STEPS = [
-  { label: 'Type a task', desc: '"Research my competitors and draft a LinkedIn post"', icon: 'M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18', color: '#34d399' },
-  { label: 'JAK plans', desc: 'Plain English &rarr; reviewable steps', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75', color: '#fbbf24' },
-  { label: 'Agents work', desc: 'Specialists run with your tools', icon: 'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z', color: '#38bdf8' },
-  { label: 'You approve', desc: 'Review the exact action before it runs', icon: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z', color: '#f472b6' },
-  { label: 'Audit trail', desc: 'Every step logged + verifiable', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z', color: '#c084fc' },
-];
-
+// Pricing copy is OpenAI-first across every tier so the public messaging
+// matches the runtime's primary path. Other providers (Anthropic /
+// Gemini / DeepSeek / Ollama / OpenRouter) remain wired in the runtime
+// as optional fallback — they're documented in the README, not in
+// pricing claims.
 const PRICING = [
   {
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Run JAK on your own infrastructure. Forever.',
-    features: ['200 credits / month', '30 credits / day', '5 core agents', '1 vibe coding project', 'Standard AI models', 'Community support'],
+    description: 'Run JAK on your own machine, forever.',
+    features: [
+      '200 credits / month',
+      '30 credits / day',
+      '5 core agents',
+      '1 vibe coding project',
+      'Bring-your-own OpenAI key',
+      'Community support',
+    ],
     cta: 'Start Free',
     href: '/register',
     highlighted: false,
@@ -126,8 +116,16 @@ const PRICING = [
     name: 'Pro',
     price: '$29',
     period: '/mo',
-    description: 'Hosted runtime with approvals built in.',
-    features: ['3,000 credits / month', '200 credits / day', 'All 38 specialist agents', '5 vibe coding projects', 'Premium OpenAI model routing (GPT-4o tier)', '500 premium credits', 'Email support'],
+    description: 'Hosted runtime, OpenAI managed, approvals built in.',
+    features: [
+      '3,000 credits / month',
+      '200 credits / day',
+      'All 38 specialist agents',
+      '5 vibe coding projects',
+      'Managed OpenAI runtime (GPT-4o tier)',
+      '500 premium credits',
+      'Email support',
+    ],
     cta: 'Go Pro',
     href: '/register',
     highlighted: true,
@@ -138,7 +136,15 @@ const PRICING = [
     price: '$99',
     period: '/mo',
     description: 'Higher limits and priority model access for teams.',
-    features: ['15,000 credits / month', '600 credits / day', 'All agents + custom skills', 'Unlimited projects', '3,000 premium credits', 'Managed OpenAI runtime', 'Priority support'],
+    features: [
+      '15,000 credits / month',
+      '600 credits / day',
+      'All agents + custom skills',
+      'Unlimited projects',
+      '3,000 premium credits',
+      'Managed OpenAI runtime',
+      'Priority support',
+    ],
     cta: 'Start Team',
     href: '/register',
     highlighted: false,
@@ -149,7 +155,15 @@ const PRICING = [
     price: '$249',
     period: '/mo',
     description: 'SSO, audit exports, and dedicated deployment.',
-    features: ['50,000 credits / month', '2,000 credits / day', '15,000 premium credits', 'SSO + RBAC', 'Audit logs', 'Custom integrations', 'Dedicated support'],
+    features: [
+      '50,000 credits / month',
+      '2,000 credits / day',
+      '15,000 premium credits',
+      'SSO + RBAC + audit logs',
+      'Custom integrations',
+      'Managed OpenAI runtime',
+      'Dedicated support',
+    ],
     cta: 'Contact Us',
     href: 'mailto:contact@inbharat.ai',
     highlighted: false,
@@ -163,8 +177,6 @@ export default function HomePage() {
   const router = useRouter();
   const [heroVisible, setHeroVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const workflowSection = useFadeIn();
 
   // Redirect authenticated users to workspace
   // (Supabase middleware handles this at the edge, but this is a client-side safety net)
@@ -297,7 +309,7 @@ export default function HomePage() {
             </div>
             <div className="hidden md:flex items-center gap-8 text-sm text-slate-400">
               <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Outcomes</a>
-              <a href="#workflow" className="hover:text-white focus-visible:text-white transition-colors duration-200">How It Works</a>
+              <a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors duration-200">How It Works</a>
               <a href="#audit" className="hover:text-white focus-visible:text-white transition-colors duration-200">Audit</a>
               <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
             </div>
@@ -334,7 +346,7 @@ export default function HomePage() {
           {mobileMenuOpen && (
             <div id="mobile-menu" className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
               <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Outcomes</a>
-              <a href="#workflow" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
+              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
               <a href="#audit" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Audit</a>
               <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
               <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-emerald-400 hover:text-emerald-300 transition-colors">Builder</Link>
@@ -365,17 +377,18 @@ export default function HomePage() {
             <div className="inline-flex items-center gap-2 mb-8">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               <span className="text-[11px] font-semibold text-emerald-300/90 tracking-[0.18em] uppercase font-sans">
-                For Founder-Led Teams &middot; Open-Source Core
+                AI Operations Cockpit &middot; For Founder-Led Teams
               </span>
             </div>
 
             <h1 className="mb-6 pb-3 mx-auto text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15]">
-              <span className="block text-white">Your AI operations team&mdash;</span>
-              <span className="block mt-2 gradient-text landing-gradient-text">visible, controlled, approval-gated.</span>
+              <span className="block text-white">Give JAK a task.</span>
+              <span className="block mt-2 text-white">Watch an AI team plan, execute, and</span>
+              <span className="block mt-2 gradient-text landing-gradient-text">ask approval before anything risky.</span>
             </h1>
 
             <p className="mb-10 max-w-2xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              Give JAK a business task in plain English &mdash; &ldquo;research my competitors and draft a LinkedIn post,&rdquo; or &ldquo;review my website and propose 5 fixes.&rdquo; JAK plans the work, routes it to specialist agents, pauses before anything risky, and gives you a complete audit trail. Not another chatbot. A cockpit for getting real work done.
+              JAK Swarm is an AI operations cockpit for founder-led teams. It turns plain-English commands into visible workflows across research, content, code, outreach, and business operations &mdash; with human approval gates and a tamper-evident audit trail on every step.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -402,103 +415,68 @@ export default function HomePage() {
                 View on GitHub
               </a>
             </div>
+
+            {/* Hero cockpit mockup — shows the full loop (command → plan →
+                agents → approval → output → audit) so visitors see the
+                actual product, not generic abstract cards. */}
+            <div className="mt-12 sm:mt-16">
+              <HeroCockpit />
+              <p className="mt-4 text-[11px] sm:text-xs text-slate-500 font-mono tabular-nums">
+                Live preview of the cockpit · same surface every workflow runs through
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* ── 2. What JAK does (Build / Operate / Verify pillars) ──────────── */}
-        <WhatJakDoes />
+        {/* ── 2. Pain framing — "AI chat gives answers. JAK gets work done." */}
+        <PainSection />
 
-        {/* ── 3. Show the work (outcome cards) ─────────────────────────────── */}
+        {/* ── 3. How It Works — 7-step pipeline (Command → Plan → Route →
+             Execute → Approve → Verify → Deliver). Replaces the prior
+             5-icon strip; native section anchor #how-it-works. */}
+        <HowItWorks />
+
+        {/* ── 4. Product Cockpit — premium dashboard mockup. Left rail =
+             user command + recent runs · Center = live agent graph ·
+             Right = approval card + output preview · Bottom = audit
+             timeline. Mirrors the actual cockpit at /workspace. */}
+        <ProductCockpit />
+
+        {/* ── 5. Outcomes (4 product-proof cards) ──────────────────────── */}
         <ShowTheWork />
 
-        {/* ── 4. Workflow Animation ────────────────────────────────────────── */}
-        {/* (ExecutionFlow removed from homepage — duplicated OrchestrationEngine's
-             architecture diagram. Component retained in `@/components/landing`
-             for future use on /docs or marketing sub-pages.) */}
-        <section id="workflow" className="relative px-4 py-24 sm:px-6 lg:px-8 diagonal-cut" style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.02), rgba(251,191,36,0.02), transparent)' }}>
-          <div ref={workflowSection.ref} className={`fade-section ${workflowSection.visible ? 'visible' : ''} mx-auto max-w-5xl`}>
-            <div className="text-center mb-16">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400 mb-3 font-sans">How It Works</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">From intent to verified result.</h2>
-            </div>
+        {/* ── 6. Trust Layer — 6 grep-able guarantees ──────────────────── */}
+        <TrustLayer />
 
-            {/* Animated workflow pipeline */}
-            <div className="relative max-w-5xl mx-auto">
-              {/* Connection line */}
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 -translate-y-1/2 hidden lg:block" aria-hidden="true">
-                <div className="h-full bg-gradient-to-r from-emerald-500/0 via-amber-400/50 to-pink-400/0" />
-                <div className="absolute top-0 h-full w-20 bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
-                  style={{ animation: 'flow-travel 3s ease-in-out infinite' }} />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 lg:gap-0">
-                {WORKFLOW_STEPS.map((step, i) => (
-                  <div key={i} className="flex flex-col items-center text-center relative group">
-
-                    {/* Step number badge */}
-                    <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-[#09090b] z-10 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: step.color }}>
-                      {i + 1}
-                    </div>
-
-                    {/* Icon circle */}
-                    <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition-all duration-500"
-                      style={{
-                        background: `${step.color}15`,
-                        border: `1px solid ${step.color}30`,
-                        animation: 'flow-pulse 3s ease-in-out infinite',
-                        animationDelay: `${i * 0.6}s`,
-                      }}
-                    >
-                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ color: step.color }} aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d={step.icon} />
-                      </svg>
-                    </div>
-
-                    <span className="text-sm font-display font-semibold text-white mb-0.5">{step.label}</span>
-                    <span className="text-xs text-slate-400 max-w-[120px] font-sans">{step.desc}</span>
-
-                    {/* Arrow between steps */}
-                    {i < 4 && (
-                      <div className="hidden lg:block absolute top-1/2 -right-2 -translate-y-1/2 text-slate-600" aria-hidden="true">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── 5. Audit & Compliance Agent Pack — compressed to a single tile.
-             Full engagement workspace lives at /audit/runs. Three framework
-             counts + the gate-list + auditor-portal bullet are all that
-             belong on the homepage; the rest belongs on a dedicated page. */}
+        {/* ── 7. Audit & Compliance Pack — sits after the Trust Layer.
+             Most visitors are solo founders / small teams who don't
+             need SOC 2 yet; the pack is reframed as a *trust signal*
+             available when they need it, not the headline pitch. */}
         <section
           id="audit"
           className="relative px-4 py-24 sm:px-6 lg:px-8"
-          style={{ background: 'linear-gradient(180deg, rgba(251,146,60,0.04), rgba(244,114,182,0.03), transparent)' }}
+          style={{ background: 'linear-gradient(180deg, transparent, rgba(251,146,60,0.04), transparent)' }}
         >
           <div className="mx-auto max-w-5xl relative z-10">
+            <div className="text-center mb-10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-400 mb-3 font-sans">
+                When you need audit-grade
+              </p>
+              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
+                Enterprise-grade auditability when you need it.
+              </h2>
+              <p className="mt-4 text-base sm:text-lg text-slate-300 font-sans max-w-2xl mx-auto leading-relaxed">
+                You don&rsquo;t need to think about SOC 2 on day one. Every workflow JAK runs is already tamper-evident, signed, and replayable &mdash; so when an enterprise customer asks, the evidence is already there.
+              </p>
+            </div>
+
             <div
               className="rounded-3xl p-8 sm:p-12 glass-card"
               style={{ borderTop: '3px solid #fb923c' }}
             >
               <div className="grid gap-8 md:grid-cols-2 md:items-center">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-400 mb-3 font-sans">
-                    Audit &amp; Compliance Pack
-                  </p>
-                  <h2 className="text-3xl font-display font-bold sm:text-4xl tracking-tight mb-4">
-                    A SOC 2 audit you can actually finish.
-                  </h2>
-                  <p className="text-slate-300 font-sans mb-6">
-                    <span className="text-white font-semibold">182 controls seeded</span> across SOC 2, HIPAA, and ISO 27001 &mdash; <span className="text-white font-semibold">108 operationally backed</span> (auto-mapping rules pull evidence from system activity) and <span className="text-white font-semibold">74 require reviewer attestation</span> (policy / paperwork / physical). LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs that verify byte-for-byte. Invite an external auditor through a SHA-256-hashed token portal.
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-8">
+                  <div className="flex flex-wrap gap-2 mb-6">
                     {[
                       // Counts match packages/db/prisma/seed-data/compliance-frameworks.ts.
                       // The truth-check CI gate (scripts/check-docs-truth.ts) cross-verifies
@@ -524,6 +502,10 @@ export default function HomePage() {
                     ))}
                   </div>
 
+                  <p className="text-slate-300 font-sans mb-6 text-sm leading-relaxed">
+                    <span className="text-white font-semibold">182 controls</span> seeded across three frameworks &mdash; <span className="text-white">108 are operationally backed</span> (evidence pulled from system activity) and <span className="text-white">74 require reviewer attestation</span>. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs.
+                  </p>
+
                   <Link
                     href="/audit/runs"
                     className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-orange-400"
@@ -544,7 +526,7 @@ export default function HomePage() {
                     'External Auditor Portal — invite-token-only, engagement-scoped, fully audited',
                     'HMAC-SHA256 evidence bundles verify byte-for-byte',
                   ].map((item) => (
-                    <li key={item} className="flex items-start gap-3 text-slate-300">
+                    <li key={item} className="flex items-start gap-3 text-slate-200">
                       <CheckIcon className="h-5 w-5 shrink-0 text-orange-400 mt-0.5" />
                       <span>{item}</span>
                     </li>
@@ -555,101 +537,112 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 6. Live Execution Demo ─────────────────────────────────────── */}
-        <LiveDemo />
-
-        {/* ── 6. Pricing ───────────────────────────────────────────────────── */}
+        {/* ── 8. Pricing — height-aligned 4-tier grid. Pro stands out via
+             border + glow + badge, NOT via scale (scale-105 made it
+             awkwardly larger AND mis-aligned the column heights). All
+             cards use `flex flex-col h-full` + `mt-auto` on the CTA so
+             every card is the same height regardless of feature count. */}
         <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
           <div className="mx-auto max-w-6xl relative z-10">
             <div className="text-center mb-16">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Pricing</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Transparent pricing. Open-source core.</h2>
-              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted ops, higher limits, and SLA.</p>
+              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted OpenAI ops, higher limits, and SLA.</p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto items-start">
+            <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
               {PRICING.map((tier) => (
                 <div
                   key={tier.name}
-                  className={`relative rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 ${
-                    tier.highlighted ? 'lg:scale-105' : ''
-                  }`}
+                  className="relative rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full min-w-0"
                   style={{
                     background: tier.highlighted
-                      ? 'linear-gradient(135deg, rgba(52,211,153,0.12), rgba(251,191,36,0.06))'
+                      ? 'linear-gradient(165deg, rgba(52,211,153,0.16), rgba(251,191,36,0.08) 60%, rgba(52,211,153,0.04))'
                       : tier.accent === 'amber'
-                      ? 'linear-gradient(135deg, rgba(251,191,36,0.06), rgba(251,191,36,0.02))'
-                      : 'rgba(255,255,255,0.03)',
+                      ? 'linear-gradient(165deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02))'
+                      : 'rgba(255,255,255,0.025)',
                     border: tier.highlighted
-                      ? '1px solid rgba(52,211,153,0.4)'
+                      ? '1.5px solid rgba(52,211,153,0.55)'
                       : tier.accent === 'amber'
-                      ? '1px solid rgba(251,191,36,0.2)'
-                      : '1px solid rgba(255,255,255,0.08)',
+                      ? '1px solid rgba(251,191,36,0.25)'
+                      : '1px solid rgba(255,255,255,0.07)',
                     boxShadow: tier.highlighted
-                      ? '0 0 40px rgba(52,211,153,0.1), 0 20px 60px rgba(52,211,153,0.05)'
+                      ? '0 0 0 1px rgba(52,211,153,0.15), 0 0 50px rgba(52,211,153,0.18), 0 20px 60px -10px rgba(52,211,153,0.1)'
                       : 'none',
                   }}
                 >
                   {tier.highlighted && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-[#09090b]" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)' }}>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                      <span
+                        className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#09090b] whitespace-nowrap"
+                        style={{
+                          background: 'linear-gradient(135deg, #34d399, #fbbf24)',
+                          boxShadow: '0 4px 14px rgba(52,211,153,0.35)',
+                        }}
+                      >
                         Most Popular
                       </span>
                     </div>
                   )}
 
                   <div className="mb-6">
-                    <h3 className="text-lg font-display font-semibold mb-2 text-white">{tier.name}</h3>
+                    <h3 className="text-base font-display font-semibold mb-2 text-white tracking-tight">{tier.name}</h3>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-display font-bold text-white tabular-nums">{tier.price}</span>
-                      {tier.period && <span className="text-slate-500 font-sans">{tier.period}</span>}
+                      {tier.period && <span className="text-slate-500 font-sans text-sm">{tier.period}</span>}
                     </div>
-                    <p className="mt-2 text-sm text-slate-300 font-sans">{tier.description}</p>
+                    <p className="mt-3 text-[13px] text-slate-300 font-sans leading-relaxed min-h-[2.6rem]">{tier.description}</p>
                   </div>
 
-                  <ul className="mb-8 space-y-3">
+                  <ul className="space-y-2.5 mb-7">
                     {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3 text-sm font-sans">
-                        <CheckIcon className="h-5 w-5 shrink-0 text-emerald-400" />
-                        <span className="text-slate-300">{feature}</span>
+                      <li key={feature} className="flex items-start gap-2.5 text-[13px] font-sans">
+                        <CheckIcon
+                          className={`h-4 w-4 shrink-0 mt-0.5 ${tier.highlighted ? 'text-emerald-300' : 'text-emerald-400/80'}`}
+                        />
+                        <span className="text-slate-200 leading-snug">{feature}</span>
                       </li>
                     ))}
                   </ul>
 
-                  {tier.href.startsWith('mailto:') ? (
-                    <a
-                      href={tier.href}
-                      className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-amber-400"
-                      style={{
-                        background: 'rgba(251,191,36,0.1)',
-                        border: '1px solid rgba(251,191,36,0.2)',
-                        color: '#fbbf24',
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      {tier.cta}
-                    </a>
-                  ) : (
-                    <Link
-                      href={tier.href}
-                      className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                      style={{
-                        background: tier.highlighted ? 'linear-gradient(135deg, #34d399, #fbbf24)' : 'rgba(255,255,255,0.05)',
-                        border: tier.highlighted ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                        color: tier.highlighted ? '#09090b' : '#fff',
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      {tier.cta}
-                    </Link>
-                  )}
+                  {/* CTA pinned to bottom so heights align across tiers regardless
+                      of feature-count differences. */}
+                  <div className="mt-auto">
+                    {tier.href.startsWith('mailto:') ? (
+                      <a
+                        href={tier.href}
+                        className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 hover:bg-amber-500/15 focus-visible:ring-2 focus-visible:ring-amber-400"
+                        style={{
+                          background: 'rgba(251,191,36,0.1)',
+                          border: '1px solid rgba(251,191,36,0.25)',
+                          color: '#fbbf24',
+                          touchAction: 'manipulation',
+                        }}
+                      >
+                        {tier.cta}
+                      </a>
+                    ) : (
+                      <Link
+                        href={tier.href}
+                        className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                        style={{
+                          background: tier.highlighted ? 'linear-gradient(135deg, #34d399, #fbbf24)' : 'rgba(255,255,255,0.04)',
+                          border: tier.highlighted ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                          color: tier.highlighted ? '#09090b' : '#fff',
+                          touchAction: 'manipulation',
+                        }}
+                      >
+                        {tier.cta}
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── 8. Premium CTA ─────────────────────────────────────────────── */}
+        {/* ── 9. Final CTA ─────────────────────────────────────────────── */}
         <PremiumCTA />
 
         {/* ── 9. Footer ────────────────────────────────────────────────────── */}
@@ -673,7 +666,7 @@ export default function HomePage() {
                 <h4 className="text-sm font-display font-semibold text-white mb-4">Product</h4>
                 <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
                   <li><a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors">Outcomes</a></li>
-                  <li><a href="#workflow" className="hover:text-white focus-visible:text-white transition-colors">How It Works</a></li>
+                  <li><a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors">How It Works</a></li>
                   <li><a href="#audit" className="hover:text-white focus-visible:text-white transition-colors">Audit &amp; Compliance</a></li>
                   <li><a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors">Pricing</a></li>
                   <li><a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Documentation</a></li>
