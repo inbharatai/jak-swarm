@@ -1,0 +1,14 @@
+{
+  "name": "landing-desktop",
+  "generatedAt": "2026-05-01T08:40:05.947Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\landing-desktop\\shots",
+  "screenshotsCount": 12,
+  "counts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 0
+  },
+  "findings": []
+}
