@@ -345,6 +345,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@jak-swarm/security':
+        specifier: workspace:*
+        version: link:../security
       '@jak-swarm/shared':
         specifier: workspace:*
         version: link:../shared

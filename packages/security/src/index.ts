@@ -27,6 +27,20 @@ export type { RedactionStats } from './guardrails/runtime-pii-redactor.js';
 export { redactJsonForPersistence, isPersistenceRedactionDisabled }
   from './guardrails/persistence-redactor.js';
 
+// Local Sprint 3 — at-rest field encryption for workflow goal/error/finalOutput/
+// planJson/stateJson columns. AES-256-GCM with key from JAK_FIELD_ENCRYPTION_KEY.
+// Passthrough mode when no key is configured (dev default). See
+// docs/workflow-pii-storage-policy.md for the design rationale.
+export {
+  encryptString,
+  decryptString,
+  encryptJson,
+  decryptJson,
+  isEncrypted,
+  isFieldEncryptionEnabled,
+  __resetFieldCipherKeyCache,
+} from './encryption/field-cipher.js';
+
 // Injection Detection
 export { detectInjection, isInjectionAttempt } from './guardrails/injection-detector.js';
 export type { InjectionDetectionResult } from './guardrails/injection-detector.js';

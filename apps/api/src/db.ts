@@ -1,28 +1,15 @@
 /**
  * Prisma client singleton for the API.
  *
- * Imports from @jak-swarm/db which re-exports @prisma/client.
- * In development the client is cached on globalThis to prevent connection
- * pool exhaustion from hot-reloads.
+ * Local Sprint 3 — switched to import the EXTENDED `prisma` from
+ * `@jak-swarm/db`. Previously this file created its own bare
+ * PrismaClient, which silently bypassed the workflow-encryption
+ * extension wired in `packages/db/src/client.ts`. Result: writes
+ * went straight to the DB plaintext even with JAK_FIELD_ENCRYPTION_KEY
+ * set. The extended client preserves all behaviour (hot-reload
+ * caching is handled inside @jak-swarm/db) and adds at-rest
+ * encryption for workflow goal/error/finalOutput/planJson/stateJson.
  */
-import { PrismaClient } from '@jak-swarm/db';
+import { prisma as extendedPrisma, type PrismaClient } from '@jak-swarm/db';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env['NODE_ENV'] === 'development'
-        ? ['warn', 'error']
-        : ['warn', 'error'],
-    datasources: {
-      db: {
-        url: process.env['DATABASE_URL'],
-      },
-    },
-  });
-
-if (process.env['NODE_ENV'] !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+export const prisma: PrismaClient = extendedPrisma;
