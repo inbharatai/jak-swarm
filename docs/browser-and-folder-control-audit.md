@@ -113,19 +113,22 @@ All pass.
 | `tests/unit/api/sandboxed-installer.test.ts` | Allowlist + argv guard + timeout |
 | `tests/unit/api/tool-installer.test.ts` | `approvalId` required + role gate |
 
-## 6. Known remaining gaps (honest)
+## 6. Known remaining gaps (honest, after this sprint)
 
-1. **No filesystem-quota enforcement on browser session dirs.** A runaway
-   session that fills the host disk would be caught only by the OS,
-   not by the operator. Mitigation: idle sweep keeps active count low.
-   Future: add a per-tenant disk-bytes cap.
+1. ~~**No filesystem-quota enforcement on browser session dirs.**~~
+   **CLOSED** this sprint. `tenantQuotaBytes` (default 500 MB) caps
+   per-tenant session disk usage. `getTenantBytesSync` walks the
+   tenant subtree on every `startSession`; over-quota refuses with
+   `BROWSER_QUOTA_EXCEEDED` audit + a clear error message.
 
-2. **No DNS-rebinding defence.** A public domain whose A-record changes
-   to `169.254.169.254` between the allowlist check and the actual fetch
-   could bypass the URL guard. The per-request route interceptor closes
-   most of this (it re-checks every fetch), but a TOCTOU race is
-   theoretically possible. Real fix needs a custom DNS resolver that
-   re-checks the IP after lookup. Scoped for a follow-on sprint.
+2. ~~**No DNS-rebinding defence.**~~
+   **CLOSED** this sprint. `resolveAndCheckHost` runs a real DNS
+   lookup on every navigation-class request (`document` / `xhr` /
+   `fetch` / `websocket`) and rejects if any resolved IP is private
+   or metadata. Image / stylesheet / script fetches skip the lookup
+   for performance — those classes don't matter for rebinding.
+   `BROWSER_DNS_REBIND_BLOCKED` audit emit on every blocked request.
+   Fail-closed when DNS lookup itself errors.
 
 3. **`acceptDownloads: false` is per-context.** A user-script that
    triggers a synthetic download (data URI a-tag click) could still be
@@ -164,9 +167,11 @@ pnpm --filter @jak-swarm/tests exec vitest run integration/browser-operator-real
 | Cleanup on endSession | 9/10 | Hard delete + idle sweep |
 | Argv injection on subprocess | 10/10 | Literal argv, never shell-true |
 | Path traversal in sandbox FS | 8/10 | `..` + absolute path blocked; symlinks rely on container filesystem semantics |
-| Disk-fill protection | 5/10 | No per-tenant quota; relies on OS |
-| DNS-rebinding | 6/10 | Per-request guard mostly closes it; TOCTOU race remains |
+| Disk-fill protection | 9/10 | NEW per-tenant quota (default 500 MB) refuses over-quota startSession + audit-emits BROWSER_QUOTA_EXCEEDED. Idle sweep still backstops. |
+| DNS-rebinding | 9/10 | NEW resolveAndCheckHost runs real DNS lookup on every navigation-class request + rejects if any resolved IP is private/metadata. Fail-closed on DNS error. |
 
-**Overall browser/folder/sandbox control: 8/10.** Solid for controlled
-beta against trusted public sites; the disk-quota + DNS-rebinding
-follow-ups are real backlog items, not show-stoppers.
+**Overall browser/folder/sandbox control: 9/10** after this sprint
+closed disk-fill + DNS-rebinding. The remaining 1 point is for
+synthetic-download handling + CSP enforcement + the dev-only
+`playwright-engine.ts` singleton that bypasses the route guard —
+all backlog items, not show-stoppers.

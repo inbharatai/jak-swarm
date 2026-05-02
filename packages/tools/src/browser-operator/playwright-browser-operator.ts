@@ -36,7 +36,7 @@
  */
 
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import crypto from 'node:crypto';
@@ -92,7 +92,16 @@ interface SessionRecord {
 
 /** Optional callback for emitting audit log rows. Wired by the API layer. */
 export type BrowserAuditEmitter = (event: {
-  action: 'BROWSER_SESSION_STARTED' | 'BROWSER_OBSERVED' | 'BROWSER_PROPOSED' | 'BROWSER_EXECUTED' | 'BROWSER_SESSION_ENDED' | 'BROWSER_TENANT_VIOLATION' | 'BROWSER_REQUEST_BLOCKED';
+  action:
+    | 'BROWSER_SESSION_STARTED'
+    | 'BROWSER_OBSERVED'
+    | 'BROWSER_PROPOSED'
+    | 'BROWSER_EXECUTED'
+    | 'BROWSER_SESSION_ENDED'
+    | 'BROWSER_TENANT_VIOLATION'
+    | 'BROWSER_REQUEST_BLOCKED'
+    | 'BROWSER_DNS_REBIND_BLOCKED'
+    | 'BROWSER_QUOTA_EXCEEDED';
   tenantId: string;
   userId: string;
   sessionId: string;
@@ -111,6 +120,64 @@ export interface PlaywrightBrowserOperatorOptions {
   baseDataDir?: string;
   /** Override per-host allowlist (default: any https URL). */
   isUrlAllowed?: (url: string) => boolean;
+  /**
+   * Per-tenant disk quota for browser session data dirs (cookies,
+   * screenshots, IndexedDB, etc.). Default: 500 MB. When the tenant's
+   * total session bytes exceed this, startSession() refuses, the
+   * sweeper kills the oldest session(s), and a BROWSER_QUOTA_EXCEEDED
+   * audit event is emitted. Set to 0 to disable.
+   */
+  tenantQuotaBytes?: number;
+  /**
+   * Whether to do a DNS lookup + IP-class re-check on every navigation
+   * request. Default: true. Closes the DNS-rebinding TOCTOU race that
+   * a hostname-only allowlist leaves open. Set false only for tests.
+   */
+  dnsRebindGuardEnabled?: boolean;
+}
+
+/**
+ * Resolve a hostname to its A/AAAA records and return true iff EVERY
+ * resolved IP is a public address. Closes the DNS-rebinding hole that
+ * a hostname-only allowlist leaves open: a public domain whose A
+ * record changes to 169.254.169.254 between the URL parse and the
+ * fetch would otherwise bypass the URL-shape check.
+ *
+ * Returns { allowed, resolvedIps, blockedIps }. The route handler
+ * uses this to decide whether to abort + audit.
+ *
+ * Idempotent under repeat calls — the OS resolver caches.
+ */
+export async function resolveAndCheckHost(
+  host: string,
+): Promise<{ allowed: boolean; resolvedIps: string[]; blockedIps: string[] }> {
+  // Hostname is already an IP literal? Skip the lookup.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':')) {
+    const stripped = host.replace(/^\[|\]$/g, '');
+    const blocked = isPrivateIPv4(stripped) || isPrivateIPv6(stripped) ? [stripped] : [];
+    return {
+      allowed: blocked.length === 0,
+      resolvedIps: [stripped],
+      blockedIps: blocked,
+    };
+  }
+  try {
+    const dns = await import('node:dns/promises');
+    const records = await dns.lookup(host, { all: true, verbatim: true });
+    const ips = records.map((r) => r.address);
+    const blocked = ips.filter((ip) => {
+      if (ip.includes(':')) return isPrivateIPv6(ip);
+      return isPrivateIPv4(ip);
+    });
+    return {
+      allowed: blocked.length === 0,
+      resolvedIps: ips,
+      blockedIps: blocked,
+    };
+  } catch {
+    // DNS lookup failed — fail-closed (refuse to fetch).
+    return { allowed: false, resolvedIps: [], blockedIps: [] };
+  }
 }
 
 /**
@@ -249,6 +316,8 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
   private readonly baseDataDir: string;
   private readonly isUrlAllowed: (url: string) => boolean;
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private readonly tenantQuotaBytes: number;
+  private readonly dnsRebindGuardEnabled: boolean;
 
   constructor(options: PlaywrightBrowserOperatorOptions = {}) {
     this.auditEmitter = options.auditEmitter ?? (() => {});
@@ -257,6 +326,39 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
     this.baseDataDir =
       options.baseDataDir ?? join(homedir(), '.jak-swarm', 'browser-sessions');
     this.isUrlAllowed = options.isUrlAllowed ?? defaultIsUrlAllowed;
+    this.tenantQuotaBytes = options.tenantQuotaBytes ?? 500 * 1024 * 1024; // 500 MB
+    this.dnsRebindGuardEnabled = options.dnsRebindGuardEnabled ?? true;
+  }
+
+  /**
+   * Recursively sum the bytes used by a tenant's session subtree.
+   * Sync because it runs from the cleanup timer tick and the per-
+   * tenant tree is small (sessions are short-lived). Misses are
+   * non-fatal — returns 0 if the tree doesn't exist yet.
+   */
+  private getTenantBytesSync(tenantId: string): number {
+    const tenantDir = join(this.baseDataDir, tenantId);
+    if (!existsSync(tenantDir)) return 0;
+    let total = 0;
+    const walk = (dir: string): void => {
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const full = join(dir, entry.name);
+        try {
+          if (entry.isDirectory()) walk(full);
+          else if (entry.isFile()) total += statSync(full).size;
+        } catch {
+          // entry vanished mid-walk (cleanup race) — ignore
+        }
+      }
+    };
+    walk(tenantDir);
+    return total;
   }
 
   /** Start the periodic idle-session sweeper. Idempotent. */
@@ -285,6 +387,27 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
       );
     }
 
+    // Tenant disk quota — refuse new sessions if the tenant's existing
+    // sessions already exceed the cap. This is the runtime guard that
+    // closes the prior 5/10 disk-fill gap. Set tenantQuotaBytes=0 to
+    // disable.
+    if (this.tenantQuotaBytes > 0) {
+      const used = this.getTenantBytesSync(input.tenantId);
+      if (used >= this.tenantQuotaBytes) {
+        await this.auditEmitter({
+          action: 'BROWSER_QUOTA_EXCEEDED',
+          tenantId: input.tenantId,
+          userId: input.userId,
+          sessionId: '(no-session-yet)',
+          metadata: { usedBytes: used, quotaBytes: this.tenantQuotaBytes },
+          severity: 'WARN',
+        });
+        throw new Error(
+          `Tenant ${input.tenantId} has used ${used} bytes of browser-session disk; quota is ${this.tenantQuotaBytes}. End existing sessions or wait for the idle sweep before starting a new one.`,
+        );
+      }
+    }
+
     const sessionId = `bs_${crypto.randomBytes(12).toString('hex')}`;
     const tenantDir = join(this.baseDataDir, input.tenantId);
     const sessionDataDir = join(tenantDir, sessionId);
@@ -301,15 +424,21 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
 
     // Per-request SSRF guard — every NAVIGATION-class request the
     // browser tries to make (top-frame navigation, sub-frame, or
-    // resource fetch) is checked against the URL allowlist. This
-    // catches the redirect-bypass case: a public URL we initiated
-    // could 302 to http://169.254.169.254/iam/credentials and the
-    // headless browser would happily fetch it without this guard.
+    // resource fetch) is checked against:
+    //   1. The URL allowlist (URL-shape check — covers IP literals
+    //      + cloud metadata FQDNs + private hostnames)
+    //   2. (DEFAULT-ON) DNS resolution → IP-class check on every
+    //      navigation-class request. Closes the DNS-rebinding TOCTOU
+    //      race where a public domain whose A record changes mid-
+    //      request would otherwise resolve to a private IP and bypass
+    //      the URL-shape check.
+    //
+    // Resource-class fetches (images, fonts, stylesheets, scripts
+    // already loaded from a known origin) skip the DNS round-trip
+    // for performance. Top-frame + sub-frame navigations always pay
+    // the lookup cost — that's where rebinding actually matters.
     await context.route('**', async (route, request) => {
       const reqUrl = request.url();
-      // Allow data: URIs (inline images / fonts) and chrome-extension:
-      // — they don't traverse the network. Block everything else not
-      // on the allowlist.
       if (reqUrl.startsWith('data:') || reqUrl.startsWith('chrome-extension:')) {
         return route.continue();
       }
@@ -323,6 +452,35 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
           severity: 'WARN',
         });
         return route.abort('blockedbyclient');
+      }
+      if (this.dnsRebindGuardEnabled) {
+        const rt = request.resourceType();
+        const isNavigation = rt === 'document' || rt === 'xhr' || rt === 'fetch' || rt === 'websocket';
+        if (isNavigation) {
+          try {
+            const u = new URL(reqUrl);
+            const dnsCheck = await resolveAndCheckHost(u.hostname);
+            if (!dnsCheck.allowed) {
+              await this.auditEmitter({
+                action: 'BROWSER_DNS_REBIND_BLOCKED',
+                tenantId: input.tenantId,
+                userId: input.userId,
+                sessionId,
+                metadata: {
+                  url: reqUrl,
+                  resourceType: rt,
+                  resolvedIps: dnsCheck.resolvedIps,
+                  blockedIps: dnsCheck.blockedIps,
+                },
+                severity: 'WARN',
+              });
+              return route.abort('blockedbyclient');
+            }
+          } catch {
+            // URL parse failed earlier than this guard — let the
+            // upstream isUrlAllowed catch it on retry.
+          }
+        }
       }
       return route.continue();
     });

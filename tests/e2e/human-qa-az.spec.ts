@@ -14,8 +14,16 @@
 
 import { test, expect, chromium } from '@playwright/test';
 import { HumanQATesterAgent, newQAContext, type QATargetSpec } from '../human-qa/HumanQATesterAgent.js';
+import { assertLocalOnlyOrThrow } from '../human-qa/assert-local-only.js';
 
 test.describe.configure({ mode: 'serial' });
+
+// Hard guard — refuse to run if any env var points at a production-shaped
+// host (Supabase, Render, Vercel, Upstash, Fly, AWS, etc.). The HumanQA
+// flow fills forms + clicks buttons + creates real workflow rows; that
+// must NEVER hit a customer DB by accident. Throws with the exact env
+// var + host so the user can fix the config.
+test.beforeAll(() => assertLocalOnlyOrThrow());
 
 test('Human QA — A-Z product audit (deep)', async () => {
   test.setTimeout(900_000);

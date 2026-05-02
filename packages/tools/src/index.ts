@@ -45,6 +45,7 @@ export type {
 export {
   PlaywrightBrowserOperator,
   defaultIsUrlAllowed,
+  resolveAndCheckHost,
 } from './browser-operator/playwright-browser-operator.js';
 export type {
   BrowserAuditEmitter,
