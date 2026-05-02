@@ -92,7 +92,7 @@ interface SessionRecord {
 
 /** Optional callback for emitting audit log rows. Wired by the API layer. */
 export type BrowserAuditEmitter = (event: {
-  action: 'BROWSER_SESSION_STARTED' | 'BROWSER_OBSERVED' | 'BROWSER_PROPOSED' | 'BROWSER_EXECUTED' | 'BROWSER_SESSION_ENDED' | 'BROWSER_TENANT_VIOLATION';
+  action: 'BROWSER_SESSION_STARTED' | 'BROWSER_OBSERVED' | 'BROWSER_PROPOSED' | 'BROWSER_EXECUTED' | 'BROWSER_SESSION_ENDED' | 'BROWSER_TENANT_VIOLATION' | 'BROWSER_REQUEST_BLOCKED';
   tenantId: string;
   userId: string;
   sessionId: string;
@@ -113,16 +113,72 @@ export interface PlaywrightBrowserOperatorOptions {
   isUrlAllowed?: (url: string) => boolean;
 }
 
-/** Validate a URL is well-formed and uses http(s). */
-function defaultIsUrlAllowed(url: string): boolean {
+/**
+ * Validate a URL for use by the server-side Playwright browser.
+ *
+ * Blocks the full SSRF (Server-Side Request Forgery) class so a public
+ * URL we open can't pivot the headless Chromium into:
+ *   - Cloud metadata services (AWS / GCP / Azure / Oracle / Alibaba)
+ *   - Loopback / unspecified addresses
+ *   - RFC1918 private ranges
+ *   - Link-local IPv4 (169.254.x.x — covers AWS metadata)
+ *   - Carrier-grade NAT (100.64.0.0/10)
+ *   - IPv6 loopback / link-local / unique-local
+ *   - Non-http(s) protocols
+ *
+ * Adapters may opt-in to less restrictive policies via the
+ * `isUrlAllowed` constructor option, but the default refuses every
+ * one of the above.
+ */
+const CLOUD_METADATA_HOSTS = new Set<string>([
+  '169.254.169.254',          // AWS / Oracle
+  'fd00:ec2::254',            // AWS IPv6 metadata
+  'metadata.google.internal', // GCP
+  'metadata.goog',            // GCP newer
+  'metadata.azure.com',       // Azure
+  '100.100.100.200',          // Alibaba
+]);
+
+function isPrivateIPv4(host: string): boolean {
+  // Loopback + RFC1918 + link-local + unspecified + carrier-grade NAT.
+  if (/^127\./.test(host)) return true;
+  if (host === '0.0.0.0') return true;
+  if (/^10\./.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+  if (/^192\.168\./.test(host)) return true;
+  if (/^169\.254\./.test(host)) return true;          // AWS / link-local
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return true; // 100.64/10
+  if (/^198\.1[89]\./.test(host)) return true;        // 198.18/15 benchmark
+  if (/^192\.0\.2\.|^198\.51\.100\.|^203\.0\.113\./.test(host)) return true; // TEST-NET
+  return false;
+}
+
+function isPrivateIPv6(host: string): boolean {
+  // Strip brackets if URL.hostname returned them.
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  if (h === '::' || h === '::1') return true;
+  if (h.startsWith('fe80:')) return true;             // link-local
+  if (h.startsWith('fc') || h.startsWith('fd')) return true; // unique-local
+  if (h.startsWith('fec0:') || h.startsWith('fed0:') || h.startsWith('fee0:') || h.startsWith('fef0:')) return true; // site-local (deprecated but blocked)
+  if (h === 'fd00:ec2::254') return true;             // AWS IPv6 metadata
+  return false;
+}
+
+export function defaultIsUrlAllowed(url: string): boolean {
   try {
     const u = new URL(url);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
-    // Block localhost / RFC1918 — adapters may opt in by overriding.
     const host = u.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return false;
-    if (/^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^192\.168\./.test(host)) {
-      return false;
+    if (!host) return false;
+    if (host === 'localhost' || host.endsWith('.localhost')) return false;
+    if (CLOUD_METADATA_HOSTS.has(host)) return false;
+    // Heuristic for AWS metadata FQDNs that some IAM roles resolve.
+    if (host.endsWith('.internal') || host.endsWith('.local')) return false;
+    if (host.includes(':')) {
+      // IPv6 (URL.hostname returns ::1 etc. without brackets in modern Node).
+      if (isPrivateIPv6(host)) return false;
+    } else if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      if (isPrivateIPv4(host)) return false;
     }
     return true;
   } catch {
@@ -242,6 +298,34 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
       acceptDownloads: false,
     });
     context.setDefaultTimeout(DEFAULT_TIMEOUT);
+
+    // Per-request SSRF guard — every NAVIGATION-class request the
+    // browser tries to make (top-frame navigation, sub-frame, or
+    // resource fetch) is checked against the URL allowlist. This
+    // catches the redirect-bypass case: a public URL we initiated
+    // could 302 to http://169.254.169.254/iam/credentials and the
+    // headless browser would happily fetch it without this guard.
+    await context.route('**', async (route, request) => {
+      const reqUrl = request.url();
+      // Allow data: URIs (inline images / fonts) and chrome-extension:
+      // — they don't traverse the network. Block everything else not
+      // on the allowlist.
+      if (reqUrl.startsWith('data:') || reqUrl.startsWith('chrome-extension:')) {
+        return route.continue();
+      }
+      if (!this.isUrlAllowed(reqUrl)) {
+        await this.auditEmitter({
+          action: 'BROWSER_REQUEST_BLOCKED',
+          tenantId: input.tenantId,
+          userId: input.userId,
+          sessionId,
+          metadata: { url: reqUrl, resourceType: request.resourceType() },
+          severity: 'WARN',
+        });
+        return route.abort('blockedbyclient');
+      }
+      return route.continue();
+    });
 
     const page = context.pages()[0] ?? (await context.newPage());
     page.setDefaultTimeout(DEFAULT_TIMEOUT);

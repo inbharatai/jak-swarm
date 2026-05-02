@@ -42,7 +42,10 @@ export type {
 
 // Browser-operator runtime (real Playwright-backed per-tenant sessions).
 // Replaces the prior crash-loud `NotImplementedBrowserOperator` stub.
-export { PlaywrightBrowserOperator } from './browser-operator/playwright-browser-operator.js';
+export {
+  PlaywrightBrowserOperator,
+  defaultIsUrlAllowed,
+} from './browser-operator/playwright-browser-operator.js';
 export type {
   BrowserAuditEmitter,
   PlaywrightBrowserOperatorOptions,
