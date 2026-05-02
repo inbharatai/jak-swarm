@@ -21,7 +21,14 @@
 import type { Browser, BrowserContext } from '@playwright/test';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { HumanQATester, type Finding, type FindingStatus, type Severity } from './HumanQATester.js';
+import {
+  HumanQATester,
+  type Finding,
+  type FindingStatus,
+  type Severity,
+  type CoverageRecord,
+  type TestCategory,
+} from './HumanQATester.js';
 
 export interface QATargetSpec {
   name: string;
@@ -74,66 +81,100 @@ export interface QASessionReport {
 }
 
 /**
- * 1-10 page score derived from the finding mix. Designed to be honest:
- * one CRITICAL or one not-implemented caps the score at 5, regardless
- * of how many "INFO working" entries exist. A buyer cares about the
- * worst thing, not the average.
+ * 1-10 page score with HARD coverage caps so a shallow test cannot
+ * earn a high score.
  *
- *   10 — clean: 0 CRITICAL/HIGH/MEDIUM, no not-implemented, no
- *        present-but-not-wired, ≥ 1 INFO/working observation
- *   9  — 1 MEDIUM permitted, otherwise clean
- *   8  — 2 MEDIUM permitted OR 1 LOW, otherwise clean
- *   7  — 1 HIGH (not present-but-not-wired or not-implemented)
- *   6  — 2 HIGH OR 1 present-but-not-wired
- *   5  — 1 not-implemented OR 3+ HIGH OR 2+ present-but-not-wired
- *   4  — 1 CRITICAL
- *   3  — 1 CRITICAL + 1 not-implemented
- *   2  — multiple CRITICAL
- *   1  — page didn't render at all
+ * The 12 categories an expert human reviewer covers:
+ *   render-health · console-network-health · responsive ·
+ *   primary-interaction · form-validation · loading-state ·
+ *   error-state · empty-state · backend-wiring · product-truth ·
+ *   visual-quality · evidence-screenshots
+ *
+ * Cap-by-depth (the central honesty rule):
+ *   - <  3 categories tested → CAP at 6 (page renders, mostly unproven)
+ *   - <  6 categories tested → CAP at 7 (structurally OK, depth missing)
+ *   - <  9 categories tested → CAP at 8 (one full flow but not edge states)
+ *   - >= 9 categories tested → uncapped (can earn 9 or 10)
+ *
+ * Inside that cap, findings still penalise:
+ *   1 CRITICAL    → max 4
+ *   1 not-implemented → max 5
+ *   1 present-but-not-wired → max 6
+ *   3+ HIGH       → max 5
+ *   2 HIGH        → max 6
+ *   1 HIGH        → max 7
+ *   3+ MEDIUM     → max 7
+ *   2 MEDIUM      → max 8
+ *   1 MEDIUM      → max 9
+ *
+ * Final score = MIN(coverage cap, severity cap, coverage-pass cap).
+ * Coverage-pass cap reflects "did the categories you tested PASS":
+ *   covered-passing/covered ratio < 0.5 → max 5
+ *   < 0.7 → max 6
+ *   < 0.9 → max 7
+ *   < 1.0 → max 8
  */
 export function scorePage(opts: {
   severity: Record<Severity, number>;
   status: Record<FindingStatus, number>;
   totalFindings: number;
   screenshotsCount: number;
+  coverage?: CoverageRecord[];
 }): { score: number; reason: string } {
   const s = opts.severity;
   const st = opts.status;
-  // 0 findings + ≥ 1 screenshot = the explicit checks ran AND found
-  // nothing wrong. That's the strongest possible result for this
-  // framework (a finding is only recorded when something fails).
-  if (opts.totalFindings === 0 && opts.screenshotsCount > 0) {
-    return { score: 10, reason: 'all explicit checks passed; no issues recorded' };
+  const coverage = opts.coverage ?? [];
+  const coveredCount = coverage.length;
+  const passingCount = coverage.filter((c) => c.passed).length;
+  const failedCategories = coverage
+    .filter((c) => !c.passed)
+    .map((c) => c.category as TestCategory);
+
+  // Page never rendered.
+  if (opts.totalFindings === 0 && opts.screenshotsCount === 0 && coveredCount === 0) {
+    return { score: 1, reason: 'page never rendered; no screenshots captured' };
   }
-  if (opts.totalFindings === 0 && opts.screenshotsCount === 0) {
-    return { score: 5, reason: 'page never rendered; no screenshots captured' };
-  }
-  if (s.CRITICAL >= 2) return { score: 2, reason: `${s.CRITICAL} CRITICAL findings — page broken` };
-  if (s.CRITICAL >= 1 && st['not-implemented'] >= 1) {
-    return { score: 3, reason: `1 CRITICAL + ${st['not-implemented']} not-implemented` };
-  }
-  if (s.CRITICAL >= 1) return { score: 4, reason: '1 CRITICAL finding' };
-  if (st['not-implemented'] >= 1 || s.HIGH >= 3 || st['present-but-not-wired'] >= 2) {
-    return {
-      score: 5,
-      reason: [
-        st['not-implemented'] >= 1 ? `${st['not-implemented']} not-implemented` : '',
-        s.HIGH >= 3 ? `${s.HIGH} HIGH` : '',
-        st['present-but-not-wired'] >= 2 ? `${st['present-but-not-wired']} present-but-not-wired` : '',
-      ].filter(Boolean).join(', '),
-    };
-  }
-  if (s.HIGH >= 2 || st['present-but-not-wired'] >= 1) {
-    return {
-      score: 6,
-      reason: s.HIGH >= 2 ? `${s.HIGH} HIGH` : '1 present-but-not-wired',
-    };
-  }
-  if (s.HIGH >= 1) return { score: 7, reason: '1 HIGH finding' };
-  if (s.MEDIUM >= 3) return { score: 7, reason: `${s.MEDIUM} MEDIUM (polish backlog)` };
-  if (s.MEDIUM >= 2 || s.LOW >= 1) return { score: 8, reason: `${s.MEDIUM} MEDIUM, ${s.LOW} LOW` };
-  if (s.MEDIUM >= 1) return { score: 9, reason: '1 MEDIUM (minor polish)' };
-  return { score: 10, reason: 'no severity-bearing findings; INFO/working observations only' };
+
+  // Severity-based hard caps (one bad finding limits the ceiling).
+  const sevCap =
+    s.CRITICAL >= 2 ? 2
+    : s.CRITICAL >= 1 && st['not-implemented'] >= 1 ? 3
+    : s.CRITICAL >= 1 ? 4
+    : st['not-implemented'] >= 1 ? 5
+    : s.HIGH >= 3 ? 5
+    : st['present-but-not-wired'] >= 1 ? 6
+    : s.HIGH >= 2 ? 6
+    : s.HIGH >= 1 ? 7
+    : s.MEDIUM >= 3 ? 7
+    : s.MEDIUM >= 2 ? 8
+    : s.MEDIUM >= 1 ? 9
+    : 10;
+
+  // Coverage-depth cap (shallow tests cannot earn high scores).
+  const depthCap =
+    coveredCount < 3 ? 6
+    : coveredCount < 6 ? 7
+    : coveredCount < 9 ? 8
+    : 10;
+
+  // Coverage-pass cap (categories you tested must mostly pass).
+  const passRatio = coveredCount === 0 ? 1 : passingCount / coveredCount;
+  const passCap =
+    passRatio < 0.5 ? 5
+    : passRatio < 0.7 ? 6
+    : passRatio < 0.9 ? 7
+    : passRatio < 1.0 ? 8
+    : 10;
+
+  const score = Math.min(sevCap, depthCap, passCap);
+  const reasons: string[] = [];
+  reasons.push(`${coveredCount}/12 categories tested (${passingCount} passing)`);
+  if (sevCap < 10) reasons.push(`severity cap ${sevCap}`);
+  if (depthCap < 10) reasons.push(`depth cap ${depthCap}`);
+  if (passCap < 10) reasons.push(`pass cap ${passCap}`);
+  if (failedCategories.length > 0) reasons.push(`failed: ${failedCategories.join(', ')}`);
+
+  return { score, reason: reasons.join(' · ') };
 }
 
 export class HumanQATesterAgent {
@@ -197,6 +238,7 @@ export class HumanQATesterAgent {
         status: data.statusCounts,
         totalFindings: data.findings.length,
         screenshotsCount: data.screenshotsCount,
+        coverage: data.coverage ?? [],
       });
       perPage.push({
         name: target.name,

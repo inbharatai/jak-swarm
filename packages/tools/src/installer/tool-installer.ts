@@ -124,6 +124,18 @@ const CAPABILITY_KEYWORDS: Array<{ pattern: RegExp; toolName: string; capability
   { pattern: /\b(post|publish).*(linkedin|li)\b/i, toolName: 'linkedin_publish_post', capability: 'publish a LinkedIn post' },
   { pattern: /\b(post|publish).*(instagram|ig)\b/i, toolName: 'instagram_publish_post', capability: 'publish an Instagram post' },
   { pattern: /\b(open|create).*(github|pr|pull request)\b/i, toolName: 'github_open_pr', capability: 'open a GitHub PR' },
+  // Local Sprint 4 — broaden the heuristic so the QA buyer-walk
+  // ("I need a PDF parser to extract text") and other common asks
+  // surface a real capability + safety disclosure instead of an empty
+  // "No capability detected" result.
+  { pattern: /\b(pdf|extract).*(parse|extract|read|text)\b|\bpdf parser\b/i, toolName: 'check_pdf_parser', capability: 'parse PDF documents' },
+  { pattern: /\b(spreadsheet|csv|excel|xlsx)\b/i, toolName: 'parse_spreadsheet', capability: 'parse a spreadsheet' },
+  { pattern: /\b(scrape|fetch|crawl).*(web|url|page|site)\b|\bweb (scraper|crawler)\b/i, toolName: 'web_fetch', capability: 'fetch a web page' },
+  { pattern: /\b(search|find).*(web|google|internet)\b|\bweb search\b/i, toolName: 'web_search', capability: 'search the web' },
+  { pattern: /\b(image|photo).*(generate|create|make)\b|\bgenerate (an? )?image\b/i, toolName: 'generate_image', capability: 'generate an image' },
+  { pattern: /\b(read|fetch|get).*(notion|page)\b/i, toolName: 'notion_read_page', capability: 'read a Notion page' },
+  { pattern: /\b(transcribe|speech).*(audio|voice|recording)\b/i, toolName: 'transcribe_audio', capability: 'transcribe audio' },
+  { pattern: /\b(translate)\b/i, toolName: 'translate_text', capability: 'translate text' },
 ];
 
 export class ToolRequirementDetector {

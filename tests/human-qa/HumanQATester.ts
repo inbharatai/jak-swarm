@@ -62,6 +62,34 @@ export type FindingStatus =
   | 'not-implemented'         // claimed in landing/copy but absent from product
   | 'observation';            // an evidence-only note (severity INFO)
 
+/**
+ * The 12 categories an expert human QA reviewer covers per page.
+ * A page that didn't test a category cannot earn credit for it; the
+ * scorer caps the page's possible score by the number of categories
+ * actually exercised. This eliminates the "10/10 from a shallow
+ * heading check" anti-pattern.
+ */
+export type TestCategory =
+  | 'render-health'
+  | 'console-network-health'
+  | 'responsive'
+  | 'primary-interaction'
+  | 'form-validation'
+  | 'loading-state'
+  | 'error-state'
+  | 'empty-state'
+  | 'backend-wiring'
+  | 'product-truth'
+  | 'visual-quality'
+  | 'evidence-screenshots';
+
+/** Coverage record: which categories were exercised + did they pass. */
+export interface CoverageRecord {
+  category: TestCategory;
+  passed: boolean;
+  detail?: string;
+}
+
 export interface Finding {
   page: string;
   section?: string;
@@ -92,6 +120,17 @@ export class HumanQATester {
   private currentSection = '(unset)';
   private screenshotIndex = 0;
   private opts: Required<HumanQAOptions>;
+  /** Coverage map: which 12 categories the test author actually exercised. */
+  private coverage = new Map<TestCategory, CoverageRecord>();
+
+  /** Mark a test category as exercised. Pass true if it succeeded. */
+  recordCoverage(category: TestCategory, passed: boolean, detail?: string): void {
+    this.coverage.set(category, { category, passed, detail });
+  }
+
+  getCoverage(): CoverageRecord[] {
+    return Array.from(this.coverage.values());
+  }
 
   constructor(
     private readonly page: Page,
@@ -165,6 +204,7 @@ export class HumanQATester {
       await this.pace();
 
       const text = (await el.innerText().catch(() => '')) || '';
+      this.recordCoverage('render-health', true, `${opts.selector} renders ${text.length} chars`);
       if (opts.expectedText && !opts.expectedText.test(text)) {
         this.add({
           section: name,
@@ -192,6 +232,7 @@ export class HumanQATester {
       }
     }
     await this.screenshot(`${name}`);
+    this.recordCoverage('evidence-screenshots', true, `${name} captured`);
   }
 
   /**
@@ -271,6 +312,7 @@ export class HumanQATester {
 
     await this.pace(this.opts.paceMs * 4);
     await this.screenshot(`${this.currentSection}-after-click`);
+    this.recordCoverage('primary-interaction', true, `clicked ${locatorOrName}`);
     const afterUrl = this.page.url();
 
     if (opts.expectNav && !opts.expectNav.test(afterUrl)) {
@@ -388,6 +430,7 @@ export class HumanQATester {
   // ─── Health (Step 3) ──────────────────────────────────────────────────
 
   async checkHealth(): Promise<void> {
+    const startingFindings = this.findings.length;
     if (this.consoleErrors.length > 0) {
       const seen = new Set<string>();
       let recorded = 0;
@@ -428,6 +471,8 @@ export class HumanQATester {
         });
       }
     }
+    const introducedFindings = this.findings.length - startingFindings;
+    this.recordCoverage('console-network-health', introducedFindings === 0, `${introducedFindings} new finding(s)`);
   }
 
   // ─── Responsive (Step 4) ─────────────────────────────────────────────
@@ -459,6 +504,240 @@ export class HumanQATester {
       await this.screenshot(`responsive-${v.label}`);
     }
     await this.page.setViewportSize({ width: 1280, height: 800 });
+    this.recordCoverage('responsive', true, '375 / 768 / 1280 viewports checked');
+  }
+
+  // ─── Form validation + state primitives (deep-test layer) ──────────
+
+  /**
+   * Submit a form and assert it surfaces a visible error message.
+   * Records form-validation coverage. Use after `fillSlowly` with
+   * intentionally invalid input.
+   */
+  async expectValidationError(opts: {
+    submitSelector: string;
+    /** Regex matching the error copy expected somewhere visible. */
+    expectErrorRegex: RegExp;
+    /** What scenario you're testing — "empty form" / "invalid email" / etc. */
+    scenario: string;
+  }): Promise<void> {
+    await this.hoverThenClick(opts.submitSelector);
+    await this.pace(800);
+    const bodyText = (await this.page.locator('body').innerText().catch(() => '')) || '';
+    const matched = opts.expectErrorRegex.test(bodyText);
+    if (!matched) {
+      this.add({
+        section: this.currentSection,
+        expected: `validation error "${opts.expectErrorRegex}" after submitting ${opts.scenario}`,
+        actual: 'no visible error message after submit',
+        severity: 'HIGH',
+        category: 'functionality',
+        status: 'present-but-not-wired',
+        suggestedFix: 'Surface validation feedback so the user knows what went wrong',
+      });
+      this.recordCoverage('form-validation', false, `${opts.scenario}: no error surfaced`);
+    } else {
+      this.recordCoverage('form-validation', true, `${opts.scenario}: error visible`);
+    }
+  }
+
+  /**
+   * Verify the page surfaces a loading state (spinner, "Loading…",
+   * disabled button, animate-spin element) while an action is in flight.
+   *
+   * Uses Promise.race so the indicator check observes the FIRST
+   * mid-flight render instead of waiting for the action to complete
+   * (which on local dev was finishing in <50ms — faster than the
+   * polling could observe the disabled state).
+   *
+   * Also accepts a generic spinner selector (`.animate-spin`,
+   * `[role="progressbar"]`, `svg[aria-busy="true"]`) since most
+   * modern UIs use icon spinners without text.
+   */
+  async expectLoadingState(opts: {
+    triggerAction: () => Promise<void>;
+    loadingIndicatorRegex?: RegExp;
+    disabledButtonSelector?: string;
+    /** Extra selectors to consider as "loading visible". */
+    loadingSelectors?: string[];
+  }): Promise<void> {
+    const selectors: string[] = [];
+    if (opts.disabledButtonSelector) selectors.push(`${opts.disabledButtonSelector}[disabled]`);
+    selectors.push('.animate-spin');
+    selectors.push('[role="progressbar"]');
+    selectors.push('svg[aria-busy="true"]');
+    if (opts.loadingSelectors) selectors.push(...opts.loadingSelectors);
+
+    let observed = false;
+    const triggerP = opts.triggerAction();
+
+    // Race a tight polling loop against the trigger completion. We poll
+    // every 25ms for up to 4s OR until the trigger resolves OR until we
+    // see any loading signal. This catches sub-100ms flashes that the
+    // previous "wait 50ms then check" approach missed.
+    const observerP = (async () => {
+      const start = Date.now();
+      while (Date.now() - start < 4000 && !observed) {
+        for (const sel of selectors) {
+          try {
+            if (await this.page.locator(sel).first().isVisible({ timeout: 25 })) {
+              observed = true;
+              return;
+            }
+          } catch {
+            // selector not present — continue
+          }
+        }
+        if (opts.loadingIndicatorRegex) {
+          const bodyText = (await this.page.locator('body').innerText().catch(() => '')) || '';
+          if (opts.loadingIndicatorRegex.test(bodyText)) {
+            observed = true;
+            return;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    })();
+
+    await Promise.race([triggerP, observerP]);
+    // Make sure both finish before we report (so the action settles
+    // for downstream assertions).
+    await triggerP;
+    await observerP.catch(() => {});
+
+    if (observed) {
+      this.recordCoverage('loading-state', true, 'loading indicator observed mid-flight');
+    } else {
+      this.add({
+        section: this.currentSection,
+        expected: 'loading state visible while action is in flight',
+        actual: 'no spinner / disabled button / aria-busy / "Loading" text observed across 4s window',
+        severity: 'MEDIUM',
+        category: 'UX',
+        status: 'partially-working',
+        suggestedFix: 'Show a spinner (e.g. animate-spin class), disable the submit button, or surface "Loading…" while the request is in flight',
+      });
+      this.recordCoverage('loading-state', false, 'no loading state observed');
+    }
+  }
+
+  /**
+   * Trigger an action that should fail and verify a useful error
+   * message reaches the user (not a stack trace, not silence).
+   */
+  async expectErrorState(opts: {
+    triggerAction: () => Promise<void>;
+    expectErrorRegex: RegExp;
+    scenario: string;
+  }): Promise<void> {
+    await opts.triggerAction();
+    await this.pace(1500);
+    const bodyText = (await this.page.locator('body').innerText().catch(() => '')) || '';
+    const matched = opts.expectErrorRegex.test(bodyText);
+    if (matched) {
+      this.recordCoverage('error-state', true, `${opts.scenario}: error message reached the user`);
+    } else {
+      this.add({
+        section: this.currentSection,
+        expected: `error message matching ${opts.expectErrorRegex} for ${opts.scenario}`,
+        actual: 'no user-facing error message',
+        severity: 'HIGH',
+        category: 'UX',
+        status: 'present-but-not-wired',
+        suggestedFix: 'Catch the error and surface a human-readable message — silent failures destroy trust',
+      });
+      this.recordCoverage('error-state', false, `${opts.scenario}: silent failure`);
+    }
+  }
+
+  /**
+   * Verify the page presents a useful empty state when there's no data
+   * (rather than a blank panel).
+   */
+  async expectEmptyState(opts: {
+    selector?: string;
+    expectCopyRegex: RegExp;
+  }): Promise<void> {
+    const target = opts.selector ? this.page.locator(opts.selector) : this.page.locator('main');
+    const text = (await target.innerText().catch(() => '')) || '';
+    if (opts.expectCopyRegex.test(text)) {
+      this.recordCoverage('empty-state', true, 'empty-state copy visible');
+    } else {
+      this.add({
+        section: this.currentSection,
+        expected: `empty-state copy matching ${opts.expectCopyRegex}`,
+        actual: text.slice(0, 200) || '(empty section)',
+        severity: 'MEDIUM',
+        category: 'UX',
+        status: 'partially-working',
+        suggestedFix: 'When the list is empty, show guidance copy ("No workflows yet — try…") instead of a blank panel',
+      });
+      this.recordCoverage('empty-state', false, 'no empty-state copy');
+    }
+  }
+
+  /**
+   * Confirm a backend API call was made + returned 2xx as part of an
+   * action. Use this to differentiate "button works visually" from
+   * "button actually does the thing it claims".
+   */
+  async expectBackendWiring(opts: {
+    triggerAction: () => Promise<void>;
+    urlMatch: RegExp;
+    methodMatch?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    label: string;
+  }): Promise<void> {
+    const result = await this.observeNetworkAfter(opts.triggerAction, {
+      urlMatch: opts.urlMatch,
+      methodMatch: opts.methodMatch,
+      expectedStatusOk: true,
+    });
+    if (result.status && result.status < 400) {
+      this.recordCoverage('backend-wiring', true, `${opts.label}: HTTP ${result.status}`);
+    } else {
+      this.recordCoverage('backend-wiring', false, `${opts.label}: ${result.status ? `HTTP ${result.status}` : 'no request observed'}`);
+    }
+  }
+
+  /**
+   * Mark visual quality coverage. The framework can only check
+   * mechanical properties (descender clipping, overflow, contrast
+   * heuristics). Real aesthetic judgement is human-only.
+   */
+  async checkVisualQualityHeuristics(): Promise<void> {
+    // Re-runs descender clipping across every h1/h2/h3 on the page
+    // (not just inside one section).
+    const issues = await this.page.locator(':is(h1,h2,h3)').evaluateAll((nodes) =>
+      nodes
+        .map((n) => {
+          const el = n as HTMLElement;
+          const cs = getComputedStyle(el);
+          const lh = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize);
+          return {
+            text: (el.textContent ?? '').slice(0, 40),
+            fontSize: parseFloat(cs.fontSize),
+            lineHeightRatio: lh,
+            overflow: cs.overflow,
+          };
+        })
+        .filter((h) => h.fontSize >= 24 && h.lineHeightRatio < 1.15 && h.overflow === 'hidden'),
+    );
+    if (issues.length === 0) {
+      this.recordCoverage('visual-quality', true, 'no descender-clipping risks across page headings');
+    } else {
+      for (const i of issues.slice(0, 3)) {
+        this.add({
+          section: 'visual-quality-page-wide',
+          expected: 'no descender-clipping risk on any heading',
+          actual: `"${i.text}" font-size ${i.fontSize}px line-height-ratio ${i.lineHeightRatio.toFixed(2)} overflow ${i.overflow}`,
+          severity: 'MEDIUM',
+          category: 'UI',
+          status: 'partially-working',
+          suggestedFix: 'Add overflow:visible + padding-bottom: 0.22em + line-height: 1.18 to gradient-clipped headlines',
+        });
+      }
+      this.recordCoverage('visual-quality', false, `${issues.length} descender-clipping risk(s)`);
+    }
   }
 
   // ─── Claim verification (Step 5) ─────────────────────────────────────
@@ -519,6 +798,7 @@ export class HumanQATester {
         suggestedFix: '(no action — claim verified)',
       });
     }
+    this.recordCoverage('product-truth', dash.ok, `claim "${opts.claim}" → ${dash.evidence}`);
   }
 
   // ─── Test like a buyer (Step 5 continued) ────────────────────────────
@@ -746,6 +1026,7 @@ export class HumanQATester {
           severityCounts: sevCounts,
           statusCounts,
           findings: this.findings,
+          coverage: this.getCoverage(),
         },
         null,
         2,

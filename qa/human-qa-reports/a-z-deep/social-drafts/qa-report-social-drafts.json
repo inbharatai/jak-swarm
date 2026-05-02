@@ -1,0 +1,89 @@
+{
+  "name": "social-drafts",
+  "generatedAt": "2026-05-01T15:05:09.344Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-deep\\social-drafts\\shots",
+  "screenshotsCount": 8,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 1,
+    "LOW": 0,
+    "INFO": 0
+  },
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 1,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": [
+    {
+      "page": "social-drafts",
+      "section": "social-drafts-initial",
+      "expected": "loading state visible after action triggers",
+      "actual": "no spinner / no \"Loading\" text / no disabled button observed",
+      "severity": "MEDIUM",
+      "category": "UX",
+      "status": "partially-working",
+      "suggestedFix": "Show a spinner, disable the submit button, or surface \"Loading…\" while the request is in flight"
+    }
+  ],
+  "coverage": [
+    {
+      "category": "render-health",
+      "passed": true,
+      "detail": "main renders 296 chars"
+    },
+    {
+      "category": "evidence-screenshots",
+      "passed": true,
+      "detail": "social-drafts-initial captured"
+    },
+    {
+      "category": "empty-state",
+      "passed": true,
+      "detail": "empty-state copy visible"
+    },
+    {
+      "category": "primary-interaction",
+      "passed": true,
+      "detail": "clicked [data-testid=\"social-draft-generate-btn\"]"
+    },
+    {
+      "category": "form-validation",
+      "passed": true,
+      "detail": "Generate disabled when topic is empty"
+    },
+    {
+      "category": "loading-state",
+      "passed": false,
+      "detail": "no loading state observed"
+    },
+    {
+      "category": "backend-wiring",
+      "passed": true,
+      "detail": "POST /social-drafts produced a visible result card"
+    },
+    {
+      "category": "product-truth",
+      "passed": true,
+      "detail": "manual-handoff disclosure visible: \"Manual publish required: Draft ready for LinkedIn. JAK never auto-publishes — co\""
+    },
+    {
+      "category": "visual-quality",
+      "passed": true,
+      "detail": "no descender-clipping risks across page headings"
+    },
+    {
+      "category": "responsive",
+      "passed": true,
+      "detail": "375 / 768 / 1280 viewports checked"
+    },
+    {
+      "category": "console-network-health",
+      "passed": true,
+      "detail": "0 new finding(s)"
+    }
+  ]
+}

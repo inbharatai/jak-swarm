@@ -1,0 +1,246 @@
+{
+  "sessionName": "a-z-deep",
+  "startedAt": "2026-05-01T15:04:19.743Z",
+  "completedAt": "2026-05-01T15:06:06.469Z",
+  "durationMs": 106726,
+  "pagesTested": [
+    "landing",
+    "register",
+    "login",
+    "social-drafts",
+    "tool-installer",
+    "workspace",
+    "standing-orders",
+    "audit",
+    "integrations",
+    "knowledge",
+    "skills",
+    "inbox",
+    "schedules",
+    "traces"
+  ],
+  "totalScreenshots": 55,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 1,
+    "MEDIUM": 2,
+    "LOW": 0,
+    "INFO": 6
+  },
+  "statusCounts": {
+    "working": 6,
+    "partially-working": 2,
+    "present-but-not-wired": 1,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "perPage": [
+    {
+      "name": "landing",
+      "url": "http://localhost:3000/",
+      "findings": [
+        {
+          "page": "landing",
+          "section": "trust-signals",
+          "expected": "pricing link visible",
+          "actual": "present",
+          "severity": "INFO",
+          "category": "trust",
+          "status": "working",
+          "suggestedFix": "(no action — trust signal present)"
+        },
+        {
+          "page": "landing",
+          "section": "trust-signals",
+          "expected": "GitHub link visible",
+          "actual": "present",
+          "severity": "INFO",
+          "category": "trust",
+          "status": "working",
+          "suggestedFix": "(no action — trust signal present)"
+        },
+        {
+          "page": "landing",
+          "section": "trust-signals",
+          "expected": "contact / email link visible",
+          "actual": "present",
+          "severity": "INFO",
+          "category": "trust",
+          "status": "working",
+          "suggestedFix": "(no action — trust signal present)"
+        },
+        {
+          "page": "landing",
+          "section": "trust-signals",
+          "expected": "security / privacy link visible",
+          "actual": "present",
+          "severity": "INFO",
+          "category": "trust",
+          "status": "working",
+          "suggestedFix": "(no action — trust signal present)"
+        },
+        {
+          "page": "landing",
+          "section": "trust-signals",
+          "expected": "audit / compliance link visible",
+          "actual": "present",
+          "severity": "INFO",
+          "category": "trust",
+          "status": "working",
+          "suggestedFix": "(no action — trust signal present)"
+        },
+        {
+          "page": "landing",
+          "section": "claim-vs-behaviour",
+          "expected": "122 classified tools",
+          "actual": "Backed by dashboard evidence: README badge / headline reads 122",
+          "severity": "INFO",
+          "category": "product-truth",
+          "status": "working",
+          "suggestedFix": "(no action — claim verified)"
+        }
+      ],
+      "screenshotsCount": 13,
+      "score": 8,
+      "scoreReason": "7/12 categories tested (7 passing) · depth cap 8"
+    },
+    {
+      "name": "register",
+      "url": "http://localhost:3000/register",
+      "findings": [],
+      "screenshotsCount": 8,
+      "score": 8,
+      "scoreReason": "7/12 categories tested (7 passing) · depth cap 8"
+    },
+    {
+      "name": "login",
+      "url": "http://localhost:3000/login",
+      "findings": [],
+      "screenshotsCount": 8,
+      "score": 8,
+      "scoreReason": "7/12 categories tested (7 passing) · depth cap 8"
+    },
+    {
+      "name": "social-drafts",
+      "url": "http://localhost:3000/social-drafts",
+      "findings": [
+        {
+          "page": "social-drafts",
+          "section": "social-drafts-initial",
+          "expected": "loading state visible after action triggers",
+          "actual": "no spinner / no \"Loading\" text / no disabled button observed",
+          "severity": "MEDIUM",
+          "category": "UX",
+          "status": "partially-working",
+          "suggestedFix": "Show a spinner, disable the submit button, or surface \"Loading…\" while the request is in flight"
+        }
+      ],
+      "screenshotsCount": 8,
+      "score": 8,
+      "scoreReason": "11/12 categories tested (10 passing) · severity cap 9 · pass cap 8 · failed: loading-state"
+    },
+    {
+      "name": "tool-installer",
+      "url": "http://localhost:3000/tool-installer",
+      "findings": [
+        {
+          "page": "tool-installer",
+          "section": "tool-installer-initial",
+          "expected": "loading state visible after action triggers",
+          "actual": "no spinner / no \"Loading\" text / no disabled button observed",
+          "severity": "MEDIUM",
+          "category": "UX",
+          "status": "partially-working",
+          "suggestedFix": "Show a spinner, disable the submit button, or surface \"Loading…\" while the request is in flight"
+        },
+        {
+          "page": "tool-installer",
+          "section": "tool-installer-truth",
+          "expected": "safety disclosure (sandbox / approval / reviewer) in requirements",
+          "actual": "Detected capabilities\n\nNo specific capability detected.",
+          "severity": "HIGH",
+          "category": "product-truth",
+          "status": "present-but-not-wired",
+          "suggestedFix": "Surface the sandbox + approval-required disclosure on the detect result"
+        }
+      ],
+      "screenshotsCount": 6,
+      "score": 6,
+      "scoreReason": "11/12 categories tested (9 passing) · severity cap 6 · pass cap 7 · failed: loading-state, product-truth"
+    },
+    {
+      "name": "workspace",
+      "url": "http://localhost:3000/workspace",
+      "findings": [],
+      "screenshotsCount": 4,
+      "score": 7,
+      "scoreReason": "4/12 categories tested (4 passing) · depth cap 7"
+    },
+    {
+      "name": "standing-orders",
+      "url": "http://localhost:3000/standing-orders",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "audit",
+      "url": "http://localhost:3000/audit",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "integrations",
+      "url": "http://localhost:3000/integrations",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "knowledge",
+      "url": "http://localhost:3000/knowledge",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "skills",
+      "url": "http://localhost:3000/skills",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "inbox",
+      "url": "http://localhost:3000/inbox",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "schedules",
+      "url": "http://localhost:3000/schedules",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    },
+    {
+      "name": "traces",
+      "url": "http://localhost:3000/traces",
+      "findings": [],
+      "screenshotsCount": 1,
+      "score": 7,
+      "scoreReason": "3/12 categories tested (3 passing) · depth cap 7"
+    }
+  ],
+  "sessionScore": 6,
+  "buyerVerdict": "has-rough-edges"
+}

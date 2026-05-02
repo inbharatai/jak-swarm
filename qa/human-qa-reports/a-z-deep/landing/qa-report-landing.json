@@ -1,0 +1,119 @@
+{
+  "name": "landing",
+  "generatedAt": "2026-05-01T15:04:34.842Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\a-z-deep\\landing\\shots",
+  "screenshotsCount": 13,
+  "severityCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 6
+  },
+  "statusCounts": {
+    "working": 6,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": [
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "pricing link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "GitHub link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "contact / email link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "security / privacy link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "trust-signals",
+      "expected": "audit / compliance link visible",
+      "actual": "present",
+      "severity": "INFO",
+      "category": "trust",
+      "status": "working",
+      "suggestedFix": "(no action — trust signal present)"
+    },
+    {
+      "page": "landing",
+      "section": "claim-vs-behaviour",
+      "expected": "122 classified tools",
+      "actual": "Backed by dashboard evidence: README badge / headline reads 122",
+      "severity": "INFO",
+      "category": "product-truth",
+      "status": "working",
+      "suggestedFix": "(no action — claim verified)"
+    }
+  ],
+  "coverage": [
+    {
+      "category": "render-health",
+      "passed": true,
+      "detail": "#pricing renders 1049 chars"
+    },
+    {
+      "category": "evidence-screenshots",
+      "passed": true,
+      "detail": "pricing captured"
+    },
+    {
+      "category": "primary-interaction",
+      "passed": true,
+      "detail": "clicked a[href=\"/register\"]"
+    },
+    {
+      "category": "visual-quality",
+      "passed": true,
+      "detail": "no descender-clipping risks across page headings"
+    },
+    {
+      "category": "product-truth",
+      "passed": true,
+      "detail": "claim \"122 classified tools\" → README badge / headline reads 122"
+    },
+    {
+      "category": "responsive",
+      "passed": true,
+      "detail": "375 / 768 / 1280 viewports checked"
+    },
+    {
+      "category": "console-network-health",
+      "passed": true,
+      "detail": "0 new finding(s)"
+    }
+  ]
+}
