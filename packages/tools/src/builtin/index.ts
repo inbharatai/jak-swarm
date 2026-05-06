@@ -16,10 +16,16 @@ const emailAdapter = getEmailAdapter();
 const calendarAdapter = getCalendarAdapter();
 const crmAdapter = getCRMAdapterFromEnv() ?? new UnconfiguredCRMAdapter();
 
-if (hasRealAdapters()) {
-  console.log('[tools] Using REAL Gmail + Calendar adapters');
-} else {
-  console.warn('[tools] Email + Calendar adapters NOT configured (set GMAIL_EMAIL + GMAIL_APP_PASSWORD). Tools will fail on use.');
+// Boot diagnostic — fires once per process. Suppressed in test runs
+// because vitest workers re-import this module on every spawn and the
+// warning otherwise prints 30+ times per test run, drowning real output.
+// Set JAK_TOOLS_QUIET=1 to suppress in any environment.
+if (process.env['NODE_ENV'] !== 'test' && process.env['JAK_TOOLS_QUIET'] !== '1') {
+  if (hasRealAdapters()) {
+    console.log('[tools] Using REAL Gmail + Calendar adapters');
+  } else {
+    console.warn('[tools] Email + Calendar adapters NOT configured (set GMAIL_EMAIL + GMAIL_APP_PASSWORD). Tools will fail on use.');
+  }
 }
 
 function normalizeAllowedDomain(domain: string): string | null {

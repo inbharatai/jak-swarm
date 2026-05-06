@@ -47,4 +47,26 @@ if (result.status !== 0 && hasP1001 && directLooks5432 && dbLooks6543) {
   write(result);
 }
 
+// Exit-code semantics — distinguish "pending migrations" (informational,
+// the user already knows about it) from "tooling broken" (real failure):
+//   - Prisma exit 0  → all migrations applied → exit 0
+//   - Prisma exit 1 + stdout contains "have not yet been applied"
+//     → pending migrations exist; this is INFORMATIONAL, not a crash.
+//     Print a clear note + exit 0 so routine `pnpm db:migrate:status`
+//     calls don't look like failures in CLI sweeps.
+//   - Prisma exit 1 for any other reason → real failure → exit 1
+const finalCombined = `${result.stdout || ''}\n${result.stderr || ''}`;
+const pendingMigrations = /have not yet been applied/i.test(finalCombined);
+
+if (result.status === 0) {
+  process.exit(0);
+}
+if (result.status === 1 && pendingMigrations) {
+  process.stderr.write(
+    '\n[db:migrate:status] INFO: pending migrations exist (see list above). ' +
+      'This is not a script failure — run `pnpm db:migrate:deploy` to apply them. ' +
+      'Exiting 0 so this status check does not block routine CLI sweeps.\n',
+  );
+  process.exit(0);
+}
 process.exit(typeof result.status === 'number' ? result.status : 1);

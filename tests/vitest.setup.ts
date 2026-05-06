@@ -33,6 +33,10 @@ const placeholders: Record<string, string> = {
   OPENAI_API_KEY: 'sk-test-not-real-do-not-use-vitest-placeholder-only-000000000000000000',
   ANTHROPIC_API_KEY: 'sk-ant-test-not-real-do-not-use-vitest-placeholder-only-0000000000',
   NODE_ENV: 'test',
+  // Suppress noisy module-load console.warn in @jak-swarm/tools that
+  // fires every time the package is imported. Production deploys still
+  // see the warning at boot.
+  JAK_TOOLS_QUIET: '1',
 };
 
 for (const [key, value] of Object.entries(placeholders)) {
@@ -40,3 +44,16 @@ for (const [key, value] of Object.entries(placeholders)) {
     process.env[key] = value;
   }
 }
+
+// Bump the EventEmitter max-listeners cap on `process`. Vitest spawns
+// multiple workers; each worker imports a chunk of our 137 test files,
+// and several of our dependencies (Prisma query engine, OpenAI client,
+// Playwright, Pino) register their own SIGINT/SIGTERM/exit hooks. With
+// the default cap of 10 we routinely tripped MaxListenersExceededWarning
+// in CI logs even though nothing was leaking — every hook is legitimate.
+// Bumping to 100 absorbs the legitimate listeners while still being
+// well below any actual leak threshold.
+//
+// PRODUCTION CODE must not rely on this — the API server keeps the
+// default cap so a real leak still surfaces.
+process.setMaxListeners(100);
