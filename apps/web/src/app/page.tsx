@@ -308,7 +308,17 @@ export default function HomePage() {
               <JakLogo size={32} />
               <span className="text-base sm:text-lg font-display font-bold tracking-tight whitespace-nowrap">JAK Swarm</span>
             </div>
-            <div className="hidden md:flex items-center gap-8 text-sm text-slate-400">
+            <div className="hidden md:flex items-center gap-7 text-sm text-slate-400">
+              <a
+                href="#jak-shield"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-rose-400/30 bg-rose-400/[0.06] text-rose-200 hover:bg-rose-400/10 hover:text-white focus-visible:text-white transition-colors duration-200"
+                aria-label="JAK Shield — security and trust layer"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
+                </svg>
+                <span className="font-semibold">JAK Shield</span>
+              </a>
               <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Outcomes</a>
               <a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors duration-200">How It Works</a>
               <a href="#audit" className="hover:text-white focus-visible:text-white transition-colors duration-200">Audit</a>
@@ -346,6 +356,16 @@ export default function HomePage() {
           {/* Mobile menu dropdown */}
           {mobileMenuOpen && (
             <div id="mobile-menu" className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
+              <a
+                href="#jak-shield"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-300 hover:text-white transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
+                </svg>
+                JAK Shield
+              </a>
               <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Outcomes</a>
               <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
               <a href="#audit" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Audit</a>
@@ -375,22 +395,55 @@ export default function HomePage() {
               transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
-            <div className="inline-flex items-center gap-2 mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            {/* Eyebrow — leads with the security positioning the brief
+                 demanded. JAK Shield chip is clickable + scrolls to the
+                 #jak-shield section below. */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+              <a
+                href="#jak-shield"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-rose-400/40 bg-rose-400/[0.08] text-rose-200 hover:bg-rose-400/15 hover:text-white transition-colors text-[11px] font-semibold tracking-[0.16em] uppercase font-sans"
+                aria-label="JAK Shield — security and trust layer"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
+                </svg>
+                Powered by JAK Shield
+              </a>
               <span className="text-[11px] font-semibold text-emerald-300/90 tracking-[0.18em] uppercase font-sans">
-                AI Operations Cockpit &middot; For Founder-Led Teams
+                &middot; The Secure Control Plane for AI Agents
               </span>
             </div>
 
             <h1 className="mb-6 pb-3 mx-auto text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15]">
-              <span className="block text-white">Give JAK a task.</span>
-              <span className="block mt-2 text-white">Watch an AI team plan, execute, and</span>
-              <span className="block mt-2 gradient-text landing-gradient-text">ask approval before anything risky.</span>
+              <span className="block text-white">The Secure Control Plane</span>
+              <span className="block mt-2 text-white">for</span>
+              <span className="block mt-2 gradient-text landing-gradient-text">AI Agents.</span>
             </h1>
 
-            <p className="mb-10 max-w-2xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              JAK Swarm is an AI operations cockpit for founder-led teams. It turns plain-English commands into visible workflows across research, content, code, outreach, and business operations &mdash; with human approval gates and a tamper-evident audit trail on every step.
+            <p className="mb-6 max-w-2xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
+              Run AI agents safely across code, browser, files, email, GitHub, and business tools &mdash; with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
             </p>
+
+            {/* Six security pillars chip strip — every chip is grep-able
+                 in code, every chip is a real Shield feature card below. */}
+            <div className="mb-10 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
+              {[
+                'Permissions',
+                'Approvals',
+                'Sandboxing',
+                'Risk Scoring',
+                'Defensive Review',
+                'Tamper-evident Audit',
+              ].map((pillar) => (
+                <span
+                  key={pillar}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-mono uppercase tracking-wider text-slate-300"
+                >
+                  <span className="w-1 h-1 rounded-full bg-rose-400" aria-hidden="true" />
+                  {pillar}
+                </span>
+              ))}
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link

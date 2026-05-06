@@ -66,7 +66,7 @@ test('Human QA — buyer walkthrough', async () => {
         // Step 3: walk every section slowly
         await qa.observeSection('hero', {
           selector: 'section.gradient-bg',
-          expectedText: /Give JAK a task/i,
+          expectedText: /Secure Control Plane|JAK Shield/i,
           expectMinChars: 200,
           checkDescenderClipping: true,
         });

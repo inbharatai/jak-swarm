@@ -2,22 +2,54 @@
 
 # 🐝 JAK Swarm
 
-### Operator-Grade Multi-Agent Control Plane
+### The Secure Control Plane for AI Agents
 
+[![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
-[![Vibe Coding](https://img.shields.io/badge/Vibe_Coding-Builder-emerald?style=for-the-badge&logo=vercel&logoColor=white)](https://jakswarm.com)
+[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](https://jakswarm.com)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_HIPAA_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](https://jakswarm.com)
-[![LLM Providers](https://img.shields.io/badge/AI_Providers-6_Managed-purple?style=for-the-badge&logo=anthropic&logoColor=white)](https://jakswarm.com)
+[![Runtime](https://img.shields.io/badge/Runtime-OpenAI--first-412991?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Typecheck](https://img.shields.io/badge/Typecheck-16_workspaces_green-brightgreen?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Tests](https://img.shields.io/badge/Tests-1088_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-1543_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 
-**The trusted control plane for autonomous work.** One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Native [LangGraph](https://langchain-ai.github.io/langgraphjs/) orchestration, Postgres-backed checkpoints, source-grounded verification, and runtime PII redaction. Build, operate, and verify autonomous work on infrastructure you control.
+**JAK Swarm does the work. JAK Shield makes the work safe.**
 
-**What's inside:**
-- **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
+JAK Swarm turns plain-English goals into real work using **38 specialist agents** + **122 classified tools** + **22 connectors** across code, browser, files, email, GitHub, and business workflows.
+
+**JAK Shield** — the security/trust layer wrapped around every agent action — risk-scores every task, checks permissions, blocks unsafe cyber requests, pauses risky work for human approval, sandboxes browser + subprocess execution, and signs every step into a tamper-evident evidence bundle.
+
+> "Run AI agents safely across code, browser, files, email, GitHub, and business tools — with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails."
+
+## 🛡️ JAK Shield — the trust layer
+
+Before any agent touches your code, browser, files, email, GitHub, or business tools, JAK Shield runs every action through six defenses. **Every claim below maps to a real file path** and is locked by a CI test that fails if the file disappears (see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) and [`tests/unit/landing/jak-shield-truth.test.ts`](tests/unit/landing/jak-shield-truth.test.ts)).
+
+| # | Defense | What it does | Code |
+|---|---|---|---|
+| 1 | **Agent Firewall** | Blocks prompt-injection attacks (`detectInjection`) AND offensive-cyber requests — malware, exploit generation, credential theft, unauthorized scanning, phishing — BEFORE the LLM sees them. Defensive markers (audit, review, harden, OWASP, SAST, dependency audit) down-weight confidence so legitimate security work passes. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) + [`injection-detector.ts`](packages/security/src/guardrails/injection-detector.ts) |
+| 2 | **Risk-Based Approvals** | Every tool call classified across the 6-tier `ToolRiskLevel` lattice (`READ_ONLY` → `DRAFT_ONLY` → `SANDBOX_EDIT` → `LOCAL_EXEC_ALLOWLIST` → `EXTERNAL_ACTION_APPROVAL` → `CRITICAL_MANUAL_ONLY`). Risky calls pause the workflow. Approval is bound to the exact payload via SHA-256 hash; replays with modified payloads → HTTP 409 `APPROVAL_PAYLOAD_MISMATCH`. | [`approval-policy.ts`](packages/tools/src/registry/approval-policy.ts) + `proposedDataHash` in [`schema.prisma`](packages/db/prisma/schema.prisma) |
+| 3 | **Secure Tool Permissions** | Per-tenant tool registry + industry-pack restrictions + Standing Orders (allowed-tools whitelist + blocked-actions list + budget cap + expiry). `requireRole('REVIEWER','TENANT_ADMIN','SYSTEM_ADMIN')` on every destructive route. | [`tenant-tool-registry.ts`](packages/tools/src/registry/tenant-tool-registry.ts) + `StandingOrder` model |
+| 4 | **Sandboxed Execution** | Browser sessions in per-tenant data dirs with **500 MB disk quota** + URL allowlist (no localhost, RFC1918, IPv6 link-local, cloud-metadata) + **DNS-rebind defense** on every navigation + downloads disabled. Installer subprocess uses literal argv (never `shell:true`), 60s timeout, stripped env. | [`playwright-browser-operator.ts`](packages/tools/src/browser-operator/playwright-browser-operator.ts) + [`sandboxed-installer.ts`](packages/tools/src/installer/sandboxed-installer.ts) |
+| 5 | **Defensive Vulnerability Triage** | JAK Shield supports defensive security work — repo audits, dependency scans, secret-leak detection, patch recommendations. Offensive work (writing exploits, malware, phishing kits, unauthorized scanning) is blocked at the boundary. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) — see DEFENSIVE_MARKERS list |
+| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace JSON columns are PII-redacted at write time. `workflows.{goal,error,finalOutput,planJson,stateJson}` are AES-256-GCM encrypted at rest. Final evidence bundles are HMAC-SHA256 signed and verify byte-for-byte. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) + [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) + [`persistence-redactor.ts`](packages/security/src/guardrails/persistence-redactor.ts) |
+
+### Safety boundary
+
+JAK Shield is built for **defensive security, safe automation, permissioned workflows, and audit-ready agent execution**. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation. Defensive requests pass; offensive ones are refused at the boundary with a structured error.
+
+### Honest gaps (roadmap, not shipped today)
+
+- A first-party **defensive-review agent** (audit my repo end-to-end) — the boundary exists, the agent is on the roadmap.
+- A dedicated **`/shield` dashboard tab** — Shield state is currently surfaced at `/audit` + `/inbox`; a unified panel is roadmap.
+- **Chain-hashed AuditLog rows** — bundles are HMAC-signed, but rows aren't yet hash-chained (a SYSTEM_ADMIN with DB access could rewrite a row).
+
+---
+
+## 🚀 What's inside JAK Swarm
+
+- **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real_external` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
 - **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
 - **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **182 seeded controls** (63 SOC 2 + 37 HIPAA + 82 ISO 27001) of which **108 are operationally backed** (auto-mapping rules pull evidence from system activity) and **74 require reviewer attestation** (policy / paperwork / physical), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
 - **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
