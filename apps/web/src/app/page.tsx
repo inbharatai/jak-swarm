@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   HeroCockpit,
   HowItWorks,
+  JAKShield,
   PainSection,
   PremiumCTA,
   ProductCockpit,
@@ -447,6 +448,11 @@ export default function HomePage() {
 
         {/* ── 6. Trust Layer — 6 grep-able guarantees ──────────────────── */}
         <TrustLayer />
+
+        {/* ── 6b. JAK Shield — security/trust layer brand. Each feature
+             card carries `data-evidence-path` pointing at a real file
+             so the truth-lock CI gate can verify nothing is hallucinated. */}
+        <JAKShield />
 
         {/* ── 7. Audit & Compliance Pack — sits after the Trust Layer.
              Most visitors are solo founders / small teams who don't

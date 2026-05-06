@@ -665,6 +665,31 @@ ${lines.join('\n')}
     // so legitimate requests like "ignore the failing test for now" are
     // not blocked. Off-switch via JAK_INJECTION_GUARD_DISABLED=1 for
     // operators who need raw passthrough during incident debugging.
+    // JAK Shield — defensive-only boundary. Detects offensive-cyber
+    // requests (malware / exploits / credential-theft / unauthorized
+    // scanning / phishing) BEFORE the LLM sees them. Defensive
+    // requests (audit my repo, find vulnerable deps, harden auth)
+    // are explicitly NOT blocked — defensive markers down-weight the
+    // confidence score. See
+    //   packages/security/src/guardrails/offensive-cyber-detector.ts
+    // Off-switch: JAK_SHIELD_OFFENSIVE_GUARD_DISABLED=1
+    if (process.env['JAK_SHIELD_OFFENSIVE_GUARD_DISABLED'] !== '1') {
+      const { detectOffensiveCyberRequest } = await import('@jak-swarm/security');
+      for (const msg of conversation) {
+        if (msg.role !== 'user' || typeof msg.content !== 'string') continue;
+        const r = detectOffensiveCyberRequest(msg.content);
+        if (r.detected && r.confidence >= 0.7) {
+          throw new Error(
+            `Input blocked by JAK Shield: this looks like a request to ${r.reason} ` +
+            `(category: ${r.category}). JAK Shield is built for defensive ` +
+            `security and safe automation; offensive cyber work is out of scope. ` +
+            `If this is a legitimate defensive task, rephrase to make the scope ` +
+            `explicit (e.g. "audit my repo for vulnerable dependencies").`,
+          );
+        }
+      }
+    }
+
     if (process.env['JAK_INJECTION_GUARD_DISABLED'] !== '1') {
       const { detectInjection } = await import('@jak-swarm/security');
       for (const msg of conversation) {

@@ -45,6 +45,17 @@ export {
 export { detectInjection, isInjectionAttempt } from './guardrails/injection-detector.js';
 export type { InjectionDetectionResult } from './guardrails/injection-detector.js';
 
+// JAK Shield — defensive-only boundary (offensive cyber request blocker).
+// Detects malware-creation / exploit-generation / credential-theft /
+// unauthorized-scanning / phishing requests + DOWN-WEIGHTS when the
+// request also contains defensive markers (audit / review / harden).
+// See packages/security/src/guardrails/offensive-cyber-detector.ts.
+export {
+  detectOffensiveCyberRequest,
+  isOffensiveCyberRequest,
+} from './guardrails/offensive-cyber-detector.js';
+export type { OffensiveDetectionResult } from './guardrails/offensive-cyber-detector.js';
+
 // Audit Logging
 export {
   AuditAction,

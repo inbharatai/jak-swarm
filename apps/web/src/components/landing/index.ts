@@ -15,6 +15,7 @@
 // are now covered by HeroCockpit + ProductCockpit + HowItWorks. The files
 // remain in this folder for reuse on /docs or marketing sub-pages.
 export { default as HeroCockpit } from './HeroCockpit';
+export { default as JAKShield } from './JAKShield';
 export { default as HowItWorks } from './HowItWorks';
 export { default as PainSection } from './PainSection';
 export { default as PremiumCTA } from './PremiumCTA';
