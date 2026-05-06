@@ -1,0 +1,276 @@
+/**
+ * Landing claim → code truth-lock.
+ *
+ * Every visible promise on the JAK Swarm landing page must point at a
+ * real, existing piece of code or content. This test walks the page
+ * section-by-section and asserts that:
+ *   - the file the claim implies actually exists
+ *   - the symbol or pattern the file is supposed to contain is there
+ *
+ * If any claim drifts away from code (file moved, function renamed,
+ * feature removed), CI fails here. That's the contract: the backend
+ * accurately supports the landing page.
+ *
+ * The truth-check `pnpm check:truth` already enforces COUNT consistency
+ * (122 tools, 38 agents, 22 connectors). This test enforces SHAPE +
+ * IMPLEMENTATION consistency for the qualitative claims.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const REPO_ROOT = join(__dirname, '../../..');
+
+function exists(rel: string): boolean {
+  return existsSync(join(REPO_ROOT, rel));
+}
+function read(rel: string): string {
+  return readFileSync(join(REPO_ROOT, rel), 'utf8');
+}
+function contains(rel: string, pattern: RegExp | string): boolean {
+  if (!exists(rel)) return false;
+  const src = read(rel);
+  return typeof pattern === 'string' ? src.includes(pattern) : pattern.test(src);
+}
+
+describe('Landing — Hero', () => {
+  it('"Secure Control Plane" hero copy is in the page', () => {
+    expect(contains('apps/web/src/app/page.tsx', 'Secure Control Plane')).toBe(true);
+  });
+
+  it('hero subheadline names every security pillar (permissions / approvals / sandboxing / risk scoring / defensive review / audit)', () => {
+    const src = read('apps/web/src/app/page.tsx');
+    for (const pillar of ['permission', 'approval', 'sandbox', 'risk', 'defensive', 'audit']) {
+      expect(src.toLowerCase(), `subheadline missing pillar "${pillar}"`).toMatch(
+        new RegExp(pillar, 'i'),
+      );
+    }
+  });
+
+  it('JAK Shield chip in nav (desktop) AND mobile', () => {
+    const src = read('apps/web/src/app/page.tsx');
+    // Two distinct mentions: desktop nav + mobile menu
+    const matches = src.match(/JAK Shield/g) ?? [];
+    expect(matches.length, 'expected ≥ 2 occurrences (desktop + mobile nav)').toBeGreaterThanOrEqual(2);
+    expect(src).toMatch(/href="#jak-shield"/);
+  });
+});
+
+describe('Landing — HowItWorks (7-step pipeline)', () => {
+  const HOW = 'apps/web/src/components/landing/HowItWorks.tsx';
+
+  it('seven steps are declared', () => {
+    const src = read(HOW);
+    const steps = src.match(/n:\s*[1-7],\s+label:/g) ?? [];
+    expect(steps.length, 'expected 7 steps with n: 1..7 + label').toBe(7);
+  });
+
+  // Each step's `status:` line names a real subsystem in the code.
+  it('Step 1 (Command) is backed by CommanderAgent', () => {
+    expect(contains(HOW, /commander\./)).toBe(true);
+    expect(exists('packages/agents/src/roles/commander.agent.ts')).toBe(true);
+  });
+
+  it('Step 2 (Plan) is backed by PlannerAgent + decomposeGoal', () => {
+    expect(contains(HOW, /planner\.decompose/)).toBe(true);
+    expect(exists('packages/agents/src/roles/planner.agent.ts')).toBe(true);
+    expect(contains('packages/agents/src/roles/planner.agent.ts', /decomposeGoal/)).toBe(true);
+  });
+
+  it('Step 3 (Route) is backed by RouterAgent', () => {
+    expect(contains(HOW, /router\./)).toBe(true);
+    expect(exists('packages/agents/src/roles/router.agent.ts')).toBe(true);
+  });
+
+  it('Step 4 (Execute) is backed by BaseAgent.executeWithTools', () => {
+    expect(contains(HOW, /worker\.run/)).toBe(true);
+    expect(contains('packages/agents/src/base/base-agent.ts', /executeWithTools/)).toBe(true);
+  });
+
+  it('Step 5 (Approve) is backed by DefaultApprovalPolicy + payload binding', () => {
+    expect(contains(HOW, /approval\.gate/)).toBe(true);
+    expect(contains('packages/tools/src/registry/approval-policy.ts', /DefaultApprovalPolicy/)).toBe(true);
+    expect(contains('packages/db/prisma/schema.prisma', /proposedDataHash/)).toBe(true);
+  });
+
+  it('Step 6 (Verify) is backed by VerifierAgent', () => {
+    expect(contains(HOW, /verifier\.check/)).toBe(true);
+    expect(exists('packages/agents/src/roles/verifier.agent.ts')).toBe(true);
+  });
+
+  it('Step 7 (Deliver) — signed audit trail backed by bundle-signing.service.ts', () => {
+    expect(exists('apps/api/src/services/bundle.service.ts')).toBe(true);
+    expect(exists('apps/api/src/services/bundle-signing.service.ts')).toBe(true);
+  });
+});
+
+describe('Landing — ShowTheWork (4 outcome cards)', () => {
+  const SHOW = 'apps/web/src/components/landing/ShowTheWork.tsx';
+
+  it('Competitor + market research → research worker exists', () => {
+    expect(contains(SHOW, /Competitor.*research/i)).toBe(true);
+    expect(exists('packages/agents/src/workers/research.agent.ts')).toBe(true);
+  });
+
+  it('LinkedIn + outreach drafts → social-drafts route + LinkedIn adapter exist', () => {
+    expect(contains(SHOW, /LinkedIn/)).toBe(true);
+    expect(exists('apps/api/src/routes/social-drafts.routes.ts')).toBe(true);
+    expect(exists('packages/tools/src/browser-operator/linkedin-adapter.ts')).toBe(true);
+  });
+
+  it('Website review + 5 fixes → browser operator exists', () => {
+    expect(contains(SHOW, /Website review/i)).toBe(true);
+    expect(exists('packages/tools/src/browser-operator/playwright-browser-operator.ts')).toBe(true);
+  });
+
+  it('Audit-ready evidence pack → audit-runs route + bundle service exist', () => {
+    expect(contains(SHOW, /Audit-ready evidence/i)).toBe(true);
+    expect(exists('apps/api/src/routes/audit-runs.routes.ts')).toBe(true);
+    expect(exists('apps/api/src/services/bundle.service.ts')).toBe(true);
+  });
+});
+
+describe('Landing — TrustLayer (6 grep-able guarantees)', () => {
+  const TRUST = 'apps/web/src/components/landing/TrustLayer.tsx';
+
+  it('Human approval gates → DefaultApprovalPolicy + ApprovalRequest model', () => {
+    expect(contains(TRUST, /Human approval gates/)).toBe(true);
+    expect(contains('packages/tools/src/registry/approval-policy.ts', /DefaultApprovalPolicy/)).toBe(true);
+    expect(contains('packages/db/prisma/schema.prisma', /model ApprovalRequest/)).toBe(true);
+  });
+
+  it('Source-grounded outputs → verifier citation-density check', () => {
+    expect(contains(TRUST, /Source-grounded/)).toBe(true);
+    expect(contains('packages/agents/src/roles/verifier.agent.ts', /citationDensity/)).toBe(true);
+  });
+
+  it('Tool maturity labels → ToolMaturity enum', () => {
+    expect(contains(TRUST, /Tool maturity labels/)).toBe(true);
+    expect(contains('packages/shared/src/types/tool.ts', /ToolMaturity/)).toBe(true);
+  });
+
+  it('Tamper-evident audit trail → bundle-signing HMAC service', () => {
+    expect(contains(TRUST, /Tamper-evident audit trail/)).toBe(true);
+    expect(contains('apps/api/src/services/bundle-signing.service.ts', /createHmac/i)).toBe(true);
+  });
+
+  it('Self-hostable open-source core → MIT LICENSE file present', () => {
+    expect(contains(TRUST, /Self-hostable open-source core/)).toBe(true);
+    expect(exists('LICENSE')).toBe(true);
+    expect(contains('LICENSE', /MIT/i)).toBe(true);
+  });
+
+  it('OpenAI-first runtime → openai-runtime.ts exists', () => {
+    expect(contains(TRUST, /OpenAI-first runtime/)).toBe(true);
+    expect(exists('packages/agents/src/runtime/openai-runtime.ts')).toBe(true);
+  });
+});
+
+describe('Landing — JAK Shield (6 defenses) — the new front-and-center section', () => {
+  const SHIELD = 'apps/web/src/components/landing/JAKShield.tsx';
+
+  it('JAKShield component file exists + exports default', () => {
+    expect(exists(SHIELD)).toBe(true);
+    expect(contains(SHIELD, /export default function JAKShield/)).toBe(true);
+  });
+
+  it('all 6 evidencePath attributes exist on disk', () => {
+    const src = read(SHIELD);
+    const paths = Array.from(src.matchAll(/evidencePath:\s*'([^']+)'/g)).map((m) => m[1]!);
+    expect(paths.length).toBe(6);
+    for (const p of paths) {
+      expect(exists(p), `evidencePath ${p} missing on disk`).toBe(true);
+    }
+  });
+
+  it('safety-boundary copy is present (defensive ALLOWED + offensive REFUSED)', () => {
+    expect(contains(SHIELD, /defensive (security|review|work|automation)/i)).toBe(true);
+    expect(contains(SHIELD, /(malware|exploit|phish|credential theft)/i)).toBe(true);
+    expect(contains(SHIELD, /(refuse|not support|blocked|does not)/i)).toBe(true);
+  });
+
+  it('JAK Shield IS wired into the live landing page (not just an unused component)', () => {
+    const page = read('apps/web/src/app/page.tsx');
+    expect(page).toMatch(/<JAKShield\s*\/>/);
+    expect(page).toMatch(/href="#jak-shield"/);
+  });
+
+  it('offensive-cyber-detector + injection-detector + persistence-redactor all exported from @jak-swarm/security', () => {
+    const idx = read('packages/security/src/index.ts');
+    expect(idx).toMatch(/detectOffensiveCyberRequest/);
+    expect(idx).toMatch(/detectInjection/);
+    expect(idx).toMatch(/redactJsonForPersistence/);
+    expect(idx).toMatch(/encryptString/);   // field-cipher
+    expect(idx).toMatch(/decryptString/);
+  });
+
+  it('BaseAgent wires the JAK Shield offensive guard before the LLM call', () => {
+    const baseAgent = read('packages/agents/src/base/base-agent.ts');
+    expect(baseAgent).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
+    expect(baseAgent).toMatch(/detectOffensiveCyberRequest/);
+  });
+
+  it('PlaywrightBrowserOperator implements the SSRF + DNS-rebind + disk-quota defenses', () => {
+    const op = read('packages/tools/src/browser-operator/playwright-browser-operator.ts');
+    expect(op).toMatch(/defaultIsUrlAllowed/);
+    expect(op).toMatch(/resolveAndCheckHost/);              // DNS-rebind
+    expect(op).toMatch(/tenantQuotaBytes/);                  // disk quota
+    expect(op).toMatch(/BROWSER_REQUEST_BLOCKED/);
+    expect(op).toMatch(/BROWSER_DNS_REBIND_BLOCKED/);
+    expect(op).toMatch(/BROWSER_QUOTA_EXCEEDED/);
+  });
+});
+
+describe('Landing — top-line counts', () => {
+  // The pnpm check:truth gate already enforces these against the live
+  // tool registry + AgentRole enum. We mirror the strictest checks here
+  // so a broken truth-check is caught even before the full vitest run.
+
+  it('product-truth.ts STATS array contains the expected count cards', () => {
+    const truth = read('apps/web/src/lib/product-truth.ts');
+    expect(truth).toMatch(/value:\s*38,\s*label:\s*'Specialist Agents'/);
+    expect(truth).toMatch(/value:\s*122,\s*label:\s*'Classified Tools'/);
+    expect(truth).toMatch(/value:\s*22,\s*label:\s*'Connectors'/);
+  });
+
+  it('PremiumCTA stat strip matches the truth registry', () => {
+    const cta = read('apps/web/src/components/landing/PremiumCTA.tsx');
+    expect(cta).toMatch(/value:\s*'?38'?,\s*label:\s*'(?:Agents|Specialist Agents)'/);
+    expect(cta).toMatch(/value:\s*'?122'?,\s*label:\s*'(?:Tools|Classified Tools)'/);
+    expect(cta).toMatch(/value:\s*'?20\+'?,\s*label:\s*'?Connectors'?/);
+    expect(cta).toMatch(/value:\s*'?MIT'?/);
+  });
+
+  it('README front matter declares the same counts', () => {
+    const readme = read('README.md');
+    expect(readme).toMatch(/AI_Agents-38/);
+    expect(readme).toMatch(/Classified_Tools-122/);
+    expect(readme).toMatch(/Connectors-22/);
+    expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
+  });
+});
+
+describe('Landing — public marketing copy stays honest', () => {
+  it('NO "certified" / "HIPAA-ready" / "SOC 2-ready" claims on the landing or README', () => {
+    const sources = [
+      'apps/web/src/app/page.tsx',
+      'apps/web/src/components/landing/JAKShield.tsx',
+      'apps/web/src/components/landing/TrustLayer.tsx',
+      'apps/web/src/components/landing/PremiumCTA.tsx',
+      'README.md',
+    ];
+    const banned = /\b(certified|HIPAA[\s-]ready|SOC ?2[\s-]ready|ISO[\s-]?ready|fully compliant)\b/i;
+    for (const s of sources) {
+      const src = read(s);
+      expect(banned.test(src), `forbidden compliance claim in ${s}`).toBe(false);
+    }
+  });
+
+  it('safety boundary mentions both defensive (allowed) AND offensive (refused)', () => {
+    const shield = read('apps/web/src/components/landing/JAKShield.tsx');
+    expect(shield).toMatch(/defensive/i);
+    expect(shield).toMatch(/offensive|malware|phish|exploit/i);
+    expect(shield).toMatch(/(refuse|does not|not support|blocked)/i);
+  });
+});
