@@ -1449,6 +1449,101 @@ export const standingOrdersApi = {
   disable: (id: string) => apiClient.post<unknown>(`/standing-orders/${id}/disable`),
 };
 
+// ─── Migration 106 — Team + Trial APIs ───────────────────────────────
+//
+// Backend routes:
+//   /task-assignments  — task-assignments.routes.ts
+//   /inbox             — inbox.routes.ts
+//   /team              — team.routes.ts
+//   /trial             — trial.routes.ts
+
+export interface CreateTaskAssignmentBody {
+  workflowId: string;
+  taskId: string;
+  assigneeUserId: string;
+  title: string;
+  instructions?: string;
+  riskLevel?: string;
+  dueAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export const taskAssignmentApi = {
+  list: (params?: { status?: string; workflowId?: string; assigneeUserId?: string; limit?: number }) => {
+    const qs = params
+      ? `?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params).filter(([, v]) => v !== undefined),
+          ) as Record<string, string>,
+        ).toString()}`
+      : '';
+    return apiClient.get<unknown>(`/task-assignments${qs}`);
+  },
+  mine: (status?: string) =>
+    apiClient.get<unknown>(`/task-assignments/me${status ? `?status=${status}` : ''}`),
+  get: (id: string) => apiClient.get<unknown>(`/task-assignments/${id}`),
+  create: (body: CreateTaskAssignmentBody) =>
+    apiClient.post<unknown>('/task-assignments', body),
+  acknowledge: (id: string) => apiClient.post<unknown>(`/task-assignments/${id}/acknowledge`),
+  complete: (id: string, body?: { result?: Record<string, unknown>; note?: string }) =>
+    apiClient.post<unknown>(`/task-assignments/${id}/complete`, body ?? {}),
+  decline: (id: string, reason: string) =>
+    apiClient.post<unknown>(`/task-assignments/${id}/decline`, { reason }),
+  cancel: (id: string) => apiClient.post<unknown>(`/task-assignments/${id}/cancel`),
+};
+
+export const inboxApi = {
+  get: () => apiClient.get<unknown>('/inbox'),
+  markRead: (notificationId: string) =>
+    apiClient.post<unknown>(`/inbox/notifications/${notificationId}/read`),
+  markAllRead: () => apiClient.post<unknown>('/inbox/notifications/read-all'),
+};
+
+export interface CreateDepartmentBody {
+  name: string;
+  description?: string;
+  parentId?: string | null;
+}
+
+export interface UpdateMembershipBody {
+  departmentId?: string | null;
+  jobTitle?: string | null;
+  managerId?: string | null;
+}
+
+export const teamApi = {
+  listDepartments: () => apiClient.get<unknown>('/team/departments'),
+  getDepartment: (id: string) => apiClient.get<unknown>(`/team/departments/${id}`),
+  createDepartment: (body: CreateDepartmentBody) =>
+    apiClient.post<unknown>('/team/departments', body),
+  updateDepartment: (id: string, body: Partial<CreateDepartmentBody>) =>
+    apiClient.patch<unknown>(`/team/departments/${id}`, body),
+  deleteDepartment: (id: string) => apiClient.delete<unknown>(`/team/departments/${id}`),
+  listMembers: (q?: string, departmentId?: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (departmentId) params.set('departmentId', departmentId);
+    const qs = params.toString();
+    return apiClient.get<unknown>(`/team/members${qs ? `?${qs}` : ''}`);
+  },
+  updateMember: (userId: string, body: UpdateMembershipBody) =>
+    apiClient.patch<unknown>(`/team/members/${userId}`, body),
+};
+
+export interface TrialSignupBody {
+  email: string;
+  companyName?: string;
+  industry?: string;
+  teamSize?: '1' | '2-5' | '6-20' | '21-100' | '100+';
+  source?: string;
+}
+
+export const trialApi = {
+  signup: (body: TrialSignupBody) => apiClient.post<unknown>('/trial/signup', body),
+  verify: (token: string) => apiClient.post<unknown>(`/trial/verify/${token}`),
+  status: () => apiClient.get<unknown>('/trial/status'),
+};
+
 // ─── Projects (Vibe Coding) ─────────────────────────────────────────
 
 export const projectApi = {

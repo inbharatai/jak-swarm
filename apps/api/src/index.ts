@@ -65,6 +65,10 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import llmSettingsRoutes from './routes/llm-settings.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
 import standingOrdersRoutes from './routes/standing-orders.routes.js';
+import taskAssignmentRoutes from './routes/task-assignments.routes.js';
+import inboxRoutes from './routes/inbox.routes.js';
+import teamRoutes from './routes/team.routes.js';
+import trialRoutes from './routes/trial.routes.js';
 import browserOperatorRoutes from './routes/browser-operator.routes.js';
 import socialDraftsRoutes from './routes/social-drafts.routes.js';
 import toolInstallerRoutes from './routes/tool-installer.routes.js';
@@ -219,6 +223,11 @@ async function buildApp() {
   await fastify.register(llmSettingsRoutes, { prefix: '/settings/llm' });
   await fastify.register(schedulesRoutes, { prefix: '/schedules' });
   await fastify.register(standingOrdersRoutes, { prefix: '/standing-orders' });
+  // Migration 106 — Team + Trial surfaces (humans + free trial cap).
+  await fastify.register(taskAssignmentRoutes, { prefix: '/task-assignments' });
+  await fastify.register(inboxRoutes,           { prefix: '/inbox' });
+  await fastify.register(teamRoutes,            { prefix: '/team' });
+  await fastify.register(trialRoutes,           { prefix: '/trial' });
   await fastify.register(browserOperatorRoutes, { prefix: '/browser-sessions' });
   await fastify.register(socialDraftsRoutes, { prefix: '/social-drafts' });
   await fastify.register(toolInstallerRoutes, { prefix: '/tool-installer' });

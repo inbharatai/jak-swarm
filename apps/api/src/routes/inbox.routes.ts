@@ -1,0 +1,125 @@
+/**
+ * inbox.routes.ts — single-page Inbox aggregator for the calling user.
+ *
+ * Pulls together:
+ *   - TaskAssignments addressed to me (PENDING + ACKNOWLEDGED)
+ *   - ApprovalRequests in this tenant where I am eligible to decide
+ *     (REVIEWER+) and status=PENDING
+ *   - Unread Notifications addressed to me
+ *
+ * One round-trip → cockpit-ready payload. The /inbox UI page calls this
+ * endpoint via SWR every 10s + on SSE bump events.
+ */
+
+import type { FastifyPluginAsync } from 'fastify';
+import { ok } from '../types.js';
+
+const inboxRoutes: FastifyPluginAsync = async (fastify) => {
+  /** GET /inbox — aggregated inbox payload for the calling user. */
+  fastify.get('/', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const tenantId = request.user.tenantId;
+    const userId = request.user.userId;
+    const role = request.user.role;
+
+    const isReviewerLike =
+      role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
+
+    const [tasks, approvals, notifications, taskCount, notifCount] = await Promise.all([
+      fastify.db.taskAssignment.findMany({
+        where: {
+          tenantId,
+          assigneeUserId: userId,
+          status: { in: ['PENDING', 'ACKNOWLEDGED'] },
+        },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        take: 100,
+      }),
+      isReviewerLike
+        ? fastify.db.approvalRequest.findMany({
+            where: { tenantId, status: 'PENDING' },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: {
+              id: true,
+              workflowId: true,
+              taskId: true,
+              agentRole: true,
+              action: true,
+              rationale: true,
+              riskLevel: true,
+              createdAt: true,
+            },
+          })
+        : Promise.resolve([]),
+      fastify.db.notification.findMany({
+        where: { tenantId, userId, readAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      fastify.db.taskAssignment.count({
+        where: {
+          tenantId,
+          assigneeUserId: userId,
+          status: { in: ['PENDING', 'ACKNOWLEDGED'] },
+        },
+      }),
+      fastify.db.notification.count({
+        where: { tenantId, userId, readAt: null },
+      }),
+    ]);
+
+    return reply.status(200).send(
+      ok({
+        tasks,
+        approvals,
+        notifications,
+        counts: {
+          tasks: taskCount,
+          approvals: approvals.length,
+          notifications: notifCount,
+          total: taskCount + approvals.length + notifCount,
+        },
+      }),
+    );
+  });
+
+  /** POST /inbox/notifications/:id/read — mark a notification read. */
+  fastify.post(
+    '/notifications/:id/read',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const tenantId = request.user.tenantId;
+      const userId = request.user.userId;
+
+      const result = await fastify.db.notification.updateMany({
+        where: { id, tenantId, userId },
+        data: { readAt: new Date() },
+      });
+
+      if (result.count === 0) {
+        return reply.status(404).send({ ok: false, error: { code: 'NOT_FOUND' } });
+      }
+      return reply.status(200).send(ok({ id, readAt: new Date().toISOString() }));
+    },
+  );
+
+  /** POST /inbox/notifications/read-all — mark every unread notification read. */
+  fastify.post(
+    '/notifications/read-all',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenantId = request.user.tenantId;
+      const userId = request.user.userId;
+
+      const result = await fastify.db.notification.updateMany({
+        where: { tenantId, userId, readAt: null },
+        data: { readAt: new Date() },
+      });
+
+      return reply.status(200).send(ok({ markedRead: result.count }));
+    },
+  );
+};
+
+export default inboxRoutes;

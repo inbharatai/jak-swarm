@@ -274,3 +274,67 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(shield).toMatch(/(refuse|does not|not support|blocked)/i);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Migration 106 — Free 30-day trial truth-lock.
+// Every visible claim about the trial CTA on the landing page must be
+// backed by real code. If a future edit weakens a cap, hides the
+// "no credit card" note, or renames the trial route, CI fails here.
+// ─────────────────────────────────────────────────────────────────────────
+describe('Landing — Free trial CTA (Migration 106)', () => {
+  it('hero CTA is "Start 30-Day Free Trial" pointing at /trial', () => {
+    const page = read('apps/web/src/app/page.tsx');
+    expect(page).toMatch(/Start 30-Day Free Trial/);
+    expect(page).toMatch(/href="\/trial"/);
+    expect(page).toMatch(/data-cta="hero-trial"/);
+  });
+
+  it('hero trust line declares "No credit card" + "daily caps" + "30 days"', () => {
+    const page = read('apps/web/src/app/page.tsx');
+    expect(page).toMatch(/no credit card/i);
+    expect(page).toMatch(/daily caps?/i);
+    expect(page).toMatch(/30\s*day/i);
+  });
+
+  it('/trial signup page exists and lists the four daily caps with the right numbers', () => {
+    const path = 'apps/web/src/app/(auth)/trial/page.tsx';
+    expect(exists(path)).toBe(true);
+    const src = read(path);
+    expect(src).toMatch(/20\s*\/\s*day/);          // agent runs cap
+    expect(src).toMatch(/5\s*\/\s*day/);            // approvals cap
+    expect(src).toMatch(/120\s*min\s*\/\s*day/);    // tool minutes cap
+    expect(src).toMatch(/200,?000\s*\/\s*day/);     // tokens cap
+  });
+
+  it('backend trial route + usage-counter service both exist', () => {
+    expect(exists('apps/api/src/routes/trial.routes.ts')).toBe(true);
+    expect(exists('apps/api/src/services/trial/usage-counter.service.ts')).toBe(true);
+    expect(contains('apps/api/src/services/trial/usage-counter.service.ts', 'startTrial')).toBe(true);
+    expect(contains('apps/api/src/services/trial/usage-counter.service.ts', /trialEndsAt/)).toBe(true);
+  });
+
+  it('migration 106 declares the trial fields on Subscription', () => {
+    const sql = read('packages/db/prisma/migrations/106_team_and_trial/migration.sql');
+    expect(sql).toMatch(/dailyAgentRunsCap.*DEFAULT 20/i);
+    expect(sql).toMatch(/dailyApprovalsCap.*DEFAULT 5/i);
+    expect(sql).toMatch(/dailyToolMinutesCap.*DEFAULT 120/i);
+    expect(sql).toMatch(/dailyTokensCap.*DEFAULT 200000/i);
+    expect(sql).toMatch(/trialStartedAt/);
+    expect(sql).toMatch(/trialEndsAt/);
+  });
+
+  it('workflows.routes wires the trial-cap guard before credit check', () => {
+    const route = read('apps/api/src/routes/workflows.routes.ts');
+    expect(route).toMatch(/UsageCounterService/);
+    expect(route).toMatch(/TRIAL_DAILY_CAP_HIT/);
+    expect(route).toMatch(/TRIAL_EXPIRED/);
+  });
+
+  it('Migration 106 also adds the team primitives (Department, TaskAssignment, Notification)', () => {
+    const sql = read('packages/db/prisma/migrations/106_team_and_trial/migration.sql');
+    expect(sql).toMatch(/CREATE TABLE "departments"/);
+    expect(sql).toMatch(/CREATE TABLE "task_assignments"/);
+    expect(sql).toMatch(/CREATE TABLE "notifications"/);
+    expect(sql).toMatch(/CREATE TABLE "trial_signups"/);
+  });
+});

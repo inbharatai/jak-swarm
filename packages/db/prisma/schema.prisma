@@ -52,6 +52,11 @@ model Tenant {
   tenantDocuments TenantDocument[]
   subscription    Subscription?
   companyProfile  CompanyProfile?
+  // Migration 106 — team + trial
+  departments     Department[]
+  taskAssignments TaskAssignment[]
+  notifications   Notification[]
+  trialSignup     TrialSignup?
 
   @@map("tenants")
 }
@@ -70,6 +75,17 @@ model User {
   jobFunction  String?
   avatarUrl    String?
 
+  // Migration 106 — Team + Trial.
+  // departmentId, jobTitle, managerId let us model a real org chart so a CEO
+  // can assign tasks to "the HR team" or "@anita" and the inbox / org-chart
+  // UI can render hierarchy. All three are nullable so existing rows keep
+  // working unchanged. managerId is a self-FK; we deliberately do NOT cascade
+  // on delete — when a manager leaves, their reports become managerless
+  // (status, not crash) until a TENANT_ADMIN reassigns them.
+  departmentId String?
+  jobTitle     String?
+  managerId    String?
+
   tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  Session[]
   workflows Workflow[]
@@ -77,8 +93,17 @@ model User {
   approvals ApprovalRequest[] @relation("reviewer")
   projects  Project[]
   whatsappLinks WhatsappLink[]
+  // Migration 106 relations
+  department         Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager            User?            @relation("UserManagerSelf", fields: [managerId], references: [id], onDelete: SetNull)
+  reports            User[]           @relation("UserManagerSelf")
+  taskAssignments    TaskAssignment[] @relation("TaskAssignmentAssignee")
+  taskAssignmentsCreated TaskAssignment[] @relation("TaskAssignmentAssigner")
+  notifications      Notification[]
 
   @@unique([tenantId, email])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, managerId])
   @@map("users")
 }
 
@@ -976,8 +1001,8 @@ model CrmDeal {
 model Subscription {
   id              String    @id @default(cuid())
   tenantId        String    @unique // One active subscription per tenant
-  planId          String    @default("free") // free | pro | team | enterprise
-  status          String    @default("active") // active | cancelled | past_due | trialing
+  planId          String    @default("free") // free | pro | team | enterprise | trial_30d
+  status          String    @default("active") // active | cancelled | past_due | trialing | trial_expired
   creditsTotal    Int       @default(200)    // Monthly allocation
   creditsUsed     Int       @default(0)      // Used this billing period
   premiumTotal    Int       @default(0)      // Premium model (Tier 3) allocation
@@ -995,9 +1020,34 @@ model Subscription {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Migration 106 — Free 30-day trial (the landing-page CTA destination).
+  //
+  // We keep the existing dailyCap/dailyUsed (token-credits) and ADD three
+  // independent resource counters because each one fails differently and a
+  // bad-actor can drain only one:
+  //   - dailyAgentRunsUsed/Cap        : one workflow run = one count, regardless of step count
+  //   - dailyApprovalsUsed/Cap        : counts EXTERNAL_ACTION_APPROVAL or higher gates fired
+  //   - dailyToolMinutesUsed/Cap      : minutes of tool execution (browser, code-interp, etc.)
+  //
+  // trialStartedAt + trialEndsAt are nullable so non-trial tenants are
+  // identical to before. usage-counter.service.ts owns reset + increment.
+  trialStartedAt          DateTime?
+  trialEndsAt             DateTime?
+  dailyAgentRunsUsed      Int       @default(0)
+  dailyAgentRunsCap       Int       @default(20)
+  dailyApprovalsUsed      Int       @default(0)
+  dailyApprovalsCap       Int       @default(5)
+  dailyToolMinutesUsed    Int       @default(0)
+  dailyToolMinutesCap     Int       @default(120)
+  // dailyTokensUsed/Cap is a per-day version of creditsUsed/Total, expressed
+  // in raw input+output tokens so the cap doesn't depend on credit pricing.
+  dailyTokensUsed         Int       @default(0)
+  dailyTokensCap          Int       @default(200000)
+
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([paddleSubId])
+  @@index([trialEndsAt])
   @@map("subscriptions")
 }
 
@@ -1689,6 +1739,164 @@ model ExternalAuditorAction {
   @@index([engagementId, createdAt(sort: Desc)], map: "external_auditor_actions_engagement_idx")
   @@index([userId, createdAt(sort: Desc)], map: "external_auditor_actions_user_idx")
   @@map("external_auditor_actions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration 106 — Team + Trial models
+//
+// `Department`      : org-chart unit (HR, Engineering, Marketing, ...).
+// `TaskAssignment`  : a workflow step routed to a HUMAN (vs an AI agent).
+// `Notification`    : per-user inbox notifications (assignments, mentions).
+// `TrialSignup`     : landing-page free-trial intake — captures email +
+//                     intent BEFORE the tenant is fully created. The trial
+//                     route promotes a TrialSignup row into a real Tenant
+//                     once the user verifies their email.
+//
+// Design notes:
+//   - All four tables are tenant-scoped except TrialSignup (which IS the
+//     pre-tenant signup record).
+//   - TaskAssignment carries `workflowId` + `taskId` (taskId references the
+//     in-state task identifier from `Workflow.stateJson`) so we can render
+//     "what's waiting on me" without pulling the whole workflow JSON.
+//   - We deliberately do NOT chain-hash these rows — they ride the existing
+//     AuditLog + signed-bundle infrastructure for tamper-evidence.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  // Self-FK lets us model nested orgs (Engineering > Backend > Auth).
+  // Optional; a top-level department has no parent.
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Department?  @relation("DepartmentParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentParent")
+  members  User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, parentId])
+  @@map("departments")
+}
+
+model TaskAssignment {
+  id            String    @id @default(cuid())
+  tenantId      String
+  workflowId    String
+  // Identifier of the task within the workflow's planJson/stateJson. We do
+  // not FK to Workflow on this column because tasks live in JSON; tenantId
+  // + workflowId scoping is the integrity guarantee.
+  taskId        String
+  // The user the task is assigned to. Required — there's no point creating
+  // an unassigned TaskAssignment row (use the in-state task itself).
+  assigneeUserId String
+  // Who created the assignment (CEO, manager, or the planner agent itself
+  // when an org-chart-aware planner routes a step to a human).
+  assignedByUserId String
+  // Free-form copy of the task description so the assignee doesn't need to
+  // open the workflow to understand what's being asked.
+  title         String
+  instructions  String?  @db.Text
+  // Lifecycle:
+  //   PENDING      — assigned, not yet acknowledged
+  //   ACKNOWLEDGED — assignee opened it, hasn't completed
+  //   COMPLETED    — done; output may be in `resultJson`
+  //   DECLINED     — assignee refused (with reason in `resultJson.reason`)
+  //   CANCELLED    — assigner withdrew
+  //   EXPIRED      — `dueAt` passed without action (background job sweeps)
+  status        String    @default("PENDING")
+  // Risk lattice (matches ToolRiskLevel) so the inbox can show a badge and
+  // sort by urgency. Optional — many human tasks are LOW.
+  riskLevel     String    @default("MEDIUM")
+  dueAt         DateTime?
+  acknowledgedAt DateTime?
+  completedAt   DateTime?
+  // Result captured when the human completes — could be free-form text,
+  // a decision, an attachment reference, anything the next agent step needs.
+  resultJson    Json?
+  // Free-form metadata for the producer (e.g. workflow step number).
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee    User   @relation("TaskAssignmentAssignee", fields: [assigneeUserId], references: [id], onDelete: Cascade)
+  assignedBy  User   @relation("TaskAssignmentAssigner", fields: [assignedByUserId], references: [id])
+
+  @@index([tenantId, assigneeUserId, status])
+  @@index([tenantId, workflowId])
+  @@index([status, dueAt])
+  @@map("task_assignments")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  // Open vocabulary so we can add new kinds without migrations:
+  //   'task_assigned' | 'task_due_soon' | 'task_completed' | 'mention'
+  //   | 'approval_needed' | 'approval_decided' | 'trial_cap_hit'
+  //   | 'trial_ending'  | 'workflow_completed'
+  kind      String
+  title     String
+  body      String?  @db.Text
+  // Optional deep-link target so the inbox row can route the user with one click.
+  linkPath  String?
+  // Extra payload for renderers (workflowId, taskAssignmentId, etc.)
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, readAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model TrialSignup {
+  id              String    @id @default(cuid())
+  // Captured BEFORE the tenant exists — we promote into a real Tenant once
+  // the user verifies their email AND creates a workspace. tenantId becomes
+  // non-null on promotion.
+  email           String    @unique
+  // Fingerprint to slow down trial-cycling (one trial per email + one per IP
+  // per 90 days at the application layer).
+  fingerprint     String?
+  // Marketing source for funnel analysis.
+  source          String?   // 'landing' | 'jak-shield-section' | 'partner-link' | ...
+  // Form fields collected on landing — all optional.
+  companyName     String?
+  industry        String?
+  teamSize        String?   // '1' | '2-5' | '6-20' | '21-100' | '100+'
+  // Lifecycle:
+  //   PENDING_VERIFY — email sent, awaiting click
+  //   VERIFIED       — clicked, awaiting workspace bootstrap
+  //   PROMOTED       — Tenant created; tenantId points at it
+  //   EXPIRED        — verification link timed out (24h)
+  //   ABANDONED      — verified but never bootstrapped (7d)
+  status          String    @default("PENDING_VERIFY")
+  // 32-byte URL-safe token. Stored as SHA-256 hash (never cleartext).
+  verifyTokenHash String    @unique
+  verifyExpiresAt DateTime
+  verifiedAt      DateTime?
+  promotedAt      DateTime?
+  tenantId        String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Optional FK only after promotion. SetNull on tenant delete so the signup
+  // history survives a tenant being purged for any reason.
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([fingerprint])
+  @@map("trial_signups")
 }
 
 model WorkflowCheckpoint {

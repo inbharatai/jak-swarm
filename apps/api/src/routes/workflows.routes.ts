@@ -8,6 +8,7 @@ import { AppError } from '../errors.js';
 import type { WorkflowStatus } from '../types.js';
 import { CreditService } from '../billing/credit-service.js';
 import { detectTaskType, estimateCredits } from '../billing/model-router.js';
+import { UsageCounterService } from '../services/trial/usage-counter.service.js';
 
 const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
@@ -184,6 +185,28 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
+        // ── Migration 106 — trial daily-cap + expiry guard ───────────────
+        // Runs BEFORE the credit check so trial-expired tenants see the
+        // correct error code (TRIAL_EXPIRED) and trial-cap-hit tenants see
+        // TRIAL_DAILY_CAP_HIT, not a generic CREDIT_LIMIT.
+        //
+        // Paid plans skip both branches inside `check()`.
+        const usageCounter = new UsageCounterService(fastify.db);
+        const capCheck = await usageCounter.check(tenantId, 'agentRuns', 1);
+        if (capCheck.trial.expired) {
+          return reply.status(402).send(err('TRIAL_EXPIRED', 'Your 30-day free trial has ended. Please upgrade to continue.', {
+            trialEndsAt: capCheck.trial.trialEndsAt?.toISOString() ?? null,
+          }));
+        }
+        if (!capCheck.allowed) {
+          return reply.status(429).send(err('TRIAL_DAILY_CAP_HIT', `Daily ${capCheck.blockedBy} cap reached. Resets at UTC midnight.`, {
+            resource: capCheck.blockedBy,
+            counters: capCheck.counters,
+            resetsAt: capCheck.resetsAt,
+            daysRemaining: capCheck.trial.daysRemaining,
+          }));
+        }
+
         // ── Credit check: estimate cost and verify user has budget ───────
         const creditService = new CreditService(fastify.db);
 
@@ -209,6 +232,12 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
         // 1. Persist the workflow record (PENDING)
         const workflow = await workflowService.createWorkflow(tenantId, userId, goal, industry);
+
+        // Migration 106 — increment trial counter on success. Fire-and-forget
+        // so a counter-write hiccup never rolls back a successful workflow.
+        void usageCounter.recordUsage(tenantId, 'agentRuns', 1).catch((e) => {
+          fastify.log.warn({ tenantId, err: e }, '[trial-cap] recordUsage(agentRuns) failed');
+        });
 
         // Persist queue execution intent so restart recovery can re-enqueue with
         // the same user-selected parameters even before the first state update.

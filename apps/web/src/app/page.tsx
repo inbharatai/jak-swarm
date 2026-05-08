@@ -447,15 +447,16 @@ export default function HomePage() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/register"
+                href="/trial"
                 className="group relative inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
                 style={{
                   background: 'linear-gradient(135deg, #34d399, #fbbf24)',
                   boxShadow: '0 0 30px rgba(52,211,153,0.3), 0 10px 40px rgba(52,211,153,0.15)',
                   touchAction: 'manipulation',
                 }}
+                data-cta="hero-trial"
               >
-                Start Free
+                Start 30-Day Free Trial
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <a
@@ -469,6 +470,18 @@ export default function HomePage() {
                 View on GitHub
               </a>
             </div>
+
+            {/* Trial trust line — every claim here is real and grep-able:
+                 - 30 days  : Subscription.trialEndsAt = trialStartedAt + 30 days
+                              (apps/api/src/services/trial/usage-counter.service.ts:startTrial)
+                 - Daily caps: dailyAgentRunsCap=20, dailyApprovalsCap=5,
+                              dailyToolMinutesCap=120, dailyTokensCap=200_000
+                              (packages/db/prisma/migrations/106_team_and_trial)
+                 - No credit card: trial signup at /trial collects email only
+                              (apps/api/src/routes/trial.routes.ts) */}
+            <p className="mt-5 text-xs text-slate-400 font-sans">
+              Free for 30 days · daily caps to protect your budget · no credit card required
+            </p>
 
             {/* Hero cockpit mockup — shows the full loop (command → plan →
                 agents → approval → output → audit) so visitors see the
