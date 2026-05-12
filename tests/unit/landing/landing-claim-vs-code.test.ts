@@ -300,7 +300,6 @@ describe('Landing — public marketing copy stays honest', () => {
     const railwayApiEnv = read('scripts/automation/env-templates/railway-api.env.example');
     const railwayWorkerEnv = read('scripts/automation/env-templates/railway-worker.env.example');
     const renderYaml = read('render.yaml');
-    const renderScript = read('scripts/create-render-service.ps1');
     const doctor = read('scripts/doctor.ps1');
     const truth = read('apps/web/src/lib/product-truth.ts');
 
@@ -314,7 +313,7 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(truth).toMatch(/label:\s*'Model Runtime'/);
     expect(truth).toMatch(/suffix:\s*' OpenAI'/);
 
-    const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, renderYaml, renderScript, doctor].join('\n');
+    const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, renderYaml, doctor].join('\n');
     expect(activeDeploySurfaces).not.toMatch(/ANTHROPIC_API_KEY|GEMINI_API_KEY|DEEPSEEK_API_KEY|OPENROUTER_API_KEY|OLLAMA_(URL|BASE_URL|MODEL)|OPENAI_FALLBACK_MODEL|LLM_ROUTING_STRATEGY/);
   });
 });

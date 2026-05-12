@@ -19,8 +19,8 @@
  *
  *   - Encryption is anchored on AUTH_SECRET (config.jwtSecret), NOT
  *     JAK_FIELD_ENCRYPTION_KEY. config.ts falls back to a hardcoded dev
- *     string ('dev-secret-change-me-NEVER-USE-IN-PROD') when AUTH_SECRET
- *     is unset in non-prod, so encryption ALWAYS runs — there is no
+ *     dev-only sentinel when AUTH_SECRET is unset in non-prod, so encryption
+ *     ALWAYS runs — there is no
  *     "cleartext mode". The fail-safe-vs-cleartext test documents that
  *     observed behaviour.
  *

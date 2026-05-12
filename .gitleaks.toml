@@ -27,6 +27,8 @@ regexes = [
   '''your-[a-z-]+-key''',
   '''test-bridge-token''',
   '''dev-secret-change-me-NEVER-USE-IN-PROD''',
+  # Deterministic trial-email unit-test fixture, not a live credential.
+  '''abcdef0123456789abcdef0123456789''',
   # Known example format "abcd efgh ijkl mnop" from Gmail app-password docs
   '''abcd efgh ijkl mnop''',
 ]

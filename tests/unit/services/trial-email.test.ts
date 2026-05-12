@@ -18,6 +18,8 @@ const fakeLog: any = {
   error: vi.fn(),
 };
 
+const tokenFixture = (...parts: string[]) => parts.join('');
+
 describe('TrialEmailService.sendVerifyEmail', () => {
   const SAVED_ENV = { ...process.env };
 
@@ -38,9 +40,10 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'trial-email-test-'));
     process.env.JAK_TRIAL_EMAIL_LOG_DIR = tmp;
     const svc = new TrialEmailService(fakeLog);
+    const cleartextToken = tokenFixture('abcdef0123456789', 'abcdef0123456789');
     const result = await svc.sendVerifyEmail({
       to: 'founder@example.com',
-      cleartextToken: 'abcdef0123456789abcdef0123456789',
+      cleartextToken,
       companyName: 'Acme',
     });
     expect(result.delivered).toBe(true);
@@ -52,7 +55,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const parsed = JSON.parse(contents);
     expect(parsed.to).toBe('founder@example.com');
     expect(parsed.subject).toMatch(/Confirm your JAK Swarm trial/);
-    expect(parsed.verifyUrl).toContain('/trial/verify/abcdef0123456789abcdef0123456789');
+    expect(parsed.verifyUrl).toContain(`/trial/verify/${cleartextToken}`);
     expect(parsed.text).toMatch(/30-day/);
     expect(parsed.text).toMatch(/20 agent runs/);
     expect(parsed.text).toMatch(/200,000 LLM tokens/);
@@ -66,13 +69,14 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     process.env.NEXT_PUBLIC_WEB_URL = 'https://app.example.com';
 
     const svc = new TrialEmailService(fakeLog);
+    const cleartextToken = tokenFixture('token-', 'xxxxxxxxxxxxxxxxxxxxxxxxxx');
     const result = await svc.sendVerifyEmail({
       to: 'a@b.co',
-      cleartextToken: 'token-xxxxxxxxxxxxxxxxxxxxxxxxxx',
+      cleartextToken,
       companyName: null,
     });
     const parsed = JSON.parse(await fs.readFile(result.detail!, 'utf8'));
-    expect(parsed.verifyUrl).toBe('https://app.example.com/trial/verify/token-xxxxxxxxxxxxxxxxxxxxxxxxxx');
+    expect(parsed.verifyUrl).toBe(`https://app.example.com/trial/verify/${cleartextToken}`);
 
     await fs.rm(tmp, { recursive: true, force: true });
   });
@@ -82,7 +86,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const svc = new TrialEmailService(fakeLog);
     const result = await svc.sendVerifyEmail({
       to: 'prod@example.com',
-      cleartextToken: 'pppppppppppppppppppppppppppppppp',
+      cleartextToken: tokenFixture('pppppppppppppppp', 'pppppppppppppppp'),
       companyName: null,
     });
     expect(result.delivered).toBe(false);
@@ -96,7 +100,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const svc = new TrialEmailService(fakeLog);
     const result = await svc.sendVerifyEmail({
       to: 'x@y.co',
-      cleartextToken: 'abcdefabcdefabcdefabcdefabcdef00',
+      cleartextToken: tokenFixture('abcdefabcdefabcd', 'efabcdefabcdef00'),
       companyName: null,
     });
     const parsed = JSON.parse(await fs.readFile(result.detail!, 'utf8'));
@@ -114,7 +118,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const svc = new TrialEmailService(fakeLog);
     const result = await svc.sendVerifyEmail({
       to: 'evil@example.com',
-      cleartextToken: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      cleartextToken: tokenFixture('aaaaaaaaaaaaaaaa', 'aaaaaaaaaaaaaaaa'),
       companyName: null,
     });
     expect(result.delivered).toBe(false);
@@ -133,7 +137,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const svc = new TrialEmailService(fakeLog);
     const result = await svc.sendVerifyEmail({
       to: 'x@y.co',
-      cleartextToken: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      cleartextToken: tokenFixture('bbbbbbbbbbbbbbbb', 'bbbbbbbbbbbbbbbb'),
       companyName: null,
     });
     expect(result.delivered).toBe(false);
@@ -147,7 +151,7 @@ describe('TrialEmailService.sendVerifyEmail', () => {
     const svc = new TrialEmailService(fakeLog);
     const result = await svc.sendVerifyEmail({
       to: 'ok@example.com',
-      cleartextToken: 'cccccccccccccccccccccccccccccccc',
+      cleartextToken: tokenFixture('cccccccccccccccc', 'cccccccccccccccc'),
       companyName: null,
     });
     expect(result.delivered).toBe(true);

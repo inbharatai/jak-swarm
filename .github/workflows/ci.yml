@@ -358,6 +358,7 @@ jobs:
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/security build
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
 
