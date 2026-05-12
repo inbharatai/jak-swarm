@@ -329,12 +329,14 @@ export async function ingestDocumentInBackground(
     // Import DocumentIngestor lazily so the route file doesn't pull the
     // PDF/embedding dep chain on every hot-reload in dev.
     const { DocumentIngestor } = await import('@jak-swarm/tools');
-    const { createSignedReadUrl: signUrl } = await import('../services/storage.service.js');
 
     // Fetch the file back from storage to re-read its bytes for ingestion.
     // We could also pass bytes directly at upload time, but re-fetching keeps
     // the ingestion worker decoupled from the upload request's lifetime.
-    const signedUrl = await signUrl({ tenantId: doc.tenantId, storageKey: doc.storageKey });
+    const signedUrl = await createSignedReadUrl({
+      tenantId: doc.tenantId,
+      storageKey: doc.storageKey,
+    });
     const res = await fetch(signedUrl);
     if (!res.ok) throw new Error(`Fetch storage object failed: ${res.status}`);
     const arrayBuf = await res.arrayBuffer();
