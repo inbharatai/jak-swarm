@@ -35,6 +35,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance, type FastifyRequest } from '../../../apps/api/node_modules/fastify/fastify.js';
 import multipart from '../../../apps/api/node_modules/@fastify/multipart/index.js';
 
+const documentIngestorHarness = vi.hoisted(() => ({
+  ingestText: vi.fn(async () => undefined),
+  ingestPDF: vi.fn(async () => undefined),
+}));
+
+vi.mock('@jak-swarm/tools', () => ({
+  DocumentIngestor: class {
+    ingestText = documentIngestorHarness.ingestText;
+    ingestPDF = documentIngestorHarness.ingestPDF;
+  },
+}));
+
 function mockSecurityScan(options?: {
   containsPII?: boolean;
   found?: string[];
@@ -1063,6 +1075,8 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    documentIngestorHarness.ingestText = vi.fn(async () => undefined);
+    documentIngestorHarness.ingestPDF = vi.fn(async () => undefined);
     vi.doMock('../../../apps/api/src/services/storage.service.js', () => ({
       createSignedReadUrl: vi.fn(async (opts: { tenantId: string; storageKey: string }) => {
         if (!opts.storageKey.startsWith(`${opts.tenantId}/`)) {
@@ -1075,19 +1089,12 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.doUnmock('@jak-swarm/tools');
     vi.doUnmock('@jak-swarm/security');
     vi.doUnmock('../../../apps/api/src/services/document-parsing/parsers.js');
   });
 
   it('DOCX upload routes through parseByMimeType + ingestText with mammoth diagnostics', async () => {
-    const ingestText = vi.fn(async () => undefined);
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = ingestText;
-        ingestPDF = vi.fn();
-      },
-    }));
+    const ingestText = documentIngestorHarness.ingestText;
     const parseByMimeType = vi.fn(async (_mime: string, _bytes: Buffer) => ({
       text: 'Hello from a Word document.',
       parseConfidence: 0.95,
@@ -1136,13 +1143,7 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
   });
 
   it('XLSX upload routes through parseByMimeType + ingestText with exceljs diagnostics', async () => {
-    const ingestText = vi.fn(async () => undefined);
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = ingestText;
-        ingestPDF = vi.fn();
-      },
-    }));
+    const ingestText = documentIngestorHarness.ingestText;
     const parseByMimeType = vi.fn(async (_m: string, _b: Buffer) => ({
       text: '## Sheet: Q1\nA1\tB1\nA2\tB2',
       parseConfidence: 0.85,
@@ -1183,13 +1184,7 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
   });
 
   it('JPEG/PNG upload routes through tesseract; parseConfidence ≤ 0.7', async () => {
-    const ingestText = vi.fn(async () => undefined);
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = ingestText;
-        ingestPDF = vi.fn();
-      },
-    }));
+    const ingestText = documentIngestorHarness.ingestText;
     const parseByMimeType = vi.fn(async (_m: string, _b: Buffer) => ({
       text: 'OCR scrape from a noisy receipt image',
       parseConfidence: 0.55,
@@ -1232,13 +1227,6 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
 
   it('PII text → ingestionError contains a "PII:" warning string but status is still INDEXED', async () => {
     // The route's policy is "log + warn, don't block" — confirm both halves.
-    const ingestText = vi.fn(async () => undefined);
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = ingestText;
-        ingestPDF = vi.fn();
-      },
-    }));
     vi.doMock('../../../apps/api/src/services/document-parsing/parsers.js', () => ({
       parseByMimeType: vi.fn(async () => ({
         text: 'Contact alice@example.com or call 555-12-3456 for details',
@@ -1271,12 +1259,6 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
   });
 
   it('parser throws → status=STORED_NOT_PARSED with diagnostic', async () => {
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = vi.fn();
-        ingestPDF = vi.fn();
-      },
-    }));
     vi.doMock('../../../apps/api/src/services/document-parsing/parsers.js', () => ({
       parseByMimeType: vi.fn(async () => {
         throw new Error('OOM during OCR');
@@ -1306,12 +1288,6 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
   });
 
   it('parseByMimeType returns null (unknown mime family) → STORED_NOT_PARSED honestly', async () => {
-    vi.doMock('@jak-swarm/tools', () => ({
-      DocumentIngestor: class {
-        ingestText = vi.fn();
-        ingestPDF = vi.fn();
-      },
-    }));
     vi.doMock('../../../apps/api/src/services/document-parsing/parsers.js', () => ({
       parseByMimeType: vi.fn(async () => null),
     }));
