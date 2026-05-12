@@ -1063,6 +1063,14 @@ describe('ingestDocumentInBackground — parser dispatch by MIME type', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    vi.doMock('../../../apps/api/src/services/storage.service.js', () => ({
+      createSignedReadUrl: vi.fn(async (opts: { tenantId: string; storageKey: string }) => {
+        if (!opts.storageKey.startsWith(`${opts.tenantId}/`)) {
+          throw new Error(`cross-tenant read refused: ${opts.storageKey}`);
+        }
+        return `https://stub.local/${opts.storageKey}?sig=test`;
+      }),
+    }));
   });
 
   afterEach(() => {
