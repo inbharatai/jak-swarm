@@ -13,9 +13,9 @@ import { BrowserOperatorComingSoon } from '@/components/integrations/BrowserOper
 import { getAuditGoal } from '@/lib/connector-audit-goals';
 import type { Integration, IntegrationProvider } from '@/types';
 
-// Full integration roster surfaced on /integrations. Every provider here is
-// reachable end-to-end — OAuth flow, credentials, and tools are all wired.
-// LinkedIn + Salesforce land in this list (no "coming soon" placeholders).
+// Full integration roster surfaced on /integrations. Providers here are
+// connectable/configurable surfaces, not a blanket production-readiness claim:
+// some use OAuth, some use credential paste, and some remain beta/partial.
 const ALL_PROVIDERS: IntegrationProvider[] = [
   'GMAIL',
   'GCAL',

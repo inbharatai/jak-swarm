@@ -4,8 +4,10 @@
  */
 import { test } from '@playwright/test';
 
-const EMAIL = process.env['E2E_AUTH_EMAIL']!;
-const PASSWORD = process.env['E2E_AUTH_PASSWORD']!;
+const EMAIL = process.env['E2E_AUTH_EMAIL'];
+const PASSWORD = process.env['E2E_AUTH_PASSWORD'];
+
+test.skip(!EMAIL || !PASSWORD, 'Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD to run the authenticated blank-page diagnostic.');
 
 test('diag: blank pages on /builder /knowledge /settings', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -29,8 +31,8 @@ test('diag: blank pages on /builder /knowledge /settings', async ({ browser }) =
   });
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  await page.locator('input[type="email"]').first().fill(EMAIL);
-  await page.locator('input[type="password"]').first().fill(PASSWORD);
+  await page.locator('input[type="email"]').first().fill(EMAIL!);
+  await page.locator('input[type="password"]').first().fill(PASSWORD!);
   await page.locator('button[type="submit"]').first().click();
   await page.waitForURL((u) => !/\/(login|register)/.test(u.pathname), { timeout: 20_000 });
   await page.waitForTimeout(2500);

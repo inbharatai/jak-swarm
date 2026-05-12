@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Voice UI (mobile)', () => {
   test('renders voice controls and transcript panel on mobile', async ({ page }) => {
-    await page.goto('/__e2e__/voice');
+    await page.goto('/e2e/voice');
 
     await expect(page.getByTestId('voice-lab')).toBeVisible();
     await expect(page.getByTestId('voice-input')).toBeVisible();

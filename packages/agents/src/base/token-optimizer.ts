@@ -196,33 +196,16 @@ interface ModelSelection {
  */
 const MODEL_TIERS: Record<string, Array<{ model: string; provider: string }>> = {
   simple: [
-    { model: 'llama3.1', provider: 'ollama' },
-    { model: 'meta-llama/llama-3.1-8b-instruct', provider: 'openrouter' },
-    { model: 'gpt-4o-mini', provider: 'openai' },
-    { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    { model: 'deepseek-chat', provider: 'deepseek' },
+    { model: 'gpt-5.4', provider: 'openai' },
   ],
   medium: [
-    { model: 'deepseek-chat', provider: 'deepseek' },
-    { model: 'llama3.1', provider: 'ollama' },
-    { model: 'meta-llama/llama-3.1-70b-instruct', provider: 'openrouter' },
-    { model: 'gpt-4o-mini', provider: 'openai' },
-    { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    { model: 'gpt-4o', provider: 'openai' },
+    { model: 'gpt-5.4', provider: 'openai' },
   ],
   complex: [
-    { model: 'deepseek-chat', provider: 'deepseek' },
-    { model: 'gpt-4o', provider: 'openai' },
-    { model: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    { model: 'gpt-4-turbo', provider: 'openai' },
-    { model: 'claude-opus-4-20250514', provider: 'anthropic' },
+    { model: 'gpt-5.4', provider: 'openai' },
   ],
   reasoning: [
-    { model: 'deepseek-reasoner', provider: 'deepseek' },
-    { model: 'o3-mini', provider: 'openai' },
-    { model: 'o1-mini', provider: 'openai' },
-    { model: 'o1', provider: 'openai' },
-    { model: 'claude-opus-4-20250514', provider: 'anthropic' },
+    { model: 'gpt-5.5', provider: 'openai' },
   ],
 };
 
@@ -230,7 +213,7 @@ const MODEL_TIERS: Record<string, Array<{ model: string; provider: string }>> = 
  * Select the cheapest model that can handle a task based on complexity.
  *
  * @param taskComplexity - How complex the task is
- * @param availableProviders - Which providers are available (e.g., ['openai', 'ollama'])
+ * @param availableProviders - Only 'openai' is honored in OpenAI-only mode
  * @param maxBudgetUsd - Optional maximum budget per 1K tokens
  * @returns The selected model, provider, and estimated cost
  */
@@ -261,23 +244,16 @@ export function selectModel(
     };
   }
 
-  // Fallback: if nothing matches, try any free model from available providers
-  if (availableProviders.includes('ollama')) {
-    return {
-      model: 'llama3.1',
-      provider: 'ollama',
-      estimatedCostPer1KTokens: 0,
-    };
-  }
-
-  // Last resort: return the first candidate regardless of provider availability
-  const fallback = candidates[0]!;
-  const pricing = getModelPricing(fallback.model);
+  // OpenAI-only: return the configured tier model even if the caller forgot
+  // to include 'openai' in availableProviders. The actual call will fail
+  // loudly later if OPENAI_API_KEY/model access is missing.
+  const selected = candidates[0]!;
+  const pricing = getModelPricing(selected.model);
   const costPer1K = (500 * pricing.inputPer1M + 500 * pricing.outputPer1M) / 1_000_000;
 
   return {
-    model: fallback.model,
-    provider: fallback.provider,
+    model: selected.model,
+    provider: selected.provider,
     estimatedCostPer1KTokens: Math.round(costPer1K * 1_000_000) / 1_000_000,
   };
 }

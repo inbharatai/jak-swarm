@@ -8,6 +8,7 @@
 import type { PrismaClient } from '@jak-swarm/db';
 import { CronExpressionParser } from 'cron-parser';
 import { createLogger } from '@jak-swarm/shared';
+import { UsageCounterService } from './trial/usage-counter.service.js';
 
 const logger = createLogger('scheduler');
 
@@ -234,6 +235,46 @@ export class SchedulerService {
             ? 'standing_order'
             : 'schedule';
 
+          // P0-7 (audit 2026-05-08): trial-cap enforcement on the
+          // scheduler path. Without this gate, a trial tenant could create
+          // a 1-minute cron schedule and bypass the dailyAgentRunsCap that
+          // /workflows enforces. Fail-closed: if the cap is hit, mark the
+          // schedule's lastRunStatus and skip this fire — the next cron
+          // tick will retry once the daily counter resets.
+          const usageCounter = new UsageCounterService(this.db);
+          const capCheck = await usageCounter.check(schedule.tenantId, 'agentRuns', 1);
+          if (capCheck.trial.expired) {
+            logger.warn(
+              { schedule: schedule.name, tenantId: schedule.tenantId },
+              'TRIAL_EXPIRED — schedule skipped; tenant must upgrade',
+            );
+            await this.db.workflowSchedule
+              .update({
+                where: { id: schedule.id },
+                data: { lastRunStatus: 'SKIPPED_TRIAL_EXPIRED', lastRunAt: now },
+              })
+              .catch(() => {});
+            continue;
+          }
+          if (!capCheck.allowed) {
+            logger.warn(
+              {
+                schedule: schedule.name,
+                tenantId: schedule.tenantId,
+                blockedBy: capCheck.blockedBy,
+                resetsAt: capCheck.resetsAt,
+              },
+              'TRIAL_DAILY_CAP_HIT — schedule skipped this fire; will retry after UTC midnight',
+            );
+            await this.db.workflowSchedule
+              .update({
+                where: { id: schedule.id },
+                data: { lastRunStatus: 'SKIPPED_TRIAL_CAP_HIT', lastRunAt: now },
+              })
+              .catch(() => {});
+            continue;
+          }
+
           const workflowId = await this.executeWorkflow({
             goal: schedule.goal,
             tenantId: schedule.tenantId,
@@ -245,6 +286,16 @@ export class SchedulerService {
             approvalRequiredFor: approvalRequiredFor.length > 0 ? approvalRequiredFor : undefined,
             triggeredBy,
             ...(scopedOrder ? { standingOrderId: scopedOrder.id } : {}),
+          });
+
+          // P0-7 (audit 2026-05-08): record usage immediately on success.
+          // Fire-and-forget: a counter hiccup must NEVER roll back a
+          // successful schedule fire (workflow already created).
+          void usageCounter.recordUsage(schedule.tenantId, 'agentRuns', 1).catch((e) => {
+            logger.warn(
+              { tenantId: schedule.tenantId, scheduleId: schedule.id, err: e instanceof Error ? e.message : String(e) },
+              '[trial-cap] scheduler recordUsage(agentRuns) failed',
+            );
           });
 
           if (activeOrders.length > 0) {

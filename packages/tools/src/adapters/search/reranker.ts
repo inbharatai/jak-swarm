@@ -1,10 +1,11 @@
 import type { SearchResult } from './types.js';
+import { openAIChatTokenLimitParam } from '@jak-swarm/shared';
 
 /**
  * LLM re-ranker for search results.
  *
  * After the strategy chain returns N raw results, we hand them to a cheap LLM
- * (Claude Haiku primary, GPT-4o-mini fallback) with the query and ask for a
+ * (OpenAI GPT-5.4 mini) with the query and ask for a
  * 0-1 relevance score per result. We drop results below the threshold and
  * re-sort by score. This is the single biggest accuracy lift on top of any
  * search API — raw Serper/Tavily/DDG results are ranked by their own signal,
@@ -14,8 +15,7 @@ import type { SearchResult } from './types.js';
  * returns the original results unchanged. Re-ranking must never break search.
  *
  * Cost (per re-rank call):
- *   Claude Haiku 4.5  ~$0.0015 input + $0.00015 output = ~$0.0017
- *   GPT-4o-mini       ~$0.0002 input + $0.0001 output = ~$0.0003
+ *   GPT-5.4 mini      managed OpenAI tier-1 cost
  * Gated to paid-tier tenants only (gated in the caller, not here).
  */
 
@@ -115,41 +115,6 @@ Respond ONLY with JSON, no prose, no markdown code fences:
 The scores array MUST contain exactly ${results.length} numbers in the same order as the results above.`;
 }
 
-async function rerankViaAnthropic(
-  prompt: string,
-  timeoutMs: number,
-): Promise<number[] | null> {
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { content?: Array<{ text?: string }> };
-    const text = data.content?.[0]?.text ?? '';
-    return parseScores(text);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function rerankViaOpenAI(
   prompt: string,
   timeoutMs: number,
@@ -160,6 +125,7 @@ async function rerankViaOpenAI(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const model = process.env['OPENAI_MODEL_TIER_1']?.trim() || 'gpt-5.4';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -167,8 +133,8 @@ async function rerankViaOpenAI(
         authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 500,
+        model,
+        ...openAIChatTokenLimitParam(model, 500),
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
       }),
@@ -201,9 +167,8 @@ function parseScores(text: string): number[] | null {
 }
 
 /**
- * Default LLM re-ranker. Tries Claude Haiku first (best JSON adherence +
- * reasoning per cent), falls back to GPT-4o-mini, then passes through
- * unchanged if neither key is available.
+ * Default LLM re-ranker. Uses OpenAI only, then passes through unchanged
+ * when the OpenAI key is unavailable or the call fails.
  */
 export const defaultReranker: RerankerFn = async ({
   query,
@@ -224,12 +189,8 @@ export const defaultReranker: RerankerFn = async ({
   let provider = 'none';
   let scores: number[] | null = null;
 
-  if (process.env['ANTHROPIC_API_KEY']) {
-    provider = 'anthropic-haiku';
-    scores = await rerankViaAnthropic(prompt, timeoutMs);
-  }
-  if (!scores && process.env['OPENAI_API_KEY']) {
-    provider = 'openai-gpt4o-mini';
+  if (process.env['OPENAI_API_KEY']) {
+    provider = 'openai-gpt-5.4';
     scores = await rerankViaOpenAI(prompt, timeoutMs);
   }
 

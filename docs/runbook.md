@@ -13,7 +13,7 @@ mode, its symptoms, root cause, and the fastest path to recovery.
 4. [WhatsApp client fails to start or QR expires](#4-whatsapp-client-fails-to-start-or-qr-expires)
 5. [Workflow stuck in RUNNING state](#5-workflow-stuck-in-running-state)
 6. [High token / cost usage spike](#6-high-token--cost-usage-spike)
-7. [LLM provider outage](#7-llm-provider-outage)
+7. [OpenAI outage / degradation](#7-openai-outage--degradation)
 8. [JWT / auth failures at scale](#8-jwt--auth-failures-at-scale)
 9. [CI failure reference](#9-ci-failure-reference)
 10. [Deployment rollback (Render)](#10-deployment-rollback-render)
@@ -32,7 +32,7 @@ mode, its symptoms, root cause, and the fastest path to recovery.
 | Error in logs | Fix |
 |---|---|
 | `Using default JWT secret` | Set `AUTH_SECRET` to a 32+ char random string in Render env vars. |
-| `No LLM provider API key set` | Set at least one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. |
+| `OPENAI_API_KEY is not set` | Set `OPENAI_API_KEY`. JAK Swarm has no non-OpenAI LLM fallback path. |
 | `Database unreachable` | Check `DATABASE_URL` / `DIRECT_URL`. Confirm Postgres is running and credentials are correct. |
 | `PrismaClientInitializationError` | Run `pnpm db:migrate:deploy` against the target database. |
 | TypeScript / missing module error | Rebuild: `pnpm --filter @jak-swarm/api build` |
@@ -138,13 +138,13 @@ WHATSAPP_CLIENT_PORT=47891      # Port the child process listens on
 ```bash
 # Check recent trace entries:
 GET /workflows/:id/traces
-# Check for LLM provider errors in logs:
+# Check for OpenAI runtime errors in logs:
 grep "LLMProviderError\|rate limit\|timeout" <log file>
 ```
 
 ### Recovery steps
 1. **Force stop:** `POST /workflows/:id/stop` — marks as CANCELLED, releases resources.
-2. **LLM timeout:** Check `GET /settings/llm/status` — switch to a different provider if primary is down.
+2. **OpenAI timeout:** Check `GET /settings/llm/status`, pause affected workflows, and retry after the OpenAI incident or quota issue clears. There is no non-OpenAI fallback.
 3. **Budget exceeded:** The workflow may have hit the token budget. Check `GET /analytics/cost`.
 4. **Swarm deadlock:** Rare. Stop workflow, then restart the API process to clear in-memory state.
 
@@ -169,26 +169,23 @@ UPDATE "Tenant" SET "monthlyTokenBudget" = 500000 WHERE id = '<tenant-id>';
 
 ---
 
-## 7. LLM Provider Outage
+## 7. OpenAI Outage / Degradation
 
 ### Symptoms
-- Workflows fail with `LLMProviderError: 503` or `rate limit exceeded`.
-- `GET /settings/llm/status` shows a provider as unconfigured/erroring.
+- Workflows fail with `LLMProviderError: 503`, timeout, auth, quota, or rate-limit errors.
+- `GET /settings/llm/status` shows OpenAI as unconfigured or unavailable.
 
-### Provider failover
-JAK Swarm has automatic provider failover. If the primary provider fails 3 times in a row, it routes to the next configured provider.
+### Recovery
+JAK Swarm is OpenAI-only. Do not attempt to configure Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter as an emergency fallback.
 
-**Manual override — disable a failing provider temporarily:**
+**Immediate operator actions:**
 ```bash
-DELETE /settings/llm/openai   # removes OpenAI from rotation
-# Re-add when recovered:
-PUT /settings/llm/openai  { "apiKey": "..." }
+GET /settings/llm/status
+GET /analytics/cost
+POST /workflows/:id/pause
 ```
 
-**Fallback priority** (configure via `LLM_PROVIDER_PRIORITY` env var, comma-separated):
-```
-openai,anthropic,gemini,deepseek,openrouter,ollama
-```
+After confirming key/quota/incident status, resume only the workflows that are safe to continue. If the outage is external, keep risky workflows paused so approval state and audit evidence remain intact.
 
 ---
 
@@ -251,12 +248,7 @@ DB schema migrations run automatically on deploy. Rolling back the code without 
 | `DATABASE_URL` | **Yes** | PostgreSQL connection string (pooled, e.g. PgBouncer). |
 | `DIRECT_URL` | **Yes** | Direct PostgreSQL connection (bypasses pooler, used for migrations). |
 | `REDIS_URL` | Recommended | Redis connection string. Falls back to in-memory if not set. |
-| `OPENAI_API_KEY` | One of these required | LLM provider keys. |
-| `ANTHROPIC_API_KEY` | One of these required | |
-| `GEMINI_API_KEY` | One of these required | |
-| `DEEPSEEK_API_KEY` | One of these required | |
-| `OPENROUTER_API_KEY` | One of these required | |
-| `OLLAMA_BASE_URL` | One of these required | Local Ollama instance base URL. |
+| `OPENAI_API_KEY` | **Yes** | Required OpenAI-only LLM runtime key. |
 | `WHATSAPP_BRIDGE_TOKEN` | If WhatsApp enabled | Shared secret for WhatsApp bridge auth. |
 | `WHATSAPP_AUTO_START` | Optional | `1` to start WhatsApp client on boot. |
 | `CORS_ORIGINS` | Recommended in prod | Comma-separated allowed origins. |

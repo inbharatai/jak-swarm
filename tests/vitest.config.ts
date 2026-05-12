@@ -31,19 +31,25 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
+    // Keep test-file parallelism bounded. The agents/tool suites import
+    // large TS barrels and register the full tool catalog; on Windows a
+    // full unbounded run can starve first-test warmups and fail by timeout
+    // even when the same specs pass in isolation.
+    maxWorkers: 4,
+    minWorkers: 1,
     // Vitest default `testTimeout` is 5000ms which is too tight for the
     // integration tests in this suite — they hit a real Postgres
     // (testcontainers), a real OpenAI Responses API in stub mode, real
     // Playwright browser tooling, and the full LangGraph orchestrator end-
     // to-end. Under CPU contention those tests routinely sit at 3-5s and
     // hit the ceiling intermittently (we observed 2 flakes on a parallel
-    // turbo run that went green on retry). Bumping the budget to 30s
+    // turbo run that went green on retry). Bumping the budget to 60s
     // gives integration tests headroom without masking real bugs — a test
-    // that takes longer than 30s genuinely has a problem worth fixing.
+    // that takes longer than 60s genuinely has a problem worth fixing.
     // Hooks (`beforeAll`/`afterAll`) get the same budget so DB setup +
     // testcontainer boot don't flake on cold caches.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     // Coverage gate. Not enabled by default (keeps local `pnpm test` fast);
     // CI runs `pnpm vitest run --coverage` which picks up these thresholds
     // and fails the build if either package drops below floor.

@@ -47,9 +47,13 @@ export function afterGuardrail(state: SwarmState): NodeName {
 }
 
 export function afterApproval(state: SwarmState): NodeName {
-  // If the last pending approval was rejected, end the workflow.
+  // Pending, rejected, or deferred decisions must not advance to the worker. The
+  // approval node keeps DEFERRED runs in AWAITING_APPROVAL so the reviewer
+  // can decide later through the proper approval endpoint.
   const lastApproval = state.pendingApprovals[state.pendingApprovals.length - 1];
+  if (lastApproval?.status === 'PENDING') return '__end__';
   if (lastApproval?.status === 'REJECTED') return '__end__';
+  if (lastApproval?.status === 'DEFERRED') return '__end__';
   return 'worker';
 }
 

@@ -17,7 +17,7 @@
 
 import OpenAI from 'openai';
 import type { ZodType } from 'zod';
-import { calculateCost } from '@jak-swarm/shared';
+import { calculateCost, openAISamplingParams } from '@jak-swarm/shared';
 import type { AgentContext } from '../base/agent-context.js';
 import type {
   LLMRuntime,
@@ -96,6 +96,57 @@ export class OpenAIRuntime implements LLMRuntime {
     return modelForTier(opts.tier ?? this.defaultTier);
   }
 
+  private recordResponseUsage(
+    context: AgentContext,
+    resp: OpenAI.Responses.Response,
+    fallbackModel: string,
+  ): void {
+    if (!resp.usage) return;
+
+    const promptTokens = resp.usage.input_tokens ?? 0;
+    const completionTokens = resp.usage.output_tokens ?? 0;
+    const totalTokens = promptTokens + completionTokens;
+    const usageDetails = resp.usage as {
+      input_tokens_details?: { cached_tokens?: number };
+      output_tokens_details?: { reasoning_tokens?: number };
+    };
+    const cachedReadTokens = usageDetails.input_tokens_details?.cached_tokens ?? 0;
+    const reasoningTokens = usageDetails.output_tokens_details?.reasoning_tokens ?? 0;
+    const model = typeof resp.model === 'string' && resp.model.length > 0
+      ? resp.model
+      : fallbackModel;
+    const costUsd = calculateCost(model, promptTokens, completionTokens, cachedReadTokens);
+    const timestamp = new Date().toISOString();
+
+    context.recordLLMUsage({
+      runtime: this.name,
+      model,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      ...(cachedReadTokens > 0 ? { cachedReadTokens } : {}),
+      ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+      costUsd,
+      timestamp,
+    });
+
+    context.emitActivity({
+      type: 'cost_updated',
+      agentRole: context.agentRole ?? 'UNKNOWN_AGENT',
+      runtime: this.name,
+      model,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      ...(cachedReadTokens > 0 ? { cachedReadTokens } : {}),
+      ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+      costUsd,
+      runId: context.runId,
+      stepId: context.agentRole ?? context.workflowId,
+      timestamp,
+    });
+  }
+
   /**
    * Strict structured output via Responses API json_schema format.
    * Schema is enforced at the model layer — no prose drift, no
@@ -120,8 +171,9 @@ export class OpenAIRuntime implements LLMRuntime {
     // is provided. Unwrap for direct OpenAI consumption.
     const def = jsonSchema.definitions?.[opts.schemaName ?? 'response'] ?? jsonSchema;
 
+    const model = this.resolveModel(opts);
     const resp = await this.client.responses.create({
-      model: this.resolveModel(opts),
+      model,
       input: chatMessagesToResponsesInput(messages),
       text: {
         format: {
@@ -133,8 +185,9 @@ export class OpenAIRuntime implements LLMRuntime {
         },
       },
       ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...openAISamplingParams(model, { temperature: opts.temperature }),
     });
+    this.recordResponseUsage(_context, resp, model);
 
     const text = (resp as { output_text?: string }).output_text
       ?? extractTextFromOutputItems(resp.output ?? []);
@@ -159,14 +212,16 @@ export class OpenAIRuntime implements LLMRuntime {
   ): Promise<OpenAI.ChatCompletion> {
     const opts = options as OpenAIRuntimeCallOptions;
     const tools = adaptChatToolsToResponses(undefined, opts.hostedTools);
+    const model = this.resolveModel(opts);
     const resp = await this.client.responses.create({
-      model: this.resolveModel(opts),
+      model,
       input: chatMessagesToResponsesInput(messages),
       ...(tools.length > 0 ? { tools } : {}),
       ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...openAISamplingParams(model, { temperature: opts.temperature }),
       ...(opts.jsonMode ? { text: { format: { type: 'json_object' as const } } } : {}),
     });
+    this.recordResponseUsage(_context, resp, model);
     return responsesToChatCompletion(resp);
   }
 
@@ -221,14 +276,16 @@ export class OpenAIRuntime implements LLMRuntime {
     };
 
     for (let iter = 0; iter < maxIter; iter++) {
+      const model = this.resolveModel(opts);
       const resp = await this.client.responses.create({
-        model: this.resolveModel(opts),
+        model,
         input: chatMessagesToResponsesInput(messages),
         ...(responsesTools.length > 0 ? { tools: responsesTools } : {}),
         ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
-        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+        ...openAISamplingParams(model, { temperature: opts.temperature }),
         ...(opts.jsonMode ? { text: { format: { type: 'json_object' as const } } } : {}),
       });
+      this.recordResponseUsage(context, resp, model);
 
       if (resp.usage) {
         totalPrompt += resp.usage.input_tokens ?? 0;

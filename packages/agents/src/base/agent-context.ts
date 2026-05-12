@@ -42,15 +42,8 @@ export type AgentActivityEvent =
       agentRole: string;
       /** Runtime that produced the call ('openai-responses' | 'legacy' | 'langgraph-shim'). */
       runtime?: string;
-      /** Resolved model name (e.g. 'gpt-5.4-mini'). */
+      /** Resolved model name (e.g. 'gpt-5.4'). */
       model: string;
-      /**
-       * If the runtime fell back to a different model than its first choice
-       * (e.g. tier-3 'gpt-5.4' rate-limited → fallback 'gpt-5'), this is
-       * the actually-used model so the cockpit can surface fallback usage.
-       * Equal to `model` when no fallback occurred.
-       */
-      fallbackModelUsed?: string;
       promptTokens: number;
       completionTokens: number;
       /** Sum of prompt + completion tokens (mirrors OpenAI usage.total_tokens). */
@@ -165,7 +158,20 @@ export type AgentActivityEvent =
  */
 export type AgentActivityEmitter = (event: AgentActivityEvent) => void;
 
+export interface AgentLLMUsage {
+  runtime?: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cachedReadTokens?: number;
+  reasoningTokens?: number;
+  costUsd: number;
+  timestamp: string;
+}
+
 export interface AgentContextParams {
+  agentRole?: string;
   traceId?: string;
   runId?: string;
   tenantId: string;
@@ -204,6 +210,7 @@ export interface AgentContextParams {
 }
 
 export class AgentContext {
+  readonly agentRole: string | undefined;
   readonly traceId: string;
   readonly runId: string;
   readonly tenantId: string;
@@ -221,8 +228,10 @@ export class AgentContext {
   readonly subscriptionTier: SubscriptionTier | undefined;
   readonly onActivity: AgentActivityEmitter | undefined;
   private steps: AgentTrace[] = [];
+  private llmUsages: AgentLLMUsage[] = [];
 
   constructor(params: AgentContextParams) {
+    this.agentRole = params.agentRole;
     this.traceId = params.traceId ?? generateTraceId();
     this.runId = params.runId ?? generateId('run_');
     this.tenantId = params.tenantId;
@@ -257,9 +266,31 @@ export class AgentContext {
     return [...this.steps];
   }
 
+  recordLLMUsage(usage: AgentLLMUsage): void {
+    this.llmUsages.push(usage);
+  }
+
+  getLLMUsages(): AgentLLMUsage[] {
+    return [...this.llmUsages];
+  }
+
+  getLLMUsageSummary(): Pick<AgentLLMUsage, 'promptTokens' | 'completionTokens' | 'totalTokens' | 'costUsd'> | undefined {
+    if (this.llmUsages.length === 0) return undefined;
+    return this.llmUsages.reduce(
+      (acc, usage) => ({
+        promptTokens: acc.promptTokens + usage.promptTokens,
+        completionTokens: acc.completionTokens + usage.completionTokens,
+        totalTokens: acc.totalTokens + usage.totalTokens,
+        costUsd: acc.costUsd + usage.costUsd,
+      }),
+      { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 },
+    );
+  }
+
   clone(overrides?: Partial<AgentContextParams>): AgentContext {
     return new AgentContext({
       traceId: this.traceId,
+      agentRole: this.agentRole,
       runId: this.runId,
       tenantId: this.tenantId,
       userId: this.userId,

@@ -10,6 +10,7 @@
  */
 
 import OpenAI from 'openai';
+import { openAISamplingParams } from '@jak-swarm/shared';
 
 export interface ResponsesSmokeResult {
   model: string;
@@ -57,7 +58,7 @@ export async function smokeResponsesApi(
           },
         ],
         max_output_tokens: 32,
-        temperature: 0,
+        ...openAISamplingParams(model, { temperature: 0 }),
       });
       const text = (resp as { output_text?: string }).output_text ?? '';
       results.push({

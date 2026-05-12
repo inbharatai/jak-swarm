@@ -19,7 +19,6 @@ const ORIGINAL_ENV = { ...process.env };
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
-  delete process.env['ANTHROPIC_API_KEY'];
   delete process.env['OPENAI_API_KEY'];
   delete process.env['DISABLE_SEARCH_RERANKER'];
   delete process.env['SEARCH_PROVIDER_LOG'];
@@ -44,10 +43,6 @@ function jsonResponse(body: unknown, init: { status?: number } = {}): Response {
     status: init.status ?? 200,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-function anthropicBody(text: string): unknown {
-  return { content: [{ text }] };
 }
 
 function openaiBody(text: string): unknown {
@@ -109,7 +104,7 @@ describe('defaultReranker — fail-safe', () => {
   });
 
   it('returns input unchanged when DISABLE_SEARCH_RERANKER=1', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     process.env['DISABLE_SEARCH_RERANKER'] = '1';
     installFetch(async (url) => {
       throw new Error(`kill switch leaked to ${url}`);
@@ -123,7 +118,7 @@ describe('defaultReranker — fail-safe', () => {
   });
 
   it('returns input unchanged for a single result (no ranking needed)', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
       throw new Error(`single-result leaked to ${url}`);
     });
@@ -136,10 +131,10 @@ describe('defaultReranker — fail-safe', () => {
   });
 
   it('returns input unchanged when the LLM response is malformed JSON', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('this is not JSON at all — just prose'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('this is not JSON at all — just prose'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -152,10 +147,10 @@ describe('defaultReranker — fail-safe', () => {
   });
 
   it('returns input unchanged when scores length mismatches results length', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"scores": [0.9]}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"scores": [0.9]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -168,7 +163,7 @@ describe('defaultReranker — fail-safe', () => {
   });
 
   it('returns input unchanged when LLM returns non-2xx', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async () => new Response('server error', { status: 503 }));
 
     const { defaultReranker } = await import('../../../packages/tools/src/adapters/search/index.js');
@@ -183,11 +178,11 @@ describe('defaultReranker — fail-safe', () => {
 
 describe('defaultReranker — re-ordering', () => {
   it('re-orders by score descending and applies threshold filter', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         // Results 1, 2, 3 — LLM says 3 is best, 2 is junk, 1 is decent.
-        return jsonResponse(anthropicBody('{"scores": [0.7, 0.1, 0.95]}'));
+        return jsonResponse(openaiBody('{"scores": [0.7, 0.1, 0.95]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -210,10 +205,10 @@ describe('defaultReranker — re-ordering', () => {
   });
 
   it('respects maxResults cap after re-ranking', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"scores": [0.9, 0.8, 0.7, 0.6, 0.5]}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"scores": [0.9, 0.8, 0.7, 0.6, 0.5]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -227,11 +222,11 @@ describe('defaultReranker — re-ordering', () => {
   });
 
   it('extracts JSON even when LLM adds surrounding prose', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         return jsonResponse(
-          anthropicBody('Sure, here are the scores:\n{"scores": [0.9, 0.5]}\nLet me know if you need anything else.'),
+          openaiBody('Sure, here are the scores:\n{"scores": [0.9, 0.5]}\nLet me know if you need anything else.'),
         );
       }
       throw new Error(`unexpected fetch: ${url}`);
@@ -245,11 +240,11 @@ describe('defaultReranker — re-ordering', () => {
     expect(result[0]?.title).toBe('Result 1');
   });
 
-  it('falls back to GPT-4o-mini when Anthropic key is absent', async () => {
+  it('uses OpenAI GPT-5.4 mini when the OpenAI key is configured', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-openai';
     installFetch(async (url) => {
       if (url.includes('anthropic.com')) {
-        throw new Error('anthropic called when it should not be');
+        throw new Error('anthropic should never be called in OpenAI-only mode');
       }
       if (url.includes('openai.com')) {
         return jsonResponse(openaiBody('{"scores": [0.6, 0.9]}'));
@@ -271,7 +266,7 @@ describe('defaultReranker — re-ordering', () => {
 describe('searchStrategyChain + rerank integration', () => {
   it('re-ranks Serper results when rerank:true and paid tier', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url) => {
       if (url.includes('serper.dev')) {
@@ -282,9 +277,9 @@ describe('searchStrategyChain + rerank integration', () => {
           ],
         });
       }
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         // Junk = 0.1, gold = 0.95 — should reorder AND drop junk.
-        return jsonResponse(anthropicBody('{"scores": [0.1, 0.95]}'));
+        return jsonResponse(openaiBody('{"scores": [0.1, 0.95]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -305,7 +300,7 @@ describe('searchStrategyChain + rerank integration', () => {
 
   it('does NOT re-rank when rerank:false (preserves raw ordering)', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url) => {
       if (url.includes('serper.dev')) {
@@ -316,8 +311,8 @@ describe('searchStrategyChain + rerank integration', () => {
           ],
         });
       }
-      if (url.includes('anthropic.com')) {
-        throw new Error('anthropic called when rerank was false');
+      if (url.includes('openai.com')) {
+        throw new Error('reranker called when rerank was false');
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -336,7 +331,7 @@ describe('searchStrategyChain + rerank integration', () => {
 
   it('rerank failure returns the un-ranked chain results (fails safe)', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url) => {
       if (url.includes('serper.dev')) {
@@ -347,7 +342,7 @@ describe('searchStrategyChain + rerank integration', () => {
           ],
         });
       }
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         return new Response('rate limited', { status: 429 });
       }
       throw new Error(`unexpected fetch: ${url}`);

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X, Bell, Sun, Moon, Layout, Search, StopCircle, ChevronDown } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { useShellStore } from '@/store/shell-store';
 import { useNotificationStore } from '@/store/notification-store';

@@ -23,6 +23,8 @@ function getClient(): SupabaseClient {
  * env-flag opt-in + literal bypass token in api-client.ts).
  */
 const DEV_BYPASS_ACTIVE = process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1';
+const JAK_TOKEN_KEY = 'jak-auth-token';
+const JAK_USER_KEY = 'jak-auth-user';
 
 const DEV_BYPASS_USER: AuthUser = {
   id: 'dev-user-id',
@@ -54,21 +56,89 @@ function mapSupabaseUser(user: SupabaseUser): AuthUser {
   };
 }
 
+function setJakCookie(token: string): void {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${JAK_TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`;
+}
+
+function clearJakCookie(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${JAK_TOKEN_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = 'jak_token=; Path=/; Max-Age=0; SameSite=Lax';
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    return JSON.parse(window.atob(padded)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function coerceAuthUser(value: unknown): AuthUser | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const id = String(raw['id'] ?? raw['userId'] ?? raw['sub'] ?? '');
+  const email = String(raw['email'] ?? '');
+  const tenantId = String(raw['tenantId'] ?? '');
+  if (!id || !email || !tenantId) return null;
+  return {
+    id,
+    email,
+    name: String(raw['name'] ?? email.split('@')[0] ?? ''),
+    role: String(raw['role'] ?? 'TENANT_ADMIN') as AuthUser['role'],
+    tenantId,
+    tenantName: String(raw['tenantName'] ?? ''),
+    industry: String(raw['industry'] ?? 'TECHNOLOGY') as AuthUser['industry'],
+    jobFunction: raw['jobFunction'] ? String(raw['jobFunction']) as AuthUser['jobFunction'] : undefined,
+  };
+}
+
+function getStoredJakUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null;
+  const stored = window.localStorage.getItem(JAK_USER_KEY);
+  if (stored) {
+    try {
+      const user = coerceAuthUser(JSON.parse(stored));
+      if (user) return user;
+    } catch {
+      window.localStorage.removeItem(JAK_USER_KEY);
+    }
+  }
+  const token = window.localStorage.getItem(JAK_TOKEN_KEY) ?? window.localStorage.getItem('jak_token');
+  if (!token) return null;
+  return coerceAuthUser(decodeJwtPayload(token));
+}
+
 // ─── Token helpers (backward compat) ─────────────────────────────────────────
 
-export function setToken(_token: string): void {
-  // No-op: Supabase manages tokens via cookies automatically
+export function setToken(token: string, user?: AuthUser): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(JAK_TOKEN_KEY, token);
+  setJakCookie(token);
+  if (user) {
+    window.localStorage.setItem(JAK_USER_KEY, JSON.stringify(user));
+  }
 }
 
 export function clearToken(): void {
-  // No-op: Supabase manages tokens via cookies automatically
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(JAK_TOKEN_KEY);
+  window.localStorage.removeItem(JAK_USER_KEY);
+  window.localStorage.removeItem('jak_token');
+  clearJakCookie();
 }
 
 export function getRawToken(): string | null {
   // For backward compat with api-client.ts
   if (typeof window === 'undefined') return null;
   // Supabase stores the session — we can get the access token from it
-  return null; // Will be handled asynchronously
+  return window.localStorage.getItem(JAK_TOKEN_KEY) ?? window.localStorage.getItem('jak_token');
 }
 
 // ─── Session check ───────────────────────────────────────────────────────────
@@ -76,6 +146,7 @@ export function getRawToken(): string | null {
 export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false;
   if (DEV_BYPASS_ACTIVE) return true;
+  if (getRawToken()) return true;
   // Sync check: Supabase stores auth tokens in localStorage
   const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
   if (!storageKey) return false;
@@ -117,13 +188,66 @@ function buildAbsoluteUrl(path: string): string | undefined {
   return new URL(path, window.location.origin).toString();
 }
 
+const AUTH_SERVICE_UNAVAILABLE_MESSAGE =
+  'Authentication service is unavailable. Please try again shortly.';
+
+function hasUsableSupabaseConfig(): boolean {
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
+  const anonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim();
+  if (!url || !anonKey) return false;
+
+  const combined = `${url} ${anonKey}`.toLowerCase();
+  if (/placeholder|local-e2e|yourproject|example|not-real|dummy|changeme/.test(combined)) {
+    return false;
+  }
+
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getAuthErrorMessage(error: unknown, fallback = AUTH_SERVICE_UNAVAILABLE_MESSAGE): string {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : '';
+
+  if (!rawMessage) return fallback;
+  if (/failed to fetch|fetch failed|networkerror|network request failed|load failed/i.test(rawMessage)) {
+    return fallback;
+  }
+
+  return rawMessage;
+}
+
+async function runAuthRequest<T>(
+  operation: () => Promise<T>,
+  fallback?: string,
+): Promise<T> {
+  if (!hasUsableSupabaseConfig()) {
+    throw new Error(fallback ?? AUTH_SERVICE_UNAVAILABLE_MESSAGE);
+  }
+
+  try {
+    return await operation();
+  } catch (error) {
+    throw new Error(getAuthErrorMessage(error, fallback));
+  }
+}
+
 export function useAuth(): UseAuthReturn {
+  const storedJakUser = getStoredJakUser();
   const [state, setState] = useState<AuthState>({
     // In dev-bypass mode, start with the synthetic user already populated
     // so the dashboard layout's "redirect when no user" check is satisfied
     // on the very first render. Skips the loading spinner entirely.
-    user: DEV_BYPASS_ACTIVE ? DEV_BYPASS_USER : null,
-    isLoading: !DEV_BYPASS_ACTIVE,
+    user: DEV_BYPASS_ACTIVE ? DEV_BYPASS_USER : storedJakUser,
+    isLoading: !DEV_BYPASS_ACTIVE && !storedJakUser,
     error: null,
   });
 
@@ -132,16 +256,38 @@ export function useAuth(): UseAuthReturn {
     // skip every Supabase round-trip to keep the cockpit responsive
     // and avoid pinging Supabase with a non-existent session.
     if (DEV_BYPASS_ACTIVE) return;
+    const localUser = getStoredJakUser();
+    if (localUser) {
+      setState({ user: localUser, isLoading: false, error: null });
+      return;
+    }
+
+    if (!hasUsableSupabaseConfig()) {
+      setState({
+        user: null,
+        isLoading: false,
+        error: AUTH_SERVICE_UNAVAILABLE_MESSAGE,
+      });
+      return;
+    }
 
     // Get initial session
-    getClient().auth.getUser().then((result) => {
-      const user = result.data?.user;
-      setState({
-        user: user ? mapSupabaseUser(user) : null,
-        isLoading: false,
-        error: null,
+    runAuthRequest(() => getClient().auth.getUser())
+      .then((result) => {
+        const user = result.data?.user;
+        setState({
+          user: user ? mapSupabaseUser(user) : null,
+          isLoading: false,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        setState({
+          user: null,
+          isLoading: false,
+          error: getAuthErrorMessage(error),
+        });
       });
-    });
 
     // Listen for auth state changes
     const {
@@ -157,56 +303,71 @@ export function useAuth(): UseAuthReturn {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { error } = await getClient().auth.signInWithPassword({ email, password });
-    if (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-      }));
-      throw new Error(error.message);
-    }
+  const failAuth = useCallback((error: unknown, fallback?: string): never => {
+    const message = getAuthErrorMessage(error, fallback);
+    setState(prev => ({
+      ...prev,
+      isLoading: false,
+      error: message,
+    }));
+    throw new Error(message);
   }, []);
 
-  const requestMagicPin = useCallback(async (email: string) => {
+  const login = useCallback(async (email: string, password: string) => {
+    clearToken();
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { error } = await getClient().auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: buildAbsoluteUrl('/auth/confirm?next=/workspace'),
-      },
-    });
+    const { data, error } = await runAuthRequest(
+      () => getClient().auth.signInWithPassword({ email, password }),
+    ).catch(error => failAuth(error));
     if (error) {
-      setState(prev => ({
-        ...prev,
+      failAuth(error);
+    }
+    if (data.user) {
+      setState({
+        user: mapSupabaseUser(data.user),
         isLoading: false,
-        error: error.message,
-      }));
-      throw new Error(error.message);
+        error: null,
+      });
+    }
+  }, [failAuth]);
+
+  const requestMagicPin = useCallback(async (email: string) => {
+    clearToken();
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    const { error } = await runAuthRequest(
+      () => getClient().auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: buildAbsoluteUrl('/auth/confirm?next=/workspace'),
+        },
+      }),
+    ).catch(error => failAuth(error));
+    if (error) {
+      failAuth(error);
     }
 
     setState(prev => ({ ...prev, isLoading: false, error: null }));
-  }, []);
+  }, [failAuth]);
 
   const verifyMagicPin = useCallback(async (email: string, token: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { error } = await getClient().auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    });
+    const { data, error } = await runAuthRequest(
+      () => getClient().auth.verifyOtp({
+        email,
+        token,
+        type: 'email',
+      }),
+    ).catch(error => failAuth(error));
     if (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-      }));
-      throw new Error(error.message);
+      failAuth(error);
     }
-  }, []);
+    setState({
+      user: data.user ? mapSupabaseUser(data.user) : null,
+      isLoading: false,
+      error: null,
+    });
+  }, [failAuth]);
 
   const register = useCallback(
     async (data: {
@@ -216,73 +377,72 @@ export function useAuth(): UseAuthReturn {
       tenantName: string;
       industry: string;
     }) => {
+      clearToken();
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      const { error } = await getClient().auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            name: data.name,
-            full_name: data.name,
-            tenantName: data.tenantName,
-            industry: data.industry,
-            role: 'ADMIN',
+      const { error } = await runAuthRequest(
+        () => getClient().auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              name: data.name,
+              full_name: data.name,
+              tenantName: data.tenantName,
+              industry: data.industry,
+              role: 'ADMIN',
+            },
           },
-        },
-      });
+        }),
+      ).catch(error => failAuth(error));
       if (error) {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: error.message,
-        }));
-        throw new Error(error.message);
+        failAuth(error);
       }
+      setState(prev => ({ ...prev, isLoading: false, error: null }));
     },
-    [],
+    [failAuth],
   );
 
   const requestPasswordReset = useCallback(async (email: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { error } = await getClient().auth.resetPasswordForEmail(email, {
-      redirectTo: buildAbsoluteUrl('/auth/confirm?next=/reset-password'),
-    });
+    const { error } = await runAuthRequest(
+      () => getClient().auth.resetPasswordForEmail(email, {
+        redirectTo: buildAbsoluteUrl('/auth/confirm?next=/reset-password'),
+      }),
+    ).catch(error => failAuth(error));
 
     if (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-      }));
-      throw new Error(error.message);
+      failAuth(error);
     }
 
     setState(prev => ({ ...prev, isLoading: false, error: null }));
-  }, []);
+  }, [failAuth]);
 
   const updatePassword = useCallback(async (password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { error } = await getClient().auth.updateUser({ password });
+    const { error } = await runAuthRequest(
+      () => getClient().auth.updateUser({ password }),
+    ).catch(error => failAuth(error));
 
     if (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-      }));
-      throw new Error(error.message);
+      failAuth(error);
     }
 
-    const { data } = await getClient().auth.getUser();
+    const { data } = await runAuthRequest(
+      () => getClient().auth.getUser(),
+    ).catch(error => failAuth(error));
     setState({
       user: data.user ? mapSupabaseUser(data.user) : null,
       isLoading: false,
       error: null,
     });
-  }, []);
+  }, [failAuth]);
 
   const logout = useCallback(async () => {
-    await getClient().auth.signOut();
+    clearToken();
+    await runAuthRequest(
+      () => getClient().auth.signOut(),
+      'Unable to reach the authentication service; local session was cleared.',
+    ).catch(() => undefined);
     setState({ user: null, isLoading: false, error: null });
     if (typeof window !== 'undefined') {
       window.location.href = '/login';

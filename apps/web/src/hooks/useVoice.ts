@@ -29,8 +29,11 @@ interface UseVoiceReturn {
   audioLevel: number;
 }
 
+// P1-2 (audit 2026-05-08): use a browser-safe crypto.randomUUID helper
+// instead of a non-cryptographic Math.random() ID.
+import { generateBrowserId } from '@/lib/id';
 function generateId(): string {
-  return Math.random().toString(36).slice(2, 11);
+  return generateBrowserId().slice(0, 9);
 }
 
 export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {

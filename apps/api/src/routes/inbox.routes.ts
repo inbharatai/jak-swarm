@@ -21,8 +21,13 @@ const inboxRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = request.user.userId;
     const role = request.user.role;
 
+    // B3 (audit 2026-05-08): align with /approvals/:id/decide RBAC.
+    // The decide handler requires REVIEWER+ (REVIEWER / TENANT_ADMIN /
+    // SYSTEM_ADMIN); inbox previously also surfaced approvals to OPERATOR,
+    // but OPERATORs cannot decide them — leading to "approve" buttons in
+    // the cockpit that 403 on click. Match the actual RBAC of the action.
     const isReviewerLike =
-      role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
+      role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN';
 
     const [tasks, approvals, notifications, taskCount, notifCount] = await Promise.all([
       fastify.db.taskAssignment.findMany({

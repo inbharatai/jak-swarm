@@ -6,6 +6,13 @@ await initTracing();
 // If SENTRY_DSN is unset this is a silent no-op with zero overhead.
 await initSentry();
 
+if (process.env['NODE_ENV'] !== 'production' || process.env['JAK_DEV_AUTH_BYPASS'] === '1') {
+  // Local e2e/dev runs legitimately combine Next, API, Prisma, OTel/Sentry,
+  // Testcontainers, and child-process hooks. Keep production's default leak
+  // signal intact, but avoid noisy false positives in the local harness.
+  process.setMaxListeners(Math.max(process.getMaxListeners(), 100));
+}
+
 // Unhandled promise rejections + uncaught exceptions.
 //
 // Without these handlers, a single forgotten `await` in a route handler
@@ -293,10 +300,9 @@ async function buildApp() {
 
   // ─── Model capability check ────────────────────────────────────────────
   // Warm the ModelResolver cache at boot so the first real LLM call hits
-  // a pre-verified model. Non-blocking: if the check fails, the resolver
-  // transparently falls back to the gpt-4o family and the app still boots.
+  // the configured OpenAI GPT-5.5/5.4-family model map.
   void ensureModelMap().catch((err) => {
-    fastify.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'ensureModelMap() at boot failed; resolver will use failsafe map (gpt-4o family)');
+    fastify.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'ensureModelMap() at boot failed; resolver will keep GPT-5.5/5.4 configured defaults');
   });
 
   // ─── Migration 16 — Company Brain wiring at boot ────────────────────────
@@ -389,62 +395,38 @@ async function buildApp() {
     });
   });
 
-  // /version — exposes git commit SHA so deploys can be verified end-to-end.
+  // /version - exposes git commit SHA so deploys can be verified end-to-end.
   // Render injects RENDER_GIT_COMMIT during build; falls back to env var or 'unknown'.
   //
-  // Stage 0.3 fix: surface both the raw env AND the effective runtime. Since
-  // the Phase 7 commit `662e02c`, the runtime factory defaults to
-  // openai-first when OPENAI_API_KEY is set + JAK_EXECUTION_ENGINE is not
-  // explicitly 'legacy'. The prior /version only echoed the raw env value,
-  // which said `legacy` even though the code was running `openai-first` in
-  // practice — misleading to operators trying to verify deploys. Now both
-  // values are shown so the UI and admin tooling see the truth.
+  // Surface both raw env knobs and the effective runtime. Legacy engine values
+  // are rejected by config/ignored by the package runtime; production execution
+  // is OpenAI-only and LangGraph-only.
   fastify.get('/version', async (_request, reply) => {
     const hasOpenAIKey = Boolean(process.env['OPENAI_API_KEY']);
-    // Read the RAW env — not config.executionEngine — because config
-    // defaults to 'legacy' when unset, which doesn't distinguish
-    // "operator explicitly opted into legacy" from "operator set
-    // nothing and runtime defaults to openai-first when key is present."
-    // The runtime factory at runtime/index.ts uses the raw env, so
-    // /version mirrors it here to stay honest.
+    // Read the raw env so admin diagnostics can show what operators set,
+    // while `effectiveExecutionEngine` reports what actually runs.
     const engineEnvRaw = (process.env['JAK_EXECUTION_ENGINE'] ?? '').trim().toLowerCase();
     const runtimeAgentsRaw = (process.env['JAK_OPENAI_RUNTIME_AGENTS'] ?? '').trim();
-    const hasRuntimeAgents = runtimeAgentsRaw.length > 0;
-    const explicitLegacy = engineEnvRaw === 'legacy';
     // Mirrors getRuntime() resolution order:
     //   - JAK_OPENAI_RUNTIME_AGENTS=* or role-specific → openai-first
     //   - JAK_EXECUTION_ENGINE=openai-first → openai-first
-    //   - JAK_EXECUTION_ENGINE=legacy (explicit opt-out) → legacy
+    //   - JAK_EXECUTION_ENGINE=legacy → ignored; openai-first is enforced
     //   - Otherwise, OPENAI_API_KEY present → openai-first (the default)
-    //   - No key → legacy
-    const effectiveEngine =
-      hasRuntimeAgents ||
-      engineEnvRaw === 'openai-first' ||
-      (!explicitLegacy && hasOpenAIKey)
-        ? 'openai-first'
-        : 'legacy';
+    //   - No key → still reports openai-first, calls fail until key is set
+    const effectiveEngine = 'openai-first';
     return reply.status(200).send({
       gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
       gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
       buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
       startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
-      // Migration flags — raw env (what operator explicitly set). Empty
-      // string means "unset" so the client can distinguish "legacy by
-      // default" from "legacy explicitly chosen".
-      executionEngine: engineEnvRaw || '(unset — defaults to openai-first when OPENAI_API_KEY is set)',
+      // Raw env value. Empty string means unset.
+      executionEngine: engineEnvRaw || '(unset - defaults to openai-first)',
       workflowRuntime: config.workflowRuntime,
-      // Hardening pass — surface the workflow runtime's honesty status.
-      // 'langgraph' currently returns 'present-but-not-active' because it
-      // delegates real execution to SwarmGraph under the hood. Operators
-      // should NOT attribute observed behavior to LangGraph until this
-      // status is 'active'.
-      workflowRuntimeStatus: config.workflowRuntime === 'langgraph'
-        ? 'present-but-not-active (delegates to swarmgraph; full LangGraph node migration not shipped)'
-        : 'active',
+      // LangGraph is the active workflow runtime.
+      workflowRuntimeStatus: 'active',
       openaiRuntimeAgents: runtimeAgentsRaw ? runtimeAgentsRaw.split(',').map((s) => s.trim()).filter(Boolean) : [],
-      // Effective runtime — what agents ACTUALLY use RIGHT NOW. This is
-      // the value to check when verifying "is OpenAI-first live?".
+      // Effective runtime - what agents actually use.
       effectiveExecutionEngine: effectiveEngine,
       openaiApiKeySet: hasOpenAIKey,
       strictWorkflowState: (process.env['JAK_STRICT_WORKFLOW_STATE'] ?? '').toLowerCase() === 'true',

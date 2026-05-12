@@ -423,10 +423,34 @@ export class SwarmRunner {
       'Resuming workflow after approval decision (LangGraph runtime)',
     );
 
+    if (approvalDecision.status === 'DEFERRED') {
+      const snapshot = await this.runtime.getState(workflowId).catch(() => null);
+      logger.info(
+        { workflowId, reviewedBy: approvalDecision.reviewedBy },
+        'Approval decision deferred; workflow remains awaiting approval',
+      );
+      const completedAt = new Date();
+      const pendingApprovals = (snapshot?.rawState?.pendingApprovals ?? []) as ApprovalRequest[];
+      return {
+        workflowId,
+        status: WorkflowStatus.AWAITING_APPROVAL,
+        outputs: snapshot?.rawState?.outputs ?? [],
+        traces: snapshot?.rawState?.traces ?? [],
+        pendingApprovals,
+        clarificationNeeded: snapshot?.rawState?.clarificationNeeded ?? false,
+        ...(snapshot?.rawState?.clarificationQuestion
+          ? { clarificationQuestion: snapshot.rawState.clarificationQuestion }
+          : {}),
+        durationMs: completedAt.getTime() - startedAt.getTime(),
+        startedAt,
+        completedAt,
+      };
+    }
+
     try {
       const result = await this.runWithTimeout(
         this.runtime.resume(workflowId, {
-          decision: approvalDecision.status === 'REJECTED' ? 'REJECTED' : 'APPROVED',
+          decision: approvalDecision.status,
           reviewedBy: approvalDecision.reviewedBy,
           ...(approvalDecision.comment !== undefined ? { comment: approvalDecision.comment } : {}),
         }),

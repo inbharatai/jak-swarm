@@ -23,6 +23,8 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ok, err } from '../types.js';
 import { UsageCounterService } from '../services/trial/usage-counter.service.js';
+import { TrialPromotionService } from '../services/trial/trial-promotion.service.js';
+import { TrialEmailService } from '../services/trial/trial-email.service.js';
 
 const signupBodySchema = z.object({
   email: z.string().email().max(320),
@@ -37,15 +39,75 @@ function hashToken(token: string): string {
 }
 
 function fingerprint(req: FastifyRequest): string {
-  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-    ?? req.ip
-    ?? 'unknown';
+  // P0-6 (audit 2026-05-08): X-Forwarded-For is operator-controlled when
+  // Fastify is configured with `trustProxy`. When trustProxy is off (default),
+  // `req.ip` is the direct socket peer and IS trusted; X-Forwarded-For is
+  // NOT trusted user input and must NOT influence the fingerprint, otherwise
+  // an attacker can rotate the header value to bypass the 90-day per-IP+UA
+  // anti-cycling check.
+  //
+  // Behaviour:
+  //   - If JAK_TRUST_PROXY === 'true' (operator opt-in behind a real proxy
+  //     that strips the header): use the X-Forwarded-For first hop.
+  //   - Otherwise: ignore the header entirely and use req.ip.
+  const trustProxy = process.env['JAK_TRUST_PROXY'] === 'true';
+  const fwd = trustProxy
+    ? (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+    : undefined;
+  const ip = fwd ?? req.ip ?? 'unknown';
   const ua = (req.headers['user-agent'] as string | undefined) ?? 'unknown';
   return createHash('sha256').update(`${ip}|${ua}`).digest('hex');
 }
 
+function trustedClientIp(req: FastifyRequest): string {
+  const trustProxy = process.env['JAK_TRUST_PROXY'] === 'true';
+  const fwd = trustProxy
+    ? (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+    : undefined;
+  return fwd ?? req.ip ?? 'unknown';
+}
+
+/**
+ * P0-5 (audit 2026-05-08): in-process per-email rate limiter.
+ *
+ * Keyed by lowercase email. Window-based — N submissions per W ms. Returns
+ * { allowed, retryAfterMs }. State is in-memory only (resets on restart),
+ * which is intentional: this is the second layer behind the per-IP route
+ * limit, and a restart-resistant per-email floor would need Redis we don't
+ * want to require for this public path.
+ *
+ * Defaults: 3 attempts per hour per email (covers re-tries + accidental
+ * double-clicks; bars inbox-flood + disk-fill scenarios).
+ */
+const emailLimiterState = new Map<string, { count: number; resetAt: number }>();
+function checkEmailRateLimit(
+  email: string,
+  max = 3,
+  windowMs = 60 * 60 * 1000,
+): { allowed: boolean; retryAfterMs: number } {
+  const key = email.toLowerCase();
+  const now = Date.now();
+  const slot = emailLimiterState.get(key);
+  if (!slot || slot.resetAt <= now) {
+    emailLimiterState.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfterMs: 0 };
+  }
+  if (slot.count >= max) {
+    return { allowed: false, retryAfterMs: slot.resetAt - now };
+  }
+  slot.count += 1;
+  return { allowed: true, retryAfterMs: 0 };
+}
+
+// Test-only export so the unit test can reset state between cases.
+export function _resetEmailRateLimiterForTests(): void {
+  emailLimiterState.clear();
+}
+
 const trialRoutes: FastifyPluginAsync = async (fastify) => {
   const usage = new UsageCounterService(fastify.db);
+  const promotion = new TrialPromotionService(fastify.db, fastify);
+  const email = new TrialEmailService(fastify.log);
 
   /**
    * POST /trial/signup — public.
@@ -53,8 +115,23 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
    * Returns 200 with a generic success body whether or not the email is new
    * (so attackers can't enumerate existing trial emails). The verify email
    * is sent only on a genuine new signup.
+   *
+   * P0-5 (audit 2026-05-08) — per-route rate limits:
+   *   - 5 signups per minute keyed by IP (existing global already covers
+   *     this, but make it explicit + lower so signup-flood is bounded
+   *     before the global trips)
+   *   - 3 signups per hour keyed by email (prevents using a victim's email
+   *     to flood their inbox / fill our disk via the file backend)
    */
-  fastify.post('/signup', async (request, reply) => {
+  fastify.post('/signup', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 minute',
+        keyGenerator: (req) => `trial-signup-ip:${trustedClientIp(req)}`,
+      },
+    },
+  }, async (request, reply) => {
     const parsed = signupBodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply
@@ -62,6 +139,20 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
         .send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
     }
     const data = parsed.data;
+
+    // P0-5 (audit 2026-05-08): per-email rate limit. Returns the same
+    // generic 200 success body even on cap so we don't reveal whether
+    // the email is interesting (anti-enum). The limiter's count is
+    // incremented on EVERY attempt — even rejected ones — so a flood
+    // from a single attacker still trips the gate.
+    const emailGate = checkEmailRateLimit(data.email);
+    if (!emailGate.allowed) {
+      reply.header('Retry-After', Math.ceil(emailGate.retryAfterMs / 1000).toString());
+      return reply.status(200).send(
+        ok({ message: 'If your email is eligible, a verification link is on its way.' }),
+      );
+    }
+
     const fp = fingerprint(request);
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
@@ -95,14 +186,27 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
 
-        // TODO: enqueue verify email via existing email adapter. For now we
-        // return the cleartext token in dev mode only — production callers
-        // see only the generic success body.
+        // Send the verify email through the transparent backend.
+        // Failures are logged but never surface to the caller (anti-enum).
+        const sendResult = await email.sendVerifyEmail({
+          to: data.email,
+          cleartextToken: cleartext,
+          companyName: data.companyName ?? null,
+        }).catch((e) => {
+          request.log.warn({ err: e, to: data.email }, '[trial.signup] email send failed');
+          return { delivered: false, backend: 'noop' as const };
+        });
+
+        // In non-production, return the cleartext token + delivery info so
+        // the dev loop can click through without checking SMTP. Production
+        // never leaks the token in the response body.
         if (process.env.NODE_ENV !== 'production') {
           return reply.status(200).send(
             ok({
-              message: 'Verify email sent. Check your inbox.',
-              devToken: cleartext, // ⚠ DEV ONLY — never set in prod
+              message: 'Verify email sent. Check your inbox (or the file backend in dev).',
+              devToken: cleartext,
+              emailBackend: sendResult.backend,
+              emailDelivered: sendResult.delivered,
             }),
           );
         }
@@ -121,13 +225,55 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /trial/verify/:token — public.
    *
-   * Looks up by SHA-256 hash, validates not-expired, marks VERIFIED, returns
-   * a one-time bootstrap-code the /trial/onboard page exchanges for an
-   * authenticated session + Tenant promotion.
+   * Three-phase flow in one call:
+   *   1. Look up by SHA-256 hash, validate not-expired
+   *   2. Mark signup VERIFIED (idempotent)
+   *   3. Promote into a real Tenant + first User (TENANT_ADMIN) +
+   *      Subscription(trialing, trialEndsAt = now+30d)
+   *
+   * Returns:
+   *   200 { token, initialPassword, tenant, user } — cockpit drops the JWT
+   *        in localStorage and redirects to / (the dashboard).
+   *
+   * Idempotent: clicking the link a second time returns a fresh JWT against
+   * the existing tenant (no duplicate-tenant error).
    */
-  fastify.post('/verify/:token', async (request, reply) => {
+  fastify.post('/verify/:token', {
+    config: {
+      // P0-5 (audit 2026-05-08): tight per-IP limit. A real user clicks
+      // 1-2 times. 10/min/IP is generous enough for legitimate retries
+      // (network hiccups) while hard-blocking token brute force.
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute',
+        keyGenerator: (req) => `trial-verify-ip:${req.ip ?? 'unknown'}`,
+      },
+    },
+  }, async (request, reply) => {
+    // P0-3 (audit 2026-05-08): the success response carries `initialPassword`
+    // in cleartext. Set strict no-store headers on EVERY exit path so
+    // intermediate proxies / CDNs / browser caches cannot persist it.
+    // (Also closes a fingerprintable timing-side-channel on `Vary` defaults.)
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    reply.header('Pragma', 'no-cache');
+    reply.header('Expires', '0');
+
+    // P0-2 (audit 2026-05-08): normalise response time across all paths
+    // (404 / 410 / 200) so timing observation cannot distinguish "valid
+    // token in flight" from "random brute-force miss". The floor (~80ms)
+    // is greater than the natural variance of the slowest path (DB
+    // transaction in promotion.promote), so all responses settle to ≥ floor.
+    const VERIFY_FLOOR_MS = 80;
+    const startedAt = Date.now();
+    const padToFloor = async () => {
+      const elapsed = Date.now() - startedAt;
+      const remain = VERIFY_FLOOR_MS - elapsed;
+      if (remain > 0) await new Promise((r) => setTimeout(r, remain));
+    };
+
     const { token } = request.params as { token: string };
     if (!token || token.length < 16) {
+      await padToFloor();
       return reply.status(400).send(err('INVALID_TOKEN', 'Token format invalid'));
     }
     const hash = hashToken(token);
@@ -137,6 +283,7 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     if (!signup) {
+      await padToFloor();
       return reply.status(404).send(err('NOT_FOUND', 'Verification link not found or already used'));
     }
     if (signup.verifyExpiresAt.getTime() < Date.now()) {
@@ -144,25 +291,57 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: signup.id },
         data: { status: 'EXPIRED' },
       });
+      await padToFloor();
       return reply.status(410).send(err('EXPIRED', 'Verification link has expired'));
     }
-    if (signup.status === 'PROMOTED') {
-      return reply.status(409).send(err('ALREADY_PROMOTED', 'This signup is already a workspace'));
-    }
 
-    await fastify.db.trialSignup.update({
-      where: { id: signup.id },
-      data: { status: 'VERIFIED', verifiedAt: new Date() },
-    });
+    try {
+      // If not yet PROMOTED, mark VERIFIED first so the promotion service
+      // sees the right state. PROMOTED signups skip straight through.
+      if (signup.status === 'PENDING_VERIFY') {
+        await fastify.db.trialSignup.update({
+          where: { id: signup.id },
+          data: { status: 'VERIFIED', verifiedAt: new Date() },
+        });
+        signup.status = 'VERIFIED';
+        signup.verifiedAt = new Date();
+      }
 
-    return reply.status(200).send(
-      ok({
-        signupId: signup.id,
+      const result = await promotion.promote({
+        id: signup.id,
         email: signup.email,
         companyName: signup.companyName,
-        message: 'Email verified. Continue to /trial/onboard to create your workspace.',
-      }),
-    );
+        industry: signup.industry,
+        status: signup.status,
+        tenantId: signup.tenantId,
+        verifiedAt: signup.verifiedAt,
+      });
+
+      await padToFloor();
+      return reply.status(200).send(
+        ok({
+          token: result.token,
+          initialPassword: result.initialPassword,
+          tenant: result.tenant,
+          user: {
+            id: result.user.userId,
+            email: result.user.email,
+            name: result.user.name,
+            role: result.user.role,
+          },
+          reusedExistingTenant: result.reusedExistingTenant,
+          message: result.reusedExistingTenant
+            ? 'Welcome back. Your workspace is ready.'
+            : 'Trial workspace created. Save your initial password — you can change it from Settings later.',
+        }),
+      );
+    } catch (e) {
+      request.log.error({ err: e, signupId: signup.id }, '[trial.verify] promotion failed');
+      await padToFloor();
+      return reply.status(500).send(
+        err('PROMOTION_FAILED', 'Verification succeeded but workspace creation failed. Contact support.'),
+      );
+    }
   });
 
   /**

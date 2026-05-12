@@ -20,13 +20,15 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Run-audit on CONNECTED integration (route-mocked)', () => {
+  const apiPort = process.env['E2E_API_PORT'] ?? '4000';
   test('Gmail CONNECTED → Run audit button visible → click creates workflow', async ({ page }) => {
     // Intercept GET /integrations to return a CONNECTED Gmail integration
     // — proves the Run-audit button renders on the connected card.
-    // Match the API URL only (port 4000), not the front-end /integrations route.
-    await page.route('**/localhost:4000/integrations', async (route) => {
+    // Match the API URL only, not the front-end /integrations route.
+    await page.route('**/integrations', async (route) => {
       const url = route.request().url();
-      if (route.request().method() === 'GET' && !url.includes('/integrations/')) {
+      const parsed = new URL(url);
+      if (parsed.port === apiPort && route.request().method() === 'GET' && !url.includes('/integrations/')) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -57,8 +59,9 @@ test.describe('Run-audit on CONNECTED integration (route-mocked)', () => {
     // Capture the POST /workflows payload that the Run-audit button fires.
     let capturedWorkflowGoal: string | null = null;
     let capturedWorkflowMethod: string | null = null;
-    await page.route('**/localhost:4000/workflows', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route('**/workflows', async (route) => {
+      const parsed = new URL(route.request().url());
+      if (parsed.port === apiPort && route.request().method() === 'POST') {
         const body = route.request().postDataJSON() as { goal?: string };
         capturedWorkflowGoal = body.goal ?? null;
         capturedWorkflowMethod = 'POST';
@@ -108,10 +111,11 @@ test.describe('Run-audit on CONNECTED integration (route-mocked)', () => {
 
   test('disconnected Gmail does NOT show Run audit button', async ({ page }) => {
     // Intercept with status='NOT_CONNECTED' instead.
-    // Match the API URL only (port 4000), not the front-end /integrations route.
-    await page.route('**/localhost:4000/integrations', async (route) => {
+    // Match the API URL only, not the front-end /integrations route.
+    await page.route('**/integrations', async (route) => {
       const url = route.request().url();
-      if (route.request().method() === 'GET' && !url.includes('/integrations/')) {
+      const parsed = new URL(url);
+      if (parsed.port === apiPort && route.request().method() === 'GET' && !url.includes('/integrations/')) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

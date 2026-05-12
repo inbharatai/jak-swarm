@@ -53,10 +53,10 @@ describe('classifyProviderError', () => {
 });
 
 describe('shouldFailover policy', () => {
-  it('fails over on transient/provider-scoped kinds', () => {
-    expect(shouldFailover('rate_limit')).toBe(true);
-    expect(shouldFailover('server_error')).toBe(true);
-    expect(shouldFailover('timeout')).toBe(true);
+  it('does NOT fail over on transient/provider-scoped kinds in OpenAI-only mode', () => {
+    expect(shouldFailover('rate_limit')).toBe(false);
+    expect(shouldFailover('server_error')).toBe(false);
+    expect(shouldFailover('timeout')).toBe(false);
   });
 
   it('does NOT fail over on kinds that indicate misconfiguration', () => {

@@ -303,20 +303,42 @@ async function mutateLifecycle(
     if (target === 'COMPLETED') update.completedAt = now;
     if (resultPayload) update.resultJson = resultPayload;
 
+    // B2 (audit 2026-05-08): tenant isolation invariant.
+    //
+    // Prisma's `update` requires a unique `where`, and TaskAssignment.id
+    // is the only single-column unique. We CANNOT add `tenantId` directly
+    // to the `where` here without a compound `@@unique([id, tenantId])`
+    // declaration in schema.prisma. Instead, we rely on the `findFirst`
+    // tenant check above (~25 lines up) — which is the existing contract.
+    //
+    // If a future refactor splits the read from this write (e.g. moves
+    // it behind a separate transaction boundary), the invariant breaks
+    // silently. The defensive belt + braces is the explicit ID-not-found
+    // guard right after `assignment` is loaded — keep that intact.
     const next = await fastify.db.taskAssignment.update({
       where: { id },
       data: update,
     });
 
-    // Notify the assigner on completion / decline / cancel.
+    // Notify on completion / decline / cancel.
+    // B1 (audit 2026-05-08): each terminal state gets its own correctly-
+    // labelled notification kind so cockpit filters don't mis-categorise.
+    // CANCEL goes to the assignee (their task was cancelled by someone
+    // else); COMPLETED + DECLINED go to the assigner (they're waiting on
+    // the result).
     if (target === 'COMPLETED' || target === 'DECLINED' || target === 'CANCELLED') {
-      const recipient = target === 'CANCELLED' ? assignment.assigneeUserId : assignment.assignedByUserId;
+      const recipient =
+        target === 'CANCELLED' ? assignment.assigneeUserId : assignment.assignedByUserId;
+      const kind: 'task_completed' | 'task_declined' | 'task_cancelled' =
+        target === 'COMPLETED' ? 'task_completed'
+        : target === 'DECLINED' ? 'task_declined'
+        : 'task_cancelled';
       const verb = target === 'COMPLETED' ? 'completed' : target.toLowerCase();
       await fastify.db.notification.create({
         data: {
           tenantId,
           userId: recipient,
-          kind: target === 'COMPLETED' ? 'task_completed' : 'task_assigned',
+          kind,
           title: `Task ${verb}: ${assignment.title}`,
           body: target === 'DECLINED' ? (resultPayload?.reason as string | undefined) ?? null : null,
           linkPath: `/inbox/${assignment.id}`,

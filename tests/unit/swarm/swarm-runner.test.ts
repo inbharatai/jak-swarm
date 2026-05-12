@@ -89,6 +89,18 @@ describe('SwarmRunner', () => {
     expect(state?.status).toBe(WorkflowStatus.CANCELLED);
   });
 
+  it('keeps DEFERRED approval decisions paused instead of treating them as approved', async () => {
+    const result = await runner.resume('wf_deferred_without_checkpoint', {
+      status: 'DEFERRED',
+      reviewedBy: 'usr_reviewer',
+      comment: 'Need more context',
+    });
+
+    expect(result.status).toBe(WorkflowStatus.AWAITING_APPROVAL);
+    expect(result.error).toBeUndefined();
+    expect(Array.isArray(result.pendingApprovals)).toBe(true);
+  });
+
   it('returns traces array in result', async () => {
     const result = await runner.run({
       goal: 'Draft customer support response templates',

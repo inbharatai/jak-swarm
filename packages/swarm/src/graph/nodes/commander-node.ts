@@ -95,6 +95,7 @@ export async function commanderNode(
   const agent = new CommanderAgent();
 
   const context = new AgentContext({
+    agentRole: 'COMMANDER',
     tenantId: state.tenantId,
     userId: state.userId,
     workflowId: state.workflowId,
@@ -117,6 +118,7 @@ export async function commanderNode(
       directAnswer: result.directAnswer,
       clarificationNeeded: false,
       status: WorkflowStatus.COMPLETED,
+      outputs: [result.directAnswer],
       traces,
     };
   }
@@ -125,7 +127,11 @@ export async function commanderNode(
     return {
       clarificationNeeded: true,
       clarificationQuestion: result.clarificationQuestion,
-      status: WorkflowStatus.PLANNING,
+      // The graph ends after a Commander clarification. Mark the turn as
+      // completed so callers do not leave the workflow looking stuck in
+      // PLANNING; clarificationNeeded carries the user-facing next action.
+      status: WorkflowStatus.COMPLETED,
+      ...(result.clarificationQuestion ? { outputs: [result.clarificationQuestion] } : {}),
       traces,
     };
   }
@@ -139,6 +145,7 @@ export async function commanderNode(
       directAnswer: 'I had trouble understanding that request. Could you rephrase it with a bit more detail about what you want me to do?',
       clarificationNeeded: false,
       status: WorkflowStatus.COMPLETED,
+      outputs: ['I had trouble understanding that request. Could you rephrase it with a bit more detail about what you want me to do?'],
       traces,
     };
   }

@@ -1,6 +1,10 @@
 # JAK Swarm — Deployment Automation
 
-Scripts that replace dashboard clicking for the Render API+Worker split migration. Each script accepts tokens via **env vars only** — never hardcoded, never passed as CLI args (so they don't end up in shell history).
+The active beta deploy target is now Railway for API/worker, Vercel for frontend, Supabase Postgres, and Upstash Redis. See [`docs/railway-deployment.md`](../../docs/railway-deployment.md).
+
+The Render scripts in this folder are **legacy rollback/migration helpers only**. Do not use them for the active beta path unless you are intentionally restoring the old Render setup.
+
+Each script accepts tokens via **env vars only** — never hardcoded, never passed as CLI args (so they don't end up in shell history).
 
 ## TL;DR
 
@@ -78,7 +82,7 @@ LOG_LEVEL=info
 DATABASE_URL=postgresql://...
 REDIS_URL=rediss://default:...@...upstash.io:6379
 # LLM keys
-OPENAI_API_KEY=sk-proj-...
+OPENAI_API_KEY=<openai-api-key>
 ```
 
 ### `configure-supabase-redirects.sh` — Supabase auth URLs

@@ -92,16 +92,10 @@ export class TenantToolRegistry {
       };
     }
 
-    // Enforce tool-level approval gate: if tool requires approval,
-    // the execution context must carry an approvalId proving it was approved.
-    if (tool.metadata.requiresApproval && !context.approvalId) {
-      return {
-        success: false,
-        error: `Tool '${name}' requires approval before execution. No approvalId provided.`,
-        durationMs: 0,
-      };
-    }
-
+    // Delegate approval decisions to ToolRegistry so callers get the
+    // structured outcome:'approval_required' contract. A local pre-block here
+    // turns approval pauses into plain failures and bypasses the workflow
+    // approval-request path.
     return toolRegistry.execute<TOutput>(name, input, context);
   }
 

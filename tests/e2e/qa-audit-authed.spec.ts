@@ -61,6 +61,8 @@ const EMAIL = process.env['E2E_AUTH_EMAIL'];
 const PASSWORD_PRIMARY = process.env['E2E_AUTH_PASSWORD'];
 const PASSWORD_FALLBACK = process.env['E2E_AUTH_PASSWORD_ALT'];
 
+test.skip(!EMAIL || !PASSWORD_PRIMARY, 'Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD to run the authenticated A-to-Z QA audit.');
+
 /**
  * Log in once at beforeAll and share the authenticated page across tests.
  * Tries PRIMARY password first, falls back to ALT if provided.

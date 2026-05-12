@@ -1,4 +1,5 @@
 import { AgentRole, RiskLevel } from '@jak-swarm/shared';
+import { getShieldGateway } from '@jak-swarm/security';
 import { BaseAgent } from '../base/base-agent.js';
 import type { AgentContext } from '../base/agent-context.js';
 
@@ -17,55 +18,6 @@ export interface GuardrailInput {
   toolsToExecute?: string[];
   checkType: 'INPUT' | 'OUTPUT' | 'ACTION';
 }
-
-// PII patterns
-const PII_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
-  { name: 'EMAIL', pattern: /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g },
-  {
-    name: 'PHONE',
-    pattern: /(\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b/g,
-  },
-  {
-    name: 'SSN',
-    pattern: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
-  },
-  {
-    name: 'CREDIT_CARD',
-    pattern: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12})\b/g,
-  },
-  {
-    name: 'DOB',
-    pattern:
-      /\b(0[1-9]|1[0-2])[\/\-\.](0[1-9]|[12][0-9]|3[01])[\/\-\.](19|20)\d{2}\b|\b(19|20)\d{2}[\/\-\.](0[1-9]|1[0-2])[\/\-\.](0[1-9]|[12][0-9]|3[01])\b/g,
-  },
-  {
-    name: 'MRN',
-    pattern: /\bMRN[#:\s]?\s*\d{6,10}\b/gi,
-  },
-  {
-    name: 'PASSPORT',
-    pattern: /\b[A-Z]{1,2}\d{6,9}\b/g,
-  },
-];
-
-// Prompt injection patterns
-const INJECTION_PATTERNS: Array<{ pattern: RegExp; risk: 'LOW' | 'HIGH' }> = [
-  { pattern: /ignore\s+(all\s+)?previous\s+instructions/i, risk: 'HIGH' },
-  { pattern: /ignore\s+your\s+(system\s+)?prompt/i, risk: 'HIGH' },
-  { pattern: /you\s+are\s+now\s+(a\s+)?(\w+\s+)?(?:assistant|bot|ai|model)/i, risk: 'HIGH' },
-  { pattern: /new\s+instructions:/i, risk: 'HIGH' },
-  { pattern: /\bSYSTEM:\s/m, risk: 'HIGH' },
-  { pattern: /```\s*system/i, risk: 'HIGH' },
-  { pattern: /act\s+as\s+(a\s+)?(?:different|new|unrestricted|unfiltered)/i, risk: 'HIGH' },
-  { pattern: /pretend\s+(you\s+are|to\s+be)\s+/i, risk: 'HIGH' },
-  { pattern: /disregard\s+(all\s+)?(?:previous|your|the)\s+/i, risk: 'HIGH' },
-  { pattern: /forget\s+everything\s+(you\s+know|i\s+said|above)/i, risk: 'HIGH' },
-  { pattern: /\[\[.*?\]\]/s, risk: 'LOW' },
-  { pattern: /\bDAN\s+mode\b/i, risk: 'HIGH' },
-  { pattern: /jailbreak/i, risk: 'HIGH' },
-  { pattern: /<\|system\|>/i, risk: 'HIGH' },
-  { pattern: /override\s+(safety|policy|restriction|rule)/i, risk: 'HIGH' },
-];
 
 // Destructive action patterns
 const DESTRUCTIVE_ACTIONS = new Set([
@@ -118,8 +70,16 @@ export class GuardrailAgent extends BaseAgent {
     let injectionAttempted = false;
     let blockedAction: string | undefined;
 
+    const shieldScan = await getShieldGateway().scanInput(guardrailInput.content, {
+      tenantId: context.tenantId,
+      userId: context.userId,
+      workflowId: context.workflowId,
+      runId: context.runId,
+      source: guardrailInput.checkType === 'ACTION' ? 'tool_input' : 'agent_user_message',
+    });
+
     // 1. PII detection
-    const piiResults = this.detectPII(guardrailInput.content);
+    const piiResults = shieldScan.pii.found.map(String);
     if (piiResults.length > 0) {
       piiDetected = true;
       violations.push(
@@ -128,7 +88,7 @@ export class GuardrailAgent extends BaseAgent {
     }
 
     // 2. Prompt injection detection
-    const injectionResults = this.detectInjection(guardrailInput.content);
+    const injectionResults = shieldScan.injection;
     if (injectionResults.detected) {
       injectionAttempted = true;
       violations.push(
@@ -200,38 +160,5 @@ export class GuardrailAgent extends BaseAgent {
     );
 
     return result;
-  }
-
-  detectPII(text: string): string[] {
-    const found = new Set<string>();
-    for (const { name, pattern } of PII_PATTERNS) {
-      pattern.lastIndex = 0;
-      if (pattern.test(text)) {
-        found.add(name);
-      }
-    }
-    return [...found];
-  }
-
-  detectInjection(text: string): {
-    detected: boolean;
-    patterns: string[];
-    risk: 'LOW' | 'HIGH';
-  } {
-    const matched: string[] = [];
-    let highRisk = false;
-
-    for (const { pattern, risk } of INJECTION_PATTERNS) {
-      if (pattern.test(text)) {
-        matched.push(pattern.source.slice(0, 50));
-        if (risk === 'HIGH') highRisk = true;
-      }
-    }
-
-    return {
-      detected: matched.length > 0,
-      patterns: matched,
-      risk: highRisk ? 'HIGH' : 'LOW',
-    };
   }
 }

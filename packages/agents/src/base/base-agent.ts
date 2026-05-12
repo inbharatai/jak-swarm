@@ -1,6 +1,12 @@
 import OpenAI from 'openai';
 import type { AgentRole, AgentTrace, ToolCall, ToolExecutionContext } from '@jak-swarm/shared';
-import { generateId, createLogger, calculateCost } from '@jak-swarm/shared';
+import {
+  generateId,
+  createLogger,
+  calculateCost,
+  openAIChatTokenLimitParam,
+  openAISamplingParams,
+} from '@jak-swarm/shared';
 import type { Logger } from '@jak-swarm/shared';
 import type { AgentContext } from './agent-context.js';
 import type { LLMProvider } from './llm-provider.js';
@@ -131,30 +137,22 @@ export abstract class BaseAgent {
     this.role = role;
     this.logger = createLogger(`agent:${role.toLowerCase()}`, { role });
 
-    // Auto-initialize provider routing/failover whenever any supported provider is configured.
+    // Auto-initialize the OpenAI-only provider route whenever OpenAI is configured.
     if (provider) {
       this.provider = provider;
     } else {
-      const hasProviderCredentials = Boolean(
-        process.env['OPENAI_API_KEY'] ||
-        process.env['ANTHROPIC_API_KEY'] ||
-        process.env['GEMINI_API_KEY'] ||
-        process.env['DEEPSEEK_API_KEY'] ||
-        process.env['OPENROUTER_API_KEY'] ||
-        process.env['OLLAMA_URL'] ||
-        process.env['OLLAMA_MODEL'],
-      );
+      const hasProviderCredentials = Boolean(apiKey ?? process.env['OPENAI_API_KEY']);
 
-      // Any provider available — use ProviderRouter for automatic routing/failover
+      // OpenAI available - use the tier-aware OpenAI provider route.
       if (hasProviderCredentials) {
       try {
         // Role-aware routing: pick a tier-aligned primary provider first,
-        // then let ProviderRouter append environment-driven fallbacks.
+        // then wrap it for consistent telemetry/error classification.
         const tier = getTierForAgent(this.role);
         const primary = getProviderForTier(tier);
         this.provider = new ProviderRouter(primary);
       } catch {
-        // ProviderRouter not available — fall through to direct OpenAI
+        // ProviderRouter not available - fall through to direct OpenAI.
       }
       }
     }
@@ -163,7 +161,7 @@ export abstract class BaseAgent {
     if (!resolvedKey && !this.provider) {
       this.logger.error(
         { role },
-        '[BaseAgent] No OPENAI_API_KEY or ANTHROPIC_API_KEY set — LLM calls will fail. Set at least one API key in your environment.',
+        '[BaseAgent] No OPENAI_API_KEY set - LLM calls will fail. Set OPENAI_API_KEY in your environment.',
       );
     }
 
@@ -414,8 +412,7 @@ ${lines.join('\n')}
     // Per-agent model resolution order:
     //   1. AGENT_MODEL_MAP override for this exact role (if any)
     //   2. OPENAI_MODEL env (operator-wide override)
-    //   3. ModelResolver pick for this role's tier (GPT-5.4 family default,
-    //      with falsafe to gpt-4o family if capability check failed)
+    //   3. ModelResolver pick for this role's tier (GPT-5.5/5.4 family only)
     const agentModel =
       getModelOverride(this.role) ??
       process.env['OPENAI_MODEL']?.trim() ??
@@ -424,8 +421,8 @@ ${lines.join('\n')}
     const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
       model: agentModel,
       messages,
-      max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.2,
+      ...openAIChatTokenLimitParam(agentModel, options?.maxTokens ?? 4096),
+      ...openAISamplingParams(agentModel, { temperature: options?.temperature ?? 0.2 }),
       ...(hasTools ? { tools, tool_choice: 'auto' } : {}),
       ...(wantsJson && !hasTools ? { response_format: { type: 'json_object' as const } } : {}),
     };
@@ -437,7 +434,7 @@ ${lines.join('\n')}
       try {
         const completion = await this.openai.chat.completions.create(params);
 
-        const model = params.model ?? process.env['OPENAI_MODEL'] ?? 'gpt-4o';
+        const model = params.model ?? process.env['OPENAI_MODEL'] ?? 'gpt-5.4';
         const promptTok = completion.usage?.prompt_tokens ?? 0;
         const completionTok = completion.usage?.completion_tokens ?? 0;
         const costUsd = calculateCost(model, promptTok, completionTok);
@@ -524,7 +521,7 @@ ${lines.join('\n')}
           id: `provider-${Date.now()}`,
           object: 'chat.completion',
           created: Math.floor(Date.now() / 1000),
-          model: this.provider!.name,
+          model: response.model ?? this.provider!.name,
           choices: [
             {
               index: 0,
@@ -545,7 +542,7 @@ ${lines.join('\n')}
           },
         };
 
-        const providerModel = completion.model || this.provider!.name;
+        const providerModel = response.model ?? completion.model ?? this.provider!.name;
         const costUsd = calculateCost(providerModel, response.usage.promptTokens, response.usage.completionTokens);
 
         this.logger.debug(
@@ -673,32 +670,42 @@ ${lines.join('\n')}
     // confidence score. See
     //   packages/security/src/guardrails/offensive-cyber-detector.ts
     // Off-switch: JAK_SHIELD_OFFENSIVE_GUARD_DISABLED=1
-    if (process.env['JAK_SHIELD_OFFENSIVE_GUARD_DISABLED'] !== '1') {
-      const { detectOffensiveCyberRequest } = await import('@jak-swarm/security');
+    const offensiveGuardEnabled = process.env['JAK_SHIELD_OFFENSIVE_GUARD_DISABLED'] !== '1';
+    const injectionGuardEnabled = process.env['JAK_INJECTION_GUARD_DISABLED'] !== '1';
+    if (offensiveGuardEnabled || injectionGuardEnabled) {
+      const { getShieldGateway } = await import('@jak-swarm/security');
+      const shieldGateway = getShieldGateway();
       for (const msg of conversation) {
         if (msg.role !== 'user' || typeof msg.content !== 'string') continue;
-        const r = detectOffensiveCyberRequest(msg.content);
-        if (r.detected && r.confidence >= 0.7) {
+        const scan = await shieldGateway.scanInput(msg.content, {
+          tenantId: context.tenantId,
+          userId: context.userId,
+          workflowId: context.workflowId,
+          runId: context.runId,
+          source: 'agent_user_message',
+        });
+
+        const offensive = scan.offensiveCyber;
+        if (offensiveGuardEnabled && offensive.detected && offensive.confidence >= 0.7) {
           throw new Error(
-            `Input blocked by JAK Shield: this looks like a request to ${r.reason} ` +
-            `(category: ${r.category}). JAK Shield is built for defensive ` +
+            `Input blocked by JAK Shield: this looks like a request to ${offensive.reason} ` +
+            `(category: ${offensive.category}). JAK Shield is built for defensive ` +
             `security and safe automation; offensive cyber work is out of scope. ` +
             `If this is a legitimate defensive task, rephrase to make the scope ` +
             `explicit (e.g. "audit my repo for vulnerable dependencies").`,
           );
         }
-      }
-    }
 
-    if (process.env['JAK_INJECTION_GUARD_DISABLED'] !== '1') {
-      const { detectInjection } = await import('@jak-swarm/security');
-      for (const msg of conversation) {
-        if (msg.role !== 'user' || typeof msg.content !== 'string') continue;
-        const result = detectInjection(msg.content);
-        if (result.detected && result.risk === 'HIGH' && result.confidence >= 0.7) {
+        const injection = scan.injection;
+        if (
+          injectionGuardEnabled &&
+          injection.detected &&
+          injection.risk === 'HIGH' &&
+          injection.confidence >= 0.7
+        ) {
           throw new Error(
             `Input blocked for safety: prompt-injection patterns detected ` +
-            `(${result.patterns.slice(0, 3).join('; ')}). If this was a ` +
+            `(${injection.patterns.slice(0, 3).join('; ')}). If this was a ` +
             `legitimate request, rephrase without instruction-override ` +
             `language.`,
           );
@@ -769,7 +776,7 @@ ${lines.join('\n')}
         totalTokens.completion += iterCompletion;
         totalTokens.total += completion.usage.total_tokens ?? 0;
 
-        const iterModel = completion.model || this.provider?.name || 'gpt-4o';
+        const iterModel = completion.model || this.provider?.name || 'gpt-5.4';
         // Sprint 2.2 / Item I — read OpenAI prompt-cache + reasoning
         // token breakdown that OpenAIRuntime preserves on the completion
         // via the JakAdaptedChatCompletion extension fields. LegacyRuntime
@@ -788,12 +795,9 @@ ${lines.join('\n')}
         totalCostUsd += iterCost;
 
         // Stage 2.3 + hardening pass: complete cost telemetry — runtime
-        // name, model, fallback model (if used), token breakdown, run +
-        // step ids. The cockpit aggregates these and the audit log can
+        // name, model, token breakdown, run + step ids. The cockpit can
         // reconstruct per-step spend after the fact.
         const runtimeName = this.runtime?.name ?? 'legacy';
-        const requestedModel =
-          (completion as unknown as { _requestedModel?: string })._requestedModel;
         // Sprint 2.4 / Item G — surface PII redaction stats on the cost
         // event when redactor caught something this iteration. Only emit
         // the field when there was redaction; absent field signals
@@ -807,9 +811,6 @@ ${lines.join('\n')}
           agentRole: this.role,
           runtime: runtimeName,
           model: iterModel,
-          ...(requestedModel && requestedModel !== iterModel
-            ? { fallbackModelUsed: iterModel }
-            : {}),
           promptTokens: iterPrompt,
           completionTokens: iterCompletion,
           totalTokens: iterPrompt + iterCompletion,
@@ -1216,7 +1217,7 @@ Produce a corrected output in the same format.`,
   }
 
   /**
-   * Analyze an image using the vision-capable LLM (GPT-4o or Claude).
+   * Analyze an image using the configured OpenAI vision-capable LLM.
    * Accepts base64-encoded image data and a text prompt.
    * Returns the LLM's text analysis of the image.
    */

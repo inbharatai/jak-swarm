@@ -24,11 +24,13 @@ import { test, type Page, type BrowserContext, type ConsoleMessage, type Respons
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
-const SITE = process.env['QA_SITE'] ?? 'https://jakswarm.com';
+const SITE = (process.env['QA_SITE'] ?? process.env['E2E_BASE_URL'] ?? `http://127.0.0.1:${process.env['E2E_WEB_PORT'] ?? '3100'}`).replace(/\/$/, '');
 const ARTIFACTS = 'C:/Users/reetu/Desktop/JAK/jak-swarm/qa/playwright-artifacts/a-to-z';
 const FINDINGS_PATH = 'C:/Users/reetu/Desktop/JAK/jak-swarm/qa/a-to-z-findings.json';
-const EMAIL = process.env['E2E_AUTH_EMAIL'] ?? 'reetu004@gmail.com';
-const PASSWORD = process.env['E2E_AUTH_PASSWORD'] ?? 'Adubaby.004';
+const EMAIL = process.env['E2E_AUTH_EMAIL'];
+const PASSWORD = process.env['E2E_AUTH_PASSWORD'];
+
+test.skip(!EMAIL || !PASSWORD, 'Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD to run the authenticated A-to-Z audit.');
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
 type Verdict = 'working' | 'partial' | 'inert' | 'misleading' | 'broken' | 'blocked' | 'marketing-only';
@@ -103,8 +105,8 @@ let page: Page;
 async function login() {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
-  await page.locator('input[type="email"]').first().fill(EMAIL);
-  await page.locator('input[type="password"]').first().fill(PASSWORD);
+  await page.locator('input[type="email"]').first().fill(EMAIL!);
+  await page.locator('input[type="password"]').first().fill(PASSWORD!);
   await page.locator('button[type="submit"]').first().click();
   try {
     await page.waitForURL((u) => !/\/(login|register)/.test(u.pathname), { timeout: 20_000 });

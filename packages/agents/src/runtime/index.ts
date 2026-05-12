@@ -1,27 +1,17 @@
 /**
- * Runtime factory — single point that returns the right `LLMRuntime` for
- * a given agent role based on the migration flags.
+ * Runtime factory - single point that returns the LLMRuntime for an agent role.
  *
- * Reading order at construction time:
- *   1. JAK_OPENAI_RUNTIME_AGENTS env var (CSV of agent role names).
- *      If the agent's role is in this allowlist, return OpenAIRuntime
- *      (Phase 4+). Otherwise fall through.
- *   2. JAK_EXECUTION_ENGINE env var. If 'openai-first', return
- *      OpenAIRuntime for every agent (Phase 7). Otherwise fall through.
- *   3. Default: LegacyRuntime (Phase 2 default).
- *
- * Phase 2 hardcodes LegacyRuntime; the env-var checks are scaffolded but
- * the OpenAIRuntime import is a stub that throws. Phase 3 wires it up.
+ * Production policy is OpenAI-only via OpenAIRuntime (Responses API). The old
+ * migration flags are still parsed for backward-compatible diagnostics, but
+ * they no longer enable a non-OpenAI provider chain. LegacyRuntime remains as a
+ * no-key local/test harness wrapper only; production boot requires
+ * OPENAI_API_KEY.
  */
 
 import type { LLMRuntime } from './llm-runtime.js';
 import { LegacyRuntime, type LegacyAgentBackend } from './legacy-runtime.js';
-// Static import (was previously a `require('./openai-runtime.js')` which silently
-// failed under vitest/tsx because the .js extension doesn't resolve TS source.
-// The `export { OpenAIRuntime } from './openai-runtime.js'` at the bottom of
-// this file already triggers module load, so the lazy require was never actually
-// lazy. The require + try/catch fallback masked real OpenAI runtime errors in
-// CI — silently degrading to LegacyRuntime when the real intent was OpenAIRuntime.)
+// Static import (was previously a require('./openai-runtime.js') that masked
+// real OpenAI runtime errors under vitest/tsx by silently degrading to legacy).
 import { OpenAIRuntime as OpenAIRuntimeImpl } from './openai-runtime.js';
 
 /**
@@ -39,22 +29,18 @@ function getOpenaiRuntimeAgents(): { wildcard: boolean; roles: Set<string> } {
   };
 }
 
+let warnedAboutIgnoredLegacyEngine = false;
+
 /**
  * Returns the runtime an agent should use based on its role + current flags.
  *
  * Selection order:
- *   1. JAK_OPENAI_RUNTIME_AGENTS=* → OpenAIRuntime for every agent.
- *   2. JAK_OPENAI_RUNTIME_AGENTS contains the role name → OpenAIRuntime.
- *   3. JAK_EXECUTION_ENGINE=openai-first → OpenAIRuntime for every agent.
- *   4. JAK_EXECUTION_ENGINE explicitly set to 'legacy' → LegacyRuntime.
- *   5. Default when OPENAI_API_KEY is set → OpenAIRuntime (Responses API).
- *   6. Fallback → LegacyRuntime (Chat Completions via OpenAIProvider).
- *
- * The default changed in the GPT-5.4 migration: if a caller has an
- * OPENAI_API_KEY set and has NOT explicitly chosen legacy, we use the
- * Responses API because GPT-5.4 strongly prefers it. Legacy Chat
- * Completions still works for existing callers who set
- * JAK_EXECUTION_ENGINE=legacy.
+ *   1. JAK_OPENAI_RUNTIME_AGENTS=* -> OpenAIRuntime for every agent.
+ *   2. JAK_OPENAI_RUNTIME_AGENTS contains the role name -> OpenAIRuntime.
+ *   3. JAK_EXECUTION_ENGINE=openai-first -> OpenAIRuntime for every agent.
+ *   4. JAK_EXECUTION_ENGINE=legacy -> ignored; OpenAI-only is enforced.
+ *   5. Default when OPENAI_API_KEY is set -> OpenAIRuntime (Responses API).
+ *   6. No OPENAI_API_KEY -> LegacyRuntime only for local tests/no-key stubs.
  */
 export function getRuntime(
   role: string,
@@ -67,23 +53,16 @@ export function getRuntime(
   const explicitOpenAI =
     wildcard || roles.has(role.toUpperCase()) || engineFlag === 'openai-first';
   const explicitLegacy = engineFlag === 'legacy';
-  // Default: OpenAI-first when we have a key and the operator has NOT
-  // explicitly opted into legacy.
-  const useOpenAI = explicitOpenAI || (!explicitLegacy && hasKey);
+  // OpenAI-only: a legacy engine flag no longer enables the old provider chain.
+  const useOpenAI = explicitOpenAI || hasKey || explicitLegacy;
 
   if (useOpenAI) {
-    try {
-      return new OpenAIRuntimeImpl();
-    } catch (err) {
-      // If OpenAIRuntime construction fails (e.g. missing OPENAI_API_KEY at
-      // construction time despite the env check above — race), fall back to
-      // LegacyRuntime so the agent still works. Never throw here — agent
-      // construction must not fail during boot.
+    if (explicitLegacy && !warnedAboutIgnoredLegacyEngine) {
+      warnedAboutIgnoredLegacyEngine = true;
       // eslint-disable-next-line no-console
-      console.warn(
-        `[getRuntime] OpenAIRuntime unavailable (${err instanceof Error ? err.message : String(err)}), falling back to LegacyRuntime for role ${role}.`,
-      );
+      console.warn('[getRuntime] JAK_EXECUTION_ENGINE=legacy is ignored; OpenAI-only runtime is enforced.');
     }
+    return new OpenAIRuntimeImpl();
   }
 
   return new LegacyRuntime(backend);

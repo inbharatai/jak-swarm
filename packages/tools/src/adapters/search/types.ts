@@ -118,8 +118,8 @@ export interface SearchOptions {
    */
   subscriptionTier?: 'free' | 'paid';
   /**
-   * When true, pipe chain results through an LLM re-ranker (Claude Haiku
-   * preferred, GPT-4o-mini fallback) that scores each result 0-1 on query
+   * When true, pipe chain results through an OpenAI LLM re-ranker that
+   * scores each result 0-1 on query
    * relevance, drops low-score results, and re-orders by score. Fails safe:
    * any error returns original results unchanged.
    *
@@ -138,8 +138,8 @@ export interface SearchOptions {
   rerankIntent?: 'informational' | 'navigational' | 'time_sensitive' | 'technical';
   /**
    * When true, pre-rewrite the query via a cheap LLM before hitting the
-   * provider chain. Uses the same Haiku-primary / GPT-4o-mini-fallback path
-   * as the re-ranker. Smart-gated by `needsRewrite()` — already-focused
+   * provider chain. Uses the same OpenAI-only path as the re-ranker.
+   * Smart-gated by `needsRewrite()` — already-focused
    * keyword queries pass through untouched to save cost and latency.
    *
    * Gated by caller (typically paid-tier only) and by DISABLE_SEARCH_REWRITER

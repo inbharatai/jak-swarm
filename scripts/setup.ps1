@@ -70,9 +70,6 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/jak_swarm
 
 # ── LLM Providers (at least one required) ────────────
 OPENAI_API_KEY=
-# ANTHROPIC_API_KEY=
-# GEMINI_API_KEY=
-# DEEPSEEK_API_KEY=
 
 # ── Auth (Supabase) ──────────────────────────────────
 SUPABASE_URL=

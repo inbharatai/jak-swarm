@@ -10,9 +10,9 @@
  * actions through the approval policy.
  *
  * Per-platform adapters (LinkedIn / Instagram / YouTube Studio /
- * Meta Business Suite) compose on top of this foundation in follow-up
- * sprints (`docs/browser-operator-runtime-plan.md`). Until each
- * platform adapter ships, those cards stay marked "Coming soon".
+ * Meta Business Suite) are browser-assisted adapters: they can open
+ * the right surface, observe the page, and prepare drafts. They do not
+ * auto-publish or bypass login / 2FA.
  *
  * Honest framing kept: the GENERIC card is "Functional — try it now";
  * platform-specific cards explicitly say what's not live yet.
@@ -128,7 +128,7 @@ export function BrowserOperatorComingSoon() {
           className="rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
           data-testid="browser-operator-status-badge"
         >
-          All adapters live (publish manual)
+          Assisted adapters live
         </span>
       </div>
       <p className="text-xs text-muted-foreground mb-4 max-w-2xl">
@@ -136,10 +136,10 @@ export function BrowserOperatorComingSoon() {
         capture observations, and ask your approval before any external action. The
         <strong> generic browser session</strong> is functional today — pick any URL and
         JAK will open it, screenshot it, and gate clicks/fills/navigations behind
-        approvals. Per-platform adapters (LinkedIn / Instagram / YouTube Studio /
-        Meta Business Suite review flows) ship in follow-up sprints — those cards stay
-        marked &ldquo;Coming soon&rdquo; until their adapter lands. <strong>JAK never
-        stores your password.</strong>
+        approvals. LinkedIn / Instagram / YouTube Studio / Meta Business Suite are
+        browser-assisted draft and review flows, not autonomous publishing flows:
+        login, 2FA, and the final publish/upload click remain with you. <strong>JAK never
+        stores your password or auto-posts to these platforms.</strong>
       </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {BROWSER_PLATFORMS.map((platform) => {

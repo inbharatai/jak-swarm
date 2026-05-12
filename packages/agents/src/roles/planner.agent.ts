@@ -364,12 +364,16 @@ export class PlannerAgent extends BaseAgent {
 
     const output: PlannerOutput = { plan };
 
-    // respondStructured does not yet surface token usage through the
-    // LLMRuntime interface (Phase 6 will add a usage callback). Cost
-    // tracking still flows via BaseAgent.onLLMCallComplete inside
-    // LegacyRuntime; OpenAIRuntime emits cost_updated activity events
-    // through the agent context, so the cockpit still shows live cost.
-    this.recordTrace(context, input, output, [], startedAt);
+    const usageSummary = context.getLLMUsageSummary();
+    const trace = this.recordTrace(context, input, output, [], startedAt);
+    if (usageSummary) {
+      trace.tokenUsage = {
+        promptTokens: usageSummary.promptTokens,
+        completionTokens: usageSummary.completionTokens,
+        totalTokens: usageSummary.totalTokens,
+      };
+      trace.costUsd = usageSummary.costUsd;
+    }
 
     this.logger.info(
       { planId: plan.id, taskCount: tasks.length },

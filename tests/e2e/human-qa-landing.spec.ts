@@ -73,13 +73,13 @@ test.describe('HumanQA — landing page', () => {
     //    (DOM-level, not navigated — clicking would leave the landing).
     await qa.observeSection('hero-ctas', { selector: 'section.gradient-bg' });
     const heroCtaHref = await page
-      .locator('section.gradient-bg a[href="/register"]')
+      .locator('section.gradient-bg a[href="/trial"]')
       .first()
       .getAttribute('href');
     qa.compareClaim({
-      claim: 'Hero "Start Free" CTA points at /register',
+      claim: 'Hero trial CTA points at /trial',
       observed: String(heroCtaHref),
-      matches: heroCtaHref === '/register',
+      matches: heroCtaHref === '/trial',
       section: 'hero-ctas',
     });
     const githubHref = await page

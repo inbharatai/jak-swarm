@@ -71,7 +71,7 @@ test.describe('Browser-operator UI honesty', () => {
     }
   });
 
-  test('Status badge accurately says "Generic mode live"', async ({ page }) => {
+  test('Status badge accurately reports the shipped browser-operator mode', async ({ page }) => {
     await page.goto('/integrations', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2_500);
 
@@ -80,6 +80,6 @@ test.describe('Browser-operator UI honesty', () => {
     const badgeText = await badge.innerText();
     // Status copy expands as platform adapters ship; check for any
     // of the known live states.
-    expect(badgeText.toLowerCase()).toMatch(/(generic.*live|linkedin|all adapters live)/i);
+    expect(badgeText.toLowerCase()).toMatch(/(generic.*live|assisted adapters live|linkedin|all adapters live)/i);
   });
 });

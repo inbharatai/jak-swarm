@@ -61,8 +61,8 @@ const POINTS: TrustPoint[] = [
   },
   {
     title: 'OpenAI-first runtime',
-    body: 'OpenAI Responses API as the primary path with structured output. Anthropic, Gemini, DeepSeek, Ollama, and OpenRouter remain wired as optional fallback providers.',
-    proof: 'openai-runtime.ts · Responses API',
+    body: 'JAK is OpenAI-only for model execution, with GPT-5.5/5.4-family tier routing and Responses API support for structured orchestration. No alternate LLM provider fallback is used.',
+    proof: 'openai-runtime.ts · provider-router.ts',
     color: '#f472b6',
     iconPath: 'M12 6V3m0 18v-3m6-9h3M3 12h3m11.66-6.66l2.12-2.12M3.22 20.78l2.12-2.12M17.66 20.78l2.12-2.12M3.22 3.22l2.12 2.12',
   },

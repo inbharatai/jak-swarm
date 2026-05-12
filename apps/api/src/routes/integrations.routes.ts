@@ -17,42 +17,42 @@ import { ok, err } from '../types.js';
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
 
 const INTEGRATION_MATURITY: Record<string, { maturity: IntegrationMaturity; note: string }> = {
-  // ── Anthropic-published MCP servers ──
+  // MCP-backed servers
   SLACK: {
     maturity: 'production-ready',
-    note: 'MCP-backed, webhook-verified in API runtime. Anthropic-published package.',
+    note: 'MCP-backed and webhook-verified in the API runtime.',
   },
   GITHUB: {
     maturity: 'beta',
-    note: 'MCP-backed tools via Anthropic package. Reliability depends on GitHub API and MCP server availability.',
+    note: 'MCP-backed tools. Reliability depends on GitHub API and MCP server availability.',
   },
   FILESYSTEM: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server. Sandboxed to configured directories.',
+    note: 'MCP server sandboxed to configured directories.',
   },
   FETCH: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server for HTTP fetching.',
+    note: 'MCP server for HTTP fetching.',
   },
   MEMORY: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server for knowledge graph memory.',
+    note: 'MCP server for knowledge graph memory.',
   },
   PUPPETEER: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server. Requires headless Chrome.',
+    note: 'MCP server. Requires headless Chrome.',
   },
   POSTGRES: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server. Read-only by default for safety.',
+    note: 'MCP server. Read-only by default for safety.',
   },
   BRAVE_SEARCH: {
     maturity: 'beta',
-    note: 'Anthropic-published MCP server. Requires Brave Search API key.',
+    note: 'MCP server. Requires Brave Search API key.',
   },
   SEQUENTIAL_THINKING: {
     maturity: 'beta',
-    note: 'Anthropic-published experimental reasoning server.',
+    note: 'Experimental reasoning MCP server.',
   },
   // ── Official vendor MCP servers ──
   NOTION: {
@@ -483,7 +483,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     if (!creds) {
       return reply.code(503).send(err('NOT_CONFIGURED',
         `${oauthProvider.label} OAuth is not configured on this deployment. ` +
-          `Set the provider's CLIENT_ID and CLIENT_SECRET env vars.`,
+          'Ask an admin to finish the provider sign-in setup.',
       ));
     }
 

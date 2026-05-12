@@ -265,8 +265,12 @@ function sanitizeConversationState(value: unknown): PersistedConversationState {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
+// P1-2 (audit 2026-05-08): keep the timestamp prefix (used by the UI to
+// sort message order without a separate clock) but source the random tail
+// from a browser-safe crypto UUID helper.
+import { generateBrowserId } from '@/lib/id';
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `${Date.now()}-${generateBrowserId().slice(0, 8)}`;
 }
 
 export const useConversationStore = create<ConversationState & ConversationActions>()(

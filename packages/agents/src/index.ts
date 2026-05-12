@@ -15,12 +15,7 @@ export type { Subgoal, SubgoalCoordinatorResult } from './coordination/subgoal-c
 // LLM Providers
 export type { LLMProvider, LLMResponse, TextContent, ImageContent, MessageContent } from './base/llm-provider.js';
 export { OpenAIProvider } from './base/providers/openai-provider.js';
-export { AnthropicProvider } from './base/providers/anthropic-provider.js';
 export { ProviderRouter, getDefaultProvider } from './base/provider-router.js';
-export { GeminiProvider } from './base/providers/gemini-provider.js';
-export { DeepSeekProvider } from './base/providers/deepseek-provider.js';
-export { OllamaProvider } from './base/providers/ollama-provider.js';
-export { OpenRouterProvider } from './base/providers/openrouter-provider.js';
 
 // Anti-hallucination & optimization utilities
 export {

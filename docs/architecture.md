@@ -74,19 +74,19 @@ Core principles:
 │   └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │   ┌──────────────────────────────────────────────────────────────┐  │
-│   │  SwarmGraph + SwarmRunner (packages/swarm)                   │  │
-│   │  • DAG state machine: commander → planner → router →        │  │
-│   │    guardrail → worker → verifier → replanner                │  │
-│   │  • Parallel task execution (Promise.allSettled, max 5)      │  │
-│   │  • Dependency-aware scheduling via getReadyTasks()          │  │
-│   │  • State persisted to PostgreSQL after every node           │  │
+│   │  LangGraphRuntime + SwarmRunner facade (packages/swarm)       │  │
+│   │  • Native StateGraph: commander → planner → router →        │  │
+│   │    guardrail → approval → worker → verifier → validator     │  │
+│   │  • Postgres checkpoints via PostgresCheckpointSaver          │  │
+│   │  • Human approvals via interrupt() + Command(resume)        │  │
+│   │  • Queue worker resumes from durable workflow checkpoints    │  │
 │   └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │   ┌──────────────────────────────────────────────────────────────┐  │
 │   │  Agent Engine (packages/agents)                              │  │
-│   │  • BaseAgent with multi-provider LLM routing + failover     │  │
-│   │  • 6 providers: OpenAI, Anthropic, Gemini, DeepSeek,        │  │
-│   │    Ollama, OpenRouter                                       │  │
+│   │  • BaseAgent with OpenAI-only runtime                        │  │
+│   │  • OpenAI Responses API, GPT-5.5 / GPT-5.4 tier routing      │  │
+│   │  • No alternate LLM provider fallback                        │  │
 │   │  • Role-aware tier selection (Tier 1–3)                     │  │
 │   │  • ToolRegistry — resolves tool names to implementations    │  │
 │   │  • Memory injection via <memory> tags                       │  │

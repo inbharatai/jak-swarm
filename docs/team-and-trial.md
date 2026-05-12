@@ -1,6 +1,6 @@
 # Team + 30-Day Free Trial — Migration 106
 
-**Shipped:** 2026-05-08
+**Shipped:** 2026-05-08 (initial) + 2026-05-08 (carry-overs closed)
 **Migration:** `packages/db/prisma/migrations/106_team_and_trial/`
 
 This is the JAK wedge: humans and AI agents on **one task graph, one approval flow, one audit trail**, plus a free 30-day trial as the public-facing wedge that gets design partners in the door without billing risk.
@@ -32,7 +32,10 @@ This is the JAK wedge: humans and AI agents on **one task graph, one approval fl
 | `packages/db/prisma/schema.prisma` | 4 new models + User/Subscription extensions |
 | `packages/db/prisma/migrations/106_team_and_trial/migration.sql` | Additive migration |
 | `apps/api/src/services/trial/usage-counter.service.ts` | Cap check + record + lazy reset + startTrial |
+| `apps/api/src/services/trial/trial-promotion.service.ts` | VERIFIED signup → Tenant + admin User + trialing Sub (atomic) |
+| `apps/api/src/services/trial/trial-email.service.ts` | Verify-email send (gmail / file / noop backends) |
 | `apps/api/src/plugins/trial-cap-guard.ts` | Reusable Fastify preHandler |
+| `apps/web/src/app/(auth)/trial/verify/[token]/page.tsx` | Verify landing page — drops JWT + shows initial password |
 | `apps/api/src/routes/task-assignments.routes.ts` | 8 endpoints (create / list / me / get / acknowledge / complete / decline / cancel) |
 | `apps/api/src/routes/inbox.routes.ts` | Aggregated inbox + mark-read |
 | `apps/api/src/routes/team.routes.ts` | Department CRUD + member directory + assign-to-dept |
@@ -122,15 +125,16 @@ Run:
 cd tests && pnpm exec vitest run unit/services/trial-usage-counter.test.ts unit/landing/landing-claim-vs-code.test.ts
 ```
 
-## Honest carry-overs (NOT shipped in this round)
+## Carry-overs status
 
-| Gap | Why |
-|---|---|
-| Email send for verify token | Wired into Gmail adapter is real; the actual outbound email send-on-signup is TODO. Dev mode returns `devToken` in the response so the flow is testable locally without email infrastructure. |
-| Tenant promotion during /trial/verify | The verify route marks the signup VERIFIED but does not yet create the Tenant + initial User. That step lives in the existing `/register` flow; gluing them together is a follow-up. |
-| Live Render deployment | API is currently offline (Render minutes exhausted). Schema applies cleanly when Render restores; migration is additive and safe against running data. |
-| Twilio voice + customer chat widget | Next sprint per the plan. |
-| HubSpot CRM read-through | Adapter exists; UI integration is next sprint. |
+| Gap | Status | Files |
+|---|---|---|
+| Email send for verify token | ✅ **CLOSED** — three transparent backends (gmail / file logger / noop) with structured warning when no backend configured | `apps/api/src/services/trial/trial-email.service.ts` |
+| Tenant promotion during /trial/verify | ✅ **CLOSED** — atomic `$transaction` creates Tenant + admin User + trialing Subscription + OnboardingState; idempotent on PROMOTED signup; returns JWT + one-time initial password | `apps/api/src/services/trial/trial-promotion.service.ts` + `apps/web/src/app/(auth)/trial/verify/[token]/page.tsx` |
+| Daily approvals cap actually counts | ✅ **CLOSED** — `POST /approvals/:id/decide` checks + records on `decision === 'APPROVED'` only | `apps/api/src/routes/approvals.routes.ts` |
+| Live Render deployment | ⏸ Honestly deferred — API is offline (Render minutes exhausted). Migration is additive + safe against running data; applies cleanly when Render restores. |
+| Twilio voice + customer chat widget | ⏸ Next sprint per the plan. |
+| HubSpot CRM read-through | ⏸ Adapter exists; UI integration is next sprint. |
 
 ## Demo path (when API is up)
 

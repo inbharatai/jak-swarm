@@ -1,5 +1,7 @@
 # JAK Swarm — Deployment Runbook (P0-A fix sprint)
 
+> Legacy note: this runbook documents the old Render API/worker deployment. The active beta target is Railway API + Railway worker, Vercel frontend, Supabase Postgres, and Upstash Redis. Use [`docs/railway-deployment.md`](railway-deployment.md) for new beta deploys.
+
 This doc replaces the implicit knowledge that the live `jakswarm.com`
 deploy was missing — specifically why the dashboard buttons were calling
 `localhost:4000` from a browser running on a customer's machine.
@@ -54,12 +56,10 @@ Set in the Render dashboard (per `render.yaml` `sync: false` entries):
 - `DATABASE_URL`, `DIRECT_URL` — Supabase pooler + direct
 - `AUTH_SECRET` — JWT signing secret
 - `REDIS_URL` — Upstash `rediss://` URL
-- `OPENAI_API_KEY` — primary LLM
+- `OPENAI_API_KEY` — required OpenAI-only LLM runtime
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — for auth verification
 - `WORKFLOW_WORKER_MODE=standalone` — disables the in-API worker (the
   separate `jak-swarm-worker` service drains the queue)
-- Optional: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY` —
-  fallback providers
 - Optional: `JAK_AGENT_TRACE_RETENTION_DAYS=90` — overrides default
   AgentTrace retention window (P0-B follow-on)
 

@@ -4,6 +4,7 @@ import { WorkflowService } from '../services/workflow.service.js';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError } from '../errors.js';
 import type { ApprovalStatus } from '../types.js';
+import { UsageCounterService } from '../services/trial/usage-counter.service.js';
 
 const decideBodySchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED', 'DEFERRED']),
@@ -117,6 +118,31 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { decision, comment } = parseResult.data;
 
+      // Migration 106 — daily-approvals cap on trial tenants. We check
+      // BEFORE resolving so the workflow doesn't get an unrecoverable
+      // half-committed state (decision applied + counter blocked at the
+      // last second). REJECTED / DEFERRED don't consume the cap because
+      // no external action was authorized.
+      if (decision === 'APPROVED') {
+        const usage = new UsageCounterService(fastify.db);
+        const cap = await usage.check(request.user.tenantId, 'approvals', 1);
+        if (cap.trial.expired) {
+          return reply.status(402).send(err('TRIAL_EXPIRED',
+            'Your 30-day free trial has ended. Please upgrade to approve external actions.', {
+              trialEndsAt: cap.trial.trialEndsAt?.toISOString() ?? null,
+            }));
+        }
+        if (!cap.allowed) {
+          return reply.status(429).send(err('TRIAL_DAILY_CAP_HIT',
+            `Daily ${cap.blockedBy} cap reached. Resets at UTC midnight.`, {
+              resource: cap.blockedBy,
+              counters: cap.counters,
+              resetsAt: cap.resetsAt,
+              daysRemaining: cap.trial.daysRemaining,
+            }));
+        }
+      }
+
       try {
         const approval = await workflowService.resolveApproval(
           request.user.tenantId,
@@ -125,6 +151,15 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
           request.user.userId,
           comment,
         );
+
+        // Record approval usage on APPROVED only — fire-and-forget so a
+        // counter hiccup never rolls back a committed decision.
+        if (decision === 'APPROVED') {
+          const usage = new UsageCounterService(fastify.db);
+          void usage.recordUsage(request.user.tenantId, 'approvals', 1).catch((e) => {
+            fastify.log.warn({ tenantId: request.user.tenantId, err: e }, '[trial-cap] recordUsage(approvals) failed');
+          });
+        }
 
         await fastify.auditLog(request, `APPROVAL_${decision}`, 'ApprovalRequest', approvalId, {
           decision,

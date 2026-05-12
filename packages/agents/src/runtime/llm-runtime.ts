@@ -1,11 +1,9 @@
 /**
  * LLMRuntime — JAK-owned interface for all LLM calls.
  *
- * Phase 2 of the OpenAI-first migration introduces this as the single
- * abstraction every agent will eventually call through. The current legacy
- * path (BaseAgent.callLLM + ProviderRouter + 6 providers) lives behind
- * `LegacyRuntime`. Phase 3 adds `OpenAIRuntime` (Responses API + hosted
- * tools). Phases 4 and 7 flip agents from Legacy → OpenAI one by one.
+ * OpenAI-first runtime interface for JAK agent calls. Legacy agents still
+ * route through BaseAgent while the OpenAI Responses runtime becomes the
+ * primary path for model/tool execution.
  *
  * Invariant: agents never import the OpenAI SDK directly. They get an
  * `LLMRuntime` from `getRuntime(role)` and call `respond` / `callTools`.
@@ -22,10 +20,8 @@ export interface LLMCallOptions {
   maxTokens?: number;
   temperature?: number;
   /**
-   * When true, instruct the provider to return a strict JSON object.
-   * OpenAI uses `response_format: { type: 'json_object' }`. Gemini's
-   * OpenAI-compatible endpoint supports the same. Providers that don't
-   * support it may ignore it — agents always re-parse defensively.
+   * When true, instruct OpenAI to return a strict JSON object. Agents still
+   * re-parse defensively because model output is an external boundary.
    */
   jsonMode?: boolean;
 }

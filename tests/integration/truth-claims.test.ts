@@ -48,9 +48,59 @@ describe('Product truth claims', () => {
   it('does not overstate production readiness in FAQ', () => {
     const readme = readRepoFile('README.md');
     const faqSection = readme.substring(readme.indexOf('Is JAK Swarm production-ready?'));
-    // Should acknowledge staging-ready status and caveats
-    expect(faqSection).toContain('staging-ready');
-    expect(faqSection).toContain('v0.1.0');
+    // The FAQ must acknowledge that JAK Swarm is NOT yet ready for paying
+    // enterprise customers expecting an SLA. After the Migration 106 README
+    // rewrite (May 2026) the wording moved from "staging-ready / v0.1.0"
+    // hedges to a bluntly honest "for paying enterprise customers: NO" with
+    // concrete numbered blockers. The intent is the same: never claim
+    // unqualified production readiness, always name the specific gaps.
+    //
+    // Required signals (any rewording must keep these):
+    //   1. The phrase "not yet" or an explicit "NO" — production-readiness
+    //      caveat must be visible
+    //   2. A specific blocker about third-party security audit / SOC 2 /
+    //      certification status
+    //   3. A specific blocker about lawyer-reviewed Terms / Privacy / DPA
+    expect(faqSection).toMatch(/not yet|\bNO\b|\bnot\b/i);
+    expect(faqSection).toMatch(/(third-party security audit|SOC ?2|ISO 27001|attestation)/i);
+    expect(faqSection).toMatch(/(Terms of Service|Privacy Policy|DPA|lawyer)/i);
+  });
+
+  it('declares the beta release without implying hosted production readiness', () => {
+    const readme = readRepoFile('README.md');
+    const beta = readRepoFile('docs/beta-release.md');
+    const packageManifests = [
+      'package.json',
+      'apps/api/package.json',
+      'apps/web/package.json',
+      'tests/package.json',
+      'packages/agents/package.json',
+      'packages/client/package.json',
+      'packages/db/package.json',
+      'packages/industry-packs/package.json',
+      'packages/security/package.json',
+      'packages/shared/package.json',
+      'packages/skills/package.json',
+      'packages/swarm/package.json',
+      'packages/tools/package.json',
+      'packages/verification/package.json',
+      'packages/voice/package.json',
+      'packages/whatsapp-client/package.json',
+      'packages/workflows/package.json',
+    ];
+
+    for (const manifest of packageManifests) {
+      const pkg = JSON.parse(readRepoFile(manifest)) as { version: string };
+      expect(pkg.version, manifest).toBe('0.1.0-beta.0');
+    }
+    expect(readme).toContain('Beta `0.1.0-beta.0`');
+    expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
+    expect(readme).toContain('hosted Vercel + Railway beta must be smoke-tested');
+    expect(beta).toContain('hosted Vercel/Railway health');
+    expect(readRepoFile('docs/railway-deployment.md')).toContain('API | Railway');
+    expect(readRepoFile('docs/railway-deployment.md')).toContain('Worker | Railway');
+    expect(beta).toContain('not yet ready for unqualified public/enterprise promises');
+    expect(beta).toContain('Use "beta", "design partner", or "self-hosted validation" language');
   });
 
   it('integration maturity map covers all major providers', () => {

@@ -111,7 +111,7 @@ describe('Agent Execution — Behavioral', () => {
     const { calculateCost } = await import('@jak-swarm/shared');
 
     if (typeof calculateCost === 'function') {
-      const cost = calculateCost('gpt-4o', 1000, 500);
+      const cost = calculateCost('gpt-5.4', 1000, 500);
       expect(cost).toBeGreaterThan(0);
       expect(cost).toBeLessThan(1); // 1K in + 500 out should be < $1
     }
@@ -120,25 +120,20 @@ describe('Agent Execution — Behavioral', () => {
   // Sprint 2.2 / Item I — OpenAI prompt-cache aware cost path.
   it('calculateCost discounts cached input tokens', async () => {
     const { calculateCost } = await import('@jak-swarm/shared');
-    // gpt-4o: $2.50/1M input, $1.25/1M cached input, $10/1M output
-    // 1000 prompt tokens, 0 cached → 1000 * 2.50 / 1M = 0.0025
-    // 500 completion → 500 * 10 / 1M = 0.005
-    // Total: 0.0075
-    const fullCost = calculateCost('gpt-4o', 1000, 500);
+    // gpt-5.4: $5/1M input, $0.50/1M cached input, $15/1M output.
+    const fullCost = calculateCost('gpt-5.4', 1000, 500);
     // Same call with 800 cached out of 1000 prompt tokens →
-    //   200 * 2.50 / 1M + 800 * 1.25 / 1M + 500 * 10 / 1M
-    //   = 0.0005 + 0.001 + 0.005 = 0.0065
-    const cachedCost = calculateCost('gpt-4o', 1000, 500, 800);
+    //   200 * 5 / 1M + 800 * 0.50 / 1M + 500 * 15 / 1M = 0.0089
+    const cachedCost = calculateCost('gpt-5.4', 1000, 500, 800);
     expect(cachedCost).toBeLessThan(fullCost);
-    expect(cachedCost).toBeCloseTo(0.0065, 5);
+    expect(cachedCost).toBeCloseTo(0.0089, 5);
   });
 
   it('calculateCost falls back to 50% discount for models without explicit cached pricing', async () => {
     const { calculateCost } = await import('@jak-swarm/shared');
-    // claude-sonnet-4-7 ships without cachedInputPer1M → fallback 50% off
-    // Sonnet input is $3/1M; 1000 cached tokens at 50% = 1000 * 1.50 / 1M = 0.0015
-    const fullCost = calculateCost('claude-sonnet-4-7', 1000, 0);
-    const cachedCost = calculateCost('claude-sonnet-4-7', 1000, 0, 1000);
+    // gpt-4-turbo has no explicit cachedInputPer1M, so it uses the default 50% discount.
+    const fullCost = calculateCost('gpt-4-turbo', 1000, 0);
+    const cachedCost = calculateCost('gpt-4-turbo', 1000, 0, 1000);
     // 100% cached → exactly half the full cost
     expect(cachedCost).toBeCloseTo(fullCost / 2, 5);
   });
@@ -146,9 +141,9 @@ describe('Agent Execution — Behavioral', () => {
   it('calculateCost clamps cachedTokens to <= promptTokens (defensive)', async () => {
     const { calculateCost } = await import('@jak-swarm/shared');
     // Bogus input: cachedTokens > promptTokens shouldn't yield negative billable tokens
-    const cost = calculateCost('gpt-4o', 100, 0, 99999);
-    // All 100 prompt tokens treated as cached; 0 uncached; 0 output → 100 * 1.25 / 1M
-    expect(cost).toBeCloseTo(0.000125, 6);
+    const cost = calculateCost('gpt-5.4', 100, 0, 99999);
+    // All 100 prompt tokens treated as cached; 0 uncached; 0 output.
+    expect(cost).toBeCloseTo(0.00005, 6);
     expect(cost).toBeGreaterThanOrEqual(0);
   });
 });

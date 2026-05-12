@@ -1,4 +1,4 @@
-import { ToolCategory, ToolRiskClass } from '@jak-swarm/shared';
+import { ToolCategory, ToolRiskClass, openAIChatTokenLimitParam } from '@jak-swarm/shared';
 import type { ToolExecutionContext } from '@jak-swarm/shared';
 import { toolRegistry } from '../registry/tool-registry.js';
 import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
@@ -1553,7 +1553,7 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'browser_analyze_page',
-      description: 'Take a screenshot of the current active browser page and analyze it using AI vision (GPT-4o). Returns a detailed description of what is visible: layout, text, buttons, forms, images, data. Use when you need to UNDERSTAND what a page looks like. Requires OPENAI_API_KEY env var for vision analysis.',
+      description: 'Take a screenshot of the current active browser page and analyze it using OpenAI vision. Returns a detailed description of what is visible: layout, text, buttons, forms, images, data. Use when you need to UNDERSTAND what a page looks like. Requires OPENAI_API_KEY env var for vision analysis.',
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
@@ -1596,8 +1596,9 @@ export function registerBuiltinTools(): void {
         const openai = new OpenAI({ apiKey });
         const analysisPrompt = prompt || 'Analyze this webpage screenshot. Describe: 1) Page layout and structure, 2) Key text content visible, 3) Interactive elements (buttons, forms, links), 4) Any data or tables shown, 5) Overall purpose of the page.';
 
+        const model = process.env['OPENAI_MODEL_TIER_2']?.trim() || 'gpt-5.4';
         const response = await openai.chat.completions.create({
-          model: 'gpt-4o',
+          model,
           messages: [
             {
               role: 'user',
@@ -1607,7 +1608,7 @@ export function registerBuiltinTools(): void {
               ],
             },
           ],
-          max_tokens: 1500,
+          ...openAIChatTokenLimitParam(model, 1500),
         });
 
         const analysis = response.choices[0]?.message?.content ?? 'Unable to analyze screenshot.';
@@ -2048,7 +2049,7 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'pdf_analyze',
-      description: 'Extract text from a PDF and analyze its content using AI (GPT-4o). Returns structured analysis including summary, key data, and entities. Requires OPENAI_API_KEY for AI analysis; falls back to raw text extraction without it.',
+      description: 'Extract text from a PDF and analyze its content using OpenAI. Returns structured analysis including summary, key data, and entities. Requires OPENAI_API_KEY for AI analysis; returns raw extraction metadata when analysis is unavailable.',
       category: ToolCategory.DOCUMENT,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
@@ -2112,10 +2113,11 @@ export function registerBuiltinTools(): void {
           ? `Analyze this PDF text and answer: ${query}\n\nPDF TEXT:\n${data.text.slice(0, 8000)}`
           : `Analyze this PDF document. Provide: 1) Summary, 2) Key findings/data, 3) Important entities (names, dates, amounts), 4) Document type and purpose.\n\nPDF TEXT:\n${data.text.slice(0, 8000)}`;
 
+        const model = process.env['OPENAI_MODEL'] ?? process.env['OPENAI_MODEL_TIER_2'] ?? 'gpt-5.4';
         const response = await openai.chat.completions.create({
-          model: process.env['OPENAI_MODEL'] ?? 'gpt-4o',
+          model,
           messages: [{ role: 'user', content: analysisPrompt }],
-          max_tokens: 2000,
+          ...openAIChatTokenLimitParam(model, 2000),
         });
 
         return {

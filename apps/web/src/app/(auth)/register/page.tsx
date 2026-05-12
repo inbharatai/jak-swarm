@@ -84,16 +84,22 @@ export default function RegisterPage() {
       // user knows exactly what to do next.
       let attempts = 0;
       const checkInterval = setInterval(async () => {
-        attempts++;
-        const { createClient } = await import('@/lib/supabase');
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          clearInterval(checkInterval);
-          router.push('/workspace');
-          router.refresh();
-        } else if (attempts >= 10) {
-          // 10 × 500ms = 5s. No session — stay on interstitial.
+        try {
+          attempts++;
+          const { createClient } = await import('@/lib/supabase');
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            clearInterval(checkInterval);
+            router.push('/workspace');
+            router.refresh();
+          } else if (attempts >= 10) {
+            // 10 x 500ms = 5s. No session, stay on interstitial.
+            clearInterval(checkInterval);
+          }
+        } catch {
+          // Confirmation polling is opportunistic. If Supabase is unreachable,
+          // keep the user on the explicit "check your email" screen.
           clearInterval(checkInterval);
         }
       }, 500);

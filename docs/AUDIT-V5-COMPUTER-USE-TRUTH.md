@@ -429,3 +429,6 @@ But it is categorically different from Claude's computer-use, which operates at 
 ---
 
 *Audit V5 complete. No code was modified — this is a read-only assessment. All findings cite specific files and line numbers from the codebase as of 2025-07-16.*
+# Historical report
+
+This report predates the OpenAI GPT-5.5/GPT-5.4 cleanup. References to GPT-4o are historical examples of the earlier vision path; current product truth should say "OpenAI vision-capable runtime" unless a specific current model is being tested.

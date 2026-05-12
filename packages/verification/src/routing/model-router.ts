@@ -2,8 +2,8 @@
  * Model Router — Smart LLM Escalation for Verification
  *
  * Layer 1: Rules (free, ~10ms) — always runs
- * Layer 2: AI Tier 1 (Gemini Flash / DeepSeek) — $0.001-0.01, ~2s
- * Layer 3: AI Tier 3 (GPT-4.1 / Claude Opus) — $0.05-0.50, ~10s
+ * Layer 2: AI Tier 1 (OpenAI GPT-5.4 lower-cost route) — ~2s target
+ * Layer 3: AI Tier 3 (OpenAI GPT-5.5) — deeper analysis path
  * Layer 4: Human review — via ApprovalRequest
  *
  * Escalation triggers:
@@ -93,21 +93,15 @@ export function shouldEscalate(ctx: EscalationContext): EscalationDecision {
  */
 export function selectModel(tier: 1 | 2 | 3, taskType: string): { provider: string; model: string } {
   if (tier === 1) {
-    // Cheapest: fast classification
-    return { provider: 'gemini', model: 'gemini-2.5-flash' };
+    void taskType;
+    return { provider: 'openai', model: 'gpt-5.4' };
   }
 
   if (tier === 3) {
-    // Premium: deep analysis
-    if (taskType === 'DOCUMENT' || taskType === 'IMAGE_ANALYSIS') {
-      return { provider: 'openai', model: 'gpt-4.1' }; // Best for multimodal
-    }
-    if (taskType === 'CROSS_VERIFY' || taskType === 'LONG_CONTEXT') {
-      return { provider: 'anthropic', model: 'claude-opus-4-20250514' }; // Best for long-context reasoning
-    }
-    return { provider: 'openai', model: 'gpt-4.1' }; // Default premium
+    void taskType;
+    return { provider: 'openai', model: 'gpt-5.5' };
   }
 
-  // Tier 2 fallback
-  return { provider: 'openai', model: 'gpt-4o-mini' };
+  void taskType;
+  return { provider: 'openai', model: 'gpt-5.4' };
 }

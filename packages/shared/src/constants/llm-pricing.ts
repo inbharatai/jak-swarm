@@ -1,6 +1,7 @@
 /**
- * Token pricing for all supported LLM models.
- * Prices are in USD. Local/free models have zero cost.
+ * Token pricing for runtime and historical trace models.
+ * Production LLM execution is OpenAI-only; non-OpenAI rows, if present,
+ * exist only so old imported traces can still be costed honestly.
  */
 
 export interface ModelPricing {
@@ -25,6 +26,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // match OpenAI's published pricing as of 2026-04; update when OpenAI
   // adjusts. cachedInputPer1M values follow OpenAI's standard 50% cache
   // discount where unpublished; published values are used directly.
+  'gpt-5.5': { inputPer1M: 8.00, outputPer1M: 24.00, cachedInputPer1M: 0.80 },
   'gpt-5.4': { inputPer1M: 5.00, outputPer1M: 15.00, cachedInputPer1M: 0.50 },
   'gpt-5.4-mini': { inputPer1M: 0.50, outputPer1M: 2.00, cachedInputPer1M: 0.05 },
   'gpt-5.4-nano': { inputPer1M: 0.10, outputPer1M: 0.40, cachedInputPer1M: 0.01 },
@@ -98,8 +100,8 @@ const UNKNOWN_MODEL_WARNED = new Set<string>();
 
 /**
  * Calculate the USD cost for a given model and token counts.
- * Falls back to prefix matching for Ollama models, then to zero cost if
- * unknown — but logs a one-time warning per unknown model so operators
+ * Uses prefix matching for known historical model families, then zero cost if
+ * unknown - but logs a one-time warning per unknown model so operators
  * know cost tracking silently zeroed out. The 2026-04 finding: gpt-4.1
  * and gemini-2.5-flash were in real use but missing from MODEL_PRICING,
  * so every workflow tracked $0 with no signal.
@@ -124,7 +126,7 @@ export function calculateCost(
 
   // Warn once per process per unknown model so the silent-$0 bug can't
   // recur. Only warn when tokens > 0 — zero-token calls don't indicate
-  // missing pricing. Ollama/local models have known-zero pricing and
+  // missing pricing. Historical local-model rows have known-zero pricing and
   // match prefixes cleanly, so they never hit this warning.
   if (!exactMatch && !prefixMatch && (promptTokens > 0 || completionTokens > 0)) {
     if (!UNKNOWN_MODEL_WARNED.has(model)) {

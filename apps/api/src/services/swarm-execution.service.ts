@@ -20,7 +20,7 @@ import { CompanyProfileService } from './company-brain/company-profile.service.j
 import { WorkflowTemplateService } from './company-brain/workflow-template.service.js';
 import { CEOOrchestratorService, type CEOPreFlightResult } from './ceo-orchestrator.service.js';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
-import { detectPII, detectInjection, AuditLogger, AuditAction, classifyToolRisk } from '@jak-swarm/security';
+import { AuditLogger, AuditAction, classifyToolRisk, getShieldGateway } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
 import { toolRegistry } from '@jak-swarm/tools';
 import { WorkflowService } from './workflow.service.js';
@@ -893,7 +893,13 @@ export class SwarmExecutionService extends EventEmitter {
     // LangGraphRuntime adapter. Both flags now route to real impls.
 
     // ── Guardrail: injection detection ───────────────────────────────────
-    const injectionResult = detectInjection(goal);
+    const shieldScan = await getShieldGateway().scanInput(goal, {
+      tenantId,
+      userId,
+      workflowId,
+      source: 'workflow_goal',
+    });
+    const injectionResult = shieldScan.injection;
     if (injectionResult.detected && injectionResult.risk === 'HIGH') {
       this.log.warn({ workflowId, patterns: injectionResult.patterns }, '[Guardrail] Injection attempt detected in goal');
       void this.audit.log({
@@ -914,7 +920,7 @@ export class SwarmExecutionService extends EventEmitter {
     }
 
     // ── Guardrail: PII detection ─────────────────────────────────────────
-    const piiResult = detectPII(goal);
+    const piiResult = shieldScan.pii;
     if (piiResult.containsPII) {
       this.log.warn({ workflowId, piiTypes: piiResult.found }, '[Guardrail] PII detected in goal');
       void this.audit.log({
@@ -1739,6 +1745,17 @@ export class SwarmExecutionService extends EventEmitter {
   async resumeWorkflow(workflowId: string): Promise<void> {
     const workflow = await this.db.workflow.findUnique({ where: { id: workflowId } });
     if (!workflow) return;
+    const pendingApproval = await this.db.approvalRequest.findFirst({
+      where: { workflowId, tenantId: workflow.tenantId, status: 'PENDING' },
+      select: { id: true },
+    });
+    if (pendingApproval) {
+      this.log.warn(
+        { workflowId, approvalId: pendingApproval.id },
+        '[Swarm] Refusing generic resume while workflow has a pending approval',
+      );
+      return;
+    }
 
     this.log.info({ workflowId }, '[Swarm] Resuming paused workflow');
 

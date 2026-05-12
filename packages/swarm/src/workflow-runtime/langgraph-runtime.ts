@@ -226,6 +226,14 @@ export class LangGraphRuntime implements WorkflowRuntime {
     // Terminal state — emit corresponding lifecycle event.
     const durationMs = Date.now() - startedAt;
     if (ctx?.onLifecycle) {
+      if (finalState.clarificationNeeded && finalState.clarificationQuestion) {
+        safeEmitLifecycle(ctx.onLifecycle, {
+          type: 'clarification_required',
+          workflowId: ctx.workflowId,
+          question: finalState.clarificationQuestion,
+          timestamp: new Date().toISOString(),
+        });
+      }
       if (finalState.status === WorkflowStatus.CANCELLED) {
         safeEmitLifecycle(ctx.onLifecycle, {
           type: 'cancelled',

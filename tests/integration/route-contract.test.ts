@@ -118,4 +118,28 @@ describe('JAK Swarm route contract checks', () => {
     expect(workflowHook).toContain("params.set('limit', String(filters.pageSize))");
     expect(workflowRoutes).toContain("parseInt(query.limit ?? '20', 10)");
   });
+
+  it('prevents generic resume/unpause paths from bypassing pending approvals', () => {
+    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const whatsappRoutes = readRepoFile('apps/api/src/routes/whatsapp.routes.ts');
+    const executionService = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
+    const runner = readRepoFile('packages/swarm/src/runner/swarm-runner.ts');
+    const graphBuilder = readRepoFile('packages/swarm/src/workflow-runtime/langgraph-graph-builder.ts');
+    const edges = readRepoFile('packages/swarm/src/graph/edges.ts');
+
+    expect(workflowRoutes).toContain('APPROVAL_REQUIRED');
+    expect(workflowRoutes).toContain('approvalRequest.findFirst');
+    expect(workflowRoutes).toContain("status: 'PENDING'");
+    expect(workflowRoutes).toContain('enqueueControl({');
+    expect(workflowRoutes).toContain("action: 'resume'");
+
+    expect(whatsappRoutes).toContain('generic resume cannot bypass approval');
+    expect(executionService).toContain('Refusing generic resume while workflow has a pending approval');
+
+    expect(runner).toContain("approvalDecision.status === 'DEFERRED'");
+    expect(runner).not.toContain("approvalDecision.status === 'REJECTED' ? 'REJECTED' : 'APPROVED'");
+    expect(graphBuilder).toContain('const approvalReducer =');
+    expect(graphBuilder).toContain("decision.status === 'DEFERRED'");
+    expect(edges).toContain("lastApproval?.status === 'DEFERRED'");
+  });
 });

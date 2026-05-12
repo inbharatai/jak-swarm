@@ -163,6 +163,9 @@ describe('Landing — TrustLayer (6 grep-able guarantees)', () => {
 
   it('OpenAI-first runtime → openai-runtime.ts exists', () => {
     expect(contains(TRUST, /OpenAI-first runtime/)).toBe(true);
+    expect(contains(TRUST, /OpenAI-only for model execution/)).toBe(true);
+    expect(contains(TRUST, /Responses API support for structured orchestration/)).toBe(true);
+    expect(contains(TRUST, /enforced execution path/)).toBe(false);
     expect(exists('packages/agents/src/runtime/openai-runtime.ts')).toBe(true);
   });
 });
@@ -208,7 +211,8 @@ describe('Landing — JAK Shield (6 defenses) — the new front-and-center secti
   it('BaseAgent wires the JAK Shield offensive guard before the LLM call', () => {
     const baseAgent = read('packages/agents/src/base/base-agent.ts');
     expect(baseAgent).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
-    expect(baseAgent).toMatch(/detectOffensiveCyberRequest/);
+    expect(baseAgent).toMatch(/getShieldGateway/);
+    expect(baseAgent).toMatch(/offensiveCyber/);
   });
 
   it('PlaywrightBrowserOperator implements the SSRF + DNS-rebind + disk-quota defenses', () => {
@@ -249,6 +253,20 @@ describe('Landing — top-line counts', () => {
     expect(readme).toMatch(/Connectors-22/);
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
+
+  it('README declares beta release status and current local verification evidence', () => {
+    const readme = read('README.md');
+    const beta = read('docs/beta-release.md');
+    const page = read('apps/web/src/app/page.tsx');
+    expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
+    expect(readme).toContain('Beta `0.1.0-beta.0`');
+    expect(readme).toMatch(/Tests-2059_passing/);
+    expect(page).toContain('Beta 0.1.0-beta.0');
+    expect(page).toContain('Controlled beta');
+    expect(beta).toContain('Status: beta release candidate');
+    expect(beta).toContain('2059 passed, 99 skipped, 54 todo');
+    expect(beta).toMatch(/not an enterprise-SLA release/i);
+  });
 });
 
 describe('Landing — public marketing copy stays honest', () => {
@@ -272,6 +290,32 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(shield).toMatch(/defensive/i);
     expect(shield).toMatch(/offensive|malware|phish|exploit/i);
     expect(shield).toMatch(/(refuse|does not|not support|blocked)/i);
+  });
+
+  it('OpenAI-only runtime claims are enforced by config, docs, and deploy templates', () => {
+    const config = read('apps/api/src/config.ts');
+    const runtimeFactory = read('packages/agents/src/runtime/index.ts');
+    const executionDoc = read('docs/architecture/execution-engines.md');
+    const envExample = read('.env.example');
+    const railwayApiEnv = read('scripts/automation/env-templates/railway-api.env.example');
+    const railwayWorkerEnv = read('scripts/automation/env-templates/railway-worker.env.example');
+    const renderYaml = read('render.yaml');
+    const renderScript = read('scripts/create-render-service.ps1');
+    const doctor = read('scripts/doctor.ps1');
+    const truth = read('apps/web/src/lib/product-truth.ts');
+
+    expect(config).toContain("JAK_EXECUTION_ENGINE must be unset or 'openai-first'");
+    expect(config).toContain("JAK_WORKFLOW_RUNTIME must be unset or 'langgraph'");
+    expect(runtimeFactory).toContain('OpenAI-only');
+    expect(runtimeFactory).toContain('JAK_EXECUTION_ENGINE=legacy -> ignored');
+    expect(executionDoc).toContain('one production LLM runtime');
+    expect(executionDoc).toContain('Do not configure Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter runtime keys');
+    expect(envExample).toContain('OpenAI-only for LLM execution');
+    expect(truth).toMatch(/label:\s*'Model Runtime'/);
+    expect(truth).toMatch(/suffix:\s*' OpenAI'/);
+
+    const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, renderYaml, renderScript, doctor].join('\n');
+    expect(activeDeploySurfaces).not.toMatch(/ANTHROPIC_API_KEY|GEMINI_API_KEY|DEEPSEEK_API_KEY|OPENROUTER_API_KEY|OLLAMA_(URL|BASE_URL|MODEL)|OPENAI_FALLBACK_MODEL|LLM_ROUTING_STRATEGY/);
   });
 });
 
@@ -336,5 +380,115 @@ describe('Landing — Free trial CTA (Migration 106)', () => {
     expect(sql).toMatch(/CREATE TABLE "task_assignments"/);
     expect(sql).toMatch(/CREATE TABLE "notifications"/);
     expect(sql).toMatch(/CREATE TABLE "trial_signups"/);
+  });
+
+  it('/trial/verify/[token] page exists and stores the JWT via the shared auth helper', () => {
+    const path = 'apps/web/src/app/(auth)/trial/verify/[token]/page.tsx';
+    expect(exists(path)).toBe(true);
+    const src = read(path);
+    expect(src).toMatch(/trialApi\.verify/);
+    expect(src).toMatch(/import \{ setToken \} from '@\/lib\/auth'/);
+    expect(src).toMatch(/setToken\(resp\.data\.token/);
+    expect(src).toMatch(/initialPassword/);
+  });
+
+  it('TrialPromotionService creates Tenant + admin User + trialing Subscription atomically', () => {
+    const path = 'apps/api/src/services/trial/trial-promotion.service.ts';
+    expect(exists(path)).toBe(true);
+    const src = read(path);
+    expect(src).toMatch(/\$transaction/);
+    expect(src).toMatch(/role:\s*'TENANT_ADMIN'/);
+    expect(src).toMatch(/planId:\s*'trial_30d'/);
+    expect(src).toMatch(/status:\s*'trialing'/);
+    expect(src).toMatch(/setUTCDate.*\+\s*30/s);
+  });
+
+  it('TrialEmailService is wired with three transparent backends (gmail/file/noop)', () => {
+    const path = 'apps/api/src/services/trial/trial-email.service.ts';
+    expect(exists(path)).toBe(true);
+    const src = read(path);
+    expect(src).toMatch(/GMAIL_EMAIL/);
+    expect(src).toMatch(/JAK_TRIAL_EMAIL_LOG_DIR/);
+    expect(src).toMatch(/backend:\s*'noop'/);
+    expect(src).toMatch(/NO BACKEND CONFIGURED/);
+  });
+
+  it('approvals route enforces dailyApprovalsCap on APPROVED decisions', () => {
+    const route = read('apps/api/src/routes/approvals.routes.ts');
+    expect(route).toMatch(/UsageCounterService/);
+    expect(route).toMatch(/'approvals'/);
+    expect(route).toMatch(/TRIAL_DAILY_CAP_HIT/);
+    expect(route).toMatch(/decision === 'APPROVED'/);
+  });
+
+  // Audit hardening — 2026-05-08 P0 fixes (8 items)
+  it('P0-1 schema declares onDelete on Workflow.userId + TaskAssignment.assignedByUserId', () => {
+    const schema = read('packages/db/prisma/schema.prisma');
+    expect(schema).toMatch(/User\s+@relation\(fields:\s*\[userId\][^)]*onDelete:\s*Restrict/);
+    expect(schema).toMatch(/TaskAssignmentAssigner[^)]*onDelete:\s*NoAction/);
+  });
+
+  it('P0-2 + P0-3 /trial/verify sets no-store + has timing floor', () => {
+    const route = read('apps/api/src/routes/trial.routes.ts');
+    expect(route).toMatch(/Cache-Control/);
+    expect(route).toMatch(/no-store/);
+    expect(route).toMatch(/VERIFY_FLOOR_MS/);
+    expect(route).toMatch(/padToFloor/);
+  });
+
+  it('P0-4 trial-email validates JAK_TRIAL_EMAIL_LOG_DIR against allowlist', () => {
+    const svc = read('apps/api/src/services/trial/trial-email.service.ts');
+    expect(svc).toMatch(/validateLogDir/);
+    expect(svc).toMatch(/JAK_ALLOWED_DATA_ROOT/);
+    expect(svc).toMatch(/path-escape-refused|rejected by allowlist/);
+  });
+
+  it('P0-5 trial route declares per-IP + per-email rate limits', () => {
+    const route = read('apps/api/src/routes/trial.routes.ts');
+    expect(route).toMatch(/rateLimit:\s*{/);
+    expect(route).toMatch(/checkEmailRateLimit/);
+    expect(route).toMatch(/trial-signup-ip:/);
+    expect(route).toMatch(/trial-verify-ip:/);
+  });
+
+  it('P0-6 fingerprint() honours X-Forwarded-For only when JAK_TRUST_PROXY=true', () => {
+    const route = read('apps/api/src/routes/trial.routes.ts');
+    expect(route).toMatch(/JAK_TRUST_PROXY/);
+    expect(route).toMatch(/trustProxy/);
+  });
+
+  it('P0-7 scheduler enforces trial cap before executeWorkflow', () => {
+    const svc = read('apps/api/src/services/scheduler.service.ts');
+    expect(svc).toMatch(/UsageCounterService/);
+    expect(svc).toMatch(/SKIPPED_TRIAL_CAP_HIT/);
+    expect(svc).toMatch(/SKIPPED_TRIAL_EXPIRED/);
+  });
+
+  it('P0-8 team route walks ancestor chain for indirect-cycle detection', () => {
+    const route = read('apps/api/src/routes/team.routes.ts');
+    expect(route).toMatch(/Reparenting would create a cycle/);
+    expect(route).toMatch(/parent chain already contains a cycle/);
+    expect(route).toMatch(/cursor.*parentId/s);
+  });
+
+  it('P1-1 unbounded findMany routes have take: 500 cap', () => {
+    const ext = read('apps/api/src/routes/external-auditor.routes.ts');
+    expect(ext).toMatch(/take:\s*500/);
+    const compl = read('apps/api/src/routes/compliance.routes.ts');
+    expect(compl).toMatch(/take:\s*500/);
+  });
+
+  it('P1-2 web no longer uses standalone Math.random() ID generators', () => {
+    const useVoice = read('apps/web/src/hooks/useVoice.ts');
+    const convStore = read('apps/web/src/store/conversation-store.ts');
+    expect(useVoice).toMatch(/from\s+'@\/lib\/id'/);
+    expect(convStore).toMatch(/from\s+'@\/lib\/id'/);
+    expect(useVoice).not.toMatch(/from\s+'@jak-swarm\/shared'/);
+    expect(convStore).not.toMatch(/from\s+'@jak-swarm\/shared'/);
+    expect(useVoice).toMatch(/generateBrowserId/);
+    expect(convStore).toMatch(/generateBrowserId/);
+    // The bare `Math.random().toString(36).slice(2, 11)` collision-prone
+    // pattern must be gone:
+    expect(useVoice).not.toMatch(/Math\.random\(\)\.toString\(36\)\.slice\(2,\s*11\)/);
   });
 });

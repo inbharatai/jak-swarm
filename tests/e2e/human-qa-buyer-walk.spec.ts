@@ -33,6 +33,11 @@ import {
 
 test.describe.configure({ mode: 'serial' });
 
+const LOCAL_SITE = (
+  process.env['E2E_BASE_URL'] ??
+  `http://127.0.0.1:${process.env['E2E_WEB_PORT'] ?? '3100'}`
+).replace(/\/$/, '');
+
 test('Human QA — buyer walkthrough', async () => {
   test.setTimeout(300_000);
 
@@ -44,14 +49,14 @@ test('Human QA — buyer walkthrough', async () => {
   // without this the spec sees an empty page and reports 13 false
   // not-implemented findings.
   const warmup = await context.newPage();
-  await warmup.goto('http://localhost:3000/', { waitUntil: 'load', timeout: 60_000 });
+  await warmup.goto(`${LOCAL_SITE}/`, { waitUntil: 'load', timeout: 60_000 });
   await warmup.waitForTimeout(2000);
   await warmup.close();
 
   const targets: QATargetSpec[] = [
     {
       name: 'landing',
-      url: 'http://localhost:3000/',
+      url: `${LOCAL_SITE}/`,
       run: async (qa, page) => {
         // Step 1: observe first-fold clarity
         await qa.inspectOnboardingClarity();
@@ -111,7 +116,7 @@ test('Human QA — buyer walkthrough', async () => {
     },
     {
       name: 'social-drafts-interactive',
-      url: 'http://localhost:3000/social-drafts',
+      url: `${LOCAL_SITE}/social-drafts`,
       run: async (qa, page) => {
         // Per-page warm-up so the first selector hit doesn't race the
         // dev compile.

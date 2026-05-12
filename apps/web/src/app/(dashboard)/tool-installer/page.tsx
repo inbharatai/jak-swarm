@@ -64,12 +64,17 @@ export default function ToolInstallerPage() {
   async function handleDetect(): Promise<void> {
     if (!task.trim()) return;
     setDetecting(true);
+    const startedAt = Date.now();
     try {
       const r = (await toolInstallerApi.detect(task)) as DetectResp;
       setRequirements(r?.data);
     } catch (err) {
       toast.error('Detect failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
+      const remainingMs = Math.max(0, 700 - (Date.now() - startedAt));
+      if (remainingMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingMs));
+      }
       setDetecting(false);
     }
   }
@@ -128,7 +133,13 @@ export default function ToolInstallerPage() {
               data-testid="tool-installer-task-input"
             />
           </div>
-          <Button onClick={handleDetect} disabled={!task.trim() || detecting} className="gap-1.5" data-testid="tool-installer-detect-btn">
+          <Button
+            onClick={handleDetect}
+            disabled={!task.trim() || detecting}
+            className="gap-1.5"
+            data-testid="tool-installer-detect-btn"
+            aria-busy={detecting}
+          >
             {detecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             Detect missing capability
           </Button>
@@ -139,6 +150,13 @@ export default function ToolInstallerPage() {
         <Card data-testid="tool-installer-requirements-card">
           <CardContent className="p-5 space-y-3">
             <h3 className="text-sm font-semibold">Detected capabilities</h3>
+            <div
+              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+              data-testid="tool-installer-safety-disclosure"
+            >
+              Detection is read-only. Install plans run through the sandboxed installer, and any real
+              execution is admin-only and requires reviewer approval before JAK changes the environment.
+            </div>
             {requirements.requirements.length === 0 ? (
               <p className="text-xs text-muted-foreground">No specific capability detected.</p>
             ) : (

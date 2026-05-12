@@ -1,5 +1,6 @@
 import type { ApiError, ApprovalRequest, Integration, PaginatedResult, Workflow } from '@/types';
 import { createClient } from './supabase';
+import { clearToken, getRawToken } from './auth';
 
 /**
  * Resolve the API base URL with a strict production guard (P0-A fix).
@@ -101,6 +102,8 @@ const DEV_BYPASS_TOKEN = 'jak-dev-bypass';
 async function getToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   if (DEV_BYPASS_ACTIVE) return DEV_BYPASS_TOKEN;
+  const jakToken = getRawToken();
+  if (jakToken) return jakToken;
   const now = Date.now();
   if (cachedToken && now < tokenExpiresAt) return cachedToken;
   try {
@@ -120,6 +123,7 @@ function clearSession(): void {
   if (typeof window === 'undefined') return;
   cachedToken = null;
   tokenExpiresAt = 0;
+  clearToken();
   const supabase = createClient();
   supabase.auth.signOut();
   window.location.href = '/login';
@@ -160,7 +164,7 @@ async function request<T>(
   const token = await getToken();
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    Accept: 'application/json',
   };
 
   if (token) {
@@ -173,6 +177,7 @@ async function request<T>(
   };
 
   if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
 
@@ -582,6 +587,13 @@ export const documentApi = {
    * boundary. Auth header is injected via getToken() the same way other calls do.
    */
   upload: async (file: File, opts?: { tags?: string[]; metadata?: Record<string, unknown> }) => {
+    if (API_MISCONFIGURED) {
+      throw {
+        message: 'Backend API is not configured. ' + (API_MISCONFIGURED_REASON ?? ''),
+        code: 'MISCONFIGURED_API_URL',
+        status: 503,
+      } as ApiError;
+    }
     const token = await getToken();
     const formData = new FormData();
     formData.append('file', file);

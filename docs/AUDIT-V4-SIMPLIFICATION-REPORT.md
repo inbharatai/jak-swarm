@@ -344,3 +344,6 @@ Both are now fixed. The product is real, and users see actual agent progress in 
 | `apps/web/src/app/terms/page.tsx` | 9 hardcoded dark colors → theme-aware | Theme |
 
 **Total: 7 files modified, 12 distinct issues fixed, 0 type errors, 0 regressions**
+# Historical report
+
+This report predates the OpenAI-only cleanup. Provider-count statements below are historical and must not be used as current product truth; current LLM execution is OpenAI-only with GPT-5.5/GPT-5.4 tier routing.

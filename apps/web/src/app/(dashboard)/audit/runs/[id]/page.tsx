@@ -86,7 +86,13 @@ export default function AuditRunDetailPage() {
     let es: EventSource | null = null;
     try {
       const token = typeof window !== 'undefined'
-        ? (window.localStorage.getItem('jak_token') ?? document.cookie.split('; ').find((c) => c.startsWith('jak_token='))?.split('=')[1] ?? '')
+        ? (
+            window.localStorage.getItem('jak-auth-token')
+            ?? window.localStorage.getItem('jak_token')
+            ?? document.cookie.split('; ').find((c) => c.startsWith('jak-auth-token='))?.split('=')[1]
+            ?? document.cookie.split('; ').find((c) => c.startsWith('jak_token='))?.split('=')[1]
+            ?? ''
+          )
         : '';
       const apiBase = (process.env['NEXT_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
       if (!apiBase) return;

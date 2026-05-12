@@ -90,7 +90,7 @@ export default function SocialDraftsPage() {
       </div>
 
       <Card>
-        <CardContent className="p-5 space-y-4">
+        <CardContent className="p-5 space-y-4" aria-busy={loading}>
           <div>
             <label className="text-xs font-medium">Platform</label>
             <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -99,6 +99,7 @@ export default function SocialDraftsPage() {
                   key={p.id}
                   type="button"
                   onClick={() => setPlatform(p.id)}
+                  disabled={loading}
                   data-testid={`social-draft-platform-${p.id.toLowerCase()}`}
                   className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
                     platform === p.id
@@ -131,6 +132,7 @@ export default function SocialDraftsPage() {
                   key={t}
                   type="button"
                   onClick={() => setTone(t)}
+                  disabled={loading}
                   className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     tone === t ? 'border-primary bg-primary/10 text-primary' : 'border-border'
                   }`}
@@ -148,8 +150,19 @@ export default function SocialDraftsPage() {
             data-testid="social-draft-generate-btn"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Generate draft
+            {loading ? 'Generating draft...' : 'Generate draft'}
           </Button>
+
+          {loading && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-xs text-muted-foreground"
+              data-testid="social-draft-loading-state"
+            >
+              Loading platform rules and preparing a manual-publish draft.
+            </p>
+          )}
         </CardContent>
       </Card>
 

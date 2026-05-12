@@ -1,9 +1,11 @@
+import { openAIChatTokenLimitParam, openAISamplingParams } from '@jak-swarm/shared';
+
 /**
  * LLM-powered analysis layer for the verification engine.
  * Replaces heuristic-only analysis with actual LLM calls.
  *
- * Tier 1: GPT-4o-mini or Gemini Flash (fast, cheap)
- * Tier 3: GPT-4o or Claude Opus (deep reasoning)
+ * Tier 1: GPT-5.4 mini (fast)
+ * Tier 3: GPT-5.5 (deep reasoning)
  *
  * Falls back to heuristic analysis when no LLM API keys are configured.
  */
@@ -74,7 +76,7 @@ Return JSON with: { "findings": [{ "severity": "CRITICAL|WARNING|INFO", "categor
 
 /**
  * Call an LLM for verification analysis.
- * Uses OpenAI API (works with gpt-4o-mini for Tier 1, gpt-4o for Tier 3).
+ * Uses OpenAI API with GPT-5.4/5.5-family models.
  */
 export async function callVerificationLLM(
   tier: 1 | 3,
@@ -84,7 +86,7 @@ export async function callVerificationLLM(
   const openaiKey = process.env['OPENAI_API_KEY'];
   if (!openaiKey) return null; // No LLM available
 
-  const model = tier === 1 ? 'gpt-4o-mini' : 'gpt-4o';
+  const model = tier === 1 ? 'gpt-5.4' : 'gpt-5.5';
   const systemPrompt = ANALYSIS_PROMPTS[verificationType];
 
   try {
@@ -100,8 +102,8 @@ export async function callVerificationLLM(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analyze the following content:\n\n${content.slice(0, 8000)}` },
         ],
-        temperature: 0.1,
-        max_tokens: 2000,
+        ...openAISamplingParams(model, { temperature: 0.1 }),
+        ...openAIChatTokenLimitParam(model, 2000),
         response_format: { type: 'json_object' },
       }),
     });
@@ -121,8 +123,7 @@ export async function callVerificationLLM(
     };
 
     const tokensUsed = data.usage?.total_tokens ?? 0;
-    // Approximate cost: gpt-4o-mini ~$0.15/1M input + $0.6/1M output; gpt-4o ~$2.5/1M + $10/1M
-    const costPerToken = tier === 1 ? 0.0000004 : 0.000006;
+    const costPerToken = tier === 1 ? 0.00000125 : 0.00002;
     const costUsd = tokensUsed * costPerToken;
 
     return {

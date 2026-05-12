@@ -57,7 +57,7 @@ function stubLLM<T>(agent: T, jsonPayload: unknown): void {
 // ─── CEO / Strategist ──────────────────────────────────────────────────────
 
 describe('StrategistAgent (CEO) — strategic analysis output schema', () => {
-  it('preserves recommendations + risks + opportunities + framework on STRATEGIC_ANALYSIS', { timeout: 20_000 }, async () => {
+  it('preserves recommendations + risks + opportunities + framework on STRATEGIC_ANALYSIS', { timeout: 60_000 }, async () => {
     const agent = new StrategistAgent('stub-key');
     stubLLM(agent, {
       analysis: 'Market is bifurcating between enterprise and SMB — we have an attacker advantage in SMB due to self-serve onboarding.',

@@ -204,21 +204,27 @@ describe('Security contract guards', () => {
 
   it('injection detection runs before workflow execution', () => {
     const exec = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
-    const injectionIndex = exec.indexOf('detectInjection(goal)');
+    const scanIndex = exec.indexOf('getShieldGateway().scanInput(goal');
+    const injectionIndex = exec.indexOf('const injectionResult = shieldScan.injection');
     const runnerIndex = exec.indexOf('this.runner.run(');
 
+    expect(scanIndex).toBeGreaterThan(-1);
     expect(injectionIndex).toBeGreaterThan(-1);
     expect(runnerIndex).toBeGreaterThan(-1);
-    // Injection check must come before runner execution
+    expect(scanIndex).toBeLessThan(injectionIndex);
+    // Injection check must come before runner execution.
     expect(injectionIndex).toBeLessThan(runnerIndex);
   });
 
   it('PII detection runs before workflow execution', () => {
     const exec = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
-    const piiIndex = exec.indexOf('detectPII(goal)');
+    const scanIndex = exec.indexOf('getShieldGateway().scanInput(goal');
+    const piiIndex = exec.indexOf('const piiResult = shieldScan.pii');
     const runnerIndex = exec.indexOf('this.runner.run(');
 
+    expect(scanIndex).toBeGreaterThan(-1);
     expect(piiIndex).toBeGreaterThan(-1);
+    expect(scanIndex).toBeLessThan(piiIndex);
     expect(piiIndex).toBeLessThan(runnerIndex);
   });
 

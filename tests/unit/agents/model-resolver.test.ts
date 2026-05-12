@@ -60,49 +60,49 @@ afterEach(() => {
 });
 
 describe('ModelResolver — preferred model picks', () => {
-  it('picks gpt-5.4 family when all preferred models are available', async () => {
+  it('picks the configured GPT-5.5/5.4 OpenAI tiers when available', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
-    state.modelIds = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-4o'];
+    state.modelIds = ['gpt-5.5', 'gpt-5.4', 'gpt-4o'];
+    const map = await ensureModelMap({ client });
+
+    expect(map.tier3).toBe('gpt-5.5');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
+    expect(map.verified).toBe(true);
+    expect(map.available).toContain('gpt-5.5');
+  });
+
+  it('uses tier-adjacent GPT-5.4 models when GPT-5.5 is unavailable', async () => {
+    process.env['OPENAI_API_KEY'] = 'sk-test';
+    state.modelIds = ['gpt-5.4'];
     const map = await ensureModelMap({ client });
 
     expect(map.tier3).toBe('gpt-5.4');
-    expect(map.tier2).toBe('gpt-5.4-mini');
-    expect(map.tier1).toBe('gpt-5.4-nano');
-    expect(map.verified).toBe(true);
-    expect(map.available).toContain('gpt-5.4');
-  });
-
-  it('falls back to gpt-5 family when gpt-5.4 unavailable', async () => {
-    process.env['OPENAI_API_KEY'] = 'sk-test';
-    state.modelIds = ['gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-4o'];
-    const map = await ensureModelMap({ client });
-
-    expect(map.tier3).toBe('gpt-5');
-    expect(map.tier2).toBe('gpt-5-mini');
-    expect(map.tier1).toBe('gpt-5-nano');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
     expect(map.verified).toBe(true);
   });
 
-  it('falls back to gpt-4o family when neither gpt-5.4 nor gpt-5 available', async () => {
+  it('keeps configured GPT-5.5/5.4 defaults when preferred models are not listed', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
     state.modelIds = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
     const map = await ensureModelMap({ client });
 
-    expect(map.tier3).toBe('gpt-4o');
-    expect(map.tier2).toBe('gpt-4o-mini');
-    expect(map.tier1).toBe('gpt-4o-mini');
-    expect(map.verified).toBe(true);
+    expect(map.tier3).toBe('gpt-5.5');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
+    expect(map.verified).toBe(false);
   });
 
-  it('mixes families correctly when only some preferred models are available', async () => {
+  it('does not fall back to legacy GPT-4 models for missing tiers', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
-    // Only gpt-5.4 (the premier one) is available. Mini + nano fall through.
-    state.modelIds = ['gpt-5.4', 'gpt-5-mini', 'gpt-4o-mini'];
+    state.modelIds = ['gpt-5.4', 'gpt-4o-mini'];
     const map = await ensureModelMap({ client });
 
-    expect(map.tier3).toBe('gpt-5.4'); // preferred hit
-    expect(map.tier2).toBe('gpt-5-mini'); // fell through to gpt-5 family
-    expect(map.tier1).toBe('gpt-4o-mini'); // fell through to gpt-4o family
+    expect(map.tier3).toBe('gpt-5.4');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
+    expect(map.verified).toBe(true);
   });
 });
 
@@ -112,7 +112,7 @@ describe('ModelResolver — env overrides', () => {
     process.env['OPENAI_MODEL_TIER_3'] = 'my-custom-model';
     process.env['OPENAI_MODEL_TIER_2'] = 'my-custom-mini';
     process.env['OPENAI_MODEL_TIER_1'] = 'my-custom-nano';
-    state.modelIds = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'];
+    state.modelIds = ['gpt-5.4'];
     const map = await ensureModelMap({ client });
 
     expect(map.tier3).toBe('my-custom-model');
@@ -122,31 +122,42 @@ describe('ModelResolver — env overrides', () => {
 });
 
 describe('ModelResolver — failure paths', () => {
-  it('uses failsafe (gpt-4o family) when OPENAI_API_KEY is missing and no client injected', async () => {
+  it('keeps configured GPT-5.5/5.4 defaults when OPENAI_API_KEY is missing and no client injected', async () => {
     // key intentionally not set, no client injected
     const map = await ensureModelMap();
 
     expect(map.verified).toBe(false);
-    expect(map.tier3).toBe('gpt-4o');
-    expect(map.tier2).toBe('gpt-4o-mini');
-    expect(map.tier1).toBe('gpt-4o-mini');
+    expect(map.tier3).toBe('gpt-5.5');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
   });
 
-  it('uses failsafe when models.list throws (network/auth error)', async () => {
+  it('does not call OpenAI when OPENAI_API_KEY is a local placeholder and no client is injected', async () => {
+    process.env['OPENAI_API_KEY'] = 'sk-test-local-e2e-0000';
+    const map = await ensureModelMap();
+
+    expect(map.verified).toBe(false);
+    expect(map.tier3).toBe('gpt-5.5');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.diagnostic).toContain('placeholder');
+  });
+
+  it('keeps configured GPT-5.5/5.4 defaults when models.list throws', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
     state.throwOnList = true;
     const map = await ensureModelMap({ client });
 
     expect(map.verified).toBe(false);
-    expect(map.tier3).toBe('gpt-4o');
-    expect(map.tier2).toBe('gpt-4o-mini');
+    expect(map.tier3).toBe('gpt-5.5');
+    expect(map.tier2).toBe('gpt-5.4');
+    expect(map.tier1).toBe('gpt-5.4');
   });
 });
 
 describe('ModelResolver — caching', () => {
   it('calls models.list only once across multiple ensureModelMap() calls', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
-    state.modelIds = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'];
+    state.modelIds = ['gpt-5.5', 'gpt-5.4'];
     await ensureModelMap({ client });
     await ensureModelMap({ client });
     await ensureModelMap({ client });
@@ -165,15 +176,15 @@ describe('ModelResolver — caching', () => {
   it('getModelMapSync returns failsafe before ensureModelMap() runs', () => {
     const m = getModelMapSync();
     expect(m.verified).toBe(false);
-    expect(m.tier3).toBe('gpt-4o');
+    expect(m.tier3).toBe('gpt-5.5');
   });
 
   it('modelForTier returns the resolved model after ensure completes', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-test';
-    state.modelIds = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'];
+    state.modelIds = ['gpt-5.5', 'gpt-5.4'];
     await ensureModelMap({ client });
-    expect(modelForTier(3)).toBe('gpt-5.4');
-    expect(modelForTier(2)).toBe('gpt-5.4-mini');
-    expect(modelForTier(1)).toBe('gpt-5.4-nano');
+    expect(modelForTier(3)).toBe('gpt-5.5');
+    expect(modelForTier(2)).toBe('gpt-5.4');
+    expect(modelForTier(1)).toBe('gpt-5.4');
   });
 });

@@ -25,45 +25,63 @@ function okResponse(content = 'ok'): LLMResponse {
   };
 }
 
-describe('ProviderRouter failover policy', () => {
-  it('fails over on 429 rate limit', async () => {
+describe('ProviderRouter OpenAI-only failure policy', () => {
+  it('does NOT fail over on 429 rate limit', async () => {
     const primary = new MockProvider('primary', async () => {
       const err = new Error('HTTP 429 rate limit exceeded') as Error & { status?: number };
       err.status = 429;
       throw err;
     });
-    const fallback = new MockProvider('fallback', async () => okResponse('rl-fallback'));
+    let fallbackCalled = false;
+    const fallback = new MockProvider('fallback', async () => {
+      fallbackCalled = true;
+      return okResponse('should-not-run');
+    });
 
     const router = new ProviderRouter(primary, [fallback]);
-    const result = await router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] });
 
-    expect(result.content).toBe('rl-fallback');
+    await expect(
+      router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] }),
+    ).rejects.toMatchObject({ status: 429, providerErrorKind: 'rate_limit' });
+    expect(fallbackCalled).toBe(false);
   });
 
-  it('fails over on 5xx server error', async () => {
+  it('does NOT fail over on 5xx server error', async () => {
     const primary = new MockProvider('primary', async () => {
       const err = new Error('HTTP 503 service unavailable') as Error & { status?: number };
       err.status = 503;
       throw err;
     });
-    const fallback = new MockProvider('fallback', async () => okResponse('5xx-fallback'));
+    let fallbackCalled = false;
+    const fallback = new MockProvider('fallback', async () => {
+      fallbackCalled = true;
+      return okResponse('should-not-run');
+    });
 
     const router = new ProviderRouter(primary, [fallback]);
-    const result = await router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] });
 
-    expect(result.content).toBe('5xx-fallback');
+    await expect(
+      router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] }),
+    ).rejects.toMatchObject({ status: 503, providerErrorKind: 'server_error' });
+    expect(fallbackCalled).toBe(false);
   });
 
-  it('fails over on timeout', async () => {
+  it('does NOT fail over on timeout', async () => {
     const primary = new MockProvider('primary', async () => {
       throw new Error('Request timed out after 30000ms');
     });
-    const fallback = new MockProvider('fallback', async () => okResponse('to-fallback'));
+    let fallbackCalled = false;
+    const fallback = new MockProvider('fallback', async () => {
+      fallbackCalled = true;
+      return okResponse('should-not-run');
+    });
 
     const router = new ProviderRouter(primary, [fallback]);
-    const result = await router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] });
 
-    expect(result.content).toBe('to-fallback');
+    await expect(
+      router.chatCompletion({ messages: [{ role: 'user', content: 'hello' }] }),
+    ).rejects.toMatchObject({ providerErrorKind: 'timeout' });
+    expect(fallbackCalled).toBe(false);
   });
 
   it('does NOT fail over on 401 auth error', async () => {

@@ -1,5 +1,7 @@
 # JAK Swarm - Hacker News Post
 
+> Archived historical copy. Do not publish as product truth. Current JAK Swarm is OpenAI-only for LLM execution, uses GPT-5.5/GPT-5.4 routing, has 38 agents and 122 classified tools, and does not support Anthropic/Gemini/DeepSeek/Ollama/OpenRouter runtime fallback.
+
 ---
 
 ## Title
@@ -63,3 +65,6 @@ So I extracted the patterns into a framework. Then I added more agents. Then mor
 I'd appreciate any feedback on the architecture, the agent design patterns, or the developer experience. I'm also very interested in what agents or tools people would want to see added.
 
 Happy to answer any questions.
+# Archived pre-OpenAI-only launch draft
+
+This file is retained for historical copywriting reference only. Do not publish it as product truth: JAK Swarm is now OpenAI-only for LLM execution, uses 122 classified tools, and does not support Ollama/OpenRouter/Anthropic/Gemini/DeepSeek runtime fallback.
