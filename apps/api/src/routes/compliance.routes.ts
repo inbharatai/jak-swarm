@@ -353,9 +353,13 @@ const complianceRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { tenantId } = request.user;
       try {
+        // P1-1 (audit 2026-05-08): cap unbounded findMany to prevent OOM
+        // on tenants with thousands of historical schedules. Pagination
+        // params can be added later; for now 500 is a generous ceiling.
         const items = await fastify.db.scheduledAttestation.findMany({
           where: { tenantId },
           orderBy: { createdAt: 'desc' },
+          take: 500,
         });
         // Resolve framework slugs in one pass
         const fwIds = Array.from(new Set(items.map((s) => s.frameworkId)));

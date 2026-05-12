@@ -1,5 +1,7 @@
 # JAK Swarm - Reddit Posts
 
+> Archived historical copy. Do not publish as product truth. Current JAK Swarm is OpenAI-only for LLM execution, uses GPT-5.5/GPT-5.4 routing, has 38 agents and 122 classified tools, and does not support Anthropic/Gemini/DeepSeek/Ollama/OpenRouter runtime fallback.
+
 ---
 
 ## Post 1: r/artificial
@@ -181,3 +183,6 @@ If 500 developers contribute agents and tools to JAK Swarm, the platform becomes
 GitHub: https://github.com/inbharatai/jak-swarm
 
 For other founders building in AI: are you going open-source or proprietary? What's driving your decision?
+# Archived pre-OpenAI-only launch draft
+
+This file is retained for historical copywriting reference only. Do not publish it as product truth: JAK Swarm is now OpenAI-only for LLM execution, uses 122 classified tools, and does not support Ollama/OpenRouter/Anthropic/Gemini/DeepSeek runtime fallback.

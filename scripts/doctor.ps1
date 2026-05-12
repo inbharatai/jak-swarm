@@ -129,7 +129,7 @@ if ($envPath) {
 # Check critical env vars (from process env, not just .env file)
 $criticalVars = @(
     @{ Name = "DATABASE_URL"; Fix = "Set DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm" },
-    @{ Name = "OPENAI_API_KEY"; Fix = "Set OPENAI_API_KEY=sk-... (or ANTHROPIC_API_KEY)" }
+    @{ Name = "OPENAI_API_KEY"; Fix = "Set OPENAI_API_KEY=sk-... (required; no non-OpenAI fallback)" }
 )
 
 foreach ($v in $criticalVars) {
@@ -143,7 +143,7 @@ foreach ($v in $criticalVars) {
 }
 
 # Optional but recommended vars
-$optionalVars = @("ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY", "REDIS_URL")
+$optionalVars = @("SUPABASE_URL", "SUPABASE_ANON_KEY", "REDIS_URL")
 foreach ($v in $optionalVars) {
     $val = [Environment]::GetEnvironmentVariable($v)
     if ($val) {

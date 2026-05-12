@@ -1,6 +1,7 @@
 # AUDIT V7: Truth Audit + Minimal Agent Arcade Adoption
 
 Date: 2026-04-15
+Status: Superseded for provider inventory as of 2026-05-10. The current runtime is OpenAI-only; DeepSeek/Ollama/Gemini/Anthropic/OpenRouter execution adapters and deploy/env configuration have been removed. Keep this file as historical audit context only.
 Scope: JAK Swarm architecture reality check, DAG/visualization truth, WhatsApp truth, provider inventory, and selective Agent Arcade reuse strategy.
 
 ## Executive decision

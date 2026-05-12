@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  *   - needsRewrite heuristic gating (short/focused queries skip LLM)
  *   - fails-safe no-op when no LLM key / kill switch / malformed JSON / 5xx
  *   - Successful rewrite picks the first (best) rewrite
- *   - GPT-4o-mini fallback when Anthropic key is absent
+ *   - OpenAI GPT-5.4 mini path when configured
  *   - searchStrategyChain sets rewrittenFrom when the query changes
  *   - searchStrategyChain skips rewriter when needsRewrite returns false
  */
@@ -16,7 +16,6 @@ const ORIGINAL_ENV = { ...process.env };
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
-  delete process.env['ANTHROPIC_API_KEY'];
   delete process.env['OPENAI_API_KEY'];
   delete process.env['DISABLE_SEARCH_REWRITER'];
   delete process.env['DISABLE_SEARCH_RERANKER'];
@@ -42,10 +41,6 @@ function jsonResponse(body: unknown, init: { status?: number } = {}): Response {
     status: init.status ?? 200,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-function anthropicBody(text: string): unknown {
-  return { content: [{ text }] };
 }
 
 function openaiBody(text: string): unknown {
@@ -103,7 +98,7 @@ describe('defaultRewriter — fail-safe', () => {
   });
 
   it('returns [query] when DISABLE_SEARCH_REWRITER=1', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     process.env['DISABLE_SEARCH_REWRITER'] = '1';
     installFetch(async (url) => {
       throw new Error(`kill switch leaked to ${url}`);
@@ -116,10 +111,10 @@ describe('defaultRewriter — fail-safe', () => {
   });
 
   it('returns [query] on malformed LLM response', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('this is prose, not JSON'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('this is prose, not JSON'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -131,7 +126,7 @@ describe('defaultRewriter — fail-safe', () => {
   });
 
   it('returns [query] on LLM 5xx', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async () => new Response('busy', { status: 503 }));
 
     const { defaultRewriter } = await import('../../../packages/tools/src/adapters/search/index.js');
@@ -141,10 +136,10 @@ describe('defaultRewriter — fail-safe', () => {
   });
 
   it('returns [query] when queries array is empty', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"queries": []}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"queries": []}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -160,10 +155,10 @@ describe('defaultRewriter — fail-safe', () => {
 
 describe('defaultRewriter — success paths', () => {
   it('returns rewrites sorted with best first', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"queries": ["postgres query result caching", "PgBouncer Redis cache", "materialized views caching strategy"]}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"queries": ["postgres query result caching", "PgBouncer Redis cache", "materialized views caching strategy"]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -176,10 +171,10 @@ describe('defaultRewriter — success paths', () => {
   });
 
   it('respects maxRewrites cap', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"queries": ["a", "b", "c", "d"]}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"queries": ["a", "b", "c", "d"]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -191,10 +186,10 @@ describe('defaultRewriter — success paths', () => {
   });
 
   it('extracts JSON when LLM wraps it in prose', async () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENAI_API_KEY'] = 'sk-test';
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('Here are the rewrites:\n{"queries": ["redis pubsub reliability"]}\nHope this helps.'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('Here are the rewrites:\n{"queries": ["redis pubsub reliability"]}\nHope this helps.'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -205,22 +200,22 @@ describe('defaultRewriter — success paths', () => {
     expect(result).toEqual(['redis pubsub reliability']);
   });
 
-  it('falls back to GPT-4o-mini when Anthropic key is absent', async () => {
+  it('uses OpenAI GPT-5.4 mini when the OpenAI key is configured', async () => {
     process.env['OPENAI_API_KEY'] = 'sk-openai';
     installFetch(async (url) => {
       if (url.includes('anthropic.com')) {
-        throw new Error('anthropic called when key absent');
+        throw new Error('anthropic should never be called in OpenAI-only mode');
       }
       if (url.includes('openai.com')) {
-        return jsonResponse(openaiBody('{"queries": ["fallback rewrite"]}'));
+        return jsonResponse(openaiBody('{"queries": ["openai rewrite"]}'));
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
 
     const { defaultRewriter } = await import('../../../packages/tools/src/adapters/search/index.js');
-    const result = await defaultRewriter({ query: 'how do i find a fallback rewrite' });
+    const result = await defaultRewriter({ query: 'how do i find an openai rewrite' });
 
-    expect(result).toEqual(['fallback rewrite']);
+    expect(result).toEqual(['openai rewrite']);
   });
 });
 
@@ -237,12 +232,12 @@ describe('searchStrategyChain + rewrite integration', () => {
 
   it('rewrites the query and surfaces rewrittenFrom on the response', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
     let serperQuerySeen: string | null = null;
 
     installFetch(async (url, init) => {
-      if (url.includes('anthropic.com')) {
-        return jsonResponse(anthropicBody('{"queries": ["postgres query caching strategies"]}'));
+      if (url.includes('openai.com')) {
+        return jsonResponse(openaiBody('{"queries": ["postgres query caching strategies"]}'));
       }
       if (url.includes('serper.dev')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { q?: string };
@@ -271,10 +266,10 @@ describe('searchStrategyChain + rewrite integration', () => {
 
   it('skips the rewriter for short keyword queries (needsRewrite=false)', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url, init) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         throw new Error('rewriter called on already-focused query');
       }
       if (url.includes('serper.dev')) {
@@ -301,10 +296,10 @@ describe('searchStrategyChain + rewrite integration', () => {
 
   it('rewriter failure falls back to original query (fails safe)', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url, init) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         return new Response('busy', { status: 503 });
       }
       if (url.includes('serper.dev')) {
@@ -332,10 +327,10 @@ describe('searchStrategyChain + rewrite integration', () => {
 
   it('does not rewrite when rewrite:false', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url, init) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         throw new Error('rewriter called when rewrite:false');
       }
       if (url.includes('serper.dev')) {
@@ -362,12 +357,12 @@ describe('searchStrategyChain + rewrite integration', () => {
 
   it('ignores rewrite when LLM returns the same query as original', async () => {
     process.env['SERPER_API_KEY'] = 'sk-serper';
-    process.env['ANTHROPIC_API_KEY'] = 'sk-anthropic';
+    process.env['OPENAI_API_KEY'] = 'sk-openai';
 
     installFetch(async (url) => {
-      if (url.includes('anthropic.com')) {
+      if (url.includes('openai.com')) {
         return jsonResponse(
-          anthropicBody('{"queries": ["how do i handle edge cases in node"]}'),
+          openaiBody('{"queries": ["how do i handle edge cases in node"]}'),
         );
       }
       if (url.includes('serper.dev')) {

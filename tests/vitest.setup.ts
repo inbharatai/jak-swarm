@@ -10,8 +10,6 @@
  * What this DOES:
  *   - Sets a placeholder OPENAI_API_KEY that satisfies the SDK constructor
  *     ONLY IF one is not already set (so a real key in the env wins).
- *   - Same for ANTHROPIC_API_KEY (used by the optional Anthropic provider
- *     in some unit tests that exercise multi-provider routing).
  *   - Marks NODE_ENV as 'test' so any code that branches on it sees the
  *     correct mode.
  *
@@ -31,7 +29,6 @@
 
 const placeholders: Record<string, string> = {
   OPENAI_API_KEY: 'sk-test-not-real-do-not-use-vitest-placeholder-only-000000000000000000',
-  ANTHROPIC_API_KEY: 'sk-ant-test-not-real-do-not-use-vitest-placeholder-only-0000000000',
   NODE_ENV: 'test',
   // Suppress noisy module-load console.warn in @jak-swarm/tools that
   // fires every time the package is imported. Production deploys still

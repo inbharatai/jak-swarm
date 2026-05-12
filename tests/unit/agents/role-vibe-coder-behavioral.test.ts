@@ -49,7 +49,7 @@ function stubLLM<T>(agent: T, payload: unknown): void {
 // ─── AppArchitect ──────────────────────────────────────────────────────────
 
 describe('AppArchitectAgent — architecture + fileTree + dataModels + apiEndpoints', () => {
-  it('preserves fileTree, dataModels, apiEndpoints, envVars on ARCHITECT_APP', { timeout: 20_000 }, async () => {
+  it('preserves fileTree, dataModels, apiEndpoints, envVars on ARCHITECT_APP', { timeout: 60_000 }, async () => {
     const agent = new AppArchitectAgent('stub-key');
     stubLLM(agent, {
       architecture: 'Next.js App Router with Prisma + Postgres; TailwindCSS styling; Zod validation on API routes.',

@@ -153,7 +153,7 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not start OAuth flow.';
       if (msg.toLowerCase().includes('not configured')) {
-        setError(`${oauthLabel} OAuth is not configured on this deployment. Paste credentials manually below, or ask your admin to set the provider's CLIENT_ID / CLIENT_SECRET env vars.`);
+        setError(`${oauthLabel} sign-in is not configured on this deployment. Ask your workspace admin to finish the provider setup before connecting.`);
         setStatus('error');
       } else {
         setError(msg);
@@ -210,7 +210,7 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             <span className="text-2xl">{providerEmoji}</span>
             <div>
               <h2 className="font-semibold text-lg">Connect {providerName}</h2>
-              <p className="text-xs text-muted-foreground">Set up integration credentials</p>
+              <p className="text-xs text-muted-foreground">Choose a safe connection path</p>
               {maturity && (
                 <div className="mt-1.5 flex items-center gap-2">
                   <span className={cn('inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide', maturityTone)}>
@@ -232,14 +232,6 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
           {status === 'loading' && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {/* Instructions */}
-          {instructions && status !== 'connected' && status !== 'loading' && (
-            <div className="rounded-lg bg-muted/50 p-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Setup Instructions</p>
-              <div className="text-sm space-y-1 whitespace-pre-line text-foreground/80">{instructions}</div>
             </div>
           )}
 
@@ -267,6 +259,19 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
           {/* Plain-English permissions — what JAK can do, what needs
               approval. NEVER mentions OAuth scopes, tokens, or
               developer concepts. */}
+          {status !== 'connected' && status !== 'loading' && (
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Connection path</p>
+              <p className="text-sm text-foreground/80">
+                {oauthConfigured
+                  ? `Sign in with ${oauthLabel} to connect safely. JAK will never see your password.`
+                  : supportsOAuth
+                    ? `${providerName} sign-in is available, but this deployment needs an admin to finish setup before users can connect.`
+                    : `${providerName} needs workspace admin setup before users can connect.`}
+              </p>
+            </div>
+          )}
+
           {status !== 'connected' && status !== 'loading' && (
             <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
               <div className="flex items-start gap-2">
@@ -345,6 +350,12 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
 
               {showAdvanced && (
                 <div className="mt-3 space-y-3" data-testid="admin-token-paste-form">
+                  {instructions && (
+                    <div className="rounded-lg bg-muted/50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Admin setup notes</p>
+                      <div className="text-sm space-y-1 whitespace-pre-line text-foreground/80">{instructions}</div>
+                    </div>
+                  )}
                   <p className="text-[11px] text-muted-foreground">
                     Manual credential setup. For OAuth, ask your platform team to set
                     the deployment's <code className="rounded bg-muted px-1">CLIENT_ID</code>

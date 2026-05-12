@@ -249,11 +249,24 @@ const documentsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.params as { id: string };
-      const { tenantId } = request.user;
+      const { tenantId, userId, role } = request.user;
 
       const doc = await fastify.db.tenantDocument.findUnique({ where: { id } });
       if (!doc || doc.deletedAt) throw new NotFoundError('TenantDocument', id);
       if (doc.tenantId !== tenantId) throw new ForbiddenError('Document not in your tenant');
+
+      // B5 (audit 2026-05-08): authorisation gap closed. Previously any
+      // authed same-tenant user could delete any other user's document
+      // — there was no role check + no uploader check. Tighten:
+      //   - Original uploader can always delete their own doc
+      //   - REVIEWER+ can delete any doc in their tenant
+      //   - END_USER who didn't upload → 403
+      const isPrivileged =
+        role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
+      const isUploader = doc.uploadedBy === userId;
+      if (!isPrivileged && !isUploader) {
+        throw new ForbiddenError('Only the uploader or a REVIEWER+ can delete this document');
+      }
 
       await deleteTenantFile({ tenantId, storageKey: doc.storageKey }).catch((e: unknown) => {
         request.log.warn(
@@ -417,19 +430,22 @@ export async function ingestDocumentInBackground(
       ingestedText = parsed.text;
     }
 
-    // Hardening pass: PII + prompt-injection scan on ingested text. The
-    // existing security infra (detectPII, detectInjection) was only wired
-    // to the workflow-goal path, not document upload — meaning a malicious
-    // PDF could ride right into the vector store with no guard. We log
+    // Hardening pass: PII + prompt-injection scan on ingested text. This
+    // runs through ShieldGateway so standalone JAK Shield can later own the
+    // scan without changing document ingestion. We log
     // the finding into ingestionError for the Files tab to show, but
     // we do NOT block ingestion (an Audit & Compliance UI lets the user
     // see the warning + decide whether to keep / quarantine the file).
     let scanWarning: string | null = null;
     if (ingestedText && ingestedText.length > 0) {
       try {
-        const { detectPII, detectInjection } = await import('@jak-swarm/security');
-        const piiResult = detectPII(ingestedText.slice(0, 200_000)); // cap to first ~200KB
-        const injResult = detectInjection(ingestedText.slice(0, 200_000));
+        const { getShieldGateway } = await import('@jak-swarm/security');
+        const scan = await getShieldGateway().scanInput(ingestedText.slice(0, 200_000), {
+          tenantId: doc.tenantId,
+          source: 'document_ingest',
+        });
+        const piiResult = scan.pii;
+        const injResult = scan.injection;
         const flags: string[] = [];
         if (piiResult.containsPII) flags.push(`PII: ${piiResult.found.join(', ')}`);
         if (injResult.detected) flags.push(`prompt-injection (confidence ${injResult.confidence})`);

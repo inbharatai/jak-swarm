@@ -157,6 +157,36 @@ ALTER TABLE "trial_signups"
   ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- ── Subscriptions: add trial fields + 4 daily-cap counters ──────────────────
+-- Fresh-database safety:
+-- Prisma applies these legacy numbered migration folders lexicographically, so
+-- `106_team_and_trial` runs before `2_add_subscriptions_and_usage` on a clean
+-- database. Create the base subscriptions table if migration 2 has not run yet;
+-- migration 2 will still add its indexes/FK and seed free subscriptions later.
+CREATE TABLE IF NOT EXISTS "subscriptions" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL DEFAULT 'free',
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "creditsTotal" INTEGER NOT NULL DEFAULT 200,
+    "creditsUsed" INTEGER NOT NULL DEFAULT 0,
+    "premiumTotal" INTEGER NOT NULL DEFAULT 0,
+    "premiumUsed" INTEGER NOT NULL DEFAULT 0,
+    "dailyUsed" INTEGER NOT NULL DEFAULT 0,
+    "dailyCap" INTEGER NOT NULL DEFAULT 30,
+    "perTaskCap" INTEGER NOT NULL DEFAULT 10,
+    "concurrentCap" INTEGER NOT NULL DEFAULT 1,
+    "maxModelTier" INTEGER NOT NULL DEFAULT 1,
+    "periodStart" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "periodEnd" TIMESTAMP(3) NOT NULL,
+    "dailyResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paddleSubId" TEXT,
+    "paddleCustomerId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
 ALTER TABLE "subscriptions" ADD COLUMN "trialStartedAt"        TIMESTAMP(3);
 ALTER TABLE "subscriptions" ADD COLUMN "trialEndsAt"           TIMESTAMP(3);
 ALTER TABLE "subscriptions" ADD COLUMN "dailyAgentRunsUsed"    INTEGER NOT NULL DEFAULT 0;

@@ -1,15 +1,7 @@
-/**
- * LLM provider health monitoring.
- *
- * Pings each configured provider every 60 seconds with a minimal request.
- * Tracks health score (0-100), latency, and error rate.
- * Used by the routing engine to avoid sending traffic to degraded providers.
- */
-
 interface ProviderHealth {
   provider: string;
   status: 'healthy' | 'degraded' | 'down';
-  healthScore: number; // 0-100
+  healthScore: number;
   avgLatencyMs: number;
   lastCheckAt: string;
   lastError?: string;
@@ -19,33 +11,16 @@ interface ProviderHealth {
 const healthState = new Map<string, ProviderHealth>();
 let healthInterval: ReturnType<typeof setInterval> | null = null;
 
-const PROVIDERS_TO_CHECK = [
-  {
-    name: 'openai',
-    url: 'https://api.openai.com/v1/models',
-    keyEnv: 'OPENAI_API_KEY',
-    authHeader: (key: string) => `Bearer ${key}`,
-  },
-  {
-    name: 'anthropic',
-    url: 'https://api.anthropic.com/v1/messages',
-    keyEnv: 'ANTHROPIC_API_KEY',
-    // Anthropic doesn't have a lightweight health endpoint — use /models
-    authHeader: (key: string) => key,
-    headers: { 'x-api-key': '', 'anthropic-version': '2023-06-01' },
-  },
-  {
-    name: 'google',
-    url: 'https://generativelanguage.googleapis.com/v1beta/models',
-    keyEnv: 'GEMINI_API_KEY',
-    authHeader: () => '', // Uses query param
-    queryParam: true,
-  },
-];
+const OPENAI_PROVIDER = {
+  name: 'openai',
+  url: 'https://api.openai.com/v1/models',
+  keyEnv: 'OPENAI_API_KEY',
+  authHeader: (key: string) => `Bearer ${key}`,
+};
 
-async function checkProvider(provider: typeof PROVIDERS_TO_CHECK[number]): Promise<ProviderHealth> {
-  const existing = healthState.get(provider.name) ?? {
-    provider: provider.name,
+async function checkProvider(): Promise<ProviderHealth> {
+  const existing = healthState.get(OPENAI_PROVIDER.name) ?? {
+    provider: OPENAI_PROVIDER.name,
     status: 'healthy' as const,
     healthScore: 100,
     avgLatencyMs: 0,
@@ -53,62 +28,58 @@ async function checkProvider(provider: typeof PROVIDERS_TO_CHECK[number]): Promi
     consecutiveFailures: 0,
   };
 
-  const apiKey = process.env[provider.keyEnv];
+  const apiKey = process.env[OPENAI_PROVIDER.keyEnv];
   if (!apiKey) {
-    return { ...existing, status: 'down', healthScore: 0, lastError: 'API key not configured', lastCheckAt: new Date().toISOString() };
+    return {
+      ...existing,
+      status: 'down',
+      healthScore: 0,
+      lastError: 'OPENAI_API_KEY not configured',
+      lastCheckAt: new Date().toISOString(),
+    };
   }
 
   const start = Date.now();
   try {
-    let url = provider.url;
-    const headers: Record<string, string> = { 'User-Agent': 'JAK-Swarm-HealthCheck' };
-
-    if (provider.queryParam) {
-      url = `${url}?key=${apiKey}`;
-    } else if (provider.headers) {
-      headers['x-api-key'] = apiKey;
-      headers['anthropic-version'] = '2023-06-01';
-    } else {
-      headers['Authorization'] = provider.authHeader(apiKey);
-    }
-
-    const response = await fetch(url, {
+    const response = await fetch(OPENAI_PROVIDER.url, {
       method: 'GET',
-      headers,
-      signal: AbortSignal.timeout(10000), // 10s timeout
+      headers: {
+        'User-Agent': 'JAK-Swarm-HealthCheck',
+        Authorization: OPENAI_PROVIDER.authHeader(apiKey),
+      },
+      signal: AbortSignal.timeout(10_000),
     });
 
     const latencyMs = Date.now() - start;
 
-    if (response.ok || response.status === 405) {
-      // 405 is OK for Anthropic — it doesn't support GET on /messages
-      const newScore = Math.min(100, existing.healthScore + 10); // Recover gradually
+    if (response.ok) {
+      const newScore = Math.min(100, existing.healthScore + 10);
       return {
-        provider: provider.name,
+        provider: OPENAI_PROVIDER.name,
         status: newScore >= 50 ? 'healthy' : 'degraded',
         healthScore: newScore,
         avgLatencyMs: Math.round((existing.avgLatencyMs + latencyMs) / 2),
         lastCheckAt: new Date().toISOString(),
         consecutiveFailures: 0,
       };
-    } else {
-      const consecutiveFailures = existing.consecutiveFailures + 1;
-      const newScore = Math.max(0, existing.healthScore - 20);
-      return {
-        provider: provider.name,
-        status: newScore >= 50 ? 'degraded' : 'down',
-        healthScore: newScore,
-        avgLatencyMs: Math.round((existing.avgLatencyMs + latencyMs) / 2),
-        lastCheckAt: new Date().toISOString(),
-        lastError: `HTTP ${response.status}`,
-        consecutiveFailures,
-      };
     }
+
+    const consecutiveFailures = existing.consecutiveFailures + 1;
+    const newScore = Math.max(0, existing.healthScore - 20);
+    return {
+      provider: OPENAI_PROVIDER.name,
+      status: newScore >= 50 ? 'degraded' : 'down',
+      healthScore: newScore,
+      avgLatencyMs: Math.round((existing.avgLatencyMs + latencyMs) / 2),
+      lastCheckAt: new Date().toISOString(),
+      lastError: `HTTP ${response.status}`,
+      consecutiveFailures,
+    };
   } catch (err) {
     const consecutiveFailures = existing.consecutiveFailures + 1;
     const newScore = Math.max(0, existing.healthScore - 30);
     return {
-      provider: provider.name,
+      provider: OPENAI_PROVIDER.name,
       status: newScore >= 50 ? 'degraded' : 'down',
       healthScore: newScore,
       avgLatencyMs: existing.avgLatencyMs,
@@ -119,30 +90,19 @@ async function checkProvider(provider: typeof PROVIDERS_TO_CHECK[number]): Promi
   }
 }
 
-/**
- * Start periodic health checks (every 60 seconds).
- */
 export function startProviderHealthChecks(): void {
   if (healthInterval) return;
-
-  // Initial check
   void runAllChecks();
-
   healthInterval = setInterval(() => {
     void runAllChecks();
   }, 60_000);
 }
 
 async function runAllChecks(): Promise<void> {
-  for (const provider of PROVIDERS_TO_CHECK) {
-    const result = await checkProvider(provider);
-    healthState.set(provider.name, result);
-  }
+  const result = await checkProvider();
+  healthState.set(OPENAI_PROVIDER.name, result);
 }
 
-/**
- * Stop health checks (for shutdown).
- */
 export function stopProviderHealthChecks(): void {
   if (healthInterval) {
     clearInterval(healthInterval);
@@ -150,25 +110,17 @@ export function stopProviderHealthChecks(): void {
   }
 }
 
-/**
- * Get health for a specific provider.
- */
 export function getProviderHealth(provider: string): ProviderHealth | undefined {
   return healthState.get(provider);
 }
 
-/**
- * Get all provider health states.
- */
 export function getAllProviderHealth(): ProviderHealth[] {
   return Array.from(healthState.values());
 }
 
-/**
- * Check if a provider is available for routing.
- */
 export function isProviderAvailable(provider: string): boolean {
+  if (provider !== OPENAI_PROVIDER.name) return false;
   const health = healthState.get(provider);
-  if (!health) return true; // Unknown = assume healthy (first check hasn't run yet)
+  if (!health) return true;
   return health.status !== 'down';
 }

@@ -75,3 +75,27 @@ export {
   toolRequiresApproval,
   describeRiskClass,
 } from './tool-risk/risk-classifier.js';
+
+// JAK Shield Gateway
+//
+// This is the migration seam between JAK Swarm and the standalone JAK Shield
+// service/MCP gateway. Today the default gateway preserves the embedded local
+// detectors above; future code can swap the implementation without changing
+// agents, workflow execution, approval persistence, or trace/audit callers.
+export {
+  getShieldGateway,
+  createLocalShieldGateway,
+  setShieldGateway,
+  setShieldGatewayForTesting,
+} from './shield-gateway/gateway.js';
+export { LocalShieldGateway } from './shield-gateway/local-shield-gateway.js';
+export type {
+  ShieldGateway,
+  ShieldGatewaySource,
+  ShieldGatewayStatus,
+  ShieldScanContext,
+  ShieldBlockReason,
+  ShieldInputScanResult,
+  ShieldToolCallEvaluationRequest,
+  ShieldToolCallEvaluation,
+} from './shield-gateway/types.js';

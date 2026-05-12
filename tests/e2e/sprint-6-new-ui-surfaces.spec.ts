@@ -27,7 +27,7 @@ test.describe('Sprint 6 Part D — /social-drafts UI', () => {
     // wiring test in tests/unit/api/sprint-6-wiring.test.ts proves
     // the backend route exists; this test proves the UI calls it +
     // renders the result correctly.
-    await page.route('**/localhost:4000/social-drafts', async (route) => {
+    await page.route('**/social-drafts', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
           status: 200,
@@ -87,7 +87,7 @@ test.describe('Sprint 6 Part E — /tool-installer UI', () => {
     // Route-mock /tool-installer/detect for CI stability (same
     // pattern as social-drafts above). The wiring test proves the
     // backend route exists.
-    await page.route('**/localhost:4000/tool-installer/detect', async (route) => {
+    await page.route('**/tool-installer/detect', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
           status: 200,

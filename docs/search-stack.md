@@ -80,9 +80,9 @@ focused keyword queries (short, no question words, no conversational
 phrasing). Only vague / conversational / long queries get rewritten.
 Typically cuts rewrite LLM calls by 60-70% vs always-rewrite.
 
-- **Provider**: Claude Haiku 4.5 primary, GPT-4o-mini fallback, pass-through
-  no-op if neither key is configured.
-- **Cost**: ~$0.0015 per rewrite on Haiku, ~$0.0003 on GPT-4o-mini.
+- **Provider**: OpenAI GPT-5.4 via the shared OpenAI-only runtime; pass-through
+  no-op if `OPENAI_API_KEY` is not configured.
+- **Cost**: depends on current OpenAI GPT-5.4 pricing and prompt size.
 - **Latency**: +300-800ms when rewrite runs; $0 and +0ms when gate skips.
 - **Gating**: only when `subscriptionTier === 'paid'` AND `rewrite: true` AND
   `DISABLE_SEARCH_REWRITER` is unset AND `needsRewrite(query)` returns true.
@@ -103,10 +103,9 @@ the single biggest accuracy lift on top of any search API — raw Serper/Tavily
 results are ranked by the provider's own signal, which doesn't know the
 user's specific intent.
 
-- **Provider**: Claude Haiku 4.5 primary, GPT-4o-mini fallback, pass-through
-  no-op if neither key is configured.
-- **Cost**: ~$0.0017 per re-rank on Haiku (~$0.85/mo for 500 searches/tenant),
-  ~$0.0003 on GPT-4o-mini. Cheaper than Serper itself.
+- **Provider**: OpenAI GPT-5.4 via the shared OpenAI-only runtime; pass-through
+  no-op if `OPENAI_API_KEY` is not configured.
+- **Cost**: depends on current OpenAI GPT-5.4 pricing and prompt size.
 - **Latency**: +300-1500ms per search (5s hard timeout).
 - **Gating**: only when `subscriptionTier === 'paid'` AND `rerank: true` AND
   `DISABLE_SEARCH_RERANKER` is unset. FREE-plan tenants never pay for it.

@@ -128,9 +128,10 @@ export class UsageCounterService {
       };
     }
 
-    const isTrialing = sub.status === 'trialing' || sub.planId === 'trial_30d';
+    const isTrialPlan = TRIAL_PLAN_IDS.has(sub.planId);
+    const isTrialing = sub.status === 'trialing' || isTrialPlan;
     const trialExpired =
-      sub.trialEndsAt !== null && sub.trialEndsAt.getTime() <= now.getTime();
+      isTrialing && sub.trialEndsAt !== null && sub.trialEndsAt.getTime() <= now.getTime();
     const daysRemaining =
       sub.trialEndsAt !== null
         ? Math.max(
@@ -161,13 +162,13 @@ export class UsageCounterService {
       resetsAt: startOfNextUtcDay(now).toISOString(),
     };
 
-    if (trialExpired) {
-      return { ...baseResult, allowed: false, blockedBy: resource };
+    // Paid plans skip per-resource caps and stale historical trial dates.
+    if (!isTrialPlan && sub.status !== 'trialing') {
+      return { ...baseResult, allowed: true };
     }
 
-    // Paid plans skip per-resource caps entirely.
-    if (!TRIAL_PLAN_IDS.has(sub.planId)) {
-      return { ...baseResult, allowed: true };
+    if (trialExpired) {
+      return { ...baseResult, allowed: false, blockedBy: resource };
     }
 
     const projected = counters[resource].used + amount;

@@ -115,6 +115,35 @@ describe('AgentContext', () => {
     expect(ctx.getTraces()).toHaveLength(0);
   });
 
+  it('records and summarizes LLM usage for trace cost evidence', () => {
+    const ctx = new AgentContext({ agentRole: 'COMMANDER', tenantId: 't', userId: 'u', workflowId: 'w' });
+    ctx.recordLLMUsage({
+      runtime: 'openai-responses',
+      model: 'gpt-5.4',
+      promptTokens: 100,
+      completionTokens: 25,
+      totalTokens: 125,
+      costUsd: 0.001,
+      timestamp: '2026-05-11T00:00:00.000Z',
+    });
+    ctx.recordLLMUsage({
+      runtime: 'openai-responses',
+      model: 'gpt-5.4',
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+      costUsd: 0.0002,
+      timestamp: '2026-05-11T00:00:01.000Z',
+    });
+
+    expect(ctx.getLLMUsages()).toHaveLength(2);
+    const summary = ctx.getLLMUsageSummary();
+    expect(summary?.promptTokens).toBe(110);
+    expect(summary?.completionTokens).toBe(30);
+    expect(summary?.totalTokens).toBe(140);
+    expect(summary?.costUsd).toBeCloseTo(0.0012);
+  });
+
   it('addTrace appends a trace and getTraces returns all', () => {
     const ctx = new AgentContext({ tenantId: 't', userId: 'u', workflowId: 'w' });
     const t1 = makeTrace();

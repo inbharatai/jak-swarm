@@ -26,7 +26,7 @@ Three credentials have been pasted into Claude chat across the 2026-04-18 and 20
 - **Where**: Upstash Console → Account → Management API (https://console.upstash.com/account/api) — revoke any token with that UUID. Additionally: your Redis DB → "Details" → "Reset Password" (rotates the password inside the `rediss://` URL).
 - **Why**: depending on what it is, either the management API (can create/delete DBs) or the DB password itself (read/write Redis data including signal bus + distributed locks)
 - **Blast if skipped**: attacker can flush your Redis (pause/resume/stop signals + SSE relay + distributed locks go with it), or inject fake messages on the signal bus
-- **Success check**: after password reset, you have a new `rediss://default:NEW_PASS@host.upstash.io:6379` URL. Paste this as `REDIS_URL` on both Render services in step B below.
+- **Success check**: after password reset, you have a new `rediss://default:<new-password>@host.upstash.io:6379` URL. Paste this as `REDIS_URL` on both backend services in step B below.
 
 **Do NOT proceed to any other step in this document until A1 / A2 / A3 are all rotated.**
 
@@ -40,8 +40,7 @@ Tool calls fail gracefully when keys are absent, but features stay gated until c
 |---|---|---|
 | `SERPER_API_KEY` | Production search primary — $5/mo, 2500 queries | Recommended |
 | `TAVILY_API_KEY` | Search secondary / fallback chain | Recommended |
-| `OPENAI_API_KEY` | GPT-4o tier-1 router, vision tools (browser_analyze_page, screenshot-to-code), DALL-E image gen | Required for tier-3 + vision |
-| `ANTHROPIC_API_KEY` | Claude Opus tier-3 for Architect, Technical, Strategist roles | Required for depth on those roles |
+| `OPENAI_API_KEY` | OpenAI-only runtime (GPT-5.5/GPT-5.4 tier routing), vision tools, image generation where enabled | Required |
 | `GITHUB_PAT` | github_create_repo, github_push_files, github_review_pr | Required for GitHub sync |
 | `VERCEL_TOKEN` | AppDeployer → production deployment | Required for deploy flow |
 | `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` | IMAP + SMTP email tools | Required for email worker |

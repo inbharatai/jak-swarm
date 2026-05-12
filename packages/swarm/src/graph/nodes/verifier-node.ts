@@ -117,6 +117,7 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
   const agent = new VerifierAgent();
 
   const context = new AgentContext({
+    agentRole: 'VERIFIER',
     tenantId: state.tenantId,
     userId: state.userId,
     workflowId: state.workflowId,
@@ -190,6 +191,11 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     verificationResults: { [task.id]: finalResult },
     plan: updatedPlan,
     traces,
+    completedTaskIds: finalResult.passed ? [task.id] : [],
+    failedTaskIds: finalResult.passed ? [] : [task.id],
+    taskResults: {
+      [`${task.id}_status`]: finalResult.passed ? TaskStatus.COMPLETED : TaskStatus.FAILED,
+    },
     // VERIFYING tells the graph runner "routing should decide what happens next".
     // afterVerifier() reads finalResult.needsRetry (now false) → advances correctly.
     status: WorkflowStatus.VERIFYING,

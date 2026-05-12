@@ -434,9 +434,13 @@ export class CompanyKnowledgeCrawlerService {
     // PII + injection scan (same pattern as documents.routes.ts).
     let scanWarning: string | null = null;
     try {
-      const { detectPII, detectInjection } = await import('@jak-swarm/security');
-      const pii = detectPII(text.slice(0, 200_000));
-      const inj = detectInjection(text.slice(0, 200_000));
+      const { getShieldGateway } = await import('@jak-swarm/security');
+      const scan = await getShieldGateway().scanInput(text.slice(0, 200_000), {
+        tenantId,
+        source: 'crawler_ingest',
+      });
+      const pii = scan.pii;
+      const inj = scan.injection;
       const warnings: string[] = [];
       if (pii.containsPII) warnings.push(`PII: ${pii.found.join(', ')}`);
       if (inj.detected) warnings.push(`prompt-injection (confidence ${inj.confidence})`);

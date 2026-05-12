@@ -1,5 +1,7 @@
 # JAK Swarm - Product Hunt Launch
 
+> Archived historical copy. Do not publish as product truth. Current JAK Swarm is OpenAI-only for LLM execution, uses GPT-5.5/GPT-5.4 routing, has 38 agents and 122 classified tools, and does not support Anthropic/Gemini/DeepSeek/Ollama/OpenRouter runtime fallback.
+
 ---
 
 ## Tagline (60 chars)
@@ -61,3 +63,6 @@ Description: The LLM configuration screen showing supported providers -- OpenAI,
 ### Screenshot 5: Code Example
 Title: "Deploy a Swarm in 10 Lines of Code"
 Description: A clean code editor view showing a minimal TypeScript example that initializes JAK Swarm, creates a research agent and a writing agent, connects them in a pipeline, and executes a task. The terminal below shows the output -- the agents working through the task step by step with clear, readable logs.
+# Archived pre-OpenAI-only launch draft
+
+This file is retained for historical copywriting reference only. Do not publish it as product truth: JAK Swarm is now OpenAI-only for LLM execution, uses 122 classified tools, and does not support Ollama/OpenRouter/Anthropic/Gemini/DeepSeek runtime fallback.

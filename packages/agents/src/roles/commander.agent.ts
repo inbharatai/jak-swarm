@@ -196,12 +196,14 @@ export class CommanderAgent extends BaseAgent {
       };
     }
 
-    // Token usage is no longer surfaced through respondStructured (Phase 6
-    // will add a callbacks interface to the runtime for usage telemetry).
-    // For Phase 4 we rely on the runtime's internal cost tracking
-    // (BaseAgent.onLLMCallComplete still fires from LegacyRuntime; OpenAI
-    // tracks cost in callTools but not respondStructured yet).
-    const tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined = undefined;
+    const usageSummary = context.getLLMUsageSummary();
+    const tokenUsage = usageSummary
+      ? {
+          promptTokens: usageSummary.promptTokens,
+          completionTokens: usageSummary.completionTokens,
+          totalTokens: usageSummary.totalTokens,
+        }
+      : undefined;
 
     // Direct-answer short-circuit — trivial inputs terminate the workflow
     // here without running the Planner/Router/Workers/Verifier pipeline.
@@ -215,6 +217,7 @@ export class CommanderAgent extends BaseAgent {
       };
       const trace = this.recordTrace(context, input, output, [], startedAt);
       if (tokenUsage) trace.tokenUsage = tokenUsage;
+      if (usageSummary) trace.costUsd = usageSummary.costUsd;
       this.logger.info({ runId: context.runId, len: directAnswer.length }, 'Commander direct-answered');
       return output;
     }
@@ -227,6 +230,7 @@ export class CommanderAgent extends BaseAgent {
 
       const trace = this.recordTrace(context, input, output, [], startedAt);
       if (tokenUsage) trace.tokenUsage = tokenUsage;
+      if (usageSummary) trace.costUsd = usageSummary.costUsd;
 
       return output;
     }
@@ -257,6 +261,7 @@ export class CommanderAgent extends BaseAgent {
 
     const trace = this.recordTrace(context, input, output, [], startedAt);
     if (tokenUsage) trace.tokenUsage = tokenUsage;
+    if (usageSummary) trace.costUsd = usageSummary.costUsd;
 
     this.logger.info(
       { missionBriefId: missionBrief.id, industry: detectedIndustry },
@@ -266,4 +271,3 @@ export class CommanderAgent extends BaseAgent {
     return output;
   }
 }
-

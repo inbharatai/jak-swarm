@@ -23,7 +23,7 @@
  *     as null = "no expiry".
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { Shield, Plus, Trash2, Edit2, Power, Calendar, DollarSign } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
@@ -100,6 +100,11 @@ export default function StandingOrdersPage() {
   const [form, setForm] = useState<StandingOrderFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const openCreate = useCallback(() => {
     setEditingId(null);
@@ -210,7 +215,13 @@ export default function StandingOrdersPage() {
             to do (allowlist tools, block actions, force approval, cap budget, set expiry).
           </p>
         </div>
-        <Button size="sm" className="gap-1.5" onClick={openCreate} data-testid="standing-orders-new-btn">
+        <Button
+          size="sm"
+          className="gap-1.5"
+          onClick={openCreate}
+          disabled={!isHydrated}
+          data-testid="standing-orders-new-btn"
+        >
           <Plus className="h-3.5 w-3.5" />
           New Standing Order
         </Button>
@@ -240,7 +251,7 @@ export default function StandingOrdersPage() {
               title="No standing orders yet"
               description="Create a standing order to bound what your autonomous workflows can do."
               action={
-                <Button size="sm" onClick={openCreate} className="gap-1.5">
+                <Button size="sm" onClick={openCreate} disabled={!isHydrated} className="gap-1.5">
                   <Plus className="h-3.5 w-3.5" />
                   Create Standing Order
                 </Button>

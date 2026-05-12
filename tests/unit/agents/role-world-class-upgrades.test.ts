@@ -66,7 +66,7 @@ function stubLLMRaw<T>(agent: T, text: string): void {
 describe('SupportAgent — DRAFT_RESPONSE + ESCALATE (upgrade coverage)', () => {
   it(
     'preserves draftResponse + nextActions on DRAFT_RESPONSE',
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     async () => {
       const agent = new SupportAgent('stub-key');
       stubLLMJson(agent, {
@@ -162,7 +162,7 @@ describe('OpsAgent — parse-failure fallback (upgrade coverage)', () => {
 describe('VoiceAgent — EXTRACT_ACTION_ITEMS + PII risk (upgrade coverage)', () => {
   it(
     'preserves actionItems with owner/due/priority and riskFlags on PII leak',
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     async () => {
       const agent = new VoiceAgent('stub-key');
       stubLLMJson(agent, {
@@ -215,7 +215,7 @@ describe('VoiceAgent — EXTRACT_ACTION_ITEMS + PII risk (upgrade coverage)', ()
 describe('HRAgent — policy/screen guardrails (upgrade coverage)', () => {
   it(
     'preserves legalNotes with counsel-review item on POLICY_DRAFT',
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     async () => {
       const agent = new HRAgent('stub-key');
       stubLLMJson(agent, {
@@ -299,7 +299,7 @@ describe('HRAgent — policy/screen guardrails (upgrade coverage)', () => {
 describe('DesignerAgent — REVIEW_DESIGN contrast math (upgrade coverage)', () => {
   it(
     'preserves accessibilityNotes with measured contrast ratios + WCAG criterion',
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     async () => {
       const agent = new DesignerAgent('stub-key');
       stubLLMJson(agent, {

@@ -4,7 +4,7 @@
  * any behavior change. Phase 2 only ships this implementation.
  *
  * Implementation note: the current BaseAgent owns its own `callLLM` and
- * `executeWithTools` methods which encapsulate retry, provider failover,
+ * `executeWithTools` methods which encapsulate retry, OpenAI execution,
  * cost tracking, JSON-mode detection, etc. Rather than duplicating that
  * logic here, LegacyRuntime is constructed AROUND a BaseAgent instance
  * — agents that opt into the runtime simply forward calls to the new
@@ -19,6 +19,7 @@
 
 import type OpenAI from 'openai';
 import type { ZodType } from 'zod';
+import { calculateCost } from '@jak-swarm/shared';
 import type { AgentContext } from '../base/agent-context.js';
 import type {
   LLMRuntime,
@@ -55,9 +56,11 @@ export class LegacyRuntime implements LLMRuntime {
   async respond(
     messages: OpenAI.ChatCompletionMessageParam[],
     options: LLMCallOptions,
-    _context: AgentContext,
+    context: AgentContext,
   ): Promise<OpenAI.ChatCompletion> {
-    return this.backend.callLLMPublic(messages, undefined, options);
+    const completion = await this.backend.callLLMPublic(messages, undefined, options);
+    recordCompletionUsage(context, completion, this.name);
+    return completion;
   }
 
   async callTools(
@@ -90,4 +93,27 @@ export class LegacyRuntime implements LLMRuntime {
     }
     return schema.parse(parsed);
   }
+}
+
+function recordCompletionUsage(
+  context: AgentContext,
+  completion: OpenAI.ChatCompletion,
+  runtime: string,
+): void {
+  if (!completion.usage) return;
+  const promptTokens = completion.usage.prompt_tokens ?? 0;
+  const completionTokens = completion.usage.completion_tokens ?? 0;
+  const totalTokens = completion.usage.total_tokens ?? promptTokens + completionTokens;
+  const model = completion.model || 'unknown';
+  const costUsd = calculateCost(model, promptTokens, completionTokens);
+  const timestamp = new Date().toISOString();
+  context.recordLLMUsage({
+    runtime,
+    model,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    costUsd,
+    timestamp,
+  });
 }

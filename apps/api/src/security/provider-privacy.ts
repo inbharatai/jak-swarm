@@ -1,9 +1,9 @@
-const OWNER_EMAIL = (process.env['PROVIDER_VISIBILITY_OWNER_EMAIL'] ?? 'reetu004@gmail.com')
+const OWNER_EMAIL = (process.env['PROVIDER_VISIBILITY_OWNER_EMAIL'] ?? '')
   .trim()
   .toLowerCase();
 
 export function canRevealProviderIdentity(email?: string | null): boolean {
-  if (!email) return false;
+  if (!OWNER_EMAIL || !email?.trim()) return false;
   return email.trim().toLowerCase() === OWNER_EMAIL;
 }
 

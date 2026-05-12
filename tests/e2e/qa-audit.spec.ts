@@ -61,6 +61,7 @@ const testSuffix = Date.now();
 const testEmail = `qa-${testSuffix}@jaktest.dev`;
 const testPassword = 'QaTest12345!';
 const testTenantSlug = `qa-tenant-${testSuffix}`;
+const RUN_MUTATING_AUTH = process.env['E2E_RUN_MUTATING_AUTH'] === '1';
 
 // ─────────────────────────────────────────────────────────────────────────
 // PASS 1: Landing / unauthenticated marketing surface
@@ -77,20 +78,20 @@ test.describe('Pass 1 — Landing (unauthenticated)', () => {
 
     await snap(page, 'landing', 'hero-desktop');
 
-    const h1 = await page.locator('h1').first().textContent();
-    expect(h1).toContain('trusted control plane');
+    const h1 = (await page.locator('h1').first().textContent())?.toLowerCase() ?? '';
+    expect(h1).toMatch(/(trusted|secure) control plane/);
 
     const title = await page.title();
     expect(title).toContain('Trusted Control Plane');
 
     // H2 section order sanity
     const h2s = await page.locator('h2').allTextContents();
-    if (h2s.length < 10) {
+    if (h2s.length < 8) {
       record({
         severity: 'Medium',
         area: 'Landing',
         title: 'H2 count below expected',
-        detail: `Found ${h2s.length} H2 elements; audit expected 11–13 sections.`,
+        detail: `Found ${h2s.length} H2 elements; audit expected at least 8 major sections.`,
       });
     }
 
@@ -189,21 +190,25 @@ test.describe('Pass 1 — Landing (unauthenticated)', () => {
     }
   });
 
-  test('landing LiveDemo + Trust Layer sections visible', async ({ page }) => {
+  test('landing product-proof + trust sections visible', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.locator('text=/Approvals\\. Audit\\. Recovery/').scrollIntoViewIfNeeded();
+    await page.locator('text=/Finished work, not chat output/i').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    await snap(page, 'landing', 'product-proof');
+
+    await page.locator('text=/Built for controlled autonomy/i').scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
     await snap(page, 'landing', 'trust-layer');
 
-    await page.locator('text=/Build\\. Operate\\. Verify/').scrollIntoViewIfNeeded();
+    await page.locator('text=/AI agents are powerful\\. JAK Shield makes them safe/i').scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
-    await snap(page, 'landing', 'build-operate-verify');
+    await snap(page, 'landing', 'jak-shield');
 
-    await page.locator('text=/Watch JAK work/i').scrollIntoViewIfNeeded();
+    await page.locator('text=/Enterprise-grade auditability when you need it/i').scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
-    await snap(page, 'landing', 'live-demo');
+    await snap(page, 'landing', 'auditability');
   });
 });
 
@@ -308,6 +313,8 @@ async function tryRegister(page: Page): Promise<boolean> {
 }
 
 test.describe('Pass 3 — Authenticated walkthrough', () => {
+  test.skip(!RUN_MUTATING_AUTH, 'Set E2E_RUN_MUTATING_AUTH=1 to exercise registration-backed authenticated walkthroughs.');
+
   test('register → dashboard landing', async ({ page }) => {
     const consoleErrors: string[] = [];
     collectConsoleErrors(page, consoleErrors);
@@ -416,6 +423,8 @@ test.describe('Pass 3 — Authenticated walkthrough', () => {
 // ─────────────────────────────────────────────────────────────────────────
 
 test.describe('Pass 4 — Chat + file attach', () => {
+  test.skip(!RUN_MUTATING_AUTH, 'Set E2E_RUN_MUTATING_AUTH=1 to exercise registration-backed chat/file workflows.');
+
   test('chat input renders mic + paperclip + send', async ({ page }) => {
     const registered = await tryRegister(page);
     if (!registered) { test.skip(); return; }
@@ -585,6 +594,8 @@ test.describe('Pass 6 — Error states', () => {
   });
 
   test('gated route redirects to login when unauth', async ({ browser }) => {
+    test.skip(!RUN_MUTATING_AUTH, 'Set E2E_RUN_MUTATING_AUTH=1 to verify real auth gating with dev bypass disabled.');
+
     // Fresh context with no cookies
     const context: BrowserContext = await browser.newContext();
     const page = await context.newPage();

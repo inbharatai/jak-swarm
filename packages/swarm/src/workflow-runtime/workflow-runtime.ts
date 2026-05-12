@@ -1,23 +1,9 @@
 /**
- * WorkflowRuntime — JAK-owned interface for workflow orchestration.
+ * WorkflowRuntime - JAK-owned interface for workflow orchestration.
  *
- * Phase 6 of the OpenAI-first migration introduces this so the rest of
- * the codebase never imports `@langchain/langgraph` types directly.
- * Today's `SwarmGraph` + `SwarmRunner` get wrapped as
- * `SwarmGraphRuntime`; Phase 6+ adds `LangGraphRuntime` behind the same
- * interface. Callers (apps/api/src/services/swarm-execution.service.ts,
- * apps/api/src/routes/approvals.routes.ts) only know about
- * `WorkflowRuntime` — they never care which engine is executing.
- *
- * The interface is intentionally narrow:
- *   - start: kick off a workflow with a goal + initial context
- *   - resume: continue a paused workflow after an approval decision
- *   - cancel: stop an in-flight workflow
- *   - getState: read the current state without mutating it
- *
- * Anything richer (streaming, partial-run snapshots, fork/replay) gets
- * added later as needed — keeping the interface narrow keeps both
- * runtimes interchangeable.
+ * LangGraph is the active runtime. The interface keeps API/services isolated
+ * from `@langchain/langgraph` implementation details while preserving the
+ * approval pause/resume, cancellation, and read-only snapshot contract.
  */
 
 import type { WorkflowStatus } from '@jak-swarm/shared';
@@ -93,7 +79,7 @@ export interface WorkflowSnapshot {
 }
 
 export interface WorkflowRuntime {
-  /** Engine name for telemetry ('swarmgraph' | 'langgraph'). */
+  /** Engine name for telemetry. Current production value: 'langgraph'. */
   readonly name: string;
 
   /**

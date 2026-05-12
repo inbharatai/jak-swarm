@@ -36,28 +36,19 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   }
 
   // -----------------------------------------------------------------------
-  // 2. LLM providers — at least one must be configured
+  // 2. OpenAI model execution
   // -----------------------------------------------------------------------
-  const llmProviders = [
-    { key: 'OPENAI_API_KEY', value: config.openaiApiKey },
-    { key: 'ANTHROPIC_API_KEY', value: config.anthropicApiKey },
-    { key: 'GEMINI_API_KEY', value: config.geminiApiKey },
-    { key: 'DEEPSEEK_API_KEY', value: config.deepseekApiKey },
-    { key: 'OPENROUTER_API_KEY', value: config.openrouterApiKey },
-  ];
-  const configuredProviders = llmProviders.filter((p) => p.value.length > 0);
-
-  if (configuredProviders.length === 0 && !config.ollamaBaseUrl) {
+  if (!config.openaiApiKey) {
     results.push({
-      name: 'LLM_PROVIDERS',
+      name: 'OPENAI_API_KEY',
       status: isProd ? 'error' : 'warn',
-      message: 'No LLM provider API key set — agents will not function. Set at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY',
+      message: 'OPENAI_API_KEY is not set - OpenAI-only agents will not function.',
     });
   } else {
     results.push({
-      name: 'LLM_PROVIDERS',
+      name: 'OPENAI_API_KEY',
       status: 'ok',
-      message: `${configuredProviders.length} provider(s) configured: ${configuredProviders.map((p) => p.key).join(', ')}${config.ollamaBaseUrl ? ' + Ollama' : ''}`,
+      message: 'OpenAI API key configured',
     });
   }
 

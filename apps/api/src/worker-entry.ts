@@ -15,6 +15,10 @@ import {
 import { metricsRegistry, metrics } from './observability/metrics.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 
+if (process.env['NODE_ENV'] !== 'production') {
+  process.setMaxListeners(Math.max(process.getMaxListeners(), 100));
+}
+
 /**
  * Validate worker-specific env vars. Fail fast with a clear, actionable
  * message rather than limping along with mystery NPE-like errors at first
@@ -98,16 +102,13 @@ async function main(): Promise<void> {
     metrics.postgresConnectivityStatus.set(1);
   } catch { /* swallow */ }
 
-  // Warm the OpenAI ModelResolver cache at worker boot. Non-blocking: if
-  // the /v1/models check fails (network blip, auth) the resolver falls
-  // back to the failsafe gpt-4o map and agents still execute. Mirrors
-  // the web server's boot warmup at apps/api/src/index.ts so the worker
-  // never burns extra 404s before the cache is populated. Stage 0.2 from
-  // qa/openai-api-optimization-audit.md.
+  // Warm the OpenAI ModelResolver cache at worker boot. If /v1/models is
+  // unavailable, the resolver keeps GPT-5.5/5.4 configured defaults and
+  // fails loudly at call time instead of falling back to older models.
   void ensureModelMap().catch((err) => {
     log.warn(
       { err: err instanceof Error ? err.message : String(err) },
-      '[Worker] ensureModelMap() at boot failed; resolver will use failsafe map (gpt-4o family)',
+      '[Worker] ensureModelMap() at boot failed; resolver will keep GPT-5.5/5.4 configured defaults',
     );
   });
 

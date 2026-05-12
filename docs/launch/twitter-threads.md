@@ -1,5 +1,7 @@
 # JAK Swarm - Twitter Threads
 
+> Archived historical copy. Do not publish as product truth. Current JAK Swarm is OpenAI-only for LLM execution, uses GPT-5.5/GPT-5.4 routing, has 38 agents and 122 classified tools, and does not support Anthropic/Gemini/DeepSeek/Ollama/OpenRouter runtime fallback.
+
 ---
 
 ## Thread 1: Launch Announcement
@@ -261,3 +263,6 @@ The value isn't in the code. It's in the community that forms around it.
 github.com/inbharatai/jak-swarm
 
 What would you build with 38 agents?
+# Archived pre-OpenAI-only launch draft
+
+This file is retained for historical copywriting reference only. Do not publish it as product truth: JAK Swarm is now OpenAI-only for LLM execution, uses 122 classified tools, and does not support Ollama/OpenRouter/Anthropic/Gemini/DeepSeek runtime fallback.

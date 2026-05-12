@@ -173,8 +173,8 @@ export default function AuditPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Open the dedicated workspace to create new runs, drive the test loop, approve workpapers, and generate the final signed evidence pack.
                 </p>
-                <Link href="/audit/runs">
-                  <Button>
+                <Link href="/audit/runs" className="block sm:inline-block">
+                  <Button className="w-full whitespace-normal sm:w-auto">
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     Open Audit Runs Workspace
                   </Button>
@@ -579,14 +579,14 @@ function WorkflowTrailTab() {
           <CardDescription>Paste a workflow id (e.g. from /swarm) to see its full chronological event stream.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(e) => { e.preventDefault(); setSubmitted(workflowId.trim()); }} className="flex gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); setSubmitted(workflowId.trim()); }} className="flex flex-col gap-2 sm:flex-row">
             <Input
               placeholder="wf_xxxxxxxxx"
               value={workflowId}
               onChange={(e) => setWorkflowId(e.target.value)}
               className="font-mono"
             />
-            <Button type="submit" disabled={!workflowId.trim()}>Load</Button>
+            <Button type="submit" disabled={!workflowId.trim()} className="w-full sm:w-auto">Load</Button>
           </form>
         </CardContent>
       </Card>

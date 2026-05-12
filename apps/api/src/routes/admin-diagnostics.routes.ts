@@ -22,7 +22,7 @@ import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
  *
  * POST /admin/diagnostics/smoke/openai
  *   Runs a minimal `/v1/responses` call against each preferred model
- *   (gpt-5.4, gpt-5.4-mini, gpt-5.4-nano). Returns per-model pass/fail
+ *   (gpt-5.5, gpt-5.4). Returns per-model pass/fail
  *   with latency + the first slice of the response text. Use this to
  *   confirm end-to-end the Responses API works from this deploy's env
  *   with this API key, NOT just `/v1/models`. Admin-only.
@@ -56,9 +56,9 @@ export async function adminDiagnosticsRoutes(app: FastifyInstance) {
             modelsAvailable: map.available.length,
             models: map.available,
             preferredModels: {
-              tier3: 'gpt-5.4 → gpt-5 → gpt-4o',
-              tier2: 'gpt-5.4-mini → gpt-5-mini → gpt-4o-mini',
-              tier1: 'gpt-5.4-nano → gpt-5-nano → gpt-4o-mini',
+              tier3: 'gpt-5.5 -> gpt-5.4',
+              tier2: 'gpt-5.4',
+              tier1: 'gpt-5.4',
             },
             env: {
               OPENAI_API_KEY_set: Boolean(process.env['OPENAI_API_KEY']),
@@ -67,7 +67,7 @@ export async function adminDiagnosticsRoutes(app: FastifyInstance) {
               OPENAI_MODEL_TIER_1: process.env['OPENAI_MODEL_TIER_1']?.trim() || null,
               OPENAI_MODEL_TIER_2: process.env['OPENAI_MODEL_TIER_2']?.trim() || null,
               OPENAI_MODEL_TIER_3: process.env['OPENAI_MODEL_TIER_3']?.trim() || null,
-              JAK_EXECUTION_ENGINE: process.env['JAK_EXECUTION_ENGINE']?.trim() || '(default — openai-first when key present)',
+              JAK_EXECUTION_ENGINE: process.env['JAK_EXECUTION_ENGINE']?.trim() || '(default - openai-first)',
               JAK_OPENAI_RUNTIME_AGENTS: process.env['JAK_OPENAI_RUNTIME_AGENTS']?.trim() || null,
             },
           }),
@@ -100,7 +100,7 @@ export async function adminDiagnosticsRoutes(app: FastifyInstance) {
       // key can actually access — no point spending money hitting
       // gpt-5.4 when it's not entitled.
       const map = await ensureModelMap();
-      const allCandidates = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'];
+      const allCandidates = ['gpt-5.5', 'gpt-5.4'];
       const availableSet = new Set(map.available);
       const models = allCandidates.filter((m) => map.verified ? availableSet.has(m) : true);
       const skipped = allCandidates.filter((m) => !models.includes(m));

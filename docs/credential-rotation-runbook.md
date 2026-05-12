@@ -50,7 +50,7 @@ This token was pasted into a chat session on 2026-04-18 and is considered compro
 
 ## 2. OpenAI (`OPENAI_API_KEY`)
 
-Used for: GPT-4o default chat, DALL-E image generation, Whisper transcription, GPT-4o vision (browser_analyze_page, screenshot-to-code).
+Used for: the OpenAI-only agent runtime (GPT-5.5/GPT-5.4 tier routing), image generation/transcription where enabled, and vision-capable analysis tools.
 
 **Rotation steps:**
 
@@ -61,29 +61,13 @@ Used for: GPT-4o default chat, DALL-E image generation, Whisper transcription, G
 5. Update `OPENAI_API_KEY` in your secret manager / Render / Vercel.
 6. Rolling restart the API process.
 
-**Verification:** `curl https://api.openai.com/v1/models -H "Authorization: Bearer $NEW_KEY"` returns `200`. JAK fallback will quietly route to Anthropic if OpenAI fails, so watch the logs for "OpenAI" errors after the swap.
+**Verification:** `curl https://api.openai.com/v1/models -H "Authorization: Bearer $NEW_KEY"` returns `200`. JAK has no alternate LLM provider fallback, so OpenAI auth errors must fail visibly in logs and health checks.
 
 **Blast radius if leaked:** high — the key can drive unbounded spend.
 
 ---
 
-## 3. Anthropic (`ANTHROPIC_API_KEY`)
-
-Used for: Claude Opus tier-3 routing (Architect, Technical, Strategist), Claude Haiku re-ranker.
-
-**Rotation steps:**
-
-1. https://console.anthropic.com/settings/keys
-2. Revoke the old key.
-3. Generate new, copy, update env, restart.
-
-**Verification:** re-run `pnpm bench:search` (uses Haiku re-ranker) — no 401 errors in log.
-
-**Blast radius if leaked:** high — Anthropic Opus is the most expensive routed model.
-
----
-
-## 4. Serper (`SERPER_API_KEY`)
+## 3. Serper (`SERPER_API_KEY`)
 
 Used for: primary production search provider.
 

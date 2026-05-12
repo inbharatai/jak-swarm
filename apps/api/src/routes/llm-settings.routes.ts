@@ -45,16 +45,11 @@ function decrypt(encoded: string): string {
 
 // ─── Provider configuration ──────────────────────────────────────────────────
 
-const PROVIDER_NAMES = ['openai', 'anthropic', 'gemini', 'deepseek', 'openrouter', 'ollama'] as const;
+const PROVIDER_NAMES = ['openai'] as const;
 type ProviderName = (typeof PROVIDER_NAMES)[number];
 
 const PROVIDER_ENV_KEYS: Record<ProviderName, { apiKeyEnv: string; modelEnv: string; defaultModel: string }> = {
-  openai: { apiKeyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-4.1' },
-  anthropic: { apiKeyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'ANTHROPIC_MODEL', defaultModel: 'claude-sonnet-4-20250514' },
-  gemini: { apiKeyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', defaultModel: 'gemini-2.5-flash' },
-  deepseek: { apiKeyEnv: 'DEEPSEEK_API_KEY', modelEnv: 'DEEPSEEK_MODEL', defaultModel: 'deepseek-chat' },
-  openrouter: { apiKeyEnv: 'OPENROUTER_API_KEY', modelEnv: 'OPENROUTER_MODEL', defaultModel: 'meta-llama/llama-3.1-70b-instruct' },
-  ollama: { apiKeyEnv: '', modelEnv: 'OLLAMA_MODEL', defaultModel: 'llama3.1' },
+  openai: { apiKeyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-5.4' },
 };
 
 function maskKey(key: string): string {
@@ -132,30 +127,6 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
             };
           }
 
-          // Check env vars
-          if (name === 'ollama') {
-            const hasOllama = !!process.env['OLLAMA_URL'] || !!process.env['OLLAMA_MODEL'];
-            if (hasOllama) {
-              return {
-                id: `provider_${index + 1}`,
-                name: maskedName,
-                providerKey: allowIdentity ? name : undefined,
-                configured: true,
-                model: allowIdentity ? (process.env['OLLAMA_MODEL'] ?? cfg.defaultModel) : 'managed',
-                source: allowIdentity ? ('local' as const) : ('managed' as const),
-                url: allowIdentity ? (process.env['OLLAMA_URL'] ?? 'http://localhost:11434') : undefined,
-                editable: allowIdentity,
-              };
-            }
-            return {
-              id: `provider_${index + 1}`,
-              name: maskedName,
-              providerKey: allowIdentity ? name : undefined,
-              configured: false,
-              editable: allowIdentity,
-            };
-          }
-
           const envKey = process.env[cfg.apiKeyEnv];
           if (envKey) {
             return {
@@ -202,17 +173,6 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       const results = PROVIDER_NAMES.map((name, index) => {
         const cfg = PROVIDER_ENV_KEYS[name];
         const maskedName = allowIdentity ? name : anonymizeProviderName(index);
-
-        if (name === 'ollama') {
-          const hasOllama = !!process.env['OLLAMA_URL'] || !!process.env['OLLAMA_MODEL'];
-          return {
-            id: `provider_${index + 1}`,
-            name: maskedName,
-            providerKey: allowIdentity ? name : undefined,
-            available: hasOllama,
-            source: allowIdentity ? ('local' as const) : ('managed' as const),
-          };
-        }
 
         const hasEnv = !!process.env[cfg.apiKeyEnv];
         return {

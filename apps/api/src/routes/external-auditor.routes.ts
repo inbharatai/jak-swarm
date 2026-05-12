@@ -290,10 +290,14 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       const user = request.user as AuthSession;
       const { auditRunId } = request.params as { auditRunId: string };
       const engagement = (request as FastifyRequest & { engagement: { id: string; tenantId: string } }).engagement;
+      // P1-1 (audit 2026-05-08): cap pagination at 500 to prevent OOM /
+      // unbounded transfer for engagements with extreme workpaper counts.
+      // Most engagements have <50 workpapers; 500 is a conservative ceiling.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const workpapers = await (fastify.db as any).auditWorkpaper.findMany({
         where: { auditRunId, tenantId: engagement.tenantId },
         orderBy: { createdAt: 'desc' },
+        take: 500,
       });
       await svc.logAction({
         tenantId: engagement.tenantId,

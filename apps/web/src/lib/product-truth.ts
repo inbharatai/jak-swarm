@@ -2,7 +2,7 @@
  * Canonical product-claims registry for marketing surfaces.
  *
  * This file is the single source of truth for the four headline counts
- * (agents, tools, connectors, providers) and the integration tile lists
+ * (agents, tools, connectors, model runtime) and the integration tile lists
  * (`INTEGRATIONS_CORE` + `INTEGRATIONS_INFRA`) that the marketing surfaces
  * historically encoded inline in `page.tsx`.
  *
@@ -29,7 +29,7 @@
  *   - agents = AgentRole enum entries in packages/shared/src/types/agent.ts
  *   - tools  = `toolRegistry.register(` call count in packages/tools/src/builtin/index.ts
  *   - connectors = INTEGRATIONS_CORE.length + INTEGRATIONS_INFRA.length
- *   - providers = number of LLM providers in packages/agents/src/runtime/
+ *   - model runtime = OpenAI-only execution path in packages/agents/src/runtime/
  */
 
 // ─── Stat counts ────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ export const STATS = [
   // infrastructure/MCP adapters surfaced in the UI. Only a subset are
   // production-ready runtime paths — see docs/integration-maturity-matrix.md.
   { value: 22, label: 'Connectors', suffix: '' },
-  { value: 6, label: 'AI Providers', suffix: '' },
+  { value: 1, label: 'Model Runtime', suffix: ' OpenAI' },
 ] as const;
 
 // ─── Compliance framework counts ────────────────────────────────────────────

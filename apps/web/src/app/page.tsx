@@ -89,11 +89,8 @@ function GitHubIcon({ className }: { className?: string }) {
 
 /* ─── Data ────────────────────────────────────────────────────────────────── */
 
-// Pricing copy is OpenAI-first across every tier so the public messaging
-// matches the runtime's primary path. Other providers (Anthropic /
-// Gemini / DeepSeek / Ollama / OpenRouter) remain wired in the runtime
-// as optional fallback — they're documented in the README, not in
-// pricing claims.
+// Pricing copy is OpenAI-only across every tier so public messaging matches
+// the GPT-5.5/5.4 model tier policy.
 const PRICING = [
   {
     name: 'Free',
@@ -123,7 +120,7 @@ const PRICING = [
       '200 credits / day',
       'All 38 specialist agents',
       '5 vibe coding projects',
-      'Managed OpenAI runtime (GPT-4o tier)',
+      'Managed OpenAI runtime (GPT-5.4 tier)',
       '500 premium credits',
       'Email support',
     ],
@@ -383,9 +380,9 @@ export default function HomePage() {
              particles, the orbiting agent constellation, and the four-icon
              trust strip. Two ambient mesh blobs remain for depth. Headline
              leads with what JAK *does* (verb-first), not the category. */}
-        <section className="relative min-h-[88vh] flex items-center gradient-bg px-4 pt-24 pb-20 sm:px-6 lg:px-8 grain-overlay">
-          <div className="hero-mesh-blob" style={{ width: 600, height: 600, top: '10%', left: '-10%', background: 'radial-gradient(circle, rgba(52,211,153,0.13) 0%, transparent 70%)' }} />
-          <div className="hero-mesh-blob" style={{ width: 480, height: 480, top: '35%', right: '-5%', background: 'radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 70%)', animationDelay: '-7s' }} />
+        <section className="relative min-h-[88vh] flex items-center gradient-bg px-4 pt-24 pb-20 sm:px-6 lg:px-8 grain-overlay overflow-hidden">
+          <div className="hero-mesh-blob h-[22rem] w-[22rem] sm:h-[37.5rem] sm:w-[37.5rem]" style={{ top: '10%', left: '-10%', background: 'radial-gradient(circle, rgba(52,211,153,0.13) 0%, transparent 70%)' }} />
+          <div className="hero-mesh-blob right-8 h-56 w-56 sm:-right-[5%] sm:h-[30rem] sm:w-[30rem]" style={{ top: '35%', background: 'radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 70%)', animationDelay: '-7s' }} />
 
           <div
             className="relative mx-auto max-w-4xl w-full z-10 text-center"
@@ -409,7 +406,10 @@ export default function HomePage() {
                 </svg>
                 Powered by JAK Shield
               </a>
-              <span className="text-[11px] font-semibold text-emerald-300/90 tracking-[0.18em] uppercase font-sans">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-sky-400/35 bg-sky-400/[0.08] text-sky-200 text-[11px] font-semibold tracking-[0.16em] uppercase font-sans">
+                Beta 0.1.0-beta.0
+              </span>
+              <span className="max-w-full text-center text-[11px] font-semibold text-emerald-300/90 tracking-[0.16em] uppercase font-sans break-words">
                 &middot; The Secure Control Plane for AI Agents
               </span>
             </div>
@@ -448,7 +448,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/trial"
-                className="group relative inline-flex items-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
+                className="group relative inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
                 style={{
                   background: 'linear-gradient(135deg, #34d399, #fbbf24)',
                   boxShadow: '0 0 30px rgba(52,211,153,0.3), 0 10px 40px rgba(52,211,153,0.15)',
@@ -463,7 +463,7 @@ export default function HomePage() {
                 href="https://github.com/inbharatai/jak-swarm"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-8 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50"
+                className="inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-8 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50"
                 aria-label="View JAK Swarm on GitHub"
               >
                 <GitHubIcon className="h-5 w-5" />
@@ -480,7 +480,7 @@ export default function HomePage() {
                  - No credit card: trial signup at /trial collects email only
                               (apps/api/src/routes/trial.routes.ts) */}
             <p className="mt-5 text-xs text-slate-400 font-sans">
-              Free for 30 days · daily caps to protect your budget · no credit card required
+              Controlled beta · free for 30 days · daily caps to protect your budget · no credit card required
             </p>
 
             {/* Hero cockpit mockup — shows the full loop (command → plan →
@@ -526,7 +526,7 @@ export default function HomePage() {
              available when they need it, not the headline pitch. */}
         <section
           id="audit"
-          className="relative px-4 py-24 sm:px-6 lg:px-8"
+          className="relative overflow-hidden px-4 py-24 sm:px-6 lg:px-8"
           style={{ background: 'linear-gradient(180deg, transparent, rgba(251,146,60,0.04), transparent)' }}
         >
           <div className="mx-auto max-w-5xl relative z-10">
@@ -543,7 +543,7 @@ export default function HomePage() {
             </div>
 
             <div
-              className="rounded-3xl p-8 sm:p-12 glass-card"
+              className="rounded-3xl p-5 sm:p-12 glass-card"
               style={{ borderTop: '3px solid #fb923c' }}
             >
               <div className="grid gap-8 md:grid-cols-2 md:items-center">
@@ -559,7 +559,7 @@ export default function HomePage() {
                     ].map((fw) => (
                       <span
                         key={fw.label}
-                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium font-sans"
+                        className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium font-sans"
                         style={{
                           background: `${fw.color}12`,
                           border: `1px solid ${fw.color}30`,
@@ -569,7 +569,7 @@ export default function HomePage() {
                         <span className="font-mono tabular-nums" style={{ color: fw.color }}>
                           {fw.count}
                         </span>
-                        <span>{fw.label}</span>
+                        <span className="min-w-0 break-words">{fw.label}</span>
                       </span>
                     ))}
                   </div>
@@ -580,7 +580,7 @@ export default function HomePage() {
 
                   <Link
                     href="/audit/runs"
-                    className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-orange-400"
+                    className="inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-orange-400"
                     style={{
                       background: 'linear-gradient(135deg, #fb923c, #f472b6)',
                       touchAction: 'manipulation',

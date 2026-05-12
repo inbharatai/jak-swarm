@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { apiFetch, fetcher } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, CardContent, Input, Badge, Spinner } from '@/components/ui';
-import { Key, Check, Eye, EyeOff, Zap, Brain, Cpu, Server, Globe, Box } from 'lucide-react';
+import { Key, Check, Eye, EyeOff, Brain } from 'lucide-react';
 import type { ModuleProps } from '@/modules/registry';
 
 interface LLMProvider {
@@ -13,17 +13,12 @@ interface LLMProvider {
   configured: boolean;
   keyPreview?: string;
   model?: string;
-  source?: 'database' | 'env';
+  source?: 'database' | 'env' | 'managed';
   url?: string;
 }
 
 const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; description: string; models: string[]; color: string }> = {
-  openai: { icon: <Brain className="h-5 w-5" />, label: 'OpenAI', description: 'GPT-4o, GPT-4o-mini, o1, o3', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o3-mini'], color: '#10a37f' },
-  anthropic: { icon: <Zap className="h-5 w-5" />, label: 'Anthropic', description: 'Claude Sonnet 4, Opus 4, Haiku', models: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-3-20250414'], color: '#d97706' },
-  gemini: { icon: <Globe className="h-5 w-5" />, label: 'Google Gemini', description: 'Gemini 2.5 Pro, Flash', models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'], color: '#4285f4' },
-  deepseek: { icon: <Cpu className="h-5 w-5" />, label: 'DeepSeek', description: 'DeepSeek V3, R1', models: ['deepseek-chat', 'deepseek-reasoner'], color: '#00a67e' },
-  ollama: { icon: <Server className="h-5 w-5" />, label: 'Ollama (Local)', description: 'Run models locally', models: ['llama3.1', 'llama3.2', 'mistral', 'codellama'], color: '#000000' },
-  openrouter: { icon: <Box className="h-5 w-5" />, label: 'OpenRouter', description: '100+ models, single API key', models: ['meta-llama/llama-3.1-70b-instruct'], color: '#6366f1' },
+  openai: { icon: <Brain className="h-5 w-5" />, label: 'OpenAI', description: 'GPT-5.5 / GPT-5.4 agentic runtime', models: ['gpt-5.5', 'gpt-5.4'], color: '#10a37f' },
 };
 
 export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
@@ -65,7 +60,7 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
     <div className="flex flex-col h-full p-4 gap-4 overflow-auto">
       <div className="shrink-0">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Key className="h-5 w-5 text-primary" />Settings</h2>
-        <p className="text-xs text-muted-foreground">Configure LLM providers and API keys</p>
+        <p className="text-xs text-muted-foreground">Configure the OpenAI execution key and GPT-5.5/5.4 model tier.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 max-w-3xl">

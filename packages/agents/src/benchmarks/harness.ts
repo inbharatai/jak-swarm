@@ -2,17 +2,15 @@
  * Runtime parity benchmark harness.
  *
  * Phase 8 of the OpenAI-first migration. Runs a scenario manifest against
- * BOTH runtimes (LegacyRuntime + OpenAIRuntime) and scores them on:
+ * one or more OpenAI runtime variants and scores them on:
  *   - completion (did the workflow reach a final answer?)
  *   - JSON-schema compliance (did structured outputs match the schema?)
  *   - tool-call correctness (right tool, right args)
  *   - latency p50/p95
  *   - cost
  *
- * Pass: OpenAIRuntime matches or beats LegacyRuntime on ≥90% of scenarios.
- * Until that gate clears, Gemini/Anthropic adapters stay compiling for
- * break-glass — see docs/architecture/execution-engines.md Phase 8 entry
- * condition.
+ * Pass: the candidate OpenAI runtime matches or beats the previously
+ * accepted OpenAI report on the scenario pass-rate gate.
  *
  * Usage:
  *   import { runHarness } from '@jak-swarm/agents/benchmarks/harness';

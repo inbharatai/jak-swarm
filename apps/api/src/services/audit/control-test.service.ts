@@ -336,7 +336,7 @@ export class ControlTestService {
     }
 
     try {
-      const ctx = new AgentContext({ tenantId: 'system', userId: 'control-test-builder', workflowId: 'audit-control-test' });
+      const ctx = new AgentContext({ agentRole: 'CONTROL_TEST_BUILDER', tenantId: 'system', userId: 'control-test-builder', workflowId: 'audit-control-test' });
       const resp = await llm.respond(
         [
           {
@@ -395,7 +395,7 @@ export class ControlTestService {
     }
 
     try {
-      const ctx = new AgentContext({ tenantId: input.tenantId, userId: 'control-test-evaluator', workflowId: input.auditRunId });
+      const ctx = new AgentContext({ agentRole: 'CONTROL_TEST_EVALUATOR', tenantId: input.tenantId, userId: 'control-test-evaluator', workflowId: input.auditRunId });
       const evidenceSummary = [
         `Auto-mapped evidence (${input.evidence.autoMappings.length} row(s)):`,
         ...input.evidence.autoMappings.slice(0, 20).map((m, i) => `  ${i + 1}. ${m.evidenceType} ${m.evidenceId} @ ${m.evidenceAt.toISOString()}`),

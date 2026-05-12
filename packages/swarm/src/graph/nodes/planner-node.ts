@@ -13,6 +13,7 @@ export async function plannerNode(state: SwarmState): Promise<Partial<SwarmState
   const agent = new PlannerAgent();
 
   const context = new AgentContext({
+    agentRole: 'PLANNER',
     tenantId: state.tenantId,
     userId: state.userId,
     workflowId: state.workflowId,

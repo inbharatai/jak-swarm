@@ -90,7 +90,8 @@ describe('JAK Shield landing — truth-lock', () => {
       'utf8',
     );
     expect(baseAgent).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
-    expect(baseAgent).toMatch(/detectOffensiveCyberRequest/);
+    expect(baseAgent).toMatch(/getShieldGateway/);
+    expect(baseAgent).toMatch(/offensiveCyber/);
     expect(baseAgent).toMatch(/JAK Shield/);
   });
 });

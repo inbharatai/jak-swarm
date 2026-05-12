@@ -7,7 +7,7 @@
  *
  * Run command:
  *   QA_SITE=https://jakswarm.com \
- *   E2E_AUTH_EMAIL=reetu004@gmail.com \
+ *   E2E_AUTH_EMAIL=<your-test-email> \
  *   E2E_AUTH_PASSWORD=... \
  *   pnpm exec playwright test e2e/qa-post-fix-audit.spec.ts \
  *     --reporter=list --workers=1 --project=chromium-desktop --timeout=300000
@@ -37,14 +37,16 @@ import { test, expect, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const SITE = (process.env['QA_SITE'] ?? 'https://jakswarm.com').replace(/\/$/, '');
-const EMAIL = process.env['E2E_AUTH_EMAIL'] ?? 'reetu004@gmail.com';
-const PASSWORD = process.env['E2E_AUTH_PASSWORD'] ?? '';
+const SITE = (process.env['QA_SITE'] ?? process.env['E2E_BASE_URL'] ?? `http://127.0.0.1:${process.env['E2E_WEB_PORT'] ?? '3100'}`).replace(/\/$/, '');
+const EMAIL = process.env['E2E_AUTH_EMAIL'];
+const PASSWORD = process.env['E2E_AUTH_PASSWORD'];
 
 const ROOT = path.resolve(__dirname, '../..');
 const ART_DIR = path.join(ROOT, 'qa', 'post-fix-playwright-artifacts');
 const FINDINGS_PATH = path.join(ROOT, 'qa', 'post-fix-findings.json');
 fs.mkdirSync(ART_DIR, { recursive: true });
+
+test.skip(!EMAIL || !PASSWORD, 'Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD to run the authenticated post-fix audit.');
 
 // In-memory accumulator; flushed on afterAll.
 type Severity = 'Info' | 'Low' | 'Medium' | 'High' | 'Critical';
@@ -109,8 +111,8 @@ async function snap(page: Page, sub: string, name: string): Promise<string> {
 
 async function login(page: Page): Promise<void> {
   await page.goto(`${SITE}/login`, { waitUntil: 'domcontentloaded' });
-  await page.locator('input[type="email"]').first().fill(EMAIL);
-  await page.locator('input[type="password"]').first().fill(PASSWORD);
+  await page.locator('input[type="email"]').first().fill(EMAIL!);
+  await page.locator('input[type="password"]').first().fill(PASSWORD!);
   await Promise.all([
     page.waitForURL((u) => !u.toString().includes('/login'), { timeout: 30_000 }).catch(() => null),
     page.locator('button[type="submit"]').first().click(),
@@ -399,8 +401,8 @@ test.describe('Post-fix audit', () => {
     record({ ac: 13, area: 'Auth/InvalidRejected', title: stillOnLogin ? 'Invalid creds correctly rejected' : 'Invalid creds did NOT reject', severity: stillOnLogin ? 'Info' : 'High', verdict: stillOnLogin ? 'working' : 'broken', evidence: page.url() });
 
     // Valid login
-    await page.locator('input[type="email"]').first().fill(EMAIL);
-    await page.locator('input[type="password"]').first().fill(PASSWORD);
+    await page.locator('input[type="email"]').first().fill(EMAIL!);
+    await page.locator('input[type="password"]').first().fill(PASSWORD!);
     await Promise.all([
       page.waitForURL((u) => !u.toString().includes('/login'), { timeout: 30_000 }).catch(() => null),
       page.locator('button[type="submit"]').first().click(),

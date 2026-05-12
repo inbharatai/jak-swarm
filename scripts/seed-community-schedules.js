@@ -3,8 +3,8 @@
  * JAK Swarm — Seed Community Building Scheduled Workflows
  *
  * Creates persistent scheduled workflows in the database that auto-run
- * on the API server. These generate content, create images, and post
- * to Twitter/LinkedIn/Reddit automatically.
+ * on the API server. These generate community content drafts and should
+ * route any external publishing action through approval.
  *
  * Prerequisites:
  * 1. PostgreSQL running with DATABASE_URL configured
@@ -24,16 +24,16 @@ const USER_ID = process.env.USER_ID ?? 'default';
 const schedules = [
   {
     name: 'Daily Twitter Post',
-    description: 'Generate and post a tweet about JAK Swarm with DALL-E image',
-    goal: `You are the social media manager for JAK Swarm (github.com/inbharatai/jak-swarm), an open-source AI agent platform with 33 agents, 79 tools, and 6 LLM providers.
+    description: 'Generate a tweet draft about JAK Swarm with an image concept',
+    goal: `You are the social media manager for JAK Swarm (github.com/inbharatai/jak-swarm), an open-source AI agent control plane with 38 agents, 122 classified tools, and OpenAI-only model execution.
 
-Task: Create and post a tweet to Twitter/X.
+Task: Create a Twitter/X draft and approval-ready publishing package.
 
 Steps:
 1. Use web_search to find a trending AI/automation topic today
 2. Write a punchy tweet (max 280 chars) connecting that topic to JAK Swarm. Include relevant hashtags (#AIAgents #Automation #OpenSource)
-3. Use generate_image to create an eye-catching visual for the tweet (modern, tech, blue/purple theme)
-4. Use post_to_twitter to post the tweet with the generated image
+3. Draft an eye-catching visual prompt for the tweet (modern, tech, no generic purple-on-white default)
+4. Create an approval request before any external publishing action
 
 Be creative. Never repeat the same content. Vary between: feature highlights, use cases, comparisons, tips, behind-the-scenes.`,
     cronExpression: '0 9 * * *', // Every day at 9am
@@ -50,12 +50,12 @@ Steps:
 1. Use web_search to find what AI/agent topics are hot on Reddit this week
 2. Pick ONE subreddit from: artificial, LocalLLaMA, SideProject, MachineLearning, startups
 3. Write a post that shares a genuine insight, tutorial, or experience. Examples:
-   - "I built a 33-agent AI swarm. Here's what I learned about multi-agent orchestration"
+   - "I built a 38-agent AI control plane. Here's what I learned about multi-agent orchestration"
    - "4 things I wish I knew before building an AI agent platform"
    - "How I reduced LLM costs by 80% with tier-based routing"
-4. Use post_to_reddit with the chosen subreddit, title, and body
+4. Save the chosen subreddit, title, and body as an approval-ready draft
 
-CRITICAL: Reddit HATES promotional content. Lead with VALUE. Mention JAK Swarm only at the end as "I built this open-source tool that does X" — never as the main point.`,
+CRITICAL: Reddit HATES promotional content. Lead with VALUE. Mention JAK Swarm only at the end as "I built this open-source tool that does X" — never as the main point. Do not publish without explicit approval.`,
     cronExpression: '0 12 * * 3', // Wednesday at noon
     maxCostUsd: 0.30,
   },

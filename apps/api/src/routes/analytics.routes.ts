@@ -94,7 +94,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           const completion = usage.completionTokens ?? 0;
           const tokens = usage.totalTokens ?? prompt + completion;
           const model = usage.model ?? 'unknown';
-          const provider = usage.provider ?? (model.startsWith('claude') ? 'anthropic' : 'openai');
+          const provider = usage.provider ?? 'openai';
           const cost = calculateCost(model, prompt, completion);
 
           totalPrompt += prompt;
@@ -203,7 +203,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           const completion = usage.completionTokens ?? 0;
           const tokens = usage.totalTokens ?? prompt + completion;
           const model = usage.model ?? 'unknown';
-          const provider = usage.provider ?? (model.startsWith('claude') ? 'anthropic' : 'openai');
+          const provider = usage.provider ?? 'openai';
           const cost = calculateCost(model, prompt, completion);
           const dur = trace.durationMs ?? 0;
 
@@ -288,7 +288,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           const completion = usage.completionTokens ?? 0;
           const tokens = (usage.totalTokens ?? prompt + completion);
           const model = usage.model ?? 'unknown';
-          const provider = usage.provider ?? (model.startsWith('claude') ? 'anthropic' : 'openai');
+          const provider = usage.provider ?? 'openai';
           const cost = calculateCost(model, prompt, completion);
 
           totalUsd += cost;

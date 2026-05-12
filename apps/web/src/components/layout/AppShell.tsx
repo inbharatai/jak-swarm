@@ -6,7 +6,7 @@ import { AppLayout } from './AppLayout';
 import { useAuth } from '@/lib/auth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const AUTH_PATHS = ['/login', '/register', '/', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms'];
+const AUTH_PATHS = ['/login', '/register', '/', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms', '/trial'];
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -40,7 +40,7 @@ export function AppShell({ children }: AppShellProps) {
 
   const isAuthPage = AUTH_PATHS.some(
     p => pathname === p,
-  ) || pathname.startsWith('/auth/');
+  ) || pathname.startsWith('/auth/') || pathname.startsWith('/trial/');
 
   // Auth/landing pages and unauthenticated users render without shell
   if (isAuthPage || !user) {

@@ -29,17 +29,14 @@ const ORIGINAL_ENV = {
 };
 
 afterEach(() => {
-  process.env['OPENAI_API_KEY'] = ORIGINAL_ENV.OPENAI_API_KEY;
-  process.env['ANTHROPIC_API_KEY'] = ORIGINAL_ENV.ANTHROPIC_API_KEY;
-  process.env['GEMINI_API_KEY'] = ORIGINAL_ENV.GEMINI_API_KEY;
-  process.env['DEEPSEEK_API_KEY'] = ORIGINAL_ENV.DEEPSEEK_API_KEY;
-  process.env['OPENROUTER_API_KEY'] = ORIGINAL_ENV.OPENROUTER_API_KEY;
-  process.env['OLLAMA_URL'] = ORIGINAL_ENV.OLLAMA_URL;
-  process.env['OLLAMA_MODEL'] = ORIGINAL_ENV.OLLAMA_MODEL;
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
 
 describe('BaseAgent role-aware provider routing', () => {
-  it('uses tier-3 primary for COMMANDER when Anthropic is available', () => {
+  it('uses the OpenAI tier-3 primary for COMMANDER even when old provider keys are present', () => {
     process.env['OPENAI_API_KEY'] = 'test-openai';
     process.env['ANTHROPIC_API_KEY'] = 'test-anthropic';
     process.env['GEMINI_API_KEY'] = 'test-gemini';
@@ -53,10 +50,12 @@ describe('BaseAgent role-aware provider routing', () => {
 
     expect(providerName).toBeTruthy();
     expect(providerName).toContain('router(');
-    expect(providerName).toContain('anthropic');
+    expect(providerName).toContain('openai');
+    expect(providerName).not.toContain('anthropic');
+    expect(providerName).not.toContain('gemini');
   });
 
-  it('uses tier-1 primary path for WORKER_EMAIL when only Gemini/OpenAI available', () => {
+  it('uses the OpenAI tier-1 primary path for WORKER_EMAIL and ignores Gemini', () => {
     process.env['OPENAI_API_KEY'] = 'test-openai';
     process.env['GEMINI_API_KEY'] = 'test-gemini';
     delete process.env['ANTHROPIC_API_KEY'];
@@ -70,7 +69,7 @@ describe('BaseAgent role-aware provider routing', () => {
 
     expect(providerName).toBeTruthy();
     expect(providerName).toContain('router(');
-    // Tier-1 with this env falls through to Gemini before OpenAI.
-    expect(providerName).toContain('gemini');
+    expect(providerName).toContain('openai');
+    expect(providerName).not.toContain('gemini');
   });
 });

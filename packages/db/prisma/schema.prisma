@@ -156,7 +156,10 @@ model Workflow {
   updatedAt     DateTime  @updatedAt
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user             User              @relation(fields: [userId], references: [id])
+  // P0-1 (audit 2026-05-08): the migration declares ON DELETE RESTRICT; the
+  // schema previously omitted the clause which silently let Prisma assume
+  // "no rule" — a truth-of-record lie. Now matches the live DB constraint.
+  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
   traces           AgentTrace[]
   approvalRequests ApprovalRequest[]
   jobs             WorkflowJob[]
@@ -1057,7 +1060,7 @@ model UsageLedger {
   userId          String
   workflowId      String?
   taskType        String   // chat, coding, analysis, research, etc.
-  modelUsed       String   // gpt-4o, claude-sonnet-4, gemini-2.0-flash, etc.
+  modelUsed       String   // OpenAI model id used for the trace, e.g. gpt-5.4 / gpt-5.5.
   provider        String   // openai, anthropic, google
   inputTokens     Int      @default(0)
   outputTokens    Int      @default(0)
@@ -1825,7 +1828,11 @@ model TaskAssignment {
 
   tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignee    User   @relation("TaskAssignmentAssignee", fields: [assigneeUserId], references: [id], onDelete: Cascade)
-  assignedBy  User   @relation("TaskAssignmentAssigner", fields: [assignedByUserId], references: [id])
+  // P0-1 (audit 2026-05-08): explicit `onDelete: NoAction` matches the
+  // live DB constraint (migration 106 line 94). NoAction is intentional —
+  // we want to PREVENT user-deletion when there are still TaskAssignments
+  // attributing actions to them, so the audit trail can never be orphaned.
+  assignedBy  User   @relation("TaskAssignmentAssigner", fields: [assignedByUserId], references: [id], onDelete: NoAction)
 
   @@index([tenantId, assigneeUserId, status])
   @@index([tenantId, workflowId])

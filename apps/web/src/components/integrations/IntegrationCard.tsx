@@ -188,25 +188,27 @@ export function IntegrationCard({
               </Button>
             </>
           ) : needsReauth ? (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full"
-              disabled={isLoading}
-              onClick={() => onConnect(provider)}
-            >
-              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reconnect'}
-            </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full"
+                disabled={isLoading}
+                onClick={() => onConnect(provider)}
+                data-testid={`connect-${provider.toLowerCase()}`}
+              >
+                {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reconnect'}
+              </Button>
           ) : (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full"
-              disabled={isLoading}
-              onClick={() => onConnect(provider)}
-            >
-              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Connect'}
-            </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full"
+                disabled={isLoading}
+                onClick={() => onConnect(provider)}
+                data-testid={`connect-${provider.toLowerCase()}`}
+              >
+                {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Connect'}
+              </Button>
           )}
         </div>
       </CardContent>

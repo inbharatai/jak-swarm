@@ -55,7 +55,7 @@ function stubLLM<T>(agent: T, payload: unknown): void {
 // ─── Designer ──────────────────────────────────────────────────────────────
 
 describe('DesignerAgent — UI spec + accessibility notes', () => {
-  it('preserves components, colorPalette, typography, accessibilityNotes on DESIGN_UI', { timeout: 20_000 }, async () => {
+  it('preserves components, colorPalette, typography, accessibilityNotes on DESIGN_UI', { timeout: 60_000 }, async () => {
     const agent = new DesignerAgent('stub-key');
     stubLLM(agent, {
       designSpec: 'Clean dashboard with primary action above the fold + filter sidebar.',

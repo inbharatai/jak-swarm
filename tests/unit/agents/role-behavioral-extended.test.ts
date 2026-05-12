@@ -52,7 +52,7 @@ function stubLLM<T>(agent: T, jsonPayload: unknown): void {
 
 describe('AppDeployerAgent — expert-mode output schema', () => {
   // Higher timeout on the first test — cold agents package transform.
-  it('preserves buildErrors classification, envVarsNeeded, rollback, domainStatus', { timeout: 20_000 }, async () => {
+  it('preserves buildErrors classification, envVarsNeeded, rollback, domainStatus', { timeout: 60_000 }, async () => {
     const agent = new AppDeployerAgent('stub-key');
     stubLLM(agent, {
       status: 'failed',

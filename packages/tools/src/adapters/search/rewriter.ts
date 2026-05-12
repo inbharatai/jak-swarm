@@ -1,3 +1,5 @@
+import { openAIChatTokenLimitParam } from '@jak-swarm/shared';
+
 /**
  * Query rewriter for search.
  *
@@ -16,8 +18,7 @@
  * returns `[originalQuery]` so search never fails due to rewriting.
  *
  * Cost (per rewrite, when the gate lets it through):
- *   Claude Haiku 4.5  ~$0.0015
- *   GPT-4o-mini       ~$0.0003
+ *   GPT-5.4 mini      managed OpenAI tier-1 cost
  */
 
 export interface RewriterOptions {
@@ -104,38 +105,6 @@ Respond ONLY with JSON, no prose, no markdown code fences:
 The queries array must contain 1 to ${maxRewrites} strings.`;
 }
 
-async function rewriteViaAnthropic(prompt: string, timeoutMs: number): Promise<string[] | null> {
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { content?: Array<{ text?: string }> };
-    const text = data.content?.[0]?.text ?? '';
-    return parseQueries(text);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function rewriteViaOpenAI(prompt: string, timeoutMs: number): Promise<string[] | null> {
   const apiKey = process.env['OPENAI_API_KEY'];
   if (!apiKey) return null;
@@ -143,6 +112,7 @@ async function rewriteViaOpenAI(prompt: string, timeoutMs: number): Promise<stri
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const model = process.env['OPENAI_MODEL_TIER_1']?.trim() || 'gpt-5.4';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -150,8 +120,8 @@ async function rewriteViaOpenAI(prompt: string, timeoutMs: number): Promise<stri
         authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 300,
+        model,
+        ...openAIChatTokenLimitParam(model, 300),
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
       }),
@@ -187,9 +157,8 @@ function parseQueries(text: string): string[] | null {
 }
 
 /**
- * Default LLM query rewriter. Tries Claude Haiku first (best JSON adherence +
- * reasoning per cent), falls back to GPT-4o-mini, then returns `[originalQuery]`
- * if neither key is available.
+ * Default LLM query rewriter. Uses OpenAI only, then returns
+ * `[originalQuery]` when the OpenAI key is unavailable or the call fails.
  *
  * Returns an array sorted by the LLM's confidence (first = best). Callers can
  * take just `result[0]` for single-query mode or fan-out all of them.
@@ -212,12 +181,8 @@ export const defaultRewriter: RewriterFn = async ({
   let provider = 'none';
   let rewrites: string[] | null = null;
 
-  if (process.env['ANTHROPIC_API_KEY']) {
-    provider = 'anthropic-haiku';
-    rewrites = await rewriteViaAnthropic(prompt, timeoutMs);
-  }
-  if (!rewrites && process.env['OPENAI_API_KEY']) {
-    provider = 'openai-gpt4o-mini';
+  if (process.env['OPENAI_API_KEY']) {
+    provider = 'openai-gpt-5.4';
     rewrites = await rewriteViaOpenAI(prompt, timeoutMs);
   }
 

@@ -415,7 +415,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     displayName: 'Screenshot to Code',
     maturity: 'strong',
     strengths: ['Image → design tokens', 'Typed output', 'Wired end-to-end via vibe-coding-execution service'],
-    limitations: ['Quality scales with GPT-4o vision latency and input screenshot complexity'],
+    limitations: ['Quality scales with OpenAI vision latency and input screenshot complexity'],
     implementation: 'packages/agents/src/workers/screenshot-to-code.agent.ts',
   },
 };

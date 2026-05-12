@@ -19,8 +19,7 @@
  *
  * Run: `pnpm bench:vibe-coder`
  * Skips deploy (deployAfterBuild: false) so no Vercel cost. The heuristic +
- * static build checkers run in-loop; real agents consume ANTHROPIC_API_KEY
- * or OPENAI_API_KEY.
+ * static build checkers run in-loop; real agents consume OPENAI_API_KEY.
  *
  * Without LLM keys, the harness prints a clear skip message and exits 0
  * instead of hanging.
@@ -76,7 +75,7 @@ const specsPath = resolve(repoRoot, 'scripts/_bench/vibe-coder-specs.json');
 const specsFile = JSON.parse(readFileSync(specsPath, 'utf8')) as { specs: BenchSpec[] };
 
 function hasLLMKey(): boolean {
-  return Boolean(process.env['ANTHROPIC_API_KEY']) || Boolean(process.env['OPENAI_API_KEY']);
+  return Boolean(process.env['OPENAI_API_KEY']);
 }
 
 /**
@@ -186,8 +185,8 @@ function summarizeScore(report: SpecReport): 'pass' | 'partial' | 'fail' {
 async function main(): Promise<void> {
   /* eslint-disable no-console */
   if (!hasLLMKey()) {
-    console.error('[bench-vibe-coder] Skipping — no ANTHROPIC_API_KEY or OPENAI_API_KEY set.');
-    console.error('[bench-vibe-coder] Provision at least one LLM key to benchmark real agent output.');
+    console.error('[bench-vibe-coder] Skipping — no OPENAI_API_KEY set.');
+    console.error('[bench-vibe-coder] Provision OPENAI_API_KEY to benchmark real agent output.');
     process.exit(0);
   }
 

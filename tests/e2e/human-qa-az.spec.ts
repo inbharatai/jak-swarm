@@ -18,6 +18,11 @@ import { assertLocalOnlyOrThrow } from '../human-qa/assert-local-only.js';
 
 test.describe.configure({ mode: 'serial' });
 
+const LOCAL_SITE = (
+  process.env['E2E_BASE_URL'] ??
+  `http://127.0.0.1:${process.env['E2E_WEB_PORT'] ?? '3100'}`
+).replace(/\/$/, '');
+
 // Hard guard — refuse to run if any env var points at a production-shaped
 // host (Supabase, Render, Vercel, Upstash, Fly, AWS, etc.). The HumanQA
 // flow fills forms + clicks buttons + creates real workflow rows; that
@@ -32,7 +37,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
   const context = await newQAContext(browser);
 
   const warmup = await context.newPage();
-  await warmup.goto('http://localhost:3000/', { waitUntil: 'load', timeout: 60_000 });
+  await warmup.goto(`${LOCAL_SITE}/`, { waitUntil: 'load', timeout: 60_000 });
   await warmup.waitForTimeout(2500);
   await warmup.close();
 
@@ -42,7 +47,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     // ════════════════════════════════════════════════════════════════
     {
       name: 'landing',
-      url: 'http://localhost:3000/',
+      url: `${LOCAL_SITE}/`,
       run: async (qa, page) => {
         // Categories: render-health, console-network, responsive,
         //             primary-interaction (CTA hover), product-truth,
@@ -60,7 +65,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
 
         // Primary interaction — hover the hero CTA, verify it points where it claims
         await qa.hoverThenClick('a[href="/register"]', { expectNav: /\/register/ });
-        await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded' });
+        await page.goto(`${LOCAL_SITE}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1500);
 
         // Visual-quality heuristic across all headings
@@ -86,7 +91,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'register',
-      url: 'http://localhost:3000/register',
+      url: `${LOCAL_SITE}/register`,
       run: async (qa, page) => {
         await page.waitForTimeout(2500);
         await qa.observeSection('register-form', { selector: 'form', expectMinChars: 30 });
@@ -135,7 +140,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'login',
-      url: 'http://localhost:3000/login',
+      url: `${LOCAL_SITE}/login`,
       run: async (qa, page) => {
         await page.waitForTimeout(2500);
         await qa.observeSection('login-form', { selector: 'form', expectMinChars: 30 });
@@ -175,7 +180,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'social-drafts',
-      url: 'http://localhost:3000/social-drafts',
+      url: `${LOCAL_SITE}/social-drafts`,
       run: async (qa, page) => {
         await page.waitForTimeout(2500);
         await qa.observeSection('social-drafts-initial', { selector: 'main' });
@@ -259,7 +264,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'tool-installer',
-      url: 'http://localhost:3000/tool-installer',
+      url: `${LOCAL_SITE}/tool-installer`,
       run: async (qa, page) => {
         await page.waitForTimeout(2500);
         await qa.observeSection('tool-installer-initial', { selector: 'main' });
@@ -342,7 +347,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     // ════════════════════════════════════════════════════════════════
     {
       name: 'workspace',
-      url: 'http://localhost:3000/workspace',
+      url: `${LOCAL_SITE}/workspace`,
       run: async (qa, page) => {
         // 7 categories: render · console-network · responsive ·
         //               primary-interaction · empty-state ·
@@ -393,7 +398,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'standing-orders',
-      url: 'http://localhost:3000/standing-orders',
+      url: `${LOCAL_SITE}/standing-orders`,
       run: async (qa, page) => {
         // 7 categories
         await page.waitForTimeout(2500);
@@ -434,7 +439,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'audit',
-      url: 'http://localhost:3000/audit',
+      url: `${LOCAL_SITE}/audit`,
       run: async (qa, page) => {
         // 6 categories
         await page.waitForTimeout(2500);
@@ -480,7 +485,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'integrations',
-      url: 'http://localhost:3000/integrations',
+      url: `${LOCAL_SITE}/integrations`,
       run: async (qa, page) => {
         // 6 categories
         await page.waitForTimeout(2500);
@@ -514,7 +519,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'knowledge',
-      url: 'http://localhost:3000/knowledge',
+      url: `${LOCAL_SITE}/knowledge`,
       run: async (qa, page) => {
         // 7 categories
         await page.waitForTimeout(2500);
@@ -552,7 +557,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'skills',
-      url: 'http://localhost:3000/skills',
+      url: `${LOCAL_SITE}/skills`,
       run: async (qa, page) => {
         // 6 categories
         await page.waitForTimeout(2500);
@@ -578,7 +583,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'inbox',
-      url: 'http://localhost:3000/inbox',
+      url: `${LOCAL_SITE}/inbox`,
       run: async (qa, page) => {
         // 6 categories
         await page.waitForTimeout(2500);
@@ -598,7 +603,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'schedules',
-      url: 'http://localhost:3000/schedules',
+      url: `${LOCAL_SITE}/schedules`,
       run: async (qa, page) => {
         // 7 categories
         await page.waitForTimeout(2500);
@@ -635,7 +640,7 @@ test('Human QA — A-Z product audit (deep)', async () => {
     },
     {
       name: 'traces',
-      url: 'http://localhost:3000/traces',
+      url: `${LOCAL_SITE}/traces`,
       run: async (qa, page) => {
         // 7 categories
         await page.waitForTimeout(2500);

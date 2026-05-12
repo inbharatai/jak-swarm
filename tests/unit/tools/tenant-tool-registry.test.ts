@@ -81,16 +81,31 @@ describe('TenantToolRegistry', () => {
     expect(result.error).toContain('not available');
   });
 
-  it('execute blocks tool requiring approval when no approvalId provided', async () => {
+  it('execute returns structured approval_required for tools needing approval', async () => {
     const registry = new TenantToolRegistry('t1', []);
-    // send_email requires approval
-    const result = await registry.execute('send_email', {}, {
+    const name = `tenant_requires_approval_${Date.now()}`;
+    globalRegistry.register(
+      {
+        name,
+        description: 'approval contract test tool',
+        category: ToolCategory.WEBHOOK,
+        riskClass: ToolRiskClass.READ_ONLY,
+        requiresApproval: true,
+        inputSchema: {},
+        outputSchema: {},
+        version: '1.0.0',
+      },
+      async () => ({ ok: true }),
+    );
+
+    const result = await registry.execute(name, {}, {
       tenantId: 't1',
       userId: 'u1',
       workflowId: 'w1',
       runId: 'r1',
     });
     expect(result.success).toBe(false);
-    expect(result.error).toContain('requires approval');
+    expect(result.outcome).toBe('approval_required');
+    expect(result.error).toMatch(/approval/i);
   });
 });

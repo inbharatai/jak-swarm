@@ -1,6 +1,6 @@
 # LangGraph Hard Cutover — Architecture Design (Sprint 2.5 / A.1)
 
-**Status:** in-flight on commit `e52a090` baseline.
+**Status:** superseded as of 2026-05-10. LangGraph is now the active workflow runtime; `JAK_WORKFLOW_RUNTIME=swarmgraph` is not a supported production option. This document is retained as historical cutover design context, not current operator guidance.
 **Companion:** [parity baseline](../qa/langgraph-cutover-baseline.md).
 
 This document specifies the target architecture for replacing the

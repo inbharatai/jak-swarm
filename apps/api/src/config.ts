@@ -59,7 +59,7 @@ const whatsappAllowedNumbers = (() => {
 
 export const config = {
   nodeEnv,
-  port: parseInt(process.env['API_PORT'] ?? '4000', 10),
+  port: parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '4000', 10),
 
   // In production, JWT secret MUST be set to a strong random value.
   jwtSecret: required('AUTH_SECRET', 'dev-secret-change-me-NEVER-USE-IN-PROD'),
@@ -74,42 +74,34 @@ export const config = {
     | 'embedded'
     | 'standalone',
 
-  // ─── Migration flags (Phase 1 of OpenAI-first + LangGraph migration) ─────
-  // JAK_EXECUTION_ENGINE: 'legacy' (default) routes through the existing
-  //   ProviderRouter + AGENT_TIER_MAP path with all 6 LLM providers.
-  //   'openai-first' will (in later phases) route through OpenAIRuntime that
-  //   uses Responses API + hosted tools. Phase 1 is a no-op: only the flag
-  //   value is read + logged + surfaced in /version. Any agent that branches
-  //   on 'openai-first' before Phase 2 throws "not implemented".
-  // JAK_WORKFLOW_RUNTIME: 'swarmgraph' (default) runs the existing custom
-  //   SwarmGraph loop. 'langgraph' will (in Phase 6) route through a
-  //   JAK-owned WorkflowRuntime wrapper around @langchain/langgraph.
-  // Defaults preserve all current behavior. Boot fails loud if the value is
-  // not one of the two strings, to catch typos at deploy time.
+  // Runtime selection
+  // Runtime policy: production API execution is OpenAI-only and LangGraph-only.
+  // Old migration flags are accepted only when they name the active runtime;
+  // legacy values fail loud so deploy config cannot silently drift back to
+  // removed provider/router paths.
   executionEngine: (function () {
-    const raw = (process.env['JAK_EXECUTION_ENGINE'] ?? 'legacy').trim().toLowerCase();
-    if (raw !== 'legacy' && raw !== 'openai-first') {
-      throw new Error(`JAK_EXECUTION_ENGINE must be 'legacy' or 'openai-first' (got '${raw}')`);
+    const raw = (process.env['JAK_EXECUTION_ENGINE'] ?? 'openai-first').trim().toLowerCase();
+    if (raw !== '' && raw !== 'openai-first') {
+      throw new Error(`JAK_EXECUTION_ENGINE must be unset or 'openai-first' (got '${raw}')`);
     }
-    return raw as 'legacy' | 'openai-first';
+    return 'openai-first' as const;
   })(),
   workflowRuntime: (function () {
-    const raw = (process.env['JAK_WORKFLOW_RUNTIME'] ?? 'swarmgraph').trim().toLowerCase();
-    if (raw !== 'swarmgraph' && raw !== 'langgraph') {
-      throw new Error(`JAK_WORKFLOW_RUNTIME must be 'swarmgraph' or 'langgraph' (got '${raw}')`);
+    const raw = (process.env['JAK_WORKFLOW_RUNTIME'] ?? 'langgraph').trim().toLowerCase();
+    if (raw !== '' && raw !== 'langgraph') {
+      throw new Error(`JAK_WORKFLOW_RUNTIME must be unset or 'langgraph' (got '${raw}')`);
     }
-    return raw as 'swarmgraph' | 'langgraph';
+    return 'langgraph' as const;
   })(),
-  // Phase-4 per-agent allowlist for OpenAIRuntime. CSV of agent role names
-  // (e.g. "PLANNER,COMMANDER,WORKER_RESEARCH"). Empty = all agents stay on
-  // LegacyRuntime even when JAK_EXECUTION_ENGINE=openai-first. Phase 1 reads
-  // but does not act on this.
+  // Deprecated migration allowlist retained only for diagnostics/backward
+  // compatibility. Empty or populated, the effective production runtime is
+  // still OpenAI-only.
   openaiRuntimeAgents: (process.env['JAK_OPENAI_RUNTIME_AGENTS'] ?? '')
     .split(',')
     .map(s => s.trim().toUpperCase())
     .filter(Boolean),
 
-  // LLM provider API keys. At least one is required. Agents log a warning if all are missing.
+  // OpenAI API key. Required for production LLM execution.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',
   openaiRealtimeModel: process.env['OPENAI_REALTIME_MODEL'] ?? 'gpt-4o-realtime-preview',
   // WebRTC ICE servers for voice sessions.
@@ -131,12 +123,6 @@ export const config = {
   sentryEnvironment: process.env['SENTRY_ENVIRONMENT'] ?? (process.env['NODE_ENV'] ?? 'development'),
   sentryTracesSampleRate: Number(process.env['SENTRY_TRACES_SAMPLE_RATE'] ?? '0.1'),
   sentryProfilesSampleRate: Number(process.env['SENTRY_PROFILES_SAMPLE_RATE'] ?? '0.1'),
-  anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? '',
-  geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
-  deepseekApiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
-  ollamaBaseUrl: process.env['OLLAMA_BASE_URL'] ?? '',
-  openrouterApiKey: process.env['OPENROUTER_API_KEY'] ?? '',
-
   // Slack channel bridge
   slackSigningSecret: process.env['SLACK_SIGNING_SECRET'] ?? '',
   slackClientId: process.env['SLACK_CLIENT_ID'] ?? '',

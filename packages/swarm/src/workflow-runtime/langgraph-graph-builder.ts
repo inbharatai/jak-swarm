@@ -84,7 +84,8 @@ import { PostgresCheckpointSaver, type CheckpointPrismaClient } from './postgres
  *   - Per-key shallow merge for taskResults / verificationResults so a
  *     later node's update for one task doesn't blow away another task's
  *     result.
- *   - Append for traces / outputs / pendingApprovals.
+ *   - Append for traces / outputs; replace approvals by id so resume decisions
+ *     update existing cards instead of duplicating them.
  *   - Sum for accumulatedCostUsd.
  */
 const lwwReducer = <T>(_old: T, next: T) => (next === undefined ? _old : next);
@@ -95,6 +96,16 @@ const mergeReducer = <T extends Record<string, unknown>>(old: T | undefined, nex
 const appendReducer = <T>(old: T[] | undefined, next: T[] | undefined): T[] => {
   if (!next) return old ?? [];
   return [...(old ?? []), ...next];
+};
+const approvalReducer = (
+  old: ApprovalRequest[] | undefined,
+  next: ApprovalRequest[] | undefined,
+): ApprovalRequest[] => {
+  if (!next || next.length === 0) return old ?? [];
+  const byId = new Map<string, ApprovalRequest>();
+  for (const approval of old ?? []) byId.set(approval.id, approval);
+  for (const approval of next) byId.set(approval.id, approval);
+  return Array.from(byId.values());
 };
 const uniqueAppendReducer = (old: string[] | undefined, next: string[] | undefined): string[] => {
   if (!next || next.length === 0) return old ?? [];
@@ -128,7 +139,7 @@ export const SwarmStateAnnotation = Annotation.Root({
   // Execution state
   currentTaskIndex: Annotation<number>({ reducer: lwwReducer, default: () => 0 }),
   taskResults: Annotation<Record<string, unknown>>({ reducer: mergeReducer, default: () => ({}) }),
-  pendingApprovals: Annotation<ApprovalRequest[]>({ reducer: appendReducer, default: () => [] }),
+  pendingApprovals: Annotation<ApprovalRequest[]>({ reducer: approvalReducer, default: () => [] }),
 
   // Guardrail
   guardrailResult: Annotation<GuardrailResult | undefined>({ reducer: lwwReducer, default: () => undefined }),
@@ -332,8 +343,13 @@ function wrapApprovalNode(deps: NodeDeps) {
         error: `Task rejected by reviewer: ${decision.comment ?? 'No reason provided'}`,
       } as Partial<SwarmAnnotationT>;
     }
-    // Approved or deferred (treat deferred as approved for now;
-    // SwarmRunner.resume did the same).
+    if (decision.status === 'DEFERRED') {
+      return {
+        pendingApprovals: updatedApprovals,
+        status: WorkflowStatus.AWAITING_APPROVAL,
+      } as Partial<SwarmAnnotationT>;
+    }
+
     return {
       pendingApprovals: updatedApprovals,
       status: WorkflowStatus.EXECUTING,

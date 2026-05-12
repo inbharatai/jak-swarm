@@ -1,5 +1,5 @@
 /**
- * LLM Provider abstraction — allows swapping between OpenAI, Anthropic, and other providers.
+ * LLM Provider abstraction — retained for testability while production execution is OpenAI-only.
  */
 
 // ─── Multi-modal vision content types ────────────────────────────────────────
@@ -19,6 +19,7 @@ export type MessageContent = TextContent | ImageContent;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface LLMResponse {
+  model?: string;
   content: string | null;
   toolCalls: Array<{ id: string; name: string; arguments: string }>;
   usage: { promptTokens: number; completionTokens: number; totalTokens: number };
@@ -26,7 +27,7 @@ export interface LLMResponse {
 }
 
 export interface LLMProvider {
-  /** Human-readable provider name (e.g. 'openai', 'anthropic') */
+  /** Human-readable provider name. OpenAI is the only execution provider. */
   name: string;
 
   /**
@@ -39,9 +40,8 @@ export interface LLMProvider {
     temperature?: number;
     /**
      * When true, instruct the provider to return a strict JSON object.
-     * OpenAI uses `response_format: { type: 'json_object' }`. Gemini's
-     * OpenAI-compatible endpoint supports the same. Providers that don't
-     * support it may ignore it — agents always re-parse defensively.
+     * OpenAI uses structured output / JSON mode. Agents still re-parse
+     * defensively so malformed model output becomes a safe error path.
      */
     jsonMode?: boolean;
   }): Promise<LLMResponse>;

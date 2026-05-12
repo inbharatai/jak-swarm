@@ -248,6 +248,7 @@ export class CompanyProfileService {
       .join('\n\n');
 
     const ctx = new AgentContext({
+      agentRole: 'COMPANY_BRAIN_EXTRACTOR',
       tenantId: input.tenantId,
       userId: input.userId,
       workflowId: 'company-brain-extraction',

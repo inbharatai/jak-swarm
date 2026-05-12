@@ -71,7 +71,7 @@ const TENANTS = [
 const BUILTIN_SKILLS = [
   {
     name: 'Document Summarizer',
-    description: 'Condenses long documents to key bullet points using GPT-4o.',
+    description: 'Condenses long documents to key bullet points using OpenAI.',
     tier: 1,
     status: 'APPROVED',
     riskLevel: 'LOW',

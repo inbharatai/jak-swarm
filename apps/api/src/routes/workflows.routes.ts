@@ -93,6 +93,15 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     const decision = cmd.kind === 'approve' ? 'APPROVED' : 'REJECTED';
                     await workflowService.resolveApproval(tenantId, pendingApproval.id, decision, userId);
                     await fastify.auditLog(request, `APPROVAL_${decision}_VIA_FOLLOWUP`, 'ApprovalRequest', pendingApproval.id, { decision, source: 'chat_followup' });
+                    fastify.swarm.enqueueControl({
+                      action: 'resume',
+                      workflowId: activeWorkflow.id,
+                      tenantId,
+                      userId,
+                      decision,
+                      reviewedBy: userId,
+                      comment: 'Resolved from chat follow-up command',
+                    });
                     return reply.status(200).send(ok({ ...baseResult, approvalId: pendingApproval.id, decision }));
                   }
                   case 'pause': {
@@ -100,6 +109,12 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     return reply.status(200).send(ok(baseResult));
                   }
                   case 'resume': {
+                    if (pendingApproval) {
+                      return reply.status(409).send(err(
+                        'APPROVAL_REQUIRED',
+                        `Workflow ${activeWorkflow.id} is awaiting approval. Use "approve" or "reject"; generic resume cannot bypass approval.`,
+                      ));
+                    }
                     fastify.swarm.unpauseWorkflow(activeWorkflow.id);
                     return reply.status(200).send(ok(baseResult));
                   }
@@ -559,7 +574,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
               if (errMsg) {
                 // Surface the diagnostic in plain English. Most-common pattern
-                // is `OpenAI request failed (model: gpt-4o): 404 status code
+                // is `OpenAI request failed (model: gpt-5.4): 404 status code
                 // (no body)` → keep the technical detail but add a
                 // user-actionable explanation + Inspector link.
                 const isModel404 = /404|not found|does not exist/i.test(errMsg);
@@ -740,6 +755,18 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Broadcast unpause signal — whichever instance holds the paused workflow will resume it
       // under a distributed lock (see subscriber in plugins/swarm.plugin.ts and worker-entry.ts).
+      const pendingApproval = await fastify.db.approvalRequest.findFirst({
+        where: { workflowId, tenantId, status: 'PENDING' },
+        select: { id: true },
+      });
+      if (pendingApproval) {
+        return reply.code(409).send(err(
+          'APPROVAL_REQUIRED',
+          'This workflow is paused for a pending approval. Use /approvals/:approvalId/decide or /workflows/:workflowId/resume with a reviewer role.',
+          { approvalId: pendingApproval.id },
+        ));
+      }
+
       fastify.swarm.unpauseWorkflow(workflowId); // Local instance (idempotent)
       await fastify.coordination.signals.publish({
         type: 'unpause',

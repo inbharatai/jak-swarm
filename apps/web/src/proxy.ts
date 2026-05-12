@@ -14,6 +14,7 @@ const PUBLIC_PATHS = new Set([
   '/onboarding',
   '/privacy',
   '/terms',
+  '/trial',
   '/auth/callback',
   '/auth/confirm',
 ]);
@@ -21,6 +22,8 @@ const PUBLIC_PATHS = new Set([
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname.startsWith('/login/')) return true;
+  if (pathname.startsWith('/trial/')) return true;
+  if (process.env['NODE_ENV'] !== 'production' && pathname.startsWith('/e2e/')) return true;
   // Allow static assets and API routes
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) return true;
   // Allow static file extensions only (not arbitrary dots in paths)
@@ -82,9 +85,10 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const hasJakJwt = Boolean(request.cookies.get('jak-auth-token')?.value);
 
   // If user is NOT logged in and trying to access a protected route → redirect to /login
-  if (!user && !isPublicPath(pathname)) {
+  if (!user && !hasJakJwt && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirectTo', pathname);

@@ -1,8 +1,9 @@
 /**
  * Benchmark harness — runtime parity testing for the OpenAI-first migration.
  *
- * Phase 8 of the migration. Required to gate the deletion of Gemini and
- * Anthropic adapters per docs/architecture/execution-engines.md.
+ * Phase 8 of the migration. The Gemini/Anthropic adapters have been
+ * deleted; this harness now compares OpenAI runtime changes against
+ * fixtures and prior benchmark reports.
  *
  * Public API:
  *   - runHarness({ scenarios, runtimes, buildContext }) → BenchmarkReport
@@ -14,7 +15,6 @@
  *   const report = await runHarness({
  *     scenarios: PERSONA_CORE_SCENARIOS,
  *     runtimes: [
- *       { name: 'legacy', impl: new LegacyRuntime(...) },
  *       { name: 'openai', impl: new OpenAIRuntime() },
  *     ],
  *     buildContext: () => new AgentContext({ tenantId: 'bench', userId: 'bench', ... }),

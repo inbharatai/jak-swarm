@@ -52,7 +52,7 @@ function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
     <div
       role="tablist"
       className={cn(
-        'inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
+        'inline-flex min-h-9 max-w-full flex-wrap items-center justify-start gap-1 rounded-lg bg-muted p-1 text-muted-foreground',
         className,
       )}
       {...props}

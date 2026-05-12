@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { createHash } from 'node:crypto';
 import { type PrismaClient, type Prisma } from '@jak-swarm/db';
 import type { FastifyInstance } from 'fastify';
 import type { AuthSession } from '../types.js';
@@ -12,6 +13,13 @@ import {
 } from '../errors.js';
 
 const BCRYPT_ROUNDS = 12;
+
+// B4 (audit 2026-05-08): SHA-256 of email for collision-event logging.
+// Lets ops see "X register-collision attempts in 5 minutes for the same
+// email" without storing the email cleartext in logs.
+function hashEmailForLog(email: string): string {
+  return createHash('sha256').update(email.toLowerCase()).digest('hex').slice(0, 16);
+}
 
 interface SupabaseIdentity {
   id: string;
@@ -52,12 +60,24 @@ export class AuthService {
       throw new ConflictError(`Tenant slug '${tenantSlug}' is already taken`);
     }
 
-    // Check for duplicate email across the whole system
+    // Check for duplicate email across the whole system.
+    //
+    // B4 (audit 2026-05-08): do NOT echo the email back in the error
+    // message — that creates an enumeration oracle (an attacker can
+    // probe arbitrary emails and learn which are registered). The
+    // generic message + same status code matches the pattern we use
+    // on /login (where wrong-email and wrong-password are deliberately
+    // indistinguishable). Logging at warn level so a real abuse
+    // pattern is still detectable in observability.
     const existingUser = await this.db.user.findFirst({
       where: { email: email.toLowerCase() },
     });
     if (existingUser) {
-      throw new ConflictError(`Email '${email}' is already registered`);
+      this.fastify.log.warn(
+        { event: 'register_email_collision', emailHash: hashEmailForLog(email) },
+        'Register attempted with already-registered email',
+      );
+      throw new ConflictError('Registration could not be completed.');
     }
 
     const hashedPassword = await this.hashPassword(password);

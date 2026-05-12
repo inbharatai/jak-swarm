@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Syne, JetBrains_Mono } from 'next/font/google';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from '@/lib/theme';
 import { AppShell } from '@/components/layout/AppShell';
 import { ToastProvider } from '@/components/ui/toast';
 import { CommandPalette } from '@/components/CommandPalette';
@@ -73,7 +73,6 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange
         >
           <ToastProvider>
             <AppShell>{children}</AppShell>

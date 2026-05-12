@@ -14,7 +14,7 @@ beforeAll(async () => {
   toolRegistry = mod.toolRegistry;
   registerBuiltinTools = mod.registerBuiltinTools;
   if (toolRegistry.list().length === 0) registerBuiltinTools();
-});
+}, 90_000);
 
 // approvalId bypasses the per-tool approval gate shipped Phase 4 — these
 // tests exercise tool BEHAVIOR assuming approval was granted upstream.

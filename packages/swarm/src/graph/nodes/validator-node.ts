@@ -1,4 +1,4 @@
-import type { ToolCall } from '@jak-swarm/shared';
+import { WorkflowStatus, type ToolCall } from '@jak-swarm/shared';
 import type { VerificationResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
@@ -119,6 +119,16 @@ function checkGrounding(
   return warnings;
 }
 
+function terminalStatusForValidation(state: SwarmState): WorkflowStatus {
+  const hasFailedPlanTask = state.plan?.tasks?.some((task) => task.status === 'FAILED') ?? false;
+  const hasFailedVerification = Object.values(state.verificationResults ?? {}).some(
+    (result) => result && result.passed === false && result.needsRetry === false,
+  );
+  return hasFailedPlanTask || hasFailedVerification
+    ? WorkflowStatus.FAILED
+    : WorkflowStatus.COMPLETED;
+}
+
 // ─── Main Validator Node ─────────────────────────────────────────────────────
 
 /**
@@ -135,11 +145,11 @@ function checkGrounding(
 export async function validatorNode(state: SwarmState): Promise<Partial<SwarmState>> {
   // ── Disabled via env ─────────────────────────────────────────────────────
   if (process.env['JAK_DOUBLE_VALIDATION'] === 'false') {
-    return {};
+    return { status: terminalStatusForValidation(state) };
   }
 
   const task = getCurrentTask(state);
-  if (!task) return {};
+  if (!task) return { status: terminalStatusForValidation(state) };
 
   const taskOutput = state.taskResults[task.id];
   const verificationResult: VerificationResult | undefined =
@@ -148,7 +158,7 @@ export async function validatorNode(state: SwarmState): Promise<Partial<SwarmSta
   // Only run when verifier has already PASSED. If verifier failed, no point
   // in double-checking — the task is already flagged.
   if (!verificationResult?.passed) {
-    return {};
+    return { status: terminalStatusForValidation(state) };
   }
 
   const warnings: ValidationWarning[] = [];
@@ -222,7 +232,7 @@ export async function validatorNode(state: SwarmState): Promise<Partial<SwarmSta
   // ── Build result ──────────────────────────────────────────────────────────
   if (warnings.length === 0) {
     // Clean bill of health — no state changes needed
-    return {};
+    return { status: terminalStatusForValidation(state) };
   }
 
   // Attach warnings to the task result but do NOT fail the task.
@@ -258,5 +268,6 @@ export async function validatorNode(state: SwarmState): Promise<Partial<SwarmSta
   return {
     verificationResults: { [task.id]: updatedVerification },
     plan: updatedPlan,
+    status: terminalStatusForValidation(state),
   };
 }

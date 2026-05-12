@@ -181,6 +181,14 @@ async function unpauseWorkflow(fastify: Parameters<FastifyPluginAsync>[0], ctx: 
 
   // Broadcast unpause signal — whichever instance holds the paused workflow will resume it
   // under a distributed lock. Local unpauseWorkflow is idempotent and kept for single-instance path.
+  const pendingApproval = await fastify.db.approvalRequest.findFirst({
+    where: { workflowId, tenantId: ctx.tenantId, status: 'PENDING' },
+    select: { id: true },
+  });
+  if (pendingApproval) {
+    return `Workflow ${workflowId} is waiting for approval ${pendingApproval.id}. Use approve/reject; generic resume cannot bypass approval.`;
+  }
+
   fastify.swarm.unpauseWorkflow(workflowId);
   await fastify.coordination.signals.publish({
     type: 'unpause',

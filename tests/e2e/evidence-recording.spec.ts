@@ -30,17 +30,16 @@ test('evidence: standing-orders + schedules user walk-through', async ({ page })
   // is set. The page auto-resolves to the dev user; no /login
   // round-trip needed.
 
-  // 1. Land on the cockpit (chat).
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-
-  // 2. Visit the new Standing Orders panel.
+  // 1. Visit the Standing Orders panel.
   await page.goto('/standing-orders', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: /standing orders/i })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Standing Orders', exact: true })).toBeVisible({
     timeout: 15_000,
   });
 
   // 3. Open the create dialog so the recording shows the form fields.
-  await page.getByTestId('standing-orders-new-btn').click();
+  const createButton = page.getByRole('button', { name: /new standing order|create standing order/i }).last();
+  await expect(createButton).toBeVisible({ timeout: 10_000 });
+  await createButton.click();
   await expect(page.getByTestId('standing-order-name-input')).toBeVisible({
     timeout: 5_000,
   });

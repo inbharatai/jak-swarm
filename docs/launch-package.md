@@ -1,6 +1,6 @@
 # JAK Swarm — Product Hunt Launch Package
 
-> Generated: 2026-04-06
+> Generated: 2026-04-06. Updated for product truth on 2026-05-10: current runtime is OpenAI-only (GPT-5.5/GPT-5.4) with LangGraph orchestration and 122 classified tools.
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### Description (258 chars)
 ```
-JAK Swarm is an open-source multi-agent AI platform with 38 specialized agents, 119 tools, and 6 LLM providers. Give it a goal — it plans, executes, and verifies complex business workflows autonomously, with human-in-the-loop approval gates for high-risk actions.
+JAK Swarm is an open-source multi-agent AI control plane with 38 specialized agents, 122 classified tools, and OpenAI-only model execution. Give it a goal — it plans, executes, verifies, pauses for human approval on high-risk actions, and records audit evidence.
 ```
 
 ### First Comment (Maker's Comment)
@@ -30,11 +30,11 @@ The core idea is a two-tier swarm: **Orchestrators** that think and plan, and **
 
 **What makes it different from CrewAI / LangGraph / Devin:**
 
-- **CrewAI/LangGraph** are frameworks for building agents — you still have to wire everything together, write the prompts, define the tools. JAK Swarm is a *platform*: 38 agents and 119 tools are already built, configured, and policy-governed. You bring the goal.
+- **CrewAI/LangGraph** are frameworks for building agents — you still have to wire everything together, write the prompts, define the tools. JAK Swarm is a *platform*: 38 agents and 122 classified tools are already built, configured, and policy-governed. You bring the goal.
 - **Devin** is a brilliant software engineer. JAK Swarm is a company operations platform. Different jobs — email routing, CRM updates, document workflows, customer support triage, scheduling, research synthesis.
 - **The approval gate** is the thing I haven't seen done properly anywhere else. High-risk tasks pause and notify a human reviewer before executing. You can configure the threshold per tenant and per industry. Healthcare? Approval required at MEDIUM risk. Internal ops? Only CRITICAL. This is what makes it safe enough to actually run unsupervised.
 
-**The tech stack** (for the engineers here): TypeScript monorepo, Next.js frontend, Fastify API server, PostgreSQL + Prisma, Redis, pgvector for RAG, and a custom DAG-based swarm runner. Temporal-ready workflow packages exist in the repo, but the main API execution path currently runs in-process. The workflow execution graph is visualised in real-time in the UI via React Flow.
+**The tech stack** (for the engineers here): TypeScript monorepo, Next.js frontend, Fastify API server, PostgreSQL + Prisma, Redis, pgvector for RAG, OpenAI Responses API, and LangGraph-backed workflow orchestration with persisted checkpoints. The workflow execution graph is visualised in real-time in the UI via React Flow.
 
 **What's working today:** The full agent swarm, tool registry (email, calendar, CRM, documents, spreadsheets, browser automation, research, knowledge base), multi-tenant isolation, approval workflows, voice interface (OpenAI Realtime API), industry packs for 11 verticals, and the 3-tier skill extension system.
 
@@ -52,7 +52,7 @@ Would love questions, feedback, and brutal honesty in the comments. This is v1 �
 The trace viewer showing a live workflow execution graph built with React Flow. Nodes are the agents (Commander → Planner → Router → Worker Email / Worker CRM in parallel → Verifier → Commander). Each node shows status (running/completed/pending approval) with latency. This is the "wow moment" — you can watch your company run itself in real time.
 
 **Screenshot 2 — Integrations Page**
-A grid of all connected tools and providers: Gmail, Google Calendar, Google Docs, Google Sheets, Salesforce, HubSpot, Pipedrive, Slack, Playwright Browser, Tavily Research, Pinecone, pgvector — with enabled/disabled toggles per tenant. Showcases the breadth of the 119 tools.
+A grid of connected tools and integrations: Gmail, Google Calendar, Google Docs, Google Sheets, Salesforce, HubSpot, Pipedrive, Slack, Playwright Browser, Tavily Research, Pinecone, pgvector — with enabled/disabled toggles per tenant. Showcases the breadth of the 122 classified tools without implying every connector is equally mature.
 
 **Screenshot 3 — Agent Activity Tracker**
 The live agent run log: a scrolling timeline of agent steps, tool calls, handoffs, and results. Each row shows the agent role, action taken, duration, and a snippet of the result. Guardrail verdicts (ALLOW/WARN/BLOCK) appear inline. Makes the "black box" completely transparent.
@@ -74,8 +74,8 @@ The human-in-the-loop approval UI. A pending approval card shows: the workflow t
 I built an open-source platform with 38 AI agents that runs your company autonomously.
 
 Not a demo. Not a framework. A production-grade system with:
-• 119 tools
-• 6 LLM providers
+• 122 classified tools
+• OpenAI-only GPT-5.5/GPT-5.4 runtime
 • Human approval gates for high-risk actions
 • Full execution trace
 
@@ -162,7 +162,7 @@ For the engineers:
 
 • Next.js (web)
 • Fastify (API — port 4000)
-• Custom DAG-based swarm execution engine
+• LangGraph-backed workflow orchestration
 • PostgreSQL + Prisma + pgvector
 • Redis (queues, sessions, rate limits)
 • React Flow (live execution DAG)
@@ -222,11 +222,11 @@ The execution backbone today is the in-process swarm execution service. Workflow
 
 **The tech stack:**
 - TypeScript monorepo (pnpm workspaces + Turborepo)
-- Next.js frontend with React Flow for live execution DAG visualisation
+- Next.js frontend with React Flow for live execution graph visualisation
 - Fastify API server
 - PostgreSQL + Prisma ORM + pgvector for RAG
 - Redis for job queues, sessions, and rate limiting
-- Custom swarm graph + provider router as the agent runner
+- LangGraph runtime + OpenAI runtime as the agent execution path
 
 **The piece I haven't seen elsewhere — the Guardrail + Approval gate:**
 
@@ -234,7 +234,7 @@ Every plan is validated by a Guardrail agent before execution. Every tool call r
 
 **Industry packs** are declarative config objects (not code) that customise agent behaviour for specific verticals — healthcare, legal, finance, recruiting, etc. They inject compliance rules into the Guardrail, constrain which tool categories are available, supplement agent prompts with domain context, and set default approval thresholds. Adding a new industry is purely a config change.
 
-**What's working:** Full agent swarm, 119 tools across 10 categories, multi-tenant isolation (row-level in Postgres, namespace-level in Redis), voice interface via OpenAI Realtime API, 3-tier skill extension system with sandbox execution and human review, 13 industry packs.
+**What's working:** Full agent swarm, 122 classified tools across 10 categories, multi-tenant isolation (row-level in Postgres, namespace-level in Redis), voice interface via OpenAI Realtime API, 3-tier skill extension system with sandbox execution and human review, and industry packs.
 
 **What's honestly not done yet:** Kubernetes manifests (Phase 2 target), Prometheus metrics integration, a few CRM adapters, and the public hosted version. This is v1 — I'm shipping the core, not vaporware.
 
@@ -269,7 +269,7 @@ A two-tier swarm. Orchestrators (Commander, Planner, Router, Verifier, Guardrail
 
 **Multi-agent coordination** uses structured handoffs rather than direct function calls. Each handoff is logged. Circular handoff detection prevents infinite loops. Workers can't call other workers — all coordination routes through the Router.
 
-Currently supports 6 LLM providers, 119 tools, 38 agents, 11 industry packs.
+Currently supports OpenAI-only model execution, 122 classified tools, 38 agents, and industry packs.
 
 **GitHub:** https://github.com/inbharatai/jak-swarm
 
@@ -308,7 +308,7 @@ If you're working on something similar or have feedback, I'm all ears. The solo 
 
 Just shipped an open-source project and wanted to share the tech stack decisions with r/webdev since I made some unconventional choices that might be interesting.
 
-**Project:** JAK Swarm — an autonomous multi-agent AI platform. 38 agents, 119 tools. The frontend visualises the live workflow execution graph as it runs.
+**Project:** JAK Swarm — an autonomous multi-agent AI control plane. 38 agents, 122 classified tools. The frontend visualises the live workflow execution graph as it runs.
 
 **The stack:**
 
@@ -318,8 +318,8 @@ The main app is Next.js. The most interesting piece is the workflow trace viewer
 **API — Fastify on Node.js**
 The API is built on Fastify with TypeScript. It handles auth, tenant isolation, approval flows, scheduling, Swagger generation in non-production environments, and the SSE streams that keep the execution graph live in the UI.
 
-**Orchestration — Custom DAG Runner**
-The current execution path runs through a custom DAG-based swarm runner that handles planning, routing, approvals, retries, and verifier-driven repair cycles. Temporal-ready workflow packages exist in the repo for future distributed execution, but they're not the main runtime path today.
+**Orchestration — LangGraph Runtime**
+The current execution path runs through a LangGraph-backed workflow runtime that handles planning, routing, approvals, retries, and verifier-driven repair cycles with persisted checkpoints.
 
 **Database — PostgreSQL + Prisma + pgvector**
 Standard Prisma setup. Added `pgvector` for the knowledge base RAG queries — semantic search over tenant documents without spinning up a separate vector DB. The multi-tenant isolation is all row-level (every table has `tenantId`, enforced at the repository layer).
@@ -346,7 +346,7 @@ Hi [Newsletter Name] team,
 
 I wanted to pitch a story that I think fits your audience well.
 
-**What I built:** JAK Swarm — an open-source autonomous multi-agent AI platform with 38 specialised agents, 119 tools, and 6 LLM providers. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
+**What I built:** JAK Swarm — an open-source autonomous multi-agent AI control plane with 38 specialised agents, 122 classified tools, and OpenAI-only model execution. It's designed to run real business operations (email, CRM, documents, scheduling, research, customer support) without requiring users to build or configure agents themselves.
 
 **Why it's different from what's already been covered:**
 
@@ -356,9 +356,9 @@ The key innovation is the trust model. Before any consequential action — sendi
 
 **The numbers that might interest your readers:**
 - 38 agents across two tiers (orchestrators + workers)
-- 119 tools spanning email, calendar, CRM, documents, spreadsheets, browser automation, research, and voice
+- 122 classified tools spanning email, calendar, CRM, documents, spreadsheets, browser automation, research, and voice
 - 13 industry packs (healthcare, legal, finance, recruiting, and more) with pre-configured compliance rules
-- Runs through an in-process DAG execution engine with persisted workflow state
+- Runs through LangGraph-backed orchestration with persisted workflow state
 
 **Links:**
 - GitHub: https://github.com/inbharatai/jak-swarm
@@ -388,7 +388,7 @@ Builder, JAK Swarm
 
 Hi Swyx — longtime listener of Latent Space. Your episode on agent frameworks and the "AI Engineer" role framing shaped a lot of how I thought about what I was building.
 
-I just open-sourced JAK Swarm — a 38-agent autonomous platform for business operations. The angle that might interest you specifically: it uses a DAG-based execution engine with persisted workflow state, approval gates, and verifier-driven repair loops to make multi-agent systems usable in production.
+I just open-sourced JAK Swarm — a 38-agent autonomous platform for business operations. The angle that might interest you specifically: it uses LangGraph-backed orchestration with persisted workflow state, approval gates, and verifier-driven repair loops to make multi-agent systems usable in production.
 
 I've also been thinking hard about the Guardrail design — a stateless policy agent that intercepts every plan before execution and every tool result after. Would love your take on whether this is the right abstraction or if there's a better approach.
 
@@ -402,7 +402,7 @@ GitHub: github.com/inbharatai/jak-swarm. No ask — just thought it might be gen
 
 Hi Yohei — BabyAGI was the thing that convinced me multi-agent systems could actually work. I've been building on that intuition.
 
-JAK Swarm is an open-source platform that takes the "task-driven autonomous agent" concept and operationalises it for business workflows — email, CRM, documents, scheduling, voice. 38 agents, 119 tools, with a production Fastify API and DAG-based orchestration.
+JAK Swarm is an open-source platform that takes the "task-driven autonomous agent" concept and operationalises it for business workflows — email, CRM, documents, scheduling, voice. 38 agents, 122 classified tools, with a Fastify API and LangGraph-backed orchestration.
 
 The piece I think you'd find interesting: the Verifier agent. After all tasks complete, it re-evaluates the combined output against the original goal, checks cross-task consistency (did the CRM update match the email that was sent?), and can trigger a remediation cycle if there are gaps. It's an attempt to solve the "agent hallucination compounds across steps" problem.
 
@@ -448,7 +448,7 @@ Hi Greg — your LangChain tutorials and chunking research have been genuinely u
 
 I just launched JAK Swarm on Product Hunt — an open-source multi-agent platform with a built-in Knowledge Worker agent that does RAG over tenant documents. The approach: pgvector in Postgres (no separate vector DB), semantic + full-text hybrid search, source citations on every answer, access-level tags (CONFIDENTIAL docs don't surface to END_USER roles).
 
-The broader platform is 38 agents, 119 tools, Temporal for orchestration. Would love your take on the RAG implementation specifically — I suspect there are better chunking approaches for the mixed document types (contracts, support tickets, policies) that the knowledge base ingests.
+The broader platform is 38 agents, 122 classified tools, and LangGraph-backed orchestration. Would love your take on the RAG implementation specifically — I suspect there are better chunking approaches for the mixed document types (contracts, support tickets, policies) that the knowledge base ingests.
 
 GitHub: github.com/inbharatai/jak-swarm
 

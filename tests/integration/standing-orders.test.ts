@@ -115,6 +115,15 @@ function makeStubDb(opts: {
         });
       },
     },
+    // P0-7 (audit 2026-05-08): the scheduler now consults the trial
+    // usage-counter before firing. Test tenants are treated as paid
+    // plans (no subscription row → cap check returns allowed=true).
+    subscription: {
+      findUnique: async () => null,
+      update: async () => null,
+      updateMany: async () => ({ count: 0 }),
+      upsert: async () => null,
+    },
   };
 }
 

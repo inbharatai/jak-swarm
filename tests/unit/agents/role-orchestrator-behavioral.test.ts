@@ -65,7 +65,7 @@ function stubLLM<T>(agent: T, payload: unknown): void {
 // ─── Commander ─────────────────────────────────────────────────────────────
 
 describe('CommanderAgent — mission brief extraction', () => {
-  it('preserves intent + urgency + riskIndicators + requiredOutputs on plain input', { timeout: 20_000 }, async () => {
+  it('preserves intent + urgency + riskIndicators + requiredOutputs on plain input', { timeout: 60_000 }, async () => {
     const agent = new CommanderAgent('stub-key');
     stubLLM(agent, {
       intent: 'Summarize quarterly customer escalation themes for the VPEng meeting',

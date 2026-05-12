@@ -427,6 +427,7 @@ export class CEOOrchestratorService {
 
     const runtime = new OpenAIRuntime({ tier: 2 });
     const context = new AgentContext({
+      agentRole: 'CEO_SUMMARY',
       tenantId: input.tenantId,
       userId: 'ceo-summary',
       workflowId: input.workflowId,

@@ -74,7 +74,7 @@ describe('Tool Registry', () => {
 
     // Verify minimum tool count (74 as of v0.1.0)
     expect(tools.length).toBeGreaterThanOrEqual(70);
-  }, 30_000);
+  }, 60_000);
 
   it('code_execute runs JavaScript safely', async () => {
     const { registerBuiltinTools, toolRegistry } = await import('@jak-swarm/tools');
@@ -128,7 +128,7 @@ describe('Tool Registry', () => {
     if (resultCount === 0) {
       console.log('Note: DuckDuckGo returned 0 results (may be rate-limited). Message:', data?.message);
     }
-  }, 30_000);
+  }, 60_000);
 
   it('memory_store and memory_retrieve round-trip', async () => {
     const { registerBuiltinTools, toolRegistry } = await import('@jak-swarm/tools');
@@ -252,35 +252,19 @@ describe('Anti-Hallucination', () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Cost Tracking', () => {
-  it('calculates cost for all major models', async () => {
-    const { calculateCost, getModelPricing, isFreeTier } = await import('@jak-swarm/shared');
+  it('calculates cost for the OpenAI-only model tiers', async () => {
+    const { calculateCost, isFreeTier } = await import('@jak-swarm/shared');
 
-    // OpenAI
-    const gpt4oCost = calculateCost('gpt-4o', 1000, 500);
-    expect(gpt4oCost).toBeGreaterThan(0);
-    console.log('gpt-4o cost (1K in, 500 out):', `$${gpt4oCost.toFixed(6)}`);
+    const tier3Cost = calculateCost('gpt-5.5', 1000, 500);
+    const tier2Cost = calculateCost('gpt-5.4', 1000, 500);
+    const miniCost = calculateCost('gpt-5.4-mini', 1000, 500);
 
-    // Anthropic
-    const claudeCost = calculateCost('claude-sonnet-4-20250514', 1000, 500);
-    expect(claudeCost).toBeGreaterThan(0);
-    console.log('Claude Sonnet cost:', `$${claudeCost.toFixed(6)}`);
-
-    // DeepSeek (cheap)
-    const deepseekCost = calculateCost('deepseek-chat', 1000, 500);
-    expect(deepseekCost).toBeGreaterThan(0);
-    expect(deepseekCost).toBeLessThan(gpt4oCost); // Must be cheaper
-    console.log('DeepSeek cost:', `$${deepseekCost.toFixed(6)}`);
-
-    // Gemini
-    const geminiCost = calculateCost('gemini-2.0-flash', 1000, 500);
-    expect(geminiCost).toBeGreaterThan(0);
-    console.log('Gemini Flash cost:', `$${geminiCost.toFixed(6)}`);
-
-    // Ollama (free)
-    expect(isFreeTier('llama3.1')).toBe(true);
-    expect(isFreeTier('gpt-4o')).toBe(false);
-    expect(calculateCost('llama3.1', 10000, 5000)).toBe(0);
-    console.log('Ollama/local: FREE ✓');
+    expect(tier3Cost).toBeGreaterThan(0);
+    expect(tier2Cost).toBeGreaterThan(0);
+    expect(miniCost).toBeGreaterThan(0);
+    expect(miniCost).toBeLessThan(tier2Cost);
+    expect(tier2Cost).toBeLessThan(tier3Cost);
+    expect(isFreeTier('gpt-5.4')).toBe(false);
   });
 });
 

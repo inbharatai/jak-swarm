@@ -1,21 +1,21 @@
 # JAK Swarm — Production Deployment Guide
 
-## Topology at a glance (Vercel + Render-split + Supabase + Upstash)
+## Active beta topology (Vercel + Railway + Supabase + Upstash)
 
-This is the exact topology the committed `render.yaml` ships. Every env var, healthcheck, and dashboard step below targets this stack — not a generic "cloud" deploy.
+The active beta path is Vercel for the frontend, Railway for the API and worker, Supabase Postgres for pgvector-backed state, and Upstash Redis for queue/signals/cache. See [`docs/railway-deployment.md`](railway-deployment.md) for the step-by-step Railway runbook.
 
 | Piece | Where | What runs |
 |---|---|---|
-| `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the Render API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
-| `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Render** `jak-swarm-api` (web service, public) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
-| `apps/api/dist/worker-entry.js` (durable queue consumer) | **Render** `jak-swarm-worker` (pserv, private) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
+| `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the Railway API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
+| `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Railway** `jak-swarm-api` (public service) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
+| `apps/api/dist/worker-entry.js` (durable queue consumer) | **Railway** `jak-swarm-worker` (private/background service) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
 | Postgres (+ pgvector) | **Supabase** | `DATABASE_URL` = pooler:6543, `DIRECT_URL` = direct:5432 (migrations only) |
 | Redis | **Upstash** | `rediss://default:PASS@host.upstash.io:6379` — ioredis handles TLS transparently |
-| Observability | **Render dashboard (built-in)** | Log streaming + service-down email alerts. Adequate pre-launch. |
+| Observability | **Railway logs/metrics + optional Sentry/OTel** | Adequate pre-launch; add Grafana Cloud only after real user load. |
 
-**When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Render's built-in logs + alerts cover the critical failure modes. All config needed to resurrect the observability stack later is committed at `ops/grafana-agent/*` and in `render.yaml` (commented out) — one-liner to re-enable.
+**When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Railway logs/metrics plus Sentry cover the critical failure modes. The old Render blueprint remains as legacy rollback reference only; do not treat it as the active beta path.
 
-**CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. `render.yaml` ships with `https://jakswarm.com,https://www.jakswarm.com`. The split is raw comma — NO spaces after commas ([apps/api/src/config.ts:92](apps/api/src/config.ts:92) splits without trimming).
+**CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. For production beta use `https://jakswarm.com,https://www.jakswarm.com`. The split is raw comma — NO spaces after commas ([apps/api/src/config.ts:92](apps/api/src/config.ts:92) splits without trimming).
 
 **The whole migration runbook** (rotate credentials → provision worker → flip env → import dashboards → smoke test) is documented in [docs/founder-action-list.md](founder-action-list.md). Read it start-to-finish before touching any dashboard.
 
@@ -25,9 +25,9 @@ This is the exact topology the committed `render.yaml` ships. Every env var, hea
 
 JAK ships with ONE binary + TWO runtime roles. The env var `WORKFLOW_WORKER_MODE` picks which role(s) the API process plays. The worker binary (`apps/api/dist/worker-entry.js`) is always the standalone worker.
 
-### Mode B — Two-service (production default, `render.yaml`)
+### Mode B — Two-service (production beta default)
 
-`WORKFLOW_WORKER_MODE=standalone` on the API + separate `jak-swarm-worker` pserv running `node apps/api/dist/worker-entry.js`. This is what the committed `render.yaml` applies.
+`WORKFLOW_WORKER_MODE=standalone` on the API + separate `jak-swarm-worker` service running `node apps/api/dist/worker-entry.js`. This is the Railway beta shape.
 
 - API p95 latency stays flat regardless of queue depth.
 - Worker scales horizontally without touching the API plan.
@@ -36,7 +36,7 @@ JAK ships with ONE binary + TWO runtime roles. The env var `WORKFLOW_WORKER_MODE
 
 ### Mode A — Single-service (development / staging only)
 
-`WORKFLOW_WORKER_MODE=embedded`. One process does HTTP + queue. Legitimate for local dev, staging, or a genuinely tiny deploy. **Not what production runs.** Do not use Mode A on the same Render project as Mode B — the API's embedded worker would race the standalone worker (safe under `FOR UPDATE SKIP LOCKED` but wasteful).
+`WORKFLOW_WORKER_MODE=embedded`. One process does HTTP + queue. Legitimate for local dev, staging, or a genuinely tiny deploy. **Not what production runs.** Do not use Mode A on the same Railway project as Mode B — the API's embedded worker would race the standalone worker (safe under `FOR UPDATE SKIP LOCKED` but wasteful).
 
 ### The critical flip during migration
 
@@ -82,7 +82,7 @@ When deployed as two services, the graph is:
 ```
 
 Reference implementation: `docker-compose.prod.yml` at repo root shows the
-full topology locally. Use it as a template for Kubernetes / ECS / Render /
+full topology locally. Use it as a template for Railway, Kubernetes, ECS, or
 Fly.io deployments.
 
 ## What the application provides (code-side)
@@ -116,7 +116,7 @@ Fly.io deployments.
 | `WORKER_METRICS_PORT` | 9464 | | Port for `/metrics` + `/healthz` + `/ready` |
 | `LOG_LEVEL` | info | | |
 
-Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node apps/api/dist/worker-entry.js` (prod — this is the exact command `render.yaml` sets for `jak-swarm-worker`).
+Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node apps/api/dist/worker-entry.js` (prod).
 
 ---
 
@@ -132,9 +132,9 @@ rediss://default:<PASSWORD>@<db-name>.upstash.io:6379
 - `REQUIRE_REDIS_IN_PROD=true` on both services. Without this, a missing `REDIS_URL` silently degrades to in-memory coordination which breaks cross-instance signals and SSE fan-out ([apps/api/src/config.ts:72](../apps/api/src/config.ts)).
 - Free-tier Upstash limits: 10k commands/day and (tier-dependent) 1 concurrent connection. ioredis reuses one connection per process, so API+Worker = 2 concurrent connections. Paid tier if you exceed.
 
-## Render healthcheck gotcha
+## Legacy Render healthcheck gotcha
 
-The worker pserv's `/healthz` is on **port 9464**, not the default `PORT`. In the Render dashboard, when you create `jak-swarm-worker`, you MUST explicitly set "Health Check Port: 9464". If you leave it blank, Render tries `PORT` (unset on worker) and enters a restart loop that looks like a build failure. `render.yaml` can't express this yet — it's a dashboard-only field — so verify in the UI after `render blueprint apply`.
+Render is no longer the active beta target. If you keep Render as rollback, remember the worker pserv's `/healthz` is on **port 9464**, not the default `PORT`.
 
 ## CORS_ORIGINS gotcha
 
@@ -338,7 +338,6 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 | Variable | Feature |
 |---|---|
 | `REDIS_URL` | Session cache, rate limiting, voice |
-| `ANTHROPIC_API_KEY` | Claude models |
 | `HUBSPOT_API_KEY` | CRM integration |
 | `GITHUB_PAT` | Repo creation, PR review, code push |
 | `VERCEL_TOKEN` | App deployment |

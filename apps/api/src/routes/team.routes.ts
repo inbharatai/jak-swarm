@@ -125,9 +125,33 @@ const teamRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (!existing) throw new NotFoundError('Department', id);
 
-      // Cycle-prevention: a department cannot be its own ancestor.
-      if (parsed.data.parentId === id) {
-        throw new ValidationError('A department cannot be its own parent');
+      // P0-8 (audit 2026-05-08): full ancestor-cycle prevention.
+      // Direct self-parent (A→A) is one case. Indirect cycles are A→B→C→A
+      // and arbitrary depth. Walk parent chain from the proposed parent and
+      // refuse if we ever encounter `id` (the dept being updated). Cap the
+      // walk depth at 64 to avoid pathological loops if a cycle was somehow
+      // already inserted by an older code path.
+      if (parsed.data.parentId !== undefined && parsed.data.parentId !== null) {
+        if (parsed.data.parentId === id) {
+          throw new ValidationError('A department cannot be its own parent');
+        }
+        let cursor: string | null = parsed.data.parentId;
+        const seen = new Set<string>();
+        for (let i = 0; i < 64 && cursor; i++) {
+          if (cursor === id) {
+            throw new ValidationError('Reparenting would create a cycle in the org chart');
+          }
+          if (seen.has(cursor)) {
+            throw new ValidationError('Existing parent chain already contains a cycle (data corruption — contact admin)');
+          }
+          seen.add(cursor);
+          const parent: { parentId: string | null } | null = await fastify.db.department.findFirst({
+            where: { id: cursor, tenantId },
+            select: { parentId: true },
+          });
+          if (!parent) throw new ValidationError('parentId is not in this tenant');
+          cursor = parent.parentId;
+        }
       }
 
       const dept = await fastify.db.department.update({

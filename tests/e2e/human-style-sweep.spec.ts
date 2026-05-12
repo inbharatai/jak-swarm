@@ -85,6 +85,7 @@ async function visitAndCapture(page: Page, surface: Surface, theme: 'light' | 'd
 }
 
 test.describe('Human-style A-to-Z product sweep', () => {
+  test.setTimeout(180_000);
   test('desktop light theme — visit every surface, screenshot each', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.emulateMedia({ colorScheme: 'light' });
@@ -171,7 +172,7 @@ test.describe('Layman UX guarantee — ConnectModal across providers', () => {
       // Find the connect button for this provider. The integration card
       // shows "Connect" when not connected; this is the dev tenant so
       // nothing is connected → all providers offer Connect.
-      const connectButton = page.getByRole('button', { name: /^connect$/i }).first();
+      const connectButton = page.getByTestId(`connect-${provider}`);
       const visible = await connectButton.isVisible().catch(() => false);
       if (!visible) {
         // Some surfaces don't render in the suspended preview; soft-skip.
@@ -180,8 +181,9 @@ test.describe('Layman UX guarantee — ConnectModal across providers', () => {
       }
       await connectButton.click();
 
-      // Wait for modal.
-      await page.waitForTimeout(1_500);
+      const dialog = page.getByRole('dialog', { name: /connect\s+/i });
+      await expect(dialog).toBeVisible({ timeout: 10_000 });
+      await expect(dialog.getByText(/JAK can/i)).toBeVisible({ timeout: 10_000 });
 
       // Capture screenshot of the layman default view.
       await page.screenshot({
@@ -189,7 +191,7 @@ test.describe('Layman UX guarantee — ConnectModal across providers', () => {
         fullPage: false,
       });
 
-      const visibleText = await page.locator('[role="dialog"]').innerText().catch(() => '');
+      const visibleText = await dialog.innerText().catch(() => '');
 
       for (const term of FORBIDDEN_TERMS) {
         expect(

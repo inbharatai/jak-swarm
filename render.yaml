@@ -23,7 +23,7 @@
 #
 # Required secrets (set in Render dashboard — sync: false entries):
 #   DATABASE_URL, DIRECT_URL, AUTH_SECRET, REDIS_URL,
-#   OPENAI_API_KEY, ANTHROPIC_API_KEY (and whichever other LLM keys you use),
+#   OPENAI_API_KEY,
 #   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
 #   GRAFANA_CLOUD_PROM_URL, GRAFANA_CLOUD_PROM_USER, GRAFANA_CLOUD_PROM_API_KEY
 # ────────────────────────────────────────────────────────────────────────────
@@ -78,16 +78,6 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: OPENAI_API_KEY
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: OLLAMA_BASE_URL
         sync: false
 
   # ────────────────────────────────────────────────────────────────────
@@ -147,16 +137,6 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: OPENAI_API_KEY
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: OLLAMA_BASE_URL
         sync: false
 
   # ────────────────────────────────────────────────────────────────────
