@@ -36,17 +36,17 @@ jobs:
         run: pnpm --filter @jak-swarm/db exec prisma generate
 
       - name: Build all packages (dependency order)
-        # @jak-swarm/db MUST build before tools: Track 2's find_document tool
-        # imports Prisma's `prisma` singleton from @jak-swarm/db for the
-        # TenantDocument name/tag lookup path. Keeping db out of the build
-        # order produces a "Cannot find module '@jak-swarm/db'" TS2307 error.
+        # @jak-swarm/security MUST build before db: workflow encryption
+        # extensions import field-cipher helpers from @jak-swarm/security.
+        # @jak-swarm/db MUST still build before tools because Track 2's
+        # find_document tool imports Prisma's `prisma` singleton from db.
         run: |
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/security build
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
-          pnpm --filter @jak-swarm/security build
           # @jak-swarm/skills MUST build before @jak-swarm/agents — agents
           # imports it via `await import('@jak-swarm/skills')` in
           # `BaseAgent.injectBundledSkills` and TS needs the .d.ts to resolve
@@ -120,9 +120,9 @@ jobs:
           pnpm --filter @jak-swarm/shared build
           pnpm --filter @jak-swarm/industry-packs build
           pnpm --filter @jak-swarm/verification build
+          pnpm --filter @jak-swarm/security build
           pnpm --filter @jak-swarm/db build
           pnpm --filter @jak-swarm/tools build
-          pnpm --filter @jak-swarm/security build
           # @jak-swarm/skills before @jak-swarm/agents — see Build & Typecheck
           # job for rationale (BaseAgent.injectBundledSkills dynamic import).
           pnpm --filter @jak-swarm/skills build
