@@ -30,7 +30,7 @@
     "@langchain/langgraph-checkpoint": "^1.0.1",
     "@playwright/test": "^1.50.1",
     "@temporalio/client": "^1.11.6",
-    "@temporalio/testing": "^1.11.6",
+    "@temporalio/testing": "^1.17.2",
     "@temporalio/worker": "^1.11.6",
     "@temporalio/workflow": "^1.11.6",
     "@types/node": "^22.10.7",
@@ -41,7 +41,7 @@
     "sharp": "^0.34.0",
     "tesseract.js": "^5.1.0",
     "testcontainers": "^10.13.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.22.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
