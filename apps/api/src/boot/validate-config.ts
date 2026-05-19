@@ -123,6 +123,39 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
     });
   }
 
+  if (isProd && !process.env['METRICS_TOKEN']) {
+    results.push({
+      name: 'METRICS_TOKEN',
+      status: 'error',
+      message: 'METRICS_TOKEN is not set — production /metrics must require a bearer token',
+    });
+  }
+
+  if (isProd && (!config.supabaseUrl || !config.supabaseAnonKey)) {
+    results.push({
+      name: 'SUPABASE_PUBLIC_KEYS',
+      status: 'error',
+      message: 'NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required for production auth and storage flows',
+    });
+  }
+
+  if (isProd && !config.supabaseServiceRoleKey) {
+    results.push({
+      name: 'SUPABASE_SERVICE_ROLE_KEY',
+      status: 'error',
+      message: 'SUPABASE_SERVICE_ROLE_KEY is required for production artifact/document storage writes',
+    });
+  }
+
+  const evidenceSecret = process.env['EVIDENCE_SIGNING_SECRET']?.trim();
+  if (isProd && (!evidenceSecret || evidenceSecret.length < 16)) {
+    results.push({
+      name: 'EVIDENCE_SIGNING_SECRET',
+      status: 'error',
+      message: 'EVIDENCE_SIGNING_SECRET must be set to at least 16 characters for tamper-evident bundles',
+    });
+  }
+
   // -----------------------------------------------------------------------
   // 6. Observability
   // -----------------------------------------------------------------------

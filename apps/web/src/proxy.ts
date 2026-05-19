@@ -23,6 +23,8 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname.startsWith('/login/')) return true;
   if (pathname.startsWith('/trial/')) return true;
+  if (pathname.startsWith('/auditor/accept/')) return true;
+  if (pathname === '/auditor/runs' || pathname.startsWith('/auditor/runs/')) return true;
   if (process.env['NODE_ENV'] !== 'production' && pathname.startsWith('/e2e/')) return true;
   // Allow static assets and API routes
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) return true;

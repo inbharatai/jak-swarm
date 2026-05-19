@@ -196,7 +196,7 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
         // Enqueue the resume as a durable control job so the reviewer gets an
         // immediate response AND the resume survives an API crash between now and
         // the actual swarm run.
-        fastify.swarm.enqueueControl({
+        const enqueued = await fastify.swarm.enqueueControl({
           action: 'resume',
           workflowId: approval.workflowId,
           tenantId: request.user.tenantId,
@@ -204,7 +204,11 @@ const approvalsRoutes: FastifyPluginAsync = async (fastify) => {
           decision,
           reviewedBy: request.user.userId,
           comment,
+          approvalId: approval.id,
         });
+        if (!enqueued) {
+          return reply.status(503).send(err('RESUME_ENQUEUE_FAILED', 'Approval was recorded, but workflow resume could not be queued. Try resume again or contact support.'));
+        }
 
         return reply.status(200).send(ok(approval));
       } catch (e) {

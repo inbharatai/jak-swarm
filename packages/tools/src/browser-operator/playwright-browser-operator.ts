@@ -58,6 +58,11 @@ const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
 const MAX_ACCESSIBILITY_TEXT_LEN = 8000;
 
+function chromiumExecutablePath(): string | undefined {
+  const configured = process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH']?.trim();
+  return configured ? configured : undefined;
+}
+
 /**
  * Heuristic keywords that strongly suggest a 2FA / captcha challenge.
  * Not a hard guarantee — but enough to flip `blockedBySecurity = true`
@@ -416,6 +421,7 @@ export class PlaywrightBrowserOperator implements BrowserOperatorService {
 
     const context = await chromium.launchPersistentContext(sessionDataDir, {
       headless: this.headless,
+      executablePath: chromiumExecutablePath(),
       viewport: { width: 1280, height: 800 },
       // No saved-credentials prompts. Disable autofill from prior sessions.
       acceptDownloads: false,

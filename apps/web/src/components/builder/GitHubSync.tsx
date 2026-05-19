@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button, Input, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton, Spinner } from '@/components/ui';
-import { GitBranch, Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Button, Input, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
+import { GitBranch, Upload, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 interface GitHubSyncProps {
   projectId: string;
@@ -16,7 +16,6 @@ export function GitHubSync({ projectId, currentRepo, open, onClose, onSynced }: 
   const [repoUrl, setRepoUrl] = useState(currentRepo ?? '');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [action, setAction] = useState<'push' | 'pull'>('push');
 
   const handleSync = async () => {
     if (!repoUrl.trim()) return;
@@ -26,27 +25,33 @@ export function GitHubSync({ projectId, currentRepo, open, onClose, onSynced }: 
     try {
       // Call the project API to sync with GitHub. Use centralized resolver
       // so the production-misconfig guard fires uniformly (P0-A fix).
-      const { getApiBaseUrl } = await import('@/lib/api-client');
-      const BASE_URL = getApiBaseUrl();
+      const { buildApiUrl } = await import('@/lib/api-client');
+      const { getRawToken } = await import('@/lib/auth');
       const { createClient } = await import('@/lib/supabase');
-      const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
+      let token = getRawToken();
+      if (!token) {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        token = data?.session?.access_token ?? null;
+      }
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
 
-      const response = await fetch(`${BASE_URL}/projects/${projectId}/deploy`, {
+      const response = await fetch(buildApiUrl(`/projects/${projectId}/deploy`), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
-          action: action === 'push' ? 'SYNC_GITHUB' : 'SYNC_GITHUB',
+          action: 'SYNC_GITHUB',
           githubRepo: repoUrl,
         }),
       });
 
       if (response.ok) {
-        setSyncResult({ success: true, message: `${action === 'push' ? 'Pushed to' : 'Pulled from'} GitHub successfully` });
+        setSyncResult({ success: true, message: 'GitHub push queued successfully' });
         onSynced();
       } else {
         const err = await response.json();
@@ -79,28 +84,17 @@ export function GitHubSync({ projectId, currentRepo, open, onClose, onSynced }: 
             <p className="text-[10px] text-muted-foreground mt-1">Enter the repository in owner/repo format</p>
           </div>
 
-          {/* Action toggle */}
+          {/* Action */}
           <div>
             <label className="text-sm font-medium mb-1.5 block">Action</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setAction('push')}
-                className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                  action === 'push' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/30'
-                }`}
-              >
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
                 <Upload className="h-4 w-4" />
                 Push to GitHub
-              </button>
-              <button
-                onClick={() => setAction('pull')}
-                className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                  action === 'pull' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/30'
-                }`}
-              >
-                <Download className="h-4 w-4" />
-                Pull from GitHub
-              </button>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Pull/import is not implemented yet, so JAK only exposes the backed push path.
+              </p>
             </div>
           </div>
 
@@ -121,7 +115,7 @@ export function GitHubSync({ projectId, currentRepo, open, onClose, onSynced }: 
         <Button variant="outline" onClick={onClose}>Cancel</Button>
         <Button onClick={handleSync} disabled={syncing || !repoUrl.trim()} className="gap-1.5">
           {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitBranch className="h-4 w-4" />}
-          {syncing ? 'Syncing...' : action === 'push' ? 'Push' : 'Pull'}
+          {syncing ? 'Syncing...' : 'Push'}
         </Button>
       </DialogFooter>
     </Dialog>

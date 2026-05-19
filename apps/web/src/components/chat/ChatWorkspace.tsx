@@ -190,12 +190,9 @@ export function ChatWorkspace() {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // P0-A: centralized resolver throws/warns in production if URL is missing
-      // or points at localhost. EventSource needs the URL synchronously, so we
-      // import the resolver function (statically bound) rather than the dynamic
-      // helper used in async paths.
-      const { getApiBaseUrl } = await import('@/lib/api-client');
-      const BASE_URL = getApiBaseUrl();
+      // P0-A: use the guarded URL builder so stream setup fails loudly when
+      // production NEXT_PUBLIC_API_URL is missing or points at localhost.
+      const { buildApiUrl } = await import('@/lib/api-client');
       // DEV-ONLY: when the auth bypass is on, skip Supabase entirely
       // and use the literal bypass token. The API's stream route
       // accepts it via the same `?token=` query path the legacy
@@ -212,7 +209,7 @@ export function ChatWorkspace() {
       }
 
       await connectSSE({
-        url: `${BASE_URL}/workflows/${workflow.id}/stream`,
+        url: buildApiUrl(`/workflows/${workflow.id}/stream`),
         token,
         signal: controller.signal,
         onMessage: (event: unknown) => {

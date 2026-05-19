@@ -69,6 +69,21 @@ export function getApiBaseUrl(): string {
   return BASE_URL;
 }
 
+export function ensureApiConfigured(): void {
+  if (!API_MISCONFIGURED) return;
+  throw {
+    message:
+      'Backend API is not configured. ' + (API_MISCONFIGURED_REASON ?? ''),
+    code: 'MISCONFIGURED_API_URL',
+    status: 503,
+  } as ApiError;
+}
+
+export function buildApiUrl(path: string): string {
+  ensureApiConfigured();
+  return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 if (RESOLVED.misconfigured && typeof window !== 'undefined') {
   // eslint-disable-next-line no-console -- intentional surface for misconfig
   console.error(
@@ -151,16 +166,7 @@ async function request<T>(
   // dashboard catches MISCONFIGURED_API_URL and surfaces a "Backend
   // not configured" banner instead of letting buttons silently fail
   // against a non-existent localhost API.
-  if (API_MISCONFIGURED) {
-    throw {
-      message:
-        'Backend API is not configured. ' + (API_MISCONFIGURED_REASON ?? ''),
-      code: 'MISCONFIGURED_API_URL',
-      status: 503,
-    } as ApiError;
-  }
-
-  const url = `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const url = buildApiUrl(path);
   const token = await getToken();
 
   const headers: HeadersInit = {
@@ -587,13 +593,7 @@ export const documentApi = {
    * boundary. Auth header is injected via getToken() the same way other calls do.
    */
   upload: async (file: File, opts?: { tags?: string[]; metadata?: Record<string, unknown> }) => {
-    if (API_MISCONFIGURED) {
-      throw {
-        message: 'Backend API is not configured. ' + (API_MISCONFIGURED_REASON ?? ''),
-        code: 'MISCONFIGURED_API_URL',
-        status: 503,
-      } as ApiError;
-    }
+    const url = buildApiUrl('/documents/upload');
     const token = await getToken();
     const formData = new FormData();
     formData.append('file', file);
@@ -604,7 +604,7 @@ export const documentApi = {
       formData.append('metadataJson', JSON.stringify(opts.metadata));
     }
 
-    const response = await fetch(`${BASE_URL}/documents/upload`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       body: formData,

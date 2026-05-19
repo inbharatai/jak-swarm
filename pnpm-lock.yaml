@@ -6,6 +6,7 @@ settings:
 
 overrides:
   protobufjs: 8.2.0
+  langsmith: 0.7.1
   music-metadata: '>=11.12.3'
   axios: 1.16.0
   fast-jwt: 6.2.4

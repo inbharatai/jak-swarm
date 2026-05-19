@@ -24,6 +24,11 @@ function isHeadless(): boolean {
   return process.env['JAK_BROWSER_HEADLESS'] !== 'false';
 }
 
+function chromiumExecutablePath(): string | undefined {
+  const configured = process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH']?.trim();
+  return configured ? configured : undefined;
+}
+
 export interface NavigateResult {
   title: string;
   url: string;
@@ -58,6 +63,7 @@ class PlaywrightEngine {
     // So we launch a regular browser and then create the context separately.
     this.browser = await chromium.launch({
       headless: isHeadless(),
+      executablePath: chromiumExecutablePath(),
     });
     return this.browser;
   }
@@ -74,6 +80,7 @@ class PlaywrightEngine {
     const userDataDir = getUserDataDir();
     this.context = await chromium.launchPersistentContext(userDataDir, {
       headless: isHeadless(),
+      executablePath: chromiumExecutablePath(),
       viewport: { width: 1280, height: 800 },
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });

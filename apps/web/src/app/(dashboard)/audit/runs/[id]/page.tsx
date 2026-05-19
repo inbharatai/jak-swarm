@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   auditRunsApi,
+  buildApiUrl,
   type AuditRunDetail,
   type AuditRunStatusClient,
   type ControlTestRow,
@@ -94,9 +95,9 @@ export default function AuditRunDetailPage() {
             ?? ''
           )
         : '';
-      const apiBase = (process.env['NEXT_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
-      if (!apiBase) return;
-      const url = `${apiBase}/audit/runs/${encodeURIComponent(id)}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const url = buildApiUrl(
+        `/audit/runs/${encodeURIComponent(id)}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+      );
       es = new EventSource(url);
       es.onmessage = (e) => {
         try {

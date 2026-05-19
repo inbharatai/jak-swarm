@@ -3,7 +3,6 @@ import { Syne, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/lib/theme';
 import { AppShell } from '@/components/layout/AppShell';
 import { ToastProvider } from '@/components/ui/toast';
-import { CommandPalette } from '@/components/CommandPalette';
 import './globals.css';
 
 const syne = Syne({
@@ -76,7 +75,6 @@ export default function RootLayout({
         >
           <ToastProvider>
             <AppShell>{children}</AppShell>
-            <CommandPalette />
           </ToastProvider>
         </ThemeProvider>
       </body>

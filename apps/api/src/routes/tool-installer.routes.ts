@@ -123,6 +123,18 @@ const toolInstallerRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parse.error.flatten()));
       }
       try {
+        const approval = await fastify.db.approvalRequest.findFirst({
+          where: {
+            id: parse.data.approvalId,
+            tenantId: request.user.tenantId,
+            status: 'APPROVED',
+            toolName: parse.data.toolName,
+          },
+          select: { id: true },
+        });
+        if (!approval) {
+          return reply.status(403).send(err('APPROVAL_NOT_VALID', 'A tenant-scoped approved approvalId for this tool is required before installation.'));
+        }
         const result = await installer.install({
           request: buildRequest({
             toolName: parse.data.toolName,
