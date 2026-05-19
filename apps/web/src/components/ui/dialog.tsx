@@ -41,7 +41,7 @@ function Dialog({ open, onClose, children, className }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -52,7 +52,7 @@ function Dialog({ open, onClose, children, className }: DialogProps) {
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative z-50 w-full max-w-lg rounded-xl border bg-card shadow-xl',
+          'relative z-50 flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl border bg-card shadow-xl',
           className,
         )}
         onClick={e => e.stopPropagation()}
@@ -66,7 +66,7 @@ function Dialog({ open, onClose, children, className }: DialogProps) {
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex items-center justify-between border-b p-6', className)}
+      className={cn('shrink-0 flex items-center justify-between border-b p-6', className)}
       {...props}
     />
   );
@@ -91,13 +91,13 @@ function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLPar
 }
 
 function DialogBody({ className, ...props }: DialogContentProps) {
-  return <div className={cn('p-6', className)} {...props} />;
+  return <div className={cn('min-h-0 flex-1 overflow-y-auto p-6', className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex items-center justify-end gap-3 border-t p-6', className)}
+      className={cn('shrink-0 flex items-center justify-end gap-3 border-t p-6', className)}
       {...props}
     />
   );

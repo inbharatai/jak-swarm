@@ -12,7 +12,7 @@
  * checklist + hashtag suggestions + manual-publish disclaimer.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Megaphone, Sparkles, Loader2, Copy, ExternalLink } from 'lucide-react';
 import { Button, Card, CardContent, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
@@ -51,9 +51,14 @@ export default function SocialDraftsPage() {
   const [tone, setTone] = useState<'professional' | 'casual' | 'enthusiastic'>('professional');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DraftResponse['data'] | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   async function handleGenerate(): Promise<void> {
-    if (!topic.trim()) return;
+    if (!isHydrated || !topic.trim()) return;
     setLoading(true);
     try {
       const res = (await socialDraftsApi.generate({ platform, topic, tone })) as DraftResponse;
@@ -99,7 +104,7 @@ export default function SocialDraftsPage() {
                   key={p.id}
                   type="button"
                   onClick={() => setPlatform(p.id)}
-                  disabled={loading}
+                  disabled={!isHydrated || loading}
                   data-testid={`social-draft-platform-${p.id.toLowerCase()}`}
                   className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
                     platform === p.id
@@ -120,6 +125,7 @@ export default function SocialDraftsPage() {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. our new product launch, AI agents at scale, hiring engineers"
+              disabled={!isHydrated || loading}
               data-testid="social-draft-topic-input"
             />
           </div>
@@ -132,7 +138,7 @@ export default function SocialDraftsPage() {
                   key={t}
                   type="button"
                   onClick={() => setTone(t)}
-                  disabled={loading}
+                  disabled={!isHydrated || loading}
                   className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     tone === t ? 'border-primary bg-primary/10 text-primary' : 'border-border'
                   }`}
@@ -145,7 +151,7 @@ export default function SocialDraftsPage() {
 
           <Button
             onClick={handleGenerate}
-            disabled={!topic.trim() || loading}
+            disabled={!isHydrated || !topic.trim() || loading}
             className="gap-1.5"
             data-testid="social-draft-generate-btn"
           >

@@ -96,10 +96,17 @@ export function IntegrationCard({
   isLoading,
   auditLoading,
 }: IntegrationCardProps) {
+  const [isHydrated, setIsHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
   const meta = PROVIDER_META[provider];
   const isConnected = integration?.status === 'CONNECTED';
   const needsReauth = integration?.status === 'NEEDS_REAUTH';
   const hasError = integration?.status === 'ERROR';
+  const isActionDisabled = !isHydrated || isLoading;
   const maturity = integration?.maturity;
   const maturityTone =
     maturity === 'production-ready'
@@ -181,7 +188,7 @@ export function IntegrationCard({
                 variant="outline"
                 size="sm"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isActionDisabled}
                 onClick={() => integration && onDisconnect(integration.id)}
               >
                 {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Disconnect'}
@@ -192,7 +199,7 @@ export function IntegrationCard({
                 variant="default"
                 size="sm"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isActionDisabled}
                 onClick={() => onConnect(provider)}
                 data-testid={`connect-${provider.toLowerCase()}`}
               >
@@ -203,7 +210,7 @@ export function IntegrationCard({
                 variant="default"
                 size="sm"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isActionDisabled}
                 onClick={() => onConnect(provider)}
                 data-testid={`connect-${provider.toLowerCase()}`}
               >

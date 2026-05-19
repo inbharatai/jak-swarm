@@ -1230,6 +1230,108 @@ export interface WorkflowTemplateClient {
   status: string;
 }
 
+export interface CompanyArtifactClient {
+  id: string;
+  tenantId: string;
+  sourceType: string;
+  artifactType: string;
+  externalId: string | null;
+  sourceUrl: string | null;
+  title: string;
+  body: string;
+  bodyHash: string;
+  authorName: string | null;
+  occurredAt: string | null;
+  metadata: Record<string, unknown> | null;
+  ingestionStatus: string;
+  extractedAt: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CompanyGraphEntityClient {
+  id: string;
+  tenantId: string;
+  primaryArtifactId: string | null;
+  entityType: string;
+  title: string;
+  summary: string;
+  status: string;
+  ownerName: string | null;
+  priority: string | null;
+  confidence: number;
+  occurredAt: string | null;
+  dueAt: string | null;
+  sourceArtifactIds: string[] | null;
+  relatedEntityIds: string[] | null;
+  properties: Record<string, unknown> | null;
+  extractedBy: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface ExecutionDriftFindingClient {
+  id: string;
+  tenantId: string;
+  fingerprint: string;
+  driftType: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: string;
+  title: string;
+  summary: string;
+  recommendation: string;
+  evidenceArtifactIds: string[] | null;
+  evidenceEntityIds: string[] | null;
+  confidence: number;
+  detectedAt: string;
+  resolvedAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentExecutableSpecClient {
+  id: string;
+  tenantId: string;
+  driftFindingId: string | null;
+  title: string;
+  problemStatement: string;
+  objective: string;
+  contextSummary: string;
+  proposedApproach: string;
+  acceptanceCriteria: string[] | null;
+  testPlan: Array<{ name: string; type: string; description: string }> | null;
+  agentTaskPlan: Array<{ id: string; title: string; agentRole: string; description: string; dependsOn: string[]; riskLevel: string; requiresApproval: boolean }> | null;
+  approvalGates: Array<{ gate: string; reason: string; riskLevel: string }> | null;
+  evidenceArtifactIds: string[] | null;
+  evidenceEntityIds: string[] | null;
+  status: string;
+  generatedBy: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewComment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface DriftCandidateClient {
+  fingerprint: string;
+  driftType: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  summary: string;
+  recommendation: string;
+  evidenceArtifactIds: string[];
+  evidenceEntityIds: string[];
+  confidence: number;
+  metadata: Record<string, unknown>;
+}
+
 export const companyBrainApi = {
   getProfile: () =>
     apiDataFetch<{ profile: CompanyProfileClient | null }>('/company/profile'),
@@ -1265,6 +1367,67 @@ export const companyBrainApi = {
   },
   templateForIntent: (intent: string) =>
     apiDataFetch<{ template: WorkflowTemplateClient }>(`/workflow-templates/by-intent/${encodeURIComponent(intent)}`),
+
+  // ── Company Operating Layer (Migration 107 / YC closed-loop) ─────────
+  createArtifact: (body: {
+    sourceType: 'github' | 'linear' | 'jira' | 'slack' | 'notion' | 'google_drive' | 'gmail' | 'meeting' | 'customer_call' | 'support' | 'document' | 'manual' | 'other';
+    artifactType: 'ticket' | 'issue' | 'pull_request' | 'commit' | 'slack_thread' | 'notion_page' | 'document' | 'meeting_transcript' | 'customer_feedback' | 'support_ticket' | 'email' | 'decision_note' | 'other';
+    title: string;
+    body: string;
+    externalId?: string;
+    sourceUrl?: string;
+    authorName?: string;
+    occurredAt?: string;
+    metadata?: Record<string, unknown>;
+  }) => apiDataFetch<{ artifact: CompanyArtifactClient }>('/company/artifacts', { method: 'POST', body }),
+  listArtifacts: (params?: { sourceType?: string; artifactType?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: CompanyArtifactClient[]; total: number; limit: number; offset: number }>(`/company/artifacts${qs}`);
+  },
+  extractArtifactEntities: (id: string) =>
+    apiDataFetch<{ artifact: CompanyArtifactClient; entities: CompanyGraphEntityClient[] }>(`/company/artifacts/${encodeURIComponent(id)}/extract`, { method: 'POST', body: {} }),
+  createEntity: (body: {
+    entityType: 'decision' | 'task' | 'spec' | 'customer_signal' | 'risk' | 'owner' | 'deadline' | 'code_change' | 'customer' | 'metric' | 'requirement';
+    title: string;
+    summary: string;
+    sourceArtifactIds: string[];
+    primaryArtifactId?: string;
+    status?: string;
+    ownerName?: string | null;
+    priority?: 'low' | 'medium' | 'high' | 'critical' | null;
+    confidence?: number;
+    occurredAt?: string;
+    dueAt?: string;
+    relatedEntityIds?: string[];
+    properties?: Record<string, unknown>;
+    extractedBy?: 'manual' | 'connector' | 'openai' | 'system';
+  }) => apiDataFetch<{ entity: CompanyGraphEntityClient }>('/company/entities', { method: 'POST', body }),
+  listEntities: (params?: { entityType?: string; status?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: CompanyGraphEntityClient[]; total: number; limit: number; offset: number }>(`/company/entities${qs}`);
+  },
+  analyzeAlignment: (body?: { limit?: number }) =>
+    apiDataFetch<{ findings: ExecutionDriftFindingClient[]; candidates: DriftCandidateClient[] }>('/company/alignment/analyze', { method: 'POST', body: body ?? {} }),
+  listDriftFindings: (params?: { status?: string; severity?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: ExecutionDriftFindingClient[]; total: number; limit: number; offset: number }>(`/company/alignment/drift${qs}`);
+  },
+  generateSpec: (body: { driftFindingId?: string; entityIds?: string[] }) =>
+    apiDataFetch<{ spec: AgentExecutableSpecClient }>('/company/specs/generate', { method: 'POST', body }),
+  listSpecs: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : '';
+    return apiDataFetch<{ items: AgentExecutableSpecClient[]; total: number; limit: number; offset: number }>(`/company/specs${qs}`);
+  },
+  decideSpec: (id: string, body: { decision: 'APPROVED' | 'REJECTED'; comment?: string }) =>
+    apiDataFetch<{ spec: AgentExecutableSpecClient }>(`/company/specs/${encodeURIComponent(id)}/decide`, { method: 'POST', body }),
 
   // ── Knowledge sources (Sprint 2.3 / Item C) ──────────────────────────
   // URLs registered for the company brain crawler. The crawler service

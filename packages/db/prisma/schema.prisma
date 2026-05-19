@@ -52,6 +52,10 @@ model Tenant {
   tenantDocuments TenantDocument[]
   subscription    Subscription?
   companyProfile  CompanyProfile?
+  companyArtifacts CompanyArtifact[]
+  companyGraphEntities CompanyGraphEntity[]
+  executionDriftFindings ExecutionDriftFinding[]
+  agentExecutableSpecs AgentExecutableSpec[]
   // Migration 106 — team + trial
   departments     Department[]
   taskAssignments TaskAssignment[]
@@ -1582,6 +1586,145 @@ model CompanyKnowledgeSource {
   @@unique([tenantId, url])
   @@index([tenantId, kind, deletedAt])
   @@map("company_knowledge_sources")
+}
+
+// CompanyArtifact — one raw piece of company evidence ingested from a
+// connector or uploaded source. This is the YC "company legible to AI"
+// primitive: Slack threads, GitHub PRs/commits, Linear/Jira tickets,
+// Notion docs, meeting transcripts, customer calls, support tickets, etc.
+//
+// Raw text stays tenant-scoped and source-linked; downstream entities cite
+// artifacts instead of making unsupported claims.
+model CompanyArtifact {
+  id              String    @id @default(cuid())
+  tenantId        String
+  sourceType      String    // 'github' | 'linear' | 'slack' | 'notion' | 'meeting' | 'document' | 'customer' | ...
+  artifactType    String    // 'ticket' | 'pr' | 'commit' | 'meeting_transcript' | 'customer_feedback' | ...
+  externalId      String?
+  sourceUrl       String?
+  title           String
+  body            String    @db.Text
+  bodyHash        String
+  authorName      String?
+  occurredAt      DateTime?
+  metadata        Json?
+  ingestionStatus String    @default("ingested") // 'ingested' | 'extracted' | 'failed'
+  extractedAt     DateTime?
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryEntities CompanyGraphEntity[] @relation("CompanyEntityPrimaryArtifact")
+
+  @@unique([tenantId, sourceType, externalId])
+  @@index([tenantId, sourceType, artifactType, occurredAt])
+  @@index([tenantId, deletedAt, createdAt])
+  @@map("company_artifacts")
+}
+
+// CompanyGraphEntity — normalized company knowledge extracted from raw
+// artifacts. These are the nouns the closed loop reasons over: decisions,
+// tasks, specs, customer signals, risks, owners, code changes, deadlines.
+model CompanyGraphEntity {
+  id                String    @id @default(cuid())
+  tenantId          String
+  primaryArtifactId String?
+  entityType        String    // 'decision' | 'task' | 'spec' | 'customer_signal' | 'code_change' | 'risk' | ...
+  title             String
+  summary           String    @db.Text
+  status            String    @default("active")
+  ownerName         String?
+  priority          String?   // 'low' | 'medium' | 'high' | 'critical'
+  confidence        Float     @default(0.5)
+  occurredAt        DateTime?
+  dueAt             DateTime?
+  sourceArtifactIds Json      // string[]
+  relatedEntityIds  Json?
+  properties        Json?
+  extractedBy       String    @default("openai")
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryArtifact   CompanyArtifact? @relation("CompanyEntityPrimaryArtifact", fields: [primaryArtifactId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entityType, status, updatedAt])
+  @@index([tenantId, ownerName])
+  @@index([tenantId, priority])
+  @@map("company_graph_entities")
+}
+
+// ExecutionDriftFinding — deterministic closed-loop finding produced by
+// comparing company intent/customer signal against execution evidence.
+// Examples:
+//   - customer pain has no task/spec/code tied to it
+//   - founder decision never became execution work
+//   - engineering work has no visible customer/founder rationale
+model ExecutionDriftFinding {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  fingerprint         String
+  driftType           String
+  severity            String    // 'low' | 'medium' | 'high' | 'critical'
+  status              String    @default("open") // 'open' | 'acknowledged' | 'resolved' | 'dismissed'
+  title               String
+  summary             String    @db.Text
+  recommendation      String    @db.Text
+  evidenceArtifactIds Json
+  evidenceEntityIds   Json
+  confidence          Float     @default(0.7)
+  detectedAt          DateTime  @default(now())
+  resolvedAt          DateTime?
+  metadata            Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  specs               AgentExecutableSpec[]
+
+  @@unique([tenantId, fingerprint])
+  @@index([tenantId, status, severity, detectedAt])
+  @@index([tenantId, driftType])
+  @@map("execution_drift_findings")
+}
+
+// AgentExecutableSpec — a reviewed handoff packet agents can execute:
+// PRD/technical plan, acceptance criteria, test plan, agent task plan,
+// approval gates, and evidence links.
+model AgentExecutableSpec {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  driftFindingId      String?
+  title               String
+  problemStatement    String    @db.Text
+  objective           String    @db.Text
+  contextSummary      String    @db.Text
+  proposedApproach    String    @db.Text
+  acceptanceCriteria  Json
+  testPlan            Json
+  agentTaskPlan       Json
+  approvalGates       Json
+  evidenceArtifactIds Json
+  evidenceEntityIds   Json
+  status              String    @default("draft") // 'draft' | 'approved' | 'rejected'
+  generatedBy         String    @default("openai")
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  reviewComment       String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driftFinding        ExecutionDriftFinding? @relation(fields: [driftFindingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, driftFindingId])
+  @@map("agent_executable_specs")
 }
 
 // IntentRecord — persists the Commander's intent classification per

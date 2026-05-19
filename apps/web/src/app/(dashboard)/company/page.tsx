@@ -18,12 +18,16 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import {
-  Brain, RefreshCw, CheckCircle, XCircle, AlertCircle, FileText, Sparkles, ShieldCheck,
+  Brain, RefreshCw, CheckCircle, XCircle, AlertCircle, FileText, Sparkles, ShieldCheck, Network, Target, ListChecks,
 } from 'lucide-react';
 import {
   companyBrainApi,
+  type AgentExecutableSpecClient,
+  type CompanyArtifactClient,
+  type CompanyGraphEntityClient,
   type CompanyProfileClient,
   type CompanyProfileFields,
+  type ExecutionDriftFindingClient,
 } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import {
@@ -36,6 +40,13 @@ const STATUS_BADGE: Record<string, { variant: 'default' | 'secondary' | 'destruc
   extracted:     { variant: 'secondary', label: 'Extracted — needs review', description: 'JAK auto-extracted this from your documents. Approve to make agents use it.' },
   user_approved: { variant: 'default',   label: 'Approved',                 description: 'Agents will ground their work in this profile.' },
   manual:        { variant: 'default',   label: 'Manual',                   description: 'You typed this profile by hand. Agents will use it.' },
+};
+
+type ArtifactDraft = {
+  sourceType: Parameters<typeof companyBrainApi.createArtifact>[0]['sourceType'];
+  artifactType: Parameters<typeof companyBrainApi.createArtifact>[0]['artifactType'];
+  title: string;
+  body: string;
 };
 
 export default function CompanyBrainPage() {
@@ -169,6 +180,8 @@ export default function CompanyBrainPage() {
         </>
       )}
 
+      <ClosedLoopOsCard canEdit={canEdit} />
+
       {/* Honest disclaimer */}
       <Card className="mt-6 border-blue-500/30 bg-blue-500/5">
         <CardContent className="pt-6">
@@ -188,6 +201,319 @@ export default function CompanyBrainPage() {
       </Card>
     </div>
   );
+}
+
+function ClosedLoopOsCard({ canEdit }: { canEdit: boolean }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [artifactDraft, setArtifactDraft] = useState<ArtifactDraft>({
+    sourceType: 'manual',
+    artifactType: 'decision_note',
+    title: '',
+    body: '',
+  });
+
+  const artifacts = useSWR('company:operating-layer:artifacts', () => companyBrainApi.listArtifacts({ limit: 10 }));
+  const entities = useSWR('company:operating-layer:entities', () => companyBrainApi.listEntities({ limit: 10 }));
+  const drift = useSWR('company:operating-layer:drift', () => companyBrainApi.listDriftFindings({ status: 'open', limit: 10 }));
+  const specs = useSWR('company:operating-layer:specs', () => companyBrainApi.listSpecs({ limit: 10 }));
+
+  const refreshAll = async () => {
+    await Promise.all([artifacts.mutate(), entities.mutate(), drift.mutate(), specs.mutate()]);
+  };
+
+  async function run(name: string, fn: () => Promise<unknown>): Promise<void> {
+    setBusy(name);
+    try {
+      await fn();
+      await refreshAll();
+      toast.success(`${name} succeeded`);
+    } catch (e) {
+      toast.error(`${name} failed`, e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const recentArtifacts = artifacts.data?.items ?? [];
+  const recentEntities = entities.data?.items ?? [];
+  const openDrift = drift.data?.items ?? [];
+  const recentSpecs = specs.data?.items ?? [];
+  const firstOpenDrift = openDrift[0] ?? null;
+  const isLoading = artifacts.isLoading || entities.isLoading || drift.isLoading || specs.isLoading;
+  const loadError = artifacts.error ?? entities.error ?? drift.error ?? specs.error;
+
+  return (
+    <Card className="mt-6 border-emerald-500/30 bg-emerald-500/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Network className="h-5 w-5" />
+          Closed-loop Company OS
+        </CardTitle>
+        <CardDescription>
+          Evidence artifacts, company graph entities, drift findings, and agent-executable specs. This is the YC-style operating layer, not a marketing-only claim.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {loadError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {loadError instanceof Error ? loadError.message : 'Could not load closed-loop Company OS data.'}
+          </div>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <MetricTile icon={<FileText className="h-4 w-4" />} label="Artifacts" value={artifacts.data?.total ?? 0} />
+          <MetricTile icon={<Brain className="h-4 w-4" />} label="Entities" value={entities.data?.total ?? 0} />
+          <MetricTile icon={<Target className="h-4 w-4" />} label="Open drift" value={drift.data?.total ?? 0} />
+          <MetricTile icon={<ListChecks className="h-4 w-4" />} label="Specs" value={specs.data?.total ?? 0} />
+        </div>
+
+        {canEdit ? (
+          <div className="rounded-lg border border-slate-700/70 bg-slate-950/40 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-sm">Ingest evidence</p>
+                <p className="text-xs text-muted-foreground">Use this for meeting notes, customer calls, GitHub/Linear summaries, Slack decisions, or support feedback.</p>
+              </div>
+              <Button
+                size="sm"
+                disabled={busy !== null || artifactDraft.title.trim().length === 0 || artifactDraft.body.trim().length < 20}
+                onClick={() => run('Ingest artifact', async () => {
+                  await companyBrainApi.createArtifact(artifactDraft);
+                  setArtifactDraft({ ...artifactDraft, title: '', body: '' });
+                })}
+              >
+                Ingest
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-xs font-medium text-slate-400">
+                Source
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                  value={artifactDraft.sourceType}
+                  onChange={(e) => setArtifactDraft({ ...artifactDraft, sourceType: e.target.value as ArtifactDraft['sourceType'] })}
+                >
+                  <option value="manual">Manual note</option>
+                  <option value="github">GitHub</option>
+                  <option value="linear">Linear</option>
+                  <option value="slack">Slack</option>
+                  <option value="notion">Notion</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="customer_call">Customer call</option>
+                  <option value="support">Support</option>
+                  <option value="document">Document</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="text-xs font-medium text-slate-400">
+                Artifact type
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                  value={artifactDraft.artifactType}
+                  onChange={(e) => setArtifactDraft({ ...artifactDraft, artifactType: e.target.value as ArtifactDraft['artifactType'] })}
+                >
+                  <option value="decision_note">Decision note</option>
+                  <option value="meeting_transcript">Meeting transcript</option>
+                  <option value="customer_feedback">Customer feedback</option>
+                  <option value="support_ticket">Support ticket</option>
+                  <option value="ticket">Ticket</option>
+                  <option value="pull_request">Pull request</option>
+                  <option value="commit">Commit</option>
+                  <option value="slack_thread">Slack thread</option>
+                  <option value="notion_page">Notion page</option>
+                  <option value="document">Document</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+            <input
+              className="mt-3 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              value={artifactDraft.title}
+              onChange={(e) => setArtifactDraft({ ...artifactDraft, title: e.target.value })}
+              placeholder="Evidence title, e.g. Customer calls show onboarding confusion"
+            />
+            <Textarea
+              className="mt-3"
+              rows={5}
+              value={artifactDraft.body}
+              onChange={(e) => setArtifactDraft({ ...artifactDraft, body: e.target.value })}
+              placeholder="Paste the actual evidence. JAK stores the body hash and uses this as cited context for entities, drift, and specs."
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">You can view the Company OS graph, but your role cannot ingest or approve records.</p>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => refreshAll()} disabled={busy !== null || isLoading}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh OS
+          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => run('Analyze drift', () => companyBrainApi.analyzeAlignment())}>
+              <Target className="h-4 w-4 mr-2" />
+              Analyze drift
+            </Button>
+          )}
+          {canEdit && firstOpenDrift && (
+            <Button size="sm" disabled={busy !== null} onClick={() => run('Generate spec', () => companyBrainApi.generateSpec({ driftFindingId: firstOpenDrift.id }))}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate spec from top drift
+            </Button>
+          )}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <OsList
+            title="Recent artifacts"
+            empty="No evidence artifacts yet."
+            items={recentArtifacts}
+            render={(item) => (
+              <ArtifactRow
+                artifact={item}
+                canEdit={canEdit}
+                busy={busy !== null}
+                onExtract={() => run('Extract entities', () => companyBrainApi.extractArtifactEntities(item.id))}
+              />
+            )}
+          />
+          <OsList
+            title="Recent entities"
+            empty="No graph entities yet."
+            items={recentEntities}
+            render={(item) => <EntityRow entity={item} />}
+          />
+          <OsList
+            title="Open drift findings"
+            empty="No open drift findings. Run analysis after entities exist."
+            items={openDrift}
+            render={(item) => <DriftRow finding={item} />}
+          />
+          <OsList
+            title="Executable specs"
+            empty="No specs generated yet."
+            items={recentSpecs}
+            render={(item) => (
+              <SpecRow
+                spec={item}
+                canEdit={canEdit}
+                busy={busy !== null}
+                onDecide={(decision) => run(`${decision === 'APPROVED' ? 'Approve' : 'Reject'} spec`, () => companyBrainApi.decideSpec(item.id, { decision }))}
+              />
+            )}
+          />
+        </div>
+
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-100">
+          Blunt truth: this is the foundation for the YC thesis. It does not yet auto-sync every connector; it gives us the honest data model, API, UI, audit trail, drift detector, and OpenAI spec generator those connectors will feed.
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetricTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-700/70 bg-slate-950/40 p-3">
+      <div className="flex items-center gap-2 text-slate-400">
+        {icon}
+        <span className="text-xs uppercase tracking-wider">{label}</span>
+      </div>
+      <p className="mt-2 text-2xl font-semibold text-slate-100">{value}</p>
+    </div>
+  );
+}
+
+function OsList<T>({ title, empty, items, render }: { title: string; empty: string; items: T[]; render: (item: T) => React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-slate-700/70 bg-slate-950/30 p-4">
+      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-500 italic">{empty}</p>
+      ) : (
+        <div className="space-y-3">{items.map((item, index) => <React.Fragment key={index}>{render(item)}</React.Fragment>)}</div>
+      )}
+    </div>
+  );
+}
+
+function ArtifactRow({ artifact, canEdit, busy, onExtract }: { artifact: CompanyArtifactClient; canEdit: boolean; busy: boolean; onExtract: () => void }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{artifact.title}</p>
+          <p className="text-xs text-slate-500">{artifact.sourceType} / {artifact.artifactType} · {artifact.ingestionStatus}</p>
+        </div>
+        {canEdit && (
+          <Button variant="outline" size="sm" disabled={busy} onClick={onExtract}>
+            Extract
+          </Button>
+        )}
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs text-slate-400">{artifact.body}</p>
+    </div>
+  );
+}
+
+function EntityRow({ entity }: { entity: CompanyGraphEntityClient }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3">
+      <div className="flex items-center gap-2">
+        <Badge variant="outline">{entity.entityType}</Badge>
+        {entity.priority && <Badge variant={entity.priority === 'critical' || entity.priority === 'high' ? 'destructive' : 'secondary'}>{entity.priority}</Badge>}
+      </div>
+      <p className="mt-2 text-sm font-medium">{entity.title}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-slate-400">{entity.summary}</p>
+    </div>
+  );
+}
+
+function DriftRow({ finding }: { finding: ExecutionDriftFindingClient }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3">
+      <div className="flex items-center gap-2">
+        <Badge variant={finding.severity === 'critical' || finding.severity === 'high' ? 'destructive' : 'secondary'}>{finding.severity}</Badge>
+        <Badge variant="outline">{finding.driftType}</Badge>
+      </div>
+      <p className="mt-2 text-sm font-medium">{finding.title}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-slate-400">{finding.summary}</p>
+      <p className="mt-2 text-xs text-emerald-300">{finding.recommendation}</p>
+    </div>
+  );
+}
+
+function SpecRow({ spec, canEdit, busy, onDecide }: { spec: AgentExecutableSpecClient; canEdit: boolean; busy: boolean; onDecide: (decision: 'APPROVED' | 'REJECTED') => void }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Badge variant={spec.status === 'approved' ? 'default' : spec.status === 'rejected' ? 'destructive' : 'secondary'}>{spec.status}</Badge>
+            <span className="text-xs text-slate-500">{formatShortDate(spec.createdAt)}</span>
+          </div>
+          <p className="mt-2 text-sm font-medium">{spec.title}</p>
+        </div>
+        {canEdit && spec.status === 'draft' && (
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => onDecide('REJECTED')}>Reject</Button>
+            <Button size="sm" disabled={busy} onClick={() => onDecide('APPROVED')}>Approve</Button>
+          </div>
+        )}
+      </div>
+      <p className="mt-1 line-clamp-2 text-xs text-slate-400">{spec.objective}</p>
+      {spec.acceptanceCriteria && spec.acceptanceCriteria.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">{spec.acceptanceCriteria.length} acceptance criteria · {spec.approvalGates?.length ?? 0} approval gates</p>
+      )}
+    </div>
+  );
+}
+
+function formatShortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function ProfileFieldsCard({

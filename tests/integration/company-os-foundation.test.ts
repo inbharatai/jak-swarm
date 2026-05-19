@@ -10,6 +10,8 @@
  * No DB needed — these are unit-level tests of the new code modules.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   COMPANY_OS_INTENTS,
@@ -204,5 +206,47 @@ describe('AGENT_TIER_MAP recalibration (Migration 16 / Phase 13)', () => {
     const { AGENT_TIER_MAP } = await import('../../packages/agents/src/base/provider-router.js');
     expect(AGENT_TIER_MAP['COMMANDER']).toBe(3);
     expect(AGENT_TIER_MAP['PLANNER']).toBe(3);
+  });
+});
+
+describe('Company Operating Layer route/client wiring (Migration 107)', () => {
+  const repoRoot = resolve(__dirname, '..', '..');
+  const read = (relativePath: string) => readFileSync(resolve(repoRoot, relativePath), 'utf8');
+
+  it('registers the closed-loop Company OS routes in the API boot path', () => {
+    const apiIndex = read('apps/api/src/index.ts');
+    expect(apiIndex).toContain("import companyOperatingLayerRoutes from './routes/company-operating-layer.routes.js'");
+    expect(apiIndex).toContain('await fastify.register(companyOperatingLayerRoutes)');
+  });
+
+  it('exposes evidence -> graph -> drift -> spec endpoints from the route plugin', () => {
+    const routes = read('apps/api/src/routes/company-operating-layer.routes.ts');
+    for (const path of [
+      "/company/artifacts",
+      "/company/artifacts/:id/extract",
+      "/company/entities",
+      "/company/alignment/analyze",
+      "/company/alignment/drift",
+      "/company/specs/generate",
+      "/company/specs",
+      "/company/specs/:id/decide",
+    ]) {
+      expect(routes).toContain(path);
+    }
+  });
+
+  it('wires the frontend client to the closed-loop endpoints', () => {
+    const client = read('apps/web/src/lib/api-client.ts');
+    for (const method of [
+      'createArtifact',
+      'extractArtifactEntities',
+      'createEntity',
+      'analyzeAlignment',
+      'listDriftFindings',
+      'generateSpec',
+      'decideSpec',
+    ]) {
+      expect(client).toContain(method);
+    }
   });
 });
