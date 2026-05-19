@@ -12,14 +12,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getApiBaseUrl } from '@/lib/api-client';
+import { buildApiUrl } from '@/lib/api-client';
 
 const STORAGE_KEY = 'jak_auditor_token';
-const ENGAGEMENT_KEY = 'jak_auditor_engagement';
-
-// P0-A: centralized resolver. Was reading NEXT_PUBLIC_API_BASE_URL (different
-// var from the rest of the app) which silently fell back to localhost.
-const API_BASE_URL = getApiBaseUrl();
 
 interface Workpaper {
   id: string;
@@ -41,7 +36,7 @@ interface AuditRun {
 async function auditorFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
   if (!token) throw new Error('Not signed in as auditor — accept your invite link first.');
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       ...(init.headers ?? {}),
@@ -70,15 +65,11 @@ export default function AuditorRunReviewPage() {
 
   useEffect(() => {
     if (!auditRunId) return;
-    try {
-      const stored = localStorage.getItem(ENGAGEMENT_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as { scopes?: string[] };
-        setScopes(parsed.scopes ?? []);
-      }
-    } catch { /* noop */ }
-    auditorFetch<{ auditRun: AuditRun }>(`/auditor/runs/${auditRunId}`)
-      .then((res) => setRun(res.auditRun))
+    auditorFetch<{ auditRun: AuditRun; engagement?: { scopes?: string[] } }>(`/auditor/runs/${auditRunId}`)
+      .then((res) => {
+        setRun(res.auditRun);
+        setScopes(res.engagement?.scopes ?? []);
+      })
       .catch((err: Error) => setError(err.message));
     auditorFetch<{ workpapers: Workpaper[] }>(`/auditor/runs/${auditRunId}/workpapers`)
       .then((res) => setWorkpapers(res.workpapers))

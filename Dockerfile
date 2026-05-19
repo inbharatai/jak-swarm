@@ -56,8 +56,8 @@ RUN pnpm --filter @jak-swarm/db exec prisma generate
 # .d.ts to resolve the dynamic-import type. (See ci.yml + apps/api
 # pretypecheck for the same ordering rationale.)
 RUN pnpm --filter @jak-swarm/shared build && \
-    pnpm --filter @jak-swarm/db build && \
     pnpm --filter @jak-swarm/security build && \
+    pnpm --filter @jak-swarm/db build && \
     pnpm --filter @jak-swarm/verification build && \
     pnpm --filter @jak-swarm/tools build && \
     pnpm --filter @jak-swarm/skills build && \

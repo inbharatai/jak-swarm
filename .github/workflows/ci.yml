@@ -14,7 +14,7 @@ jobs:
   build:
     name: Build & Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -54,12 +54,20 @@ jobs:
           pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
+          pnpm --filter @jak-swarm/client build
+          pnpm --filter @jak-swarm/voice build
+          pnpm --filter @jak-swarm/workflows build
+          pnpm --filter @jak-swarm/whatsapp-client build
+          pnpm --filter @jak-swarm/api build
 
       - name: Build web app
         run: pnpm --filter @jak-swarm/web exec next build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_key
+
+      - name: Build production Docker image
+        run: docker build --target runtime .
 
   test:
     name: Tests
@@ -127,6 +135,12 @@ jobs:
           # job for rationale (BaseAgent.injectBundledSkills dynamic import).
           pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
+          pnpm --filter @jak-swarm/swarm build
+          pnpm --filter @jak-swarm/client build
+          pnpm --filter @jak-swarm/voice build
+          pnpm --filter @jak-swarm/workflows build
+          pnpm --filter @jak-swarm/whatsapp-client build
+          pnpm --filter @jak-swarm/api build
 
       - name: Run unit tests with coverage (blocking)
         # Coverage thresholds live in tests/vitest.config.ts. Failing the

@@ -57,6 +57,12 @@ services:
       DIRECT_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
       REDIS_URL: redis://redis:6379
       AUTH_SECRET: ${AUTH_SECRET:?must-set-in-env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?must-set-in-env}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?must-set-in-env}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?must-set-in-env}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?must-set-in-env}
+      EVIDENCE_SIGNING_SECRET: ${EVIDENCE_SIGNING_SECRET:?must-set-in-env}
+      METRICS_TOKEN: ${METRICS_TOKEN:?must-set-in-env}
       # Prevent the API process from also running the embedded queue worker.
       # With separate worker service, API must not compete for claims.
       # The real env var is WORKFLOW_WORKER_MODE (embedded | standalone).
@@ -78,7 +84,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["node", "dist/worker-entry.js"]
+    command: ["node", "apps/api/dist/worker-entry.js"]
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -86,6 +92,12 @@ services:
       DIRECT_URL: postgres://jakswarm:jakswarm@postgres:5432/jakswarm
       REDIS_URL: redis://redis:6379
       AUTH_SECRET: ${AUTH_SECRET:?must-set-in-env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?must-set-in-env}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?must-set-in-env}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?must-set-in-env}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?must-set-in-env}
+      EVIDENCE_SIGNING_SECRET: ${EVIDENCE_SIGNING_SECRET:?must-set-in-env}
+      METRICS_TOKEN: ${METRICS_TOKEN:?must-set-in-env}
       # Stable identity so reclaim logs correlate with dead workers
       WORKFLOW_WORKER_INSTANCE_ID: "${HOSTNAME:-worker-local}"
       WORKFLOW_QUEUE_CONCURRENCY: "2"

@@ -11,10 +11,9 @@
  *   - Reddit      → find relevant threads first, then draft a reply
  *   - Hacker News → identify the right moment to share, then draft
  *
- * Flow for every card: user types an angle → JAK drafts content (via the
- * standard workflow API, role=CMO + network hint) → user reviews the
- * draft and either publishes (if the integration is connected) or copies
- * the text for manual posting. Nothing auto-publishes.
+ * Flow for every card: user types an angle, JAK drafts content (via the
+ * standard workflow API, role=CMO + network hint), then the user reviews
+ * and copies the draft for manual posting. Nothing auto-publishes.
  *
  * This page is mobile-first — the card grid collapses to a single column
  * on narrow viewports, inputs are full-width, and primary actions are
@@ -22,7 +21,6 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import useSWR from 'swr';
 import {
   Megaphone,
   Linkedin,
@@ -30,16 +28,13 @@ import {
   MessageCircle,
   Loader2,
   Copy,
-  Send,
   Sparkles,
-  Check,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { dataFetcher, workflowApi } from '@/lib/api-client';
-import type { Integration, IntegrationProvider } from '@/types';
+import { workflowApi } from '@/lib/api-client';
 
 // ─── Network definitions ────────────────────────────────────────────────────
 
@@ -54,8 +49,6 @@ interface NetworkCardDef {
   prompt: string;               // Instructional placeholder
   /** Which agent role drives the workflow for this card. */
   agentRole: string;
-  /** Which Integration.provider must be CONNECTED for the Publish button. */
-  requiredProvider?: IntegrationProvider;
   /** Prompt prefix the workflow sees — primes the worker to produce the right length/tone. */
   workflowGoalPrefix: string;
   /**
@@ -77,7 +70,7 @@ const NETWORKS: NetworkCardDef[] = [
     charLimit: 3000,
     prompt: 'What angle should the post take? e.g. "our Q3 launch narrative, thought-leader tone"',
     agentRole: 'cmo',
-    requiredProvider: 'LINKEDIN',
+    draftOnly: true,
     workflowGoalPrefix:
       'Draft a LinkedIn post (300-800 words, professional tone, first-person founder voice, 2-3 hashtags). ' +
       'Topic/angle: ',
@@ -91,6 +84,7 @@ const NETWORKS: NetworkCardDef[] = [
     charLimit: 2800, // 10-tweet thread max
     prompt: 'What should the tweet or thread be about?',
     agentRole: 'cmo',
+    draftOnly: true,
     workflowGoalPrefix:
       'Draft an X/Twitter thread (3-7 tweets, each under 280 chars, punchy hook on tweet 1, ' +
       'no more than one emoji per tweet). Topic: ',
@@ -143,29 +137,12 @@ function initialCardState(): CardState {
 
 export default function SocialHubPage() {
   const toast = useToast();
-  const { data: integrationsData } = useSWR<Integration[]>(
-    '/integrations',
-    dataFetcher,
-    { refreshInterval: 60_000 },
-  );
-  const integrations = integrationsData ?? [];
-
   const [cards, setCards] = useState<Record<NetworkId, CardState>>({
     linkedin: initialCardState(),
     x: initialCardState(),
     reddit: initialCardState(),
     hn: initialCardState(),
   });
-
-  const isProviderConnected = useCallback(
-    (provider?: IntegrationProvider): boolean => {
-      if (!provider) return false;
-      return integrations.some(
-        (i) => i.provider === provider && i.status === 'CONNECTED',
-      );
-    },
-    [integrations],
-  );
 
   const handleGenerate = useCallback(
     async (def: NetworkCardDef) => {
@@ -230,49 +207,6 @@ export default function SocialHubPage() {
     }
   }, [cards, toast]);
 
-  const handlePublish = useCallback(
-    async (def: NetworkCardDef) => {
-      const state = cards[def.id];
-      if (!state.draft || state.status === 'publishing') return;
-      if (!def.requiredProvider) {
-        toast.info('Publishing not yet wired for this network', 'Copy the draft and paste it on the platform.');
-        return;
-      }
-      if (!isProviderConnected(def.requiredProvider)) {
-        toast.warning(`Connect ${def.label} first`, 'Open Integrations to connect your account.');
-        return;
-      }
-
-      setCards((prev) => ({
-        ...prev,
-        [def.id]: { ...prev[def.id], status: 'publishing' },
-      }));
-      try {
-        // Kick off a second workflow that actually calls the connected
-        // adapter's post(). Keeps the publishing path through the swarm's
-        // approval + audit machinery rather than calling the adapter
-        // directly from the web app.
-        const goal =
-          `Post the following ${def.label} content using the connected ${def.label} integration. ` +
-          `Do not edit the content. Confirm the post ID on success.\n\n---\n${state.draft}\n---`;
-        await workflowApi.create(goal, undefined, [def.agentRole]);
-        setCards((prev) => ({
-          ...prev,
-          [def.id]: { ...prev[def.id], status: 'done' },
-        }));
-        toast.success(`${def.label} post queued`, 'Track the run in the Swarm Inspector.');
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Publish failed';
-        setCards((prev) => ({
-          ...prev,
-          [def.id]: { ...prev[def.id], status: 'error', error: msg },
-        }));
-        toast.error('Publish failed', msg);
-      }
-    },
-    [cards, isProviderConnected, toast],
-  );
-
   return (
     <div className="flex-1 overflow-auto p-4 sm:p-6" data-testid="social-hub-page">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -283,8 +217,8 @@ export default function SocialHubPage() {
             Social hub
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Pick a network. Type an angle. Review the draft. Publish or copy.
-            Each network gets a specialist agent that understands its rules of engagement.
+            Pick a network. Type an angle. Review the draft. Copy it for manual posting.
+            Direct social publishing is not enabled yet.
           </p>
         </header>
 
@@ -292,7 +226,6 @@ export default function SocialHubPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {NETWORKS.map((def) => {
             const state = cards[def.id];
-            const connected = isProviderConnected(def.requiredProvider);
             const Icon = def.icon;
             return (
               <Card
@@ -310,26 +243,12 @@ export default function SocialHubPage() {
                       <h2 className="text-sm font-semibold">{def.label}</h2>
                       <p className="text-xs text-muted-foreground">{def.tagline}</p>
                     </div>
-                    {def.draftOnly ? (
+                    {def.draftOnly && (
                       <span
                         className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[10px] font-medium"
                         title="Draft only — JAK will write the content; you copy + paste it into the platform to publish."
                       >
                         Draft only
-                      </span>
-                    ) : def.requiredProvider && (
-                      <span
-                        className={
-                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ' +
-                          (connected
-                            ? 'bg-emerald-500/10 text-emerald-600'
-                            : 'bg-muted text-muted-foreground')
-                        }
-                      >
-                        <span
-                          className={'h-1.5 w-1.5 rounded-full ' + (connected ? 'bg-emerald-500' : 'bg-muted-foreground/60')}
-                        />
-                        {connected ? 'Connected' : 'Not connected'}
                       </span>
                     )}
                   </div>
@@ -405,23 +324,6 @@ export default function SocialHubPage() {
                         <Copy className="h-3.5 w-3.5" /> Copy
                       </Button>
                     )}
-                    {state.draft && def.requiredProvider && !def.draftOnly && (
-                      <Button
-                        variant={connected ? 'default' : 'outline'}
-                        onClick={() => handlePublish(def)}
-                        disabled={!connected || state.status === 'publishing' || state.status === 'done'}
-                        className="gap-1.5"
-                        data-testid={`social-publish-${def.id}`}
-                      >
-                        {state.status === 'publishing' ? (
-                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing…</>
-                        ) : state.status === 'done' ? (
-                          <><Check className="h-3.5 w-3.5" /> Queued</>
-                        ) : (
-                          <><Send className="h-3.5 w-3.5" /> Publish</>
-                        )}
-                      </Button>
-                    )}
                     {state.draft && def.draftOnly && (
                       <p
                         className="basis-full mt-1 text-[10px] text-muted-foreground"
@@ -439,9 +341,7 @@ export default function SocialHubPage() {
 
         {/* Footer hint — what to do if not-connected */}
         <p className="text-xs text-muted-foreground text-center pt-2">
-          Not seeing a network you need? Open
-          {' '}<a href="/integrations" className="text-primary hover:underline">Integrations</a>{' '}
-          to connect your account first.
+          Social Hub currently creates reviewable drafts only. Publishing must happen manually on each platform.
         </p>
       </div>
     </div>

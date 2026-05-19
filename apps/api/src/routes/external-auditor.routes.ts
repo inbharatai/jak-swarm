@@ -262,7 +262,7 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = request.user as AuthSession;
       const { auditRunId } = request.params as { auditRunId: string };
-      const engagement = (request as FastifyRequest & { engagement: { id: string; tenantId: string } }).engagement;
+      const engagement = (request as FastifyRequest & { engagement: { id: string; tenantId: string; scopes: string[]; expiresAt?: Date | string } }).engagement;
       // Read the audit run scoped to engagement tenant.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const auditRun = await (fastify.db as any).auditRun.findFirst({
@@ -279,7 +279,15 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
         objectType: 'engagement',
         action: 'view',
       });
-      return reply.send(ok({ auditRun }));
+      return reply.send(ok({
+        auditRun,
+        engagement: {
+          id: engagement.id,
+          tenantId: engagement.tenantId,
+          scopes: engagement.scopes,
+          expiresAt: engagement.expiresAt ?? null,
+        },
+      }));
     },
   );
 

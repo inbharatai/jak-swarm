@@ -46,10 +46,10 @@ export function useWorkflowStream(workflowId: string | null) {
       const token = await getToken();
       if (!token || cancelled) return;
 
-      // P0-A: centralized resolver throws/warns in production if URL missing.
-      const { getApiBaseUrl } = await import('@/lib/api-client');
-      const apiUrl = getApiBaseUrl();
-      const url = `${apiUrl}/workflows/${workflowId}/stream`;
+      // P0-A: use the guarded URL builder so production builds never stream
+      // against localhost when NEXT_PUBLIC_API_URL is missing.
+      const { buildApiUrl } = await import('@/lib/api-client');
+      const url = buildApiUrl(`/workflows/${workflowId}/stream`);
 
       abortController = new AbortController();
 

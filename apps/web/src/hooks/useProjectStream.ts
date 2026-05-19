@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { connectSSE } from '@/lib/sse-fetch';
-import { getApiBaseUrl } from '@/lib/api-client';
+import { buildApiUrl } from '@/lib/api-client';
 
-// P0-A: centralized so production-misconfig guard fires uniformly.
-const BASE_URL = getApiBaseUrl();
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY = 1000;
 
@@ -57,7 +55,7 @@ export function useProjectStream(projectId: string | undefined) {
       const token = await getToken();
       if (cancelled || !token) return;
 
-      const url = `${BASE_URL}/projects/${projectId}/stream`;
+      const url = buildApiUrl(`/projects/${projectId}/stream`);
       abortController = new AbortController();
 
       try {

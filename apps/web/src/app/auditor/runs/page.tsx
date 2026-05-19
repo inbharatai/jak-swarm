@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { getApiBaseUrl } from '@/lib/api-client';
+import { buildApiUrl } from '@/lib/api-client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -24,15 +24,10 @@ interface Engagement {
   accessGrantedAt: string;
 }
 
-// P0-A: use centralized resolver. Was reading NEXT_PUBLIC_API_BASE_URL
-// (different name from the rest of the app) which never existed in any
-// env example, so it always silently fell back to localhost.
-const API_BASE_URL = getApiBaseUrl();
-
 async function auditorFetch<T>(path: string): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
   if (!token) throw new Error('Not signed in as auditor — accept your invite link first.');
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

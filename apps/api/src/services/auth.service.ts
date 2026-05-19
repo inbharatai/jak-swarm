@@ -314,15 +314,22 @@ export class AuthService {
 
   private async provisionUserFromSupabase(identity: SupabaseIdentity, email: string) {
     const profile = this.extractSupabaseProfile(identity);
-    const desiredRole = this.mapSupabaseRole(profile.role);
-    const requestedTenantId = typeof profile.tenantId === 'string' && profile.tenantId.trim()
+    const trustedTenantId = typeof profile.tenantId === 'string' && profile.tenantId.trim()
       ? profile.tenantId.trim()
       : null;
 
     return this.db.$transaction(async (tx) => {
-      let tenant = requestedTenantId
-        ? await tx.tenant.findUnique({ where: { id: requestedTenantId } })
+      let tenant = trustedTenantId
+        ? await tx.tenant.findUnique({ where: { id: trustedTenantId } })
         : null;
+
+      if (trustedTenantId && !tenant) {
+        throw new UnauthorizedError('Supabase tenant assignment is invalid or expired');
+      }
+
+      if (tenant && tenant.status !== 'ACTIVE') {
+        throw new UnauthorizedError('Tenant account is suspended or deleted');
+      }
 
       if (!tenant) {
         const tenantName = profile.tenantName || this.deriveTenantNameFromEmail(email);
@@ -336,6 +343,10 @@ export class AuthService {
           },
         });
       }
+
+      const desiredRole = trustedTenantId
+        ? this.mapSupabaseRole(profile.role)
+        : 'TENANT_ADMIN';
 
       const user = await tx.user.create({
         data: {
@@ -374,8 +385,12 @@ export class AuthService {
 
     return {
       name,
-      role: this.readString(userMeta['role']) ?? this.readString(appMeta['role']),
-      tenantId: this.readString(userMeta['tenantId']) ?? this.readString(appMeta['tenantId']),
+      // Authorization fields MUST come from Supabase app_metadata only.
+      // user_metadata is client-editable and can never grant roles or tenant
+      // membership. New self-serve signups without trusted app metadata get a
+      // fresh isolated tenant in provisionUserFromSupabase().
+      role: this.readString(appMeta['role']),
+      tenantId: this.readString(appMeta['tenantId']),
       tenantName: this.readString(userMeta['tenantName']) ?? this.readString(appMeta['tenantName']),
       jobFunction: this.readString(userMeta['jobFunction']) ?? this.readString(appMeta['jobFunction']),
       avatarUrl: this.readString(userMeta['avatar_url']) ?? this.readString(userMeta['avatarUrl']) ?? this.readString(appMeta['avatar_url']),
@@ -387,7 +402,9 @@ export class AuthService {
 
     switch (normalized) {
       case 'SYSTEM_ADMIN':
-        return 'SYSTEM_ADMIN';
+        // Do not mint cross-tenant super-admins from Supabase metadata. System
+        // admins must be created through the first-party admin path/local DB.
+        return 'VIEWER';
       case 'TENANT_ADMIN':
       case 'ADMIN':
         return 'TENANT_ADMIN';

@@ -426,18 +426,36 @@ export class WorkflowService {
     // for a benign retry); a different hash would have been blocked
     // above already.
     const updated = await this.db.$transaction(async (tx) => {
-      const updatedRow = await tx.approvalRequest.update({
-        where: { id: approvalId },
-        data: {
-          status: decision,
-          reviewedBy,
-          comment: comment ?? null,
-          reviewedAt: new Date(),
-          // Initialize hash for legacy rows on first decide so future
-          // decides have a binding to compare against.
-          ...(storedHash ? {} : { proposedDataHash: currentHash }),
-        },
-      });
+      const decisionUpdate = {
+        status: decision,
+        reviewedBy,
+        comment: comment ?? null,
+        reviewedAt: new Date(),
+        // Initialize hash for legacy rows on first decide so future
+        // decides have a binding to compare against.
+        ...(storedHash ? {} : { proposedDataHash: currentHash }),
+      };
+      let updatedRow: typeof existing | null;
+      if (typeof (tx.approvalRequest as unknown as { updateMany?: unknown }).updateMany === 'function') {
+        const updatedCount = await tx.approvalRequest.updateMany({
+          where: { id: approvalId, status: 'PENDING' },
+          data: decisionUpdate,
+        });
+        if (updatedCount.count !== 1) {
+          throw new WorkflowStateError('Approval was already decided by another request');
+        }
+        updatedRow = await tx.approvalRequest.findUnique({ where: { id: approvalId } });
+      } else {
+        // Unit-test fakes only implement update(); production Prisma uses
+        // updateMany above for the atomic status=PENDING guard.
+        updatedRow = await tx.approvalRequest.update({
+          where: { id: approvalId },
+          data: decisionUpdate,
+        });
+      }
+      if (!updatedRow) {
+        throw new NotFoundError('ApprovalRequest', approvalId);
+      }
 
       try {
         await tx.approvalScope.create({

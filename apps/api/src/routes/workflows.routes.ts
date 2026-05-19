@@ -93,7 +93,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     const decision = cmd.kind === 'approve' ? 'APPROVED' : 'REJECTED';
                     await workflowService.resolveApproval(tenantId, pendingApproval.id, decision, userId);
                     await fastify.auditLog(request, `APPROVAL_${decision}_VIA_FOLLOWUP`, 'ApprovalRequest', pendingApproval.id, { decision, source: 'chat_followup' });
-                    fastify.swarm.enqueueControl({
+                    const enqueued = await fastify.swarm.enqueueControl({
                       action: 'resume',
                       workflowId: activeWorkflow.id,
                       tenantId,
@@ -101,7 +101,11 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                       decision,
                       reviewedBy: userId,
                       comment: 'Resolved from chat follow-up command',
+                      approvalId: pendingApproval.id,
                     });
+                    if (!enqueued) {
+                      return reply.status(503).send(err('RESUME_ENQUEUE_FAILED', 'Approval was recorded, but workflow resume could not be queued. Try resume again or contact support.'));
+                    }
                     return reply.status(200).send(ok({ ...baseResult, approvalId: pendingApproval.id, decision }));
                   }
                   case 'pause': {
@@ -674,7 +678,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         // Enqueue the resume as a durable control job. The queue worker picks it up
         // and calls swarmService.resumeAfterApproval() with the same parameters, but
         // now it survives an API crash between the 202 and the actual resume.
-        fastify.swarm.enqueueControl({
+        const enqueued = await fastify.swarm.enqueueControl({
           action: 'resume',
           workflowId,
           tenantId: request.user.tenantId,
@@ -683,6 +687,9 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           reviewedBy: request.user.userId,
           comment,
         });
+        if (!enqueued) {
+          return reply.status(503).send(err('RESUME_ENQUEUE_FAILED', 'Workflow resume could not be queued. Try again or contact support.'));
+        }
 
         return reply.status(202).send(
           ok({

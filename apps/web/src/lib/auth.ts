@@ -47,13 +47,56 @@ function mapSupabaseUser(user: SupabaseUser): AuthUser {
     id: user.id,
     email: user.email ?? '',
     name: meta['name'] ?? meta['full_name'] ?? user.email?.split('@')[0] ?? '',
-    role: meta['role'] ?? 'END_USER',
-    tenantId: meta['tenantId'] ?? '',
+    // Never trust Supabase user_metadata for authorization. The API resolves
+    // roles and tenant membership from local DB / trusted app_metadata.
+    role: 'VIEWER',
+    tenantId: '',
     tenantName: meta['tenantName'] ?? '',
     industry: meta['industry'] ?? 'TECHNOLOGY',
     avatarUrl: meta['avatar_url'] ?? undefined,
     jobFunction: meta['jobFunction'] ?? undefined,
   };
+}
+
+function isLocalhostApi(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(url);
+}
+
+function resolveAuthApiBaseUrl(): string {
+  const configured = process.env['NEXT_PUBLIC_API_URL']?.trim();
+  const isProd = process.env['NODE_ENV'] === 'production';
+  if (configured) {
+    if (isProd && isLocalhostApi(configured)) {
+      throw new Error('Backend API is not configured. NEXT_PUBLIC_API_URL points at localhost in a production build.');
+    }
+    return configured.replace(/\/$/, '');
+  }
+  if (isProd) {
+    throw new Error('Backend API is not configured. Set NEXT_PUBLIC_API_URL to your deployed API URL.');
+  }
+  return 'http://localhost:4000';
+}
+
+function buildAuthApiUrl(path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${resolveAuthApiBaseUrl()}${normalized}`;
+}
+
+async function fetchTrustedAuthUser(accessToken: string | null | undefined, fallbackUser?: SupabaseUser | null): Promise<AuthUser | null> {
+  if (!accessToken) return fallbackUser ? mapSupabaseUser(fallbackUser) : null;
+  const response = await fetch(buildAuthApiUrl('/auth/me'), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: { message?: string }; message?: string } | null;
+    throw new Error(body?.error?.message ?? body?.message ?? `Auth profile lookup failed (${response.status})`);
+  }
+  const payload = await response.json().catch(() => null) as { data?: unknown } | null;
+  const trusted = coerceAuthUser(payload?.data);
+  if (!trusted) {
+    throw new Error('Auth profile lookup returned an invalid user profile');
+  }
+  return trusted;
 }
 
 function setJakCookie(token: string): void {
@@ -91,7 +134,7 @@ function coerceAuthUser(value: unknown): AuthUser | null {
     id,
     email,
     name: String(raw['name'] ?? email.split('@')[0] ?? ''),
-    role: String(raw['role'] ?? 'TENANT_ADMIN') as AuthUser['role'],
+    role: String(raw['role'] ?? 'VIEWER') as AuthUser['role'],
     tenantId,
     tenantName: String(raw['tenantName'] ?? ''),
     industry: String(raw['industry'] ?? 'TECHNOLOGY') as AuthUser['industry'],
@@ -271,36 +314,61 @@ export function useAuth(): UseAuthReturn {
       return;
     }
 
-    // Get initial session
-    runAuthRequest(() => getClient().auth.getUser())
-      .then((result) => {
-        const user = result.data?.user;
+    let cancelled = false;
+    const hydrateTrustedUser = async (
+      supabaseUser: SupabaseUser | null | undefined,
+      accessToken?: string | null,
+    ): Promise<void> => {
+      if (!supabaseUser) {
+        if (!cancelled) {
+          setState({ user: null, isLoading: false, error: null });
+        }
+        return;
+      }
+      const trustedUser = await fetchTrustedAuthUser(accessToken, supabaseUser);
+      if (!cancelled) {
         setState({
-          user: user ? mapSupabaseUser(user) : null,
+          user: trustedUser,
           isLoading: false,
           error: null,
         });
+      }
+    };
+
+    // Get initial session and hydrate role/tenant from the trusted API.
+    runAuthRequest(() => getClient().auth.getSession())
+      .then((result) => {
+        void hydrateTrustedUser(result.data.session?.user, result.data.session?.access_token);
       })
       .catch((error) => {
-        setState({
-          user: null,
-          isLoading: false,
-          error: getAuthErrorMessage(error),
-        });
+        if (!cancelled) {
+          setState({
+            user: null,
+            isLoading: false,
+            error: getAuthErrorMessage(error),
+          });
+        }
       });
 
     // Listen for auth state changes
     const {
       data: { subscription },
     } = getClient().auth.onAuthStateChange((_event, session) => {
-      setState({
-        user: session?.user ? mapSupabaseUser(session.user) : null,
-        isLoading: false,
-        error: null,
+      void hydrateTrustedUser(session?.user, session?.access_token).catch((error) => {
+        if (!cancelled) {
+          setState({
+            user: null,
+            isLoading: false,
+            error: getAuthErrorMessage(error),
+          });
+        }
       });
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const failAuth = useCallback((error: unknown, fallback?: string): never => {
@@ -323,8 +391,9 @@ export function useAuth(): UseAuthReturn {
       failAuth(error);
     }
     if (data.user) {
+      const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user).catch(error => failAuth(error));
       setState({
-        user: mapSupabaseUser(data.user),
+        user: trustedUser,
         isLoading: false,
         error: null,
       });
@@ -362,8 +431,9 @@ export function useAuth(): UseAuthReturn {
     if (error) {
       failAuth(error);
     }
+    const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user).catch(error => failAuth(error));
     setState({
-      user: data.user ? mapSupabaseUser(data.user) : null,
+      user: trustedUser,
       isLoading: false,
       error: null,
     });
@@ -389,7 +459,6 @@ export function useAuth(): UseAuthReturn {
               full_name: data.name,
               tenantName: data.tenantName,
               industry: data.industry,
-              role: 'ADMIN',
             },
           },
         }),
@@ -428,10 +497,11 @@ export function useAuth(): UseAuthReturn {
     }
 
     const { data } = await runAuthRequest(
-      () => getClient().auth.getUser(),
+      () => getClient().auth.getSession(),
     ).catch(error => failAuth(error));
+    const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.session?.user).catch(error => failAuth(error));
     setState({
-      user: data.user ? mapSupabaseUser(data.user) : null,
+      user: trustedUser,
       isLoading: false,
       error: null,
     });

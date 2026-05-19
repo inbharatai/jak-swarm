@@ -645,6 +645,114 @@ describe('AuthService.getUserById', () => {
 // ---------------------------------------------------------------------------
 
 describe('AuthService Supabase identity helpers', () => {
+  it('does not trust user_metadata role or tenantId when provisioning a Supabase user', async () => {
+    const fake = makeFakeDb();
+    const fastify = makeFakeFastify();
+    const svc = new AuthService(fake.db, fastify);
+
+    fake._state.tenants.push({
+      id: 'tnt-victim',
+      slug: 'victim-co',
+      name: 'Victim Co',
+      status: 'ACTIVE',
+    });
+
+    const session = await (svc as any).resolveSupabaseIdentity({
+      id: 'supabase-attacker',
+      email: 'attacker@example.com',
+      user_metadata: {
+        name: 'Attacker',
+        role: 'SYSTEM_ADMIN',
+        tenantId: 'tnt-victim',
+        tenantName: 'Attacker Workspace',
+      },
+      app_metadata: {},
+    });
+
+    expect(session.role).toBe('TENANT_ADMIN');
+    expect(session.tenantId).not.toBe('tnt-victim');
+    expect(fake._state.users[0]!.role).toBe('TENANT_ADMIN');
+    expect(fake._state.users[0]!.tenantId).not.toBe('tnt-victim');
+    expect(fake._state.tenants).toHaveLength(2);
+  });
+
+  it('uses trusted app_metadata tenantId and role for invited Supabase users', async () => {
+    const fake = makeFakeDb();
+    const fastify = makeFakeFastify();
+    const svc = new AuthService(fake.db, fastify);
+
+    fake._state.tenants.push({
+      id: 'tnt-invite',
+      slug: 'invited-co',
+      name: 'Invited Co',
+      status: 'ACTIVE',
+    });
+
+    const session = await (svc as any).resolveSupabaseIdentity({
+      id: 'supabase-invitee',
+      email: 'reviewer@example.com',
+      user_metadata: {
+        name: 'Reviewer Person',
+        role: 'SYSTEM_ADMIN',
+        tenantId: 'tnt-attacker-controlled',
+      },
+      app_metadata: {
+        tenantId: 'tnt-invite',
+        role: 'REVIEWER',
+      },
+    });
+
+    expect(session.tenantId).toBe('tnt-invite');
+    expect(session.role).toBe('REVIEWER');
+    expect(fake._state.users[0]).toMatchObject({
+      tenantId: 'tnt-invite',
+      role: 'REVIEWER',
+      email: 'reviewer@example.com',
+    });
+  });
+
+  it('rejects invalid trusted app_metadata tenant assignments instead of creating a silent new tenant', async () => {
+    const fake = makeFakeDb();
+    const fastify = makeFakeFastify();
+    const svc = new AuthService(fake.db, fastify);
+
+    await expect((svc as any).resolveSupabaseIdentity({
+      id: 'supabase-stale-invite',
+      email: 'stale@example.com',
+      user_metadata: { tenantName: 'Should Not Be Created' },
+      app_metadata: { tenantId: 'tnt-missing', role: 'REVIEWER' },
+    })).rejects.toBeInstanceOf(UnauthorizedError);
+
+    expect(fake._state.tenants).toHaveLength(0);
+    expect(fake._state.users).toHaveLength(0);
+  });
+
+  it('never provisions SYSTEM_ADMIN from Supabase app_metadata', async () => {
+    const fake = makeFakeDb();
+    const fastify = makeFakeFastify();
+    const svc = new AuthService(fake.db, fastify);
+
+    fake._state.tenants.push({
+      id: 'tnt-invite',
+      slug: 'invited-co',
+      name: 'Invited Co',
+      status: 'ACTIVE',
+    });
+
+    const session = await (svc as any).resolveSupabaseIdentity({
+      id: 'supabase-system-admin-request',
+      email: 'system-admin-request@example.com',
+      user_metadata: { name: 'Nope' },
+      app_metadata: {
+        tenantId: 'tnt-invite',
+        role: 'SYSTEM_ADMIN',
+      },
+    });
+
+    expect(session.role).toBe('VIEWER');
+    expect(fake._state.users[0]!.role).toBe('VIEWER');
+  });
+
   it.todo(
     'authenticateSupabaseToken: returns a session for a valid Supabase access token — needs global fetch mock + config.supabaseUrl/AnonKey injection',
   );
@@ -666,13 +774,9 @@ describe('AuthService Supabase identity helpers', () => {
   it.todo(
     'provisionUserFromSupabase: creates a new tenant + user when no requestedTenantId resolves — needs CreditService.createFreeSubscription mocked (constructor side-effect on free-tier creation)',
   );
-  it.todo(
-    'provisionUserFromSupabase: reuses an existing tenant when app_metadata.tenantId resolves',
-  );
+  it.todo('authenticateSupabaseToken: exercises trusted app_metadata via fetch instead of private helper access');
   it.todo(
     'generateTenantSlug: appends -2, -3 ... when the base slug is taken (private — exercise via provisionUserFromSupabase)',
   );
-  it.todo(
-    'mapSupabaseRole: maps ADMIN/TENANT_ADMIN → TENANT_ADMIN, OPERATOR → OPERATOR, USER/VIEWER/unknown → VIEWER (private — exercise via provisionUserFromSupabase)',
-  );
+  it.todo('mapSupabaseRole: full role matrix through trusted app_metadata');
 });

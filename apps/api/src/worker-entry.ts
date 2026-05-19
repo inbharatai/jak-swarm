@@ -208,6 +208,27 @@ async function main(): Promise<void> {
   const metricsServer = createServer((req, res) => {
     const url = req.url ?? '';
     if (req.method === 'GET' && url.startsWith('/metrics')) {
+      const expected = process.env['METRICS_TOKEN']?.trim();
+      if (!expected && config.nodeEnv === 'production') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'metrics endpoint is not exposed without METRICS_TOKEN' }));
+        return;
+      }
+      if (expected) {
+        const provided = (() => {
+          const header = req.headers.authorization;
+          if (typeof header === 'string' && header.startsWith('Bearer ')) {
+            return header.slice(7);
+          }
+          const query = new URL(req.url ?? '/', 'http://worker.local').searchParams;
+          return query.get('token') ?? undefined;
+        })();
+        if (provided !== expected) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'metrics endpoint requires bearer token' }));
+          return;
+        }
+      }
       metricsRegistry
         .metrics()
         .then((body) => {

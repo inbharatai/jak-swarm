@@ -283,10 +283,10 @@ export default function HeroCockpit() {
             <div className="p-3 sm:p-4 space-y-2">
               <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] sm:text-xs font-sans">
                 <span className="text-slate-500">Tool</span>
-                <span className="text-white font-mono">linkedin_publish</span>
+                <span className="text-white font-mono">linkedin_draft_handoff</span>
                 <span className="text-slate-500">Account</span>
-                <span className="text-white">Your LinkedIn (verified)</span>
-                <span className="text-slate-500">Will publish</span>
+                <span className="text-white">Manual posting required</span>
+                <span className="text-slate-500">Draft handoff</span>
                 <span className="text-slate-200 line-clamp-1">
                   &ldquo;Three things every founder should know about positioning&hellip;&rdquo;
                 </span>
@@ -302,7 +302,7 @@ export default function HeroCockpit() {
                   aria-label="Approve (demo)"
                   tabIndex={-1}
                 >
-                  Approve &amp; publish
+                  Approve draft handoff
                 </button>
                 <button
                   type="button"

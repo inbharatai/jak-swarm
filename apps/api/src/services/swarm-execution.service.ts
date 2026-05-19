@@ -193,6 +193,8 @@ export interface EnqueueControlParams {
   reviewedBy?: string;
   /** Optional free-text comment attached to the resume decision. */
   comment?: string;
+  /** Optional approval row resolved before enqueue; carried into audit/resume state. */
+  approvalId?: string;
   /** Idempotency key — prevents duplicate execution on network retries. */
   idempotencyKey?: string;
 }
@@ -564,6 +566,7 @@ export class SwarmExecutionService extends EventEmitter {
             decision: payload['decision'] as ResumeParams['decision'],
             reviewedBy: String(payload['reviewedBy'] ?? job.userId),
             comment: typeof payload['comment'] === 'string' ? (payload['comment'] as string) : undefined,
+            approvalId: typeof payload['approvalId'] === 'string' ? (payload['approvalId'] as string) : undefined,
           });
         } else if (action === 'cancel') {
           await this.cancelWorkflow({ workflowId: job.workflowId });
@@ -630,7 +633,7 @@ export class SwarmExecutionService extends EventEmitter {
    * with execution jobs and get the same atomic claim, retry/backoff, and dead-letter
    * semantics that executions already have.
    */
-  enqueueControl(params: EnqueueControlParams): boolean {
+  async enqueueControl(params: EnqueueControlParams): Promise<boolean> {
     const { action, workflowId, tenantId, userId, decision, reviewedBy, comment, idempotencyKey } = params;
 
     if (action === 'resume' && (!decision || !reviewedBy)) {
@@ -650,15 +653,19 @@ export class SwarmExecutionService extends EventEmitter {
     if (decision) payload['decision'] = decision;
     if (reviewedBy) payload['reviewedBy'] = reviewedBy;
     if (comment) payload['comment'] = comment;
+    if (params.approvalId) payload['approvalId'] = params.approvalId;
     if (idempotencyKey) payload['idempotencyKey'] = idempotencyKey;
 
-    void this.upsertWorkflowJob(payload as { workflowId: string; tenantId: string; userId: string } & Record<string, unknown>).catch((err) => {
+    try {
+      await this.upsertWorkflowJob(payload as { workflowId: string; tenantId: string; userId: string } & Record<string, unknown>);
+      return true;
+    } catch (err) {
       this.log.error(
         { workflowId, action, err: err instanceof Error ? err.message : String(err) },
         '[SwarmQueue] Failed to enqueue control action',
       );
-    });
-    return true;
+      return false;
+    }
   }
 
   async getQueueStats(): Promise<{
@@ -754,9 +761,11 @@ export class SwarmExecutionService extends EventEmitter {
     }
 
     const payload = params as unknown as Record<string, unknown>;
+    const actionField = payload['action'];
+    const action = typeof actionField === 'string' ? actionField : 'execute';
     const existing = await jobModel.findUnique({ where: { workflowId: params.workflowId } });
     if (existing) {
-      if (existing.status === 'COMPLETED') {
+      if (existing.status === 'COMPLETED' && action === 'execute') {
         this.log.warn({ workflowId: params.workflowId }, '[SwarmQueue] Workflow already completed; enqueue ignored');
         return;
       }
