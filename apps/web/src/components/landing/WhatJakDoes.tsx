@@ -1,101 +1,109 @@
 'use client';
 
 /**
- * "What JAK does" — the three-column scope summary required by the landing
- * audit (§5 and §20). Stands between the Verify section and the consolidated
- * Build section. Gives the visitor a single scannable moment that says
- * "JAK builds, operates, and verifies — one platform" without forcing them
- * to read six card grids to figure out the category.
+ * Company operating layer section.
  *
- * Design constraints:
- * - Matches the existing glass-card + colored left-border DNA used by the
- *   other landing card grids, so the section doesn't read as an alien
- *   insert.
- * - Three accents only: emerald (build), sky (operate), rose (verify).
- *   Audit §17 standardizes these as meaning-carrying colors.
- * - No new icons library — uses existing LandingIcon names already imported
- *   on the homepage. No new animation; visual calm is the point.
- * - Anchors to the existing in-page `#agents`, `#workflow`, `#pricing`
- *   routes are preserved by NOT giving this section its own anchor (it's
- *   a summary, not a linkable destination).
+ * This is the YC-ready wedge, but the copy is intentionally bounded by the
+ * implementation that exists today:
+ *   1. evidence artifacts are real tenant-scoped records
+ *   2. graph entities are extracted from evidence, not invented
+ *   3. drift detection is deterministic
+ *   4. OpenAI-generated specs require approval before execution
+ *
+ * Connector auto-sync is not claimed as complete here. The page says
+ * "connected or manually ingested evidence" because the current /company UI
+ * already supports source-labeled artifact ingestion, while deeper connector
+ * sync remains the next build phase.
  */
 
 import { LandingIcon, type LandingIconName } from './landing-icons';
 
 const PILLARS: Array<{
-  key: 'plan' | 'execute' | 'approve';
+  key: 'memory' | 'drift' | 'specs';
   eyebrow: string;
   title: string;
   body: string;
   points: string[];
+  evidencePath: string;
+  evidenceLabel: string;
   color: string;
   iconName: LandingIconName;
 }> = [
   {
-    key: 'plan',
-    eyebrow: 'Plan',
-    title: 'Plain English in. Workflow out.',
-    body: 'Type a task like "research my top 3 competitors and draft a LinkedIn post." JAK turns it into a multi-step plan you can review before anything runs.',
+    key: 'memory',
+    eyebrow: 'Company memory',
+    title: 'Evidence first, not chatbot memory.',
+    body: 'JAK stores source-labeled artifacts from docs, tickets, code, meetings, customer calls, support, Slack, Notion, Linear/Jira, GitHub, Gmail, or manual notes. It then extracts decisions, tasks, risks, owners, deadlines, customer signals, and code changes with citations.',
     points: [
-      'Natural language &rarr; structured plan',
-      'Pre-built templates for research, content, outreach, code review',
-      'Edit the plan before you approve it',
+      'Artifacts are tenant-scoped and body-hashed',
+      'Entities cite the artifacts they came from',
+      'Connector sync is setup-dependent; manual evidence already works',
     ],
-    color: '#34d399',
-    iconName: 'bolt',
-  },
-  {
-    key: 'execute',
-    eyebrow: 'Execute',
-    title: 'Specialist agents do the work.',
-    body: 'Research, content, code, design, ops — each task runs on the right specialist, using your connected tools. You watch every step in the cockpit, not a black box.',
-    points: [
-      'Live cockpit shows every agent step',
-      'Connects to Gmail, Slack, GitHub, Notion, HubSpot, and 20+ MCP servers',
-      'Self-healing retries when a tool fails',
-    ],
+    evidencePath: 'apps/api/src/routes/company-operating-layer.routes.ts',
+    evidenceLabel: '/company/artifacts + /company/entities',
     color: '#38bdf8',
-    iconName: 'bolt',
+    iconName: 'brain',
   },
   {
-    key: 'approve',
-    eyebrow: 'Approve & Audit',
-    title: 'Nothing risky ships without you.',
-    body: 'Every external action (send email, post to Slack, deploy code, charge a card) pauses for your approval. The exact tool, files, and expected result are bound to your decision &mdash; replays with a different payload are rejected.',
+    key: 'drift',
+    eyebrow: 'Execution drift',
+    title: 'Compare what is happening with what should happen.',
+    body: 'The alignment engine looks for customer pain without matching work, decisions that never became tasks, execution that has no supporting decision, and stale high-priority tasks. It is a deterministic comparator, not a vague LLM opinion.',
     points: [
-      'Inline approval card shows tool + files + expected result',
-      'Tamper-evident audit trail on every workflow run',
-      'Optional SOC 2 / HIPAA / ISO 27001 evidence packs when you need them',
+      'Flags unaddressed customer signals',
+      'Finds decisions that were not operationalized',
+      'Marks ungrounded execution and stale work',
     ],
-    color: '#f472b6',
-    iconName: 'shield',
+    evidencePath: 'apps/api/src/services/company-brain/company-operating-layer.service.ts',
+    evidenceLabel: 'buildDriftCandidates()',
+    color: '#fbbf24',
+    iconName: 'target',
+  },
+  {
+    key: 'specs',
+    eyebrow: 'Agent-executable specs',
+    title: 'Turn drift into approved work.',
+    body: 'When drift is found, JAK can generate an OpenAI-backed execution spec with objective, scope, acceptance criteria, test plan, agent task plan, approval gates, and cited evidence. A reviewer approves or rejects it before the team treats it as executable.',
+    points: [
+      'No template fallback for spec generation',
+      'Acceptance criteria and test plans are explicit',
+      'Reviewer approval is a real backend decision route',
+    ],
+    evidencePath: 'apps/web/src/app/(dashboard)/company/page.tsx',
+    evidenceLabel: '/company/specs/generate + decide',
+    color: '#34d399',
+    iconName: 'document',
   },
 ];
 
 export default function WhatJakDoes() {
   return (
-    <section className="relative px-4 py-24 sm:px-6 lg:px-8" aria-label="What JAK does">
+    <section
+      id="company-os"
+      className="relative px-4 py-24 sm:px-6 lg:px-8"
+      aria-label="Closed-loop company operating layer"
+      style={{ background: 'linear-gradient(180deg, rgba(52,211,153,0.025), rgba(56,189,248,0.035), transparent)' }}
+    >
       <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-16 max-w-3xl mx-auto">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">
-            How JAK Works
+        <div className="mb-16 max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-400 mb-3 font-sans">
+            The YC wedge
           </p>
-          <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
-            Plan. Execute. Approve.
+          <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight text-white leading-[1.15]">
+            Product and engineering alignment, closed loop.
           </h2>
-          <p className="mt-4 text-slate-300 font-sans">
-            Three steps from a task to a result you trust. Built so a solo founder can ship work that used to need an agency or a team of five.
+          <p className="mt-4 text-base sm:text-lg text-slate-300 font-sans leading-relaxed">
+            JAK is not claiming to be a finished all-company AI OS today. The honest beta wedge is sharper: make product and engineering context legible to AI, detect drift, generate executable specs, and gate action through JAK Shield.
           </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
           {PILLARS.map((pillar) => (
-            <div
+            <article
               key={pillar.key}
-              className="rounded-2xl p-7 glass-card card-lift flex flex-col"
-              style={{
-                borderLeft: `3px solid ${pillar.color}`,
-              }}
+              className="rounded-2xl p-7 glass-card card-lift flex flex-col min-w-0"
+              style={{ borderLeft: `3px solid ${pillar.color}` }}
+              data-evidence-path={pillar.evidencePath}
             >
               <div
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg mb-4"
@@ -119,7 +127,7 @@ export default function WhatJakDoes() {
                 {pillar.body}
               </p>
 
-              <ul className="mt-auto space-y-1.5">
+              <ul className="space-y-1.5">
                 {pillar.points.map((pt) => (
                   <li key={pt} className="flex items-start gap-2 text-xs text-slate-400 font-sans">
                     <span
@@ -131,8 +139,19 @@ export default function WhatJakDoes() {
                   </li>
                 ))}
               </ul>
-            </div>
+
+              <div
+                className="mt-auto pt-4 border-t text-[10px] font-mono text-slate-500"
+                style={{ borderColor: `${pillar.color}25` }}
+              >
+                Evidence: <span className="text-slate-300">{pillar.evidenceLabel}</span>
+              </div>
+            </article>
           ))}
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5 text-sm text-amber-100 font-sans leading-relaxed">
+          Blunt beta truth: JAK has the Company OS data model, API routes, dashboard surface, deterministic drift detector, OpenAI spec generator, approval decision route, and audit foundation. It still needs deeper connector auto-sync before the landing page should claim full company-wide OS coverage.
         </div>
       </div>
     </section>

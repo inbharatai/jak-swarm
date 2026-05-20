@@ -12,6 +12,7 @@ import {
   ProductCockpit,
   ShowTheWork,
   TrustLayer,
+  WhatJakDoes,
 } from '@/components/landing';
 
 /* ─── SVG Logo Component ─────────────────────────────────────────────────── */
@@ -316,9 +317,9 @@ export default function HomePage() {
                 </svg>
                 <span className="font-semibold">JAK Shield</span>
               </a>
-              <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Outcomes</a>
-              <a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors duration-200">How It Works</a>
-              <a href="#audit" className="hover:text-white focus-visible:text-white transition-colors duration-200">Audit</a>
+              <a href="#company-os" className="hover:text-white focus-visible:text-white transition-colors duration-200">Company OS</a>
+              <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Proof</a>
+              <a href="#trust" className="hover:text-white focus-visible:text-white transition-colors duration-200">Trust</a>
               <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -363,9 +364,9 @@ export default function HomePage() {
                 </svg>
                 JAK Shield
               </a>
-              <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Outcomes</a>
-              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">How It Works</a>
-              <a href="#audit" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Audit</a>
+              <a href="#company-os" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Company OS</a>
+              <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Proof</a>
+              <a href="#trust" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Trust</a>
               <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
               <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-emerald-400 hover:text-emerald-300 transition-colors">Builder</Link>
               {/* Sign In moved here from the top bar so the brand + Get Started
@@ -376,10 +377,9 @@ export default function HomePage() {
         </nav>
 
         {/* ── 1. Hero ─────────────────────────────────────────────────────────
-             Simplified per the pokee.ai-comparison pass: dropped the floating
-             particles, the orbiting agent constellation, and the four-icon
-             trust strip. Two ambient mesh blobs remain for depth. Headline
-             leads with what JAK *does* (verb-first), not the category. */}
+             YC-ready framing, but truth-locked to the current product:
+             company evidence -> drift detection -> executable specs ->
+             approval-gated agent execution. */}
         <section className="relative min-h-[88vh] flex items-center gradient-bg px-4 pt-24 pb-20 sm:px-6 lg:px-8 grain-overlay overflow-hidden">
           <div className="hero-mesh-blob h-[22rem] w-[22rem] sm:h-[37.5rem] sm:w-[37.5rem]" style={{ top: '10%', left: '-10%', background: 'radial-gradient(circle, rgba(52,211,153,0.13) 0%, transparent 70%)' }} />
           <div className="hero-mesh-blob right-8 h-56 w-56 sm:-right-[5%] sm:h-[30rem] sm:w-[30rem]" style={{ top: '35%', background: 'radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 70%)', animationDelay: '-7s' }} />
@@ -392,9 +392,8 @@ export default function HomePage() {
               transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
-            {/* Eyebrow — leads with the security positioning the brief
-                 demanded. JAK Shield chip is clickable + scrolls to the
-                 #jak-shield section below. */}
+            {/* JAK Shield stays visible, but the category lead is now the
+                 closed-loop company operating layer the product is building. */}
             <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
               <a
                 href="#jak-shield"
@@ -404,36 +403,38 @@ export default function HomePage() {
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
                 </svg>
-                Powered by JAK Shield
+                Protected by JAK Shield
               </a>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-sky-400/35 bg-sky-400/[0.08] text-sky-200 text-[11px] font-semibold tracking-[0.16em] uppercase font-sans">
                 Beta 0.1.0-beta.0
               </span>
               <span className="max-w-full text-center text-[11px] font-semibold text-emerald-300/90 tracking-[0.16em] uppercase font-sans break-words">
-                &middot; The Secure Control Plane for AI Agents
+                &middot; Closed-loop company operating layer
               </span>
             </div>
 
             <h1 className="mb-6 pb-3 mx-auto text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15]">
-              <span className="block text-white">The Secure Control Plane</span>
-              <span className="block mt-2 text-white">for</span>
-              <span className="block mt-2 gradient-text landing-gradient-text">AI Agents.</span>
+              <span className="block text-white">Turn company context</span>
+              <span className="block mt-2 text-white">into approved</span>
+              <span className="block mt-2 gradient-text landing-gradient-text">agent work.</span>
             </h1>
 
-            <p className="mb-6 max-w-2xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              Run AI agents safely across code, browser, files, email, GitHub, and business tools &mdash; with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
+            <p className="mb-6 max-w-3xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
+              JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through OpenAI-first agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
             </p>
 
-            {/* Six security pillars chip strip — every chip is grep-able
-                 in code, every chip is a real Shield feature card below. */}
+            {/* Capability strip. Every term below maps to real product code:
+                 CompanyArtifact/CompanyGraphEntity/ExecutionDriftFinding/
+                 AgentExecutableSpec plus the JAK Shield approval and audit
+                 surfaces. */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
               {[
-                'Permissions',
+                'Evidence Graph',
+                'Drift Detection',
+                'Executable Specs',
                 'Approvals',
-                'Sandboxing',
-                'Risk Scoring',
-                'Defensive Review',
-                'Tamper-evident Audit',
+                'JAK Shield',
+                'Audit Trail',
               ].map((pillar) => (
                 <span
                   key={pillar}
@@ -495,32 +496,35 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 2. Pain framing — "AI chat gives answers. JAK gets work done." */}
+        {/* ── 2. Pain framing — why fragmented context breaks execution. */}
         <PainSection />
 
-        {/* ── 3. How It Works — 7-step pipeline (Command → Plan → Route →
+        {/* ── 3. Company OS wedge — evidence -> graph -> drift -> specs. */}
+        <WhatJakDoes />
+
+        {/* ── 4. How It Works — 7-step pipeline (Command → Plan → Route →
              Execute → Approve → Verify → Deliver). Replaces the prior
              5-icon strip; native section anchor #how-it-works. */}
         <HowItWorks />
 
-        {/* ── 4. Product Cockpit — premium dashboard mockup. Left rail =
+        {/* ── 5. Product Cockpit — premium dashboard mockup. Left rail =
              user command + recent runs · Center = live agent graph ·
              Right = approval card + output preview · Bottom = audit
              timeline. Mirrors the actual cockpit at /workspace. */}
         <ProductCockpit />
 
-        {/* ── 5. Outcomes (4 product-proof cards) ──────────────────────── */}
+        {/* ── 6. Outcomes (4 product-proof cards) ──────────────────────── */}
         <ShowTheWork />
 
-        {/* ── 6. Trust Layer — 6 grep-able guarantees ──────────────────── */}
+        {/* ── 7. Trust Layer — 6 grep-able guarantees ──────────────────── */}
         <TrustLayer />
 
-        {/* ── 6b. JAK Shield — security/trust layer brand. Each feature
+        {/* ── 7b. JAK Shield — security/trust layer brand. Each feature
              card carries `data-evidence-path` pointing at a real file
              so the truth-lock CI gate can verify nothing is hallucinated. */}
         <JAKShield />
 
-        {/* ── 7. Audit & Compliance Pack — sits after the Trust Layer.
+        {/* ── 8. Audit & Compliance Pack — sits after the Trust Layer.
              Most visitors are solo founders / small teams who don't
              need SOC 2 yet; the pack is reframed as a *trust signal*
              available when they need it, not the headline pitch. */}
@@ -729,7 +733,7 @@ export default function HomePage() {
                   <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  AI workflow operator for founder-led teams. Give JAK a task in plain English &mdash; it plans, executes with the right tools, asks approval before anything risky, and gives you an audit trail. Open-source core, self-hostable, MIT licensed.
+                  Closed-loop company operating layer for product and engineering teams. JAK turns evidence into specs, routes approved work to agents, and keeps an audit trail. Open-source core, self-hostable, MIT licensed.
                 </p>
               </div>
 
@@ -737,7 +741,8 @@ export default function HomePage() {
               <div>
                 <h4 className="text-sm font-display font-semibold text-white mb-4">Product</h4>
                 <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
-                  <li><a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors">Outcomes</a></li>
+                  <li><a href="#company-os" className="hover:text-white focus-visible:text-white transition-colors">Company OS</a></li>
+                  <li><a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors">Proof</a></li>
                   <li><a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors">How It Works</a></li>
                   <li><a href="#audit" className="hover:text-white focus-visible:text-white transition-colors">Audit &amp; Compliance</a></li>
                   <li><a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors">Pricing</a></li>

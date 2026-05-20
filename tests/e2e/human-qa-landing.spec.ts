@@ -34,12 +34,12 @@ test.describe('HumanQA — landing page', () => {
     //    spot-check the headline copy + content density.
     await qa.observeSection('hero', {
       selector: 'section.gradient-bg',
-      expectedText: /Secure Control Plane|JAK Shield/i,
+      expectedText: /Turn company context|JAK Shield/i,
       expectMinChars: 200,
     });
     await qa.observeSection('pain', {
-      selector: 'section[aria-label*="Why chat" i]',
-      expectedText: /AI chat gives answers/i,
+      selector: 'section[aria-label*="Why closed-loop execution matters" i]',
+      expectedText: /Scattered context creates drift/i,
       expectMinChars: 400,
     });
     await qa.observeSection('how-it-works', {
@@ -54,7 +54,7 @@ test.describe('HumanQA — landing page', () => {
     });
     await qa.observeSection('outcomes', {
       selector: '#outcomes',
-      expectedText: /Finished work/i,
+      expectedText: /Evidence-backed artifacts/i,
     });
     await qa.observeSection('trust', {
       selector: '#trust',

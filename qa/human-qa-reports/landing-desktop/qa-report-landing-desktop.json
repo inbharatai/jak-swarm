@@ -1,14 +1,43 @@
 {
   "name": "landing-desktop",
-  "generatedAt": "2026-05-01T08:40:05.947Z",
-  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm\\qa\\human-qa-reports\\landing-desktop\\shots",
+  "generatedAt": "2026-05-20T17:10:49.198Z",
+  "screenshotsDir": "C:\\Users\\reetu\\Desktop\\JAK\\jak-swarm-public-ready\\qa\\human-qa-reports\\landing-desktop\\shots",
   "screenshotsCount": 12,
-  "counts": {
+  "severityCounts": {
     "CRITICAL": 0,
     "HIGH": 0,
     "MEDIUM": 0,
     "LOW": 0,
     "INFO": 0
   },
-  "findings": []
+  "statusCounts": {
+    "working": 0,
+    "partially-working": 0,
+    "present-but-not-wired": 0,
+    "not-implemented": 0,
+    "observation": 0
+  },
+  "findings": [],
+  "coverage": [
+    {
+      "category": "render-health",
+      "passed": true,
+      "detail": "section.gradient-bg renders 1608 chars"
+    },
+    {
+      "category": "evidence-screenshots",
+      "passed": true,
+      "detail": "hero-ctas captured"
+    },
+    {
+      "category": "console-network-health",
+      "passed": true,
+      "detail": "0 new finding(s)"
+    },
+    {
+      "category": "responsive",
+      "passed": true,
+      "detail": "375 / 768 / 1280 viewports checked"
+    }
+  ]
 }

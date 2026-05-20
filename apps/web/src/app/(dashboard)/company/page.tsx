@@ -297,8 +297,11 @@ function ClosedLoopOsCard({ canEdit }: { canEdit: boolean }) {
                   <option value="manual">Manual note</option>
                   <option value="github">GitHub</option>
                   <option value="linear">Linear</option>
+                  <option value="jira">Jira</option>
                   <option value="slack">Slack</option>
                   <option value="notion">Notion</option>
+                  <option value="google_drive">Google Drive</option>
+                  <option value="gmail">Gmail</option>
                   <option value="meeting">Meeting</option>
                   <option value="customer_call">Customer call</option>
                   <option value="support">Support</option>
@@ -318,8 +321,10 @@ function ClosedLoopOsCard({ canEdit }: { canEdit: boolean }) {
                   <option value="customer_feedback">Customer feedback</option>
                   <option value="support_ticket">Support ticket</option>
                   <option value="ticket">Ticket</option>
+                  <option value="issue">Issue</option>
                   <option value="pull_request">Pull request</option>
                   <option value="commit">Commit</option>
+                  <option value="email">Email</option>
                   <option value="slack_thread">Slack thread</option>
                   <option value="notion_page">Notion page</option>
                   <option value="document">Document</option>

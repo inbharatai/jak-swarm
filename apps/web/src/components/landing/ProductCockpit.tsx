@@ -23,9 +23,8 @@
  * conversation, center with the live agent graph, right with the
  * approval card, audit ribbon at the bottom.
  *
- * No fake numbers. Every label maps to a real cockpit surface that
- * ships in /apps/web. The graph nodes use the real agent role names
- * (Commander → Planner → Research / CMO / CTO / Verifier → Approval).
+ * No fake numbers. Every label maps to a real cockpit or Company OS
+ * surface that ships in /apps/web.
  */
 
 import { motion, useInView } from 'framer-motion';
@@ -36,14 +35,14 @@ import { useStillMode } from './useStillMode';
    placeholder grid. */
 
 const COMMAND = {
-  text: 'Research my top 3 competitors and draft a CMO-voice LinkedIn post',
+  text: 'Compare customer feedback with this sprint and generate the execution spec',
   meta: 'sent 12s ago · workflow #847',
 };
 
 const HISTORY = [
-  { label: 'Website review · 5 fixes proposed', tone: 'emerald' },
-  { label: 'SOC 2 readiness summary · pending review', tone: 'orange' },
-  { label: 'Cold-email batch · 14 drafts approved', tone: 'sky' },
+  { label: 'Customer signal drift · 3 findings', tone: 'orange' },
+  { label: 'Onboarding spec · approved', tone: 'emerald' },
+  { label: 'Evidence pack · exported', tone: 'sky' },
 ] as const;
 
 interface GraphNode {
@@ -58,29 +57,29 @@ interface GraphNode {
 
 const NODES: GraphNode[] = [
   { id: 'cmd', role: 'Commander', state: 'done', color: '#fbbf24', col: 1, row: 2 },
-  { id: 'plan', role: 'Planner', state: 'done', color: '#fbbf24', col: 2, row: 2 },
-  { id: 'research', role: 'Research', state: 'done', color: '#38bdf8', col: 3, row: 1 },
-  { id: 'ceo', role: 'CEO', state: 'done', color: '#34d399', col: 3, row: 3 },
-  { id: 'cmo', role: 'CMO', state: 'running', color: '#f472b6', col: 4, row: 2 },
+  { id: 'brain', role: 'Company Brain', state: 'done', color: '#38bdf8', col: 2, row: 2 },
+  { id: 'signals', role: 'Signals', state: 'done', color: '#38bdf8', col: 3, row: 1 },
+  { id: 'sprint', role: 'Sprint', state: 'done', color: '#34d399', col: 3, row: 3 },
+  { id: 'drift', role: 'Drift', state: 'running', color: '#fbbf24', col: 4, row: 2 },
   { id: 'verify', role: 'Verifier', state: 'queued', color: '#34d399', col: 5, row: 2 },
 ];
 
 const EDGES: Array<[string, string]> = [
-  ['cmd', 'plan'],
-  ['plan', 'research'],
-  ['plan', 'ceo'],
-  ['research', 'cmo'],
-  ['ceo', 'cmo'],
-  ['cmo', 'verify'],
+  ['cmd', 'brain'],
+  ['brain', 'signals'],
+  ['brain', 'sprint'],
+  ['signals', 'drift'],
+  ['sprint', 'drift'],
+  ['drift', 'verify'],
 ];
 
 const TIMELINE = [
   { t: '00:00', label: 'Workflow #847 started', color: '#fbbf24' },
-  { t: '00:02', label: 'Plan created · 4 steps', color: '#fbbf24' },
-  { t: '00:05', label: 'Research Agent · 3 competitors', color: '#38bdf8' },
-  { t: '00:09', label: 'CEO Agent · 5-point angle', color: '#34d399' },
-  { t: '00:12', label: 'CMO Agent · drafting…', color: '#f472b6' },
-  { t: '—', label: 'Approval gate · awaiting', color: '#fbbf24' },
+  { t: '00:02', label: 'Evidence artifacts loaded', color: '#38bdf8' },
+  { t: '00:05', label: 'Customer signals extracted', color: '#38bdf8' },
+  { t: '00:08', label: 'Sprint work compared', color: '#34d399' },
+  { t: '00:12', label: 'Drift finding · high', color: '#fbbf24' },
+  { t: '—', label: 'Spec approval · awaiting', color: '#f472b6' },
 ];
 
 /* Node positioning helpers — translate (col, row) → SVG coordinates. */
@@ -237,7 +236,7 @@ export default function ProductCockpit() {
                   Agent graph · live
                 </p>
                 <span className="text-[10px] font-mono text-slate-500 tabular-nums">
-                  3/5 done · 1 running
+                  4/5 done · 1 running
                 </span>
               </div>
 
@@ -328,9 +327,9 @@ export default function ProductCockpit() {
                 <div className="p-3 space-y-2">
                   <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[10px] font-mono">
                     <span className="text-slate-500">tool</span>
-                    <span className="text-white">linkedin_publish</span>
+                    <span className="text-white">agent_spec_approval</span>
                     <span className="text-slate-500">payload</span>
-                    <span className="text-slate-200 truncate">248-word draft</span>
+                    <span className="text-slate-200 truncate">spec + test plan</span>
                     <span className="text-slate-500">replay-safe</span>
                     <span className="text-emerald-300">payload-bound ✓</span>
                   </div>
@@ -370,11 +369,11 @@ export default function ProductCockpit() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                   <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-300">
-                    Draft preview · 248 words
+                    Spec preview · acceptance criteria
                   </span>
                 </div>
                 <p className="p-3 text-[11px] text-slate-200 font-sans leading-relaxed">
-                  &ldquo;Three things every founder should know about positioning against {'{Competitor A}'}, {'{B}'}, {'{C}'} &mdash; with one line you can copy into your next pitch&hellip;&rdquo;
+                  &ldquo;Objective: reduce onboarding drop-off. Evidence: customer calls and GitHub issues. Acceptance criteria: guided import, empty-state copy, Playwright regression, rollout approval&hellip;&rdquo;
                 </p>
               </div>
             </div>

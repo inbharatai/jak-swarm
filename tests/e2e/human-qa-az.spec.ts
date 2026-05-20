@@ -54,11 +54,11 @@ test('Human QA — A-Z product audit (deep)', async () => {
         //             visual-quality, evidence-screenshots
         await qa.inspectOnboardingClarity();
         await qa.inspectTrustSignals({ requirePricingLink: true, requireGitHubLink: true, requireContactLink: true });
-        await qa.observeSection('hero', { selector: 'section.gradient-bg', expectedText: /Secure Control Plane|JAK Shield/i, expectMinChars: 200, checkDescenderClipping: true });
-        await qa.observeSection('pain', { selector: 'section[aria-label*="Why chat" i]', expectedText: /AI chat gives answers/i });
+        await qa.observeSection('hero', { selector: 'section.gradient-bg', expectedText: /Turn company context|JAK Shield/i, expectMinChars: 200, checkDescenderClipping: true });
+        await qa.observeSection('pain', { selector: 'section[aria-label*="Why closed-loop execution matters" i]', expectedText: /Scattered context creates drift/i });
         await qa.observeSection('how-it-works', { selector: '#how-it-works', expectedText: /Seven steps/i });
         await qa.observeSection('cockpit-mockup', { selector: '#cockpit', expectedText: /one operating surface/i });
-        await qa.observeSection('outcomes', { selector: '#outcomes', expectedText: /Finished work/i });
+        await qa.observeSection('outcomes', { selector: '#outcomes', expectedText: /Evidence-backed artifacts/i });
         await qa.observeSection('trust', { selector: '#trust', expectedText: /controlled autonomy/i });
         await qa.observeSection('audit', { selector: '#audit', expectedText: /Enterprise-grade/i });
         await qa.observeSection('pricing', { selector: '#pricing', expectedText: /Transparent/i });

@@ -201,7 +201,7 @@ export default function PremiumCTA() {
           transition={{ duration: 0.7, delay: 0.2 }}
         >
           <h2 className="text-4xl sm:text-6xl font-display font-bold tracking-tight mb-6 leading-[1.2] pb-2">
-            <span className="text-white/90">Stop chatting with AI.</span>
+            <span className="text-white/90">Turn scattered context</span>
             <br />
             <span
               className="landing-gradient-text"
@@ -211,12 +211,12 @@ export default function PremiumCTA() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Start operating with it.
+              into controlled execution.
             </span>
           </h2>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
-            Run workflows with visibility, approval, and audit from day one. Open-source core. Self-hostable. OpenAI-first runtime.
+            Start with the honest beta wedge: company evidence, drift detection, executable specs, approval gates, and audit trails. Open-source core. Self-hostable. OpenAI-first runtime.
           </p>
 
           {/* CTA buttons */}
@@ -231,11 +231,11 @@ export default function PremiumCTA() {
               }}
             >
               <Link
-                href="/register"
+                href="/trial"
                 className="group inline-flex items-center gap-2 rounded-[10px] bg-[#09090b] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-transparent hover:text-[#09090b]"
                 style={{ touchAction: 'manipulation' }}
               >
-                Start Free
+                Start 30-Day Trial
                 <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>

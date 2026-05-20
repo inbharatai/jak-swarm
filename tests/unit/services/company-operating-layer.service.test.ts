@@ -111,6 +111,32 @@ describe('buildDriftCandidates', () => {
     expect(findings.filter((f) => f.driftType === 'customer_signal_unaddressed')).toHaveLength(0);
   });
 
+  it('treats completed linked execution as evidence that a customer signal was addressed', () => {
+    const findings = buildDriftCandidates({
+      tenantId: 'tenant_1',
+      now,
+      entities: [
+        entity({
+          id: 'signal_1',
+          entityType: 'customer_signal',
+          title: 'Customers need import from CSV',
+          priority: 'high',
+          sourceArtifactIds: ['call_1'],
+          relatedEntityIds: ['task_1'],
+        }),
+        entity({
+          id: 'task_1',
+          entityType: 'task',
+          title: 'Build CSV importer',
+          status: 'completed',
+          sourceArtifactIds: ['ticket_1'],
+        }),
+      ],
+    });
+
+    expect(findings.filter((f) => f.driftType === 'customer_signal_unaddressed')).toHaveLength(0);
+  });
+
   it('flags decisions that never became execution work', () => {
     const findings = buildDriftCandidates({
       tenantId: 'tenant_1',
@@ -162,6 +188,32 @@ describe('buildDriftCandidates', () => {
           entityType: 'task',
           title: 'Add billing audit trail',
           sourceArtifactIds: ['meeting_1'],
+        }),
+      ],
+    });
+
+    expect(findings.filter((f) => f.driftType === 'ungrounded_execution')).toHaveLength(0);
+    expect(findings.filter((f) => f.driftType === 'decision_not_operationalized')).toHaveLength(0);
+  });
+
+  it('uses primaryArtifactId as evidence when matching entities', () => {
+    const findings = buildDriftCandidates({
+      tenantId: 'tenant_1',
+      now,
+      entities: [
+        entity({
+          id: 'decision_1',
+          entityType: 'decision',
+          title: 'Fix billing trust issue',
+          primaryArtifactId: 'meeting_1',
+          sourceArtifactIds: [],
+        }),
+        entity({
+          id: 'task_1',
+          entityType: 'task',
+          title: 'Add billing audit trail',
+          primaryArtifactId: 'meeting_1',
+          sourceArtifactIds: [],
         }),
       ],
     });
@@ -420,6 +472,73 @@ describe('CompanyOperatingLayerService behavioral persistence', () => {
     expect(analyzed.findings[0]?.evidenceEntityIds).toEqual([signal.id]);
   });
 
+  it('adds primaryArtifactId to the cited sourceArtifactIds when creating an entity', async () => {
+    const { db } = makeFakeDb();
+    const service = new CompanyOperatingLayerService(db as never);
+
+    const primary = await service.createArtifact({
+      tenantId: 'tenant_1',
+      userId: 'user_1',
+      sourceType: 'manual',
+      artifactType: 'decision_note',
+      title: 'Founder direction',
+      body: 'Founder decided that onboarding activation is the current product priority.',
+    });
+    const supporting = await service.createArtifact({
+      tenantId: 'tenant_1',
+      userId: 'user_1',
+      sourceType: 'manual',
+      artifactType: 'customer_feedback',
+      title: 'Customer support summary',
+      body: 'Customer support notes repeatedly mention confusion around onboarding activation.',
+    });
+
+    const created = await service.createEntity({
+      tenantId: 'tenant_1',
+      userId: 'user_1',
+      entityType: 'decision',
+      title: 'Prioritize onboarding activation',
+      summary: 'Founder direction plus customer support evidence point to onboarding activation.',
+      primaryArtifactId: primary.id,
+      sourceArtifactIds: [supporting.id],
+    });
+
+    expect(created.primaryArtifactId).toBe(primary.id);
+    expect(created.sourceArtifactIds).toEqual([primary.id, supporting.id].sort());
+  });
+
+  it('reopens a previously resolved drift finding when the same drift is detected again', async () => {
+    const { state, db } = makeFakeDb();
+    const service = new CompanyOperatingLayerService(db as never);
+    const artifact = await service.createArtifact({
+      tenantId: 'tenant_1',
+      userId: 'user_1',
+      sourceType: 'manual',
+      artifactType: 'customer_feedback',
+      title: 'Customer calls show activation issue',
+      body: 'Customer calls show activation issue remains unresolved after the sprint planning meeting.',
+    });
+    await service.createEntity({
+      tenantId: 'tenant_1',
+      userId: 'user_1',
+      entityType: 'customer_signal',
+      title: 'Activation issue unresolved',
+      summary: 'Customer calls show activation issue remains unresolved.',
+      priority: 'high',
+      sourceArtifactIds: [artifact.id],
+    });
+
+    await service.analyzeAlignment({ tenantId: 'tenant_1', userId: 'user_1' });
+    state.findings[0]!.status = 'resolved';
+    state.findings[0]!.resolvedAt = new Date('2026-05-19T11:00:00.000Z');
+
+    const analyzedAgain = await service.analyzeAlignment({ tenantId: 'tenant_1', userId: 'user_1' });
+
+    expect(analyzedAgain.findings).toHaveLength(1);
+    expect(analyzedAgain.findings[0]?.status).toBe('open');
+    expect(analyzedAgain.findings[0]?.resolvedAt).toBeNull();
+  });
+
   it('approves and rejects specs through the review gate', async () => {
     const { db } = makeFakeDb();
     const service = new CompanyOperatingLayerService(db as never);
@@ -445,6 +564,35 @@ describe('CompanyOperatingLayerService behavioral persistence', () => {
     expect(approved.status).toBe('approved');
     expect(approved.reviewedBy).toBe('reviewer_1');
     expect(approved.reviewComment).toBe('Ship behind approval gate.');
+  });
+
+  it('refuses to change a spec after it has already been reviewed', async () => {
+    const { db } = makeFakeDb();
+    const service = new CompanyOperatingLayerService(db as never);
+    const spec = await db.agentExecutableSpec.create({
+      data: {
+        tenantId: 'tenant_1',
+        title: 'Fix onboarding inbox discoverability',
+        problemStatement: 'Users cannot find approvals.',
+        objective: 'Make approval inbox discoverable.',
+        contextSummary: 'Customer evidence cited.',
+        proposedApproach: 'Improve navigation and test it.',
+      },
+    });
+
+    await service.decideSpec({
+      tenantId: 'tenant_1',
+      userId: 'reviewer_1',
+      specId: spec.id,
+      decision: 'APPROVED',
+    });
+
+    await expect(service.decideSpec({
+      tenantId: 'tenant_1',
+      userId: 'reviewer_2',
+      specId: spec.id,
+      decision: 'REJECTED',
+    })).rejects.toThrow(/already reviewed/);
   });
 
   it('fails spec generation honestly when OpenAI is not configured', async () => {

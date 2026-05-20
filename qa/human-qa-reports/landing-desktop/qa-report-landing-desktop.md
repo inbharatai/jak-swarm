@@ -1,9 +1,9 @@
 # Human QA Report — landing-desktop
 
-Generated: 2026-05-01T08:40:05.946Z
-Screenshots: `C:\Users\reetu\Desktop\JAK\jak-swarm\qa\human-qa-reports\landing-desktop\shots` (12 captured)
+Generated: 2026-05-20T17:10:49.196Z
+Screenshots: `C:\Users\reetu\Desktop\JAK\jak-swarm-public-ready\qa\human-qa-reports\landing-desktop\shots` (12 captured)
 
-## Summary
+## Severity summary
 
 | Severity | Count |
 |---|---|
@@ -13,10 +13,20 @@ Screenshots: `C:\Users\reetu\Desktop\JAK\jak-swarm\qa\human-qa-reports\landing-d
 | LOW | 0 |
 | INFO | 0 |
 
+## Status summary
+
+| Status | Count |
+|---|---|
+| working | 0 |
+| partially-working | 0 |
+| present-but-not-wired | 0 |
+| not-implemented | 0 |
+| observation | 0 |
+
 ## Findings
 
-No findings recorded — this run only captured evidence (screenshots above).
+No findings recorded.
 
 ## Disclosure
 
-This report is **evidence-based**. Findings come from observed page behaviour, console state, network state, and viewport-overflow measurements — not from opinions about visual style. Where a marketing claim could not be verified through user-facing behaviour, the finding is tagged `product-truth`. Absence of findings in a category does NOT mean that category was tested deeply — it means the helper found nothing notable in the explicit checks the test author wired.
+This report uses the Human QA Tester framework: observe-first, slow-interact, claim-vs-behaviour, four-state status. Status meanings: **working** = observable + complete; **partially-working** = observable but with caveats; **present-but-not-wired** = UI rendered but action does nothing real; **not-implemented** = claimed but absent; **observation** = INFO only. Absence of findings does NOT mean a category was tested deeply — it means the explicit checks the test author wired returned clean.

@@ -35,16 +35,34 @@ function contains(rel: string, pattern: RegExp | string): boolean {
 }
 
 describe('Landing — Hero', () => {
-  it('"Secure Control Plane" hero copy is in the page', () => {
-    expect(contains('apps/web/src/app/page.tsx', 'Secure Control Plane')).toBe(true);
+  it('"Turn company context into approved agent work" hero copy is in the page', () => {
+    const page = read('apps/web/src/app/page.tsx');
+    expect(page).toContain('Turn company context');
+    expect(page).toContain('into approved');
+    expect(page).toContain('agent work');
+    expect(page).toContain('Closed-loop company operating layer');
   });
 
-  it('hero subheadline names every security pillar (permissions / approvals / sandboxing / risk scoring / defensive review / audit)', () => {
+  it('hero subheadline names the Company OS loop AND every security pillar', () => {
     const src = read('apps/web/src/app/page.tsx');
-    for (const pillar of ['permission', 'approval', 'sandbox', 'risk', 'defensive', 'audit']) {
-      expect(src.toLowerCase(), `subheadline missing pillar "${pillar}"`).toMatch(
-        new RegExp(pillar, 'i'),
-      );
+    for (const term of [
+      'evidence',
+      'decisions',
+      'tasks',
+      'risks',
+      'owners',
+      'deadlines',
+      'code changes',
+      'drift',
+      'specs',
+      'permission',
+      'approval',
+      'sandbox',
+      'risk',
+      'defensive',
+      'audit',
+    ]) {
+      expect(src.toLowerCase(), `subheadline missing term "${term}"`).toMatch(new RegExp(term, 'i'));
     }
   });
 
@@ -54,6 +72,47 @@ describe('Landing — Hero', () => {
     const matches = src.match(/JAK Shield/g) ?? [];
     expect(matches.length, 'expected ≥ 2 occurrences (desktop + mobile nav)').toBeGreaterThanOrEqual(2);
     expect(src).toMatch(/href="#jak-shield"/);
+  });
+});
+
+describe('Landing — Company OS wedge (YC thesis, beta-honest)', () => {
+  const COMPANY = 'apps/web/src/components/landing/WhatJakDoes.tsx';
+
+  it('WhatJakDoes is exported and rendered on the live homepage', () => {
+    expect(contains('apps/web/src/components/landing/index.ts', /export \{ default as WhatJakDoes \}/)).toBe(true);
+    expect(contains('apps/web/src/app/page.tsx', /<WhatJakDoes\s*\/>/)).toBe(true);
+    expect(contains(COMPANY, /id="company-os"/)).toBe(true);
+  });
+
+  it('company operating layer evidence paths exist on disk', () => {
+    const src = read(COMPANY);
+    const paths = Array.from(src.matchAll(/evidencePath:\s*'([^']+)'/g)).map((m) => m[1]!);
+    expect(paths.length).toBe(3);
+    for (const p of paths) {
+      expect(exists(p), `evidencePath ${p} missing on disk`).toBe(true);
+    }
+  });
+
+  it('claims evidence -> graph -> drift -> spec, backed by real routes and service logic', () => {
+    const routes = read('apps/api/src/routes/company-operating-layer.routes.ts');
+    const service = read('apps/api/src/services/company-brain/company-operating-layer.service.ts');
+    expect(routes).toContain('/company/artifacts');
+    expect(routes).toContain('/company/entities');
+    expect(routes).toContain('/company/alignment/drift');
+    expect(routes).toContain('/company/specs/generate');
+    expect(routes).toContain('/company/specs/:id/decide');
+    expect(service).toContain('buildDriftCandidates');
+    expect(service).toContain('customer_signal_unaddressed');
+    expect(service).toContain('decision_not_operationalized');
+    expect(service).toContain('ungrounded_execution');
+    expect(service).toContain('stale_high_priority_task');
+  });
+
+  it('copy is honest that full connector auto-sync is not complete yet', () => {
+    const src = read(COMPANY);
+    expect(src).toMatch(/Connector sync is setup-dependent/i);
+    expect(src).toMatch(/still needs deeper connector auto-sync/i);
+    expect(src).not.toMatch(/complete company-wide operating system/i);
   });
 });
 
@@ -108,19 +167,19 @@ describe('Landing — HowItWorks (7-step pipeline)', () => {
 describe('Landing — ShowTheWork (4 outcome cards)', () => {
   const SHOW = 'apps/web/src/components/landing/ShowTheWork.tsx';
 
-  it('Competitor + market research → research worker exists', () => {
-    expect(contains(SHOW, /Competitor.*research/i)).toBe(true);
-    expect(exists('packages/agents/src/workers/research.agent.ts')).toBe(true);
+  it('Execution drift brief → Company Operating Layer drift detector exists', () => {
+    expect(contains(SHOW, /Execution drift brief/i)).toBe(true);
+    expect(contains('apps/api/src/services/company-brain/company-operating-layer.service.ts', /buildDriftCandidates/)).toBe(true);
   });
 
-  it('LinkedIn + outreach drafts → social-drafts route + LinkedIn adapter exist', () => {
-    expect(contains(SHOW, /LinkedIn/)).toBe(true);
-    expect(exists('apps/api/src/routes/social-drafts.routes.ts')).toBe(true);
-    expect(exists('packages/tools/src/browser-operator/linkedin-adapter.ts')).toBe(true);
+  it('Agent-executable product spec → spec generation + decision routes exist', () => {
+    expect(contains(SHOW, /Agent-executable product spec/i)).toBe(true);
+    expect(contains('apps/api/src/routes/company-operating-layer.routes.ts', '/company/specs/generate')).toBe(true);
+    expect(contains('apps/api/src/routes/company-operating-layer.routes.ts', '/company/specs/:id/decide')).toBe(true);
   });
 
-  it('Website review + 5 fixes → browser operator exists', () => {
-    expect(contains(SHOW, /Website review/i)).toBe(true);
+  it('Browser QA + source-linked fixes → browser operator exists', () => {
+    expect(contains(SHOW, /Browser QA/i)).toBe(true);
     expect(exists('packages/tools/src/browser-operator/playwright-browser-operator.ts')).toBe(true);
   });
 
@@ -260,11 +319,11 @@ describe('Landing — top-line counts', () => {
     const page = read('apps/web/src/app/page.tsx');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
     expect(readme).toContain('Beta `0.1.0-beta.0`');
-    expect(readme).toMatch(/Tests-2059_passing/);
+    expect(readme).toMatch(/Tests-2090_passing/);
     expect(page).toContain('Beta 0.1.0-beta.0');
     expect(page).toContain('Controlled beta');
     expect(beta).toContain('Status: beta release candidate');
-    expect(beta).toContain('2059 passed, 99 skipped, 54 todo');
+    expect(beta).toContain('2090 passed, 99 skipped, 54 todo');
     expect(beta).toMatch(/not an enterprise-SLA release/i);
   });
 });
@@ -274,6 +333,8 @@ describe('Landing — public marketing copy stays honest', () => {
     const sources = [
       'apps/web/src/app/page.tsx',
       'apps/web/src/components/landing/JAKShield.tsx',
+      'apps/web/src/components/landing/WhatJakDoes.tsx',
+      'apps/web/src/components/landing/ShowTheWork.tsx',
       'apps/web/src/components/landing/TrustLayer.tsx',
       'apps/web/src/components/landing/PremiumCTA.tsx',
       'README.md',

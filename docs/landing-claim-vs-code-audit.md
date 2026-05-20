@@ -7,19 +7,35 @@ the landing page claims?
 specific file path or function. The `tests/unit/landing/landing-claim-vs-code.test.ts`
 suite asserts each mapping exists; CI fails if any drifts.
 
-**Run:** `cd tests && pnpm exec vitest run unit/landing/landing-claim-vs-code.test.ts`
-→ 33/33 passing as of this audit.
+**Run:** `pnpm --filter @jak-swarm/tests exec vitest run unit/landing/landing-claim-vs-code.test.ts`
+→ 59/59 passing as of the 20 May 2026 Company OS hardening pass.
 
 ## Section 1 — Hero
 
 | Hero element | Claim | Backed by |
 |---|---|---|
-| H1 | "The Secure Control Plane for AI Agents" | `apps/web/src/app/page.tsx` (test: hero copy contains "Secure Control Plane") |
-| Subheadline | "permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails" | Each of the 6 pillars asserted to appear in the hero block (test: subheadline names every pillar) |
+| H1 | "Turn company context into approved agent work." | `apps/web/src/app/page.tsx` (test: hero copy contains "Turn company context") |
+| Subheadline | Evidence from docs/tickets/code/meetings/customer feedback becomes drift detection, specs, OpenAI-first agent routing, approvals, sandboxing, risk scoring, defensive security review, and audit trails | Each shipped pillar is asserted in `tests/unit/landing/landing-claim-vs-code.test.ts` |
+| Capability strip | Evidence Graph, Drift Detection, Executable Specs, Approvals, JAK Shield, Audit Trail | `CompanyArtifact`, `CompanyGraphEntity`, `ExecutionDriftFinding`, `AgentExecutableSpec`, approval routes, and audit/bundle services |
 | Nav chip "JAK Shield" | clickable, scrolls to `#jak-shield` | `<JAKShield />` component + `id="jak-shield"` section (asserted via `href="#jak-shield"`) |
 | Mobile menu | "JAK Shield" link at top | Same — asserted by ≥2 `JAK Shield` text occurrences in page.tsx |
 
-## Section 2 — HowItWorks (7-step pipeline)
+## Section 2 — Company OS wedge
+
+The YC-aligned claim is intentionally bounded: JAK is not presented as a
+finished all-company auto-sync OS. The landing page says the beta wedge is
+product/engineering context alignment: evidence → graph → drift → spec →
+approval-gated execution.
+
+| Layer | Backed by |
+|---|---|
+| Evidence artifacts | `CompanyArtifact` model + `apps/api/src/routes/company-operating-layer.routes.ts` |
+| Company graph | `CompanyGraphEntity` model + `/company/entities` routes + `/company` dashboard |
+| Drift detection | `buildDriftCandidates()` in `company-operating-layer.service.ts` |
+| Agent-executable specs | `generateSpec()` + `/company/specs/generate` |
+| Reviewer decision gate | `decideSpec()` + immutable decision regression test |
+
+## Section 3 — HowItWorks (7-step pipeline)
 
 Every step's italicised `status:` line names a real symbol in the code:
 
@@ -33,7 +49,7 @@ Every step's italicised `status:` line names a real symbol in the code:
 | 6 | Verify | `verifier.check() · 4-layer` | `packages/agents/src/roles/verifier.agent.ts` |
 | 7 | Deliver | "signed audit trail, replayable run" | `apps/api/src/services/bundle.service.ts` + `bundle-signing.service.ts` |
 
-## Section 3 — ProductCockpit
+## Section 4 — ProductCockpit
 
 The dashboard mockup names 6 agents (Commander, Planner, Research,
 CEO, CMO, Verifier). Each agent is a real `BaseAgent` subclass:
@@ -51,16 +67,16 @@ the gated tool. That tool is registered in
 `packages/tools/src/browser-operator/linkedin-adapter.ts` returns
 `manualHandoffRequired: true` always — never auto-publishes.
 
-## Section 4 — ShowTheWork (4 outcome cards)
+## Section 5 — ShowTheWork (4 outcome cards)
 
 | Outcome | Backed by |
 |---|---|
-| Competitor + market research brief | `packages/agents/src/workers/research.agent.ts` |
-| LinkedIn + outreach drafts | `apps/api/src/routes/social-drafts.routes.ts` + `packages/tools/src/browser-operator/linkedin-adapter.ts` |
-| Website review + 5 fixes | `packages/tools/src/browser-operator/playwright-browser-operator.ts` |
+| Execution drift brief | `buildDriftCandidates()` in `company-operating-layer.service.ts` |
+| Agent-executable product spec | `/company/specs/generate`, `AgentExecutableSpec`, and `decideSpec()` |
+| Browser QA + source-linked fixes | `packages/tools/src/browser-operator/playwright-browser-operator.ts` |
 | Audit-ready evidence pack | `apps/api/src/routes/audit-runs.routes.ts` + `apps/api/src/services/bundle.service.ts` |
 
-## Section 5 — TrustLayer (6 grep-able guarantees)
+## Section 6 — TrustLayer (6 grep-able guarantees)
 
 | Trust claim | Backed by |
 |---|---|
@@ -71,7 +87,7 @@ the gated tool. That tool is registered in
 | Self-hostable open-source core | `LICENSE` file (MIT) |
 | OpenAI-first runtime | `packages/agents/src/runtime/openai-runtime.ts` |
 
-## Section 6 — JAK Shield (the new front-and-center section)
+## Section 7 — JAK Shield (the trust boundary section)
 
 Already locked by `tests/unit/landing/jak-shield-truth.test.ts`. Every
 one of the 6 feature cards carries a `data-evidence-path` HTML
@@ -96,7 +112,7 @@ asserted to exist in the operator file by symbol name:
 - `BROWSER_DNS_REBIND_BLOCKED` ✓ (DNS rebinding)
 - `BROWSER_QUOTA_EXCEEDED` ✓ (quota exceeded)
 
-## Section 7 — Top-line counts
+## Section 8 — Top-line counts
 
 These are pinned by both this test AND `pnpm check:truth`:
 

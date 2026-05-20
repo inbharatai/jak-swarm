@@ -323,6 +323,11 @@ function isRationaleEntity(entity: CompanyGraphEntityRow): boolean {
   return ['customer_signal', 'decision', 'spec'].includes(entityKind(entity));
 }
 
+function countsAsExecutionEvidence(entity: CompanyGraphEntityRow): boolean {
+  const status = lower(entity.status);
+  return isExecutionEntity(entity) && !['cancelled', 'canceled', 'deleted', 'rejected'].includes(status);
+}
+
 function prioritySeverity(priority: string | null | undefined, fallback: DriftCandidate['severity']): DriftCandidate['severity'] {
   const p = lower(priority);
   if (p === 'critical') return 'critical';
@@ -332,8 +337,11 @@ function prioritySeverity(priority: string | null | undefined, fallback: DriftCa
   return fallback;
 }
 
-function sourceIds(entity: Pick<CompanyGraphEntityRow, 'sourceArtifactIds'>): string[] {
-  return jsonStringArray(entity.sourceArtifactIds);
+function sourceIds(entity: Pick<CompanyGraphEntityRow, 'sourceArtifactIds' | 'primaryArtifactId'>): string[] {
+  return uniqueStrings([
+    ...jsonStringArray(entity.sourceArtifactIds),
+    ...(entity.primaryArtifactId ? [entity.primaryArtifactId] : []),
+  ]);
 }
 
 function relatedIds(entity: Pick<CompanyGraphEntityRow, 'relatedEntityIds' | 'properties'>): string[] {
@@ -375,8 +383,7 @@ function directOrEvidenceLinked(a: CompanyGraphEntityRow, b: CompanyGraphEntityR
 
 function hasLinkedExecution(entity: CompanyGraphEntityRow, entities: CompanyGraphEntityRow[]): boolean {
   return entities.some((candidate) =>
-    isExecutionEntity(candidate) &&
-    isOpenLike(candidate.status) &&
+    countsAsExecutionEvidence(candidate) &&
     directOrEvidenceLinked(entity, candidate),
   );
 }
@@ -407,11 +414,12 @@ export function buildDriftCandidates(input: {
   now?: Date;
 }): DriftCandidate[] {
   const now = input.now ?? new Date();
-  const active = input.entities.filter((e) => e.deletedAt === null && isOpenLike(e.status));
+  const live = input.entities.filter((e) => e.deletedAt === null);
+  const active = live.filter((e) => isOpenLike(e.status));
   const candidates: DriftCandidate[] = [];
 
   for (const signal of active.filter((e) => entityKind(e) === 'customer_signal')) {
-    if (hasLinkedExecution(signal, active)) continue;
+    if (hasLinkedExecution(signal, live)) continue;
     const severity = prioritySeverity(signal.priority, 'high');
     candidates.push(candidate({
       tenantId: input.tenantId,
@@ -428,7 +436,7 @@ export function buildDriftCandidates(input: {
   }
 
   for (const decision of active.filter((e) => entityKind(e) === 'decision')) {
-    if (hasLinkedExecution(decision, active)) continue;
+    if (hasLinkedExecution(decision, live)) continue;
     const severity = prioritySeverity(decision.priority, 'medium');
     candidates.push(candidate({
       tenantId: input.tenantId,
@@ -524,13 +532,15 @@ export class CompanyOperatingLayerService {
   }): Promise<CompanyArtifactRow> {
     const body = input.body.trim();
     if (body.length < 20) throw new Error('Company artifact body must contain at least 20 characters of evidence.');
+    const title = input.title.trim();
+    if (title.length === 0) throw new Error('Company artifact title is required.');
     const data = {
       tenantId: input.tenantId,
       sourceType: input.sourceType,
       artifactType: input.artifactType,
       externalId: input.externalId?.trim() || null,
       sourceUrl: input.sourceUrl?.trim() || null,
-      title: input.title.trim(),
+      title,
       body,
       bodyHash: sha256(body),
       authorName: input.authorName?.trim() || null,
@@ -618,7 +628,19 @@ export class CompanyOperatingLayerService {
     properties?: Record<string, unknown>;
     extractedBy?: 'manual' | 'connector' | 'openai' | 'system';
   }): Promise<CompanyGraphEntityRow> {
-    const sourceArtifactIds = uniqueStrings(input.sourceArtifactIds);
+    const title = input.title.trim();
+    const summary = input.summary.trim();
+    if (title.length === 0) throw new Error('Company graph entity title is required.');
+    if (summary.length === 0) throw new Error('Company graph entity summary is required.');
+    const confidence = input.confidence ?? 0.75;
+    if (confidence < 0 || confidence > 1) {
+      throw new Error('Company graph entity confidence must be between 0 and 1.');
+    }
+
+    const sourceArtifactIds = uniqueStrings([
+      ...input.sourceArtifactIds,
+      ...(input.primaryArtifactId ? [input.primaryArtifactId] : []),
+    ]);
     if (sourceArtifactIds.length === 0) {
       throw new Error('Company graph entities must cite at least one sourceArtifactId.');
     }
@@ -630,12 +652,12 @@ export class CompanyOperatingLayerService {
         tenantId: input.tenantId,
         primaryArtifactId: input.primaryArtifactId ?? sourceArtifactIds[0] ?? null,
         entityType: input.entityType,
-        title: input.title.trim(),
-        summary: input.summary.trim(),
+        title,
+        summary,
         status: input.status?.trim() || 'active',
         ownerName: input.ownerName?.trim() || null,
         priority: input.priority ?? null,
-        confidence: input.confidence ?? 0.75,
+        confidence,
         occurredAt: safeDate(input.occurredAt),
         dueAt: safeDate(input.dueAt),
         sourceArtifactIds,
@@ -825,6 +847,7 @@ export class CompanyOperatingLayerService {
         update: {
           driftType: c.driftType,
           severity: c.severity,
+          status: 'open',
           title: c.title,
           summary: c.summary,
           recommendation: c.recommendation,
@@ -833,6 +856,7 @@ export class CompanyOperatingLayerService {
           confidence: c.confidence,
           metadata: c.metadata,
           detectedAt: new Date(),
+          resolvedAt: null,
         },
       }).catch((err: unknown) => rethrowIfCompanyOsSchemaMissing(err));
       findings.push(row);
@@ -1042,6 +1066,9 @@ export class CompanyOperatingLayerService {
       where: { id: input.specId, tenantId: input.tenantId, deletedAt: null },
     }).catch((err: unknown) => rethrowIfCompanyOsSchemaMissing(err));
     if (!existing) throw new Error(`Agent executable spec id=${input.specId} not found in this tenant.`);
+    if (existing.status !== 'draft') {
+      throw new Error(`Agent executable spec id=${input.specId} was already reviewed with status=${existing.status}. Review decisions are immutable.`);
+    }
 
     const status = input.decision === 'APPROVED' ? 'approved' : 'rejected';
     const row = await this.db.agentExecutableSpec.update({

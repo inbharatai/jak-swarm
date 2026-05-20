@@ -2,7 +2,7 @@
 
 # 🐝 JAK Swarm
 
-### The Secure Control Plane for AI Agents
+### The Closed-Loop Company Operating Layer for Agent Work
 
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
@@ -13,18 +13,32 @@
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-2059_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-2090_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Free Trial](https://img.shields.io/badge/Free_Trial-30_Days-34d399?style=for-the-badge&logo=sparkfun&logoColor=white)](https://jakswarm.com/trial)
 
-**JAK Swarm does the work. JAK Shield makes the work safe.**
+**JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
-JAK Swarm turns plain-English goals into real work using **38 specialist agents** + **122 classified tools** + **22 connectors** across code, browser, files, email, GitHub, and business workflows.
+JAK Swarm captures evidence from company artifacts, maps decisions/tasks/risks/owners/customer signals/code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
 
-**Current release:** Beta `0.1.0-beta.0` for self-hosted and design-partner validation. Local readiness is **8.5/10** based on the 12 May 2026 verification run; this is not an enterprise-SLA release. See [`docs/beta-release.md`](docs/beta-release.md).
+**Current release:** Beta `0.1.0-beta.0` for self-hosted and design-partner validation. This is not an enterprise-SLA release. On 20 May 2026 the Company OS and landing-page hardening pass was locally verified with the landing truth-lock, Company Operating Layer unit/integration tests, web/API type-checks, production web build, and truth-check. See [`docs/beta-release.md`](docs/beta-release.md).
 
 **JAK Shield** — the security/trust layer wrapped around every agent action — risk-scores every task, checks permissions, blocks unsafe cyber requests, pauses risky work for human approval, sandboxes browser + subprocess execution, and signs every step into a tamper-evident evidence bundle.
 
-> "Run AI agents safely across code, browser, files, email, GitHub, and business tools — with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails."
+> "Turn company evidence into drift findings, executable specs, approved agent work, and tamper-evident audit trails."
+
+## 🔁 Closed-loop Company OS — beta foundation
+
+This is the YC-aligned wedge, stated honestly: JAK is not claiming finished company-wide auto-sync yet. The shipped beta foundation is an evidence-first operating layer that connectors, uploads, and manual notes can feed.
+
+| Layer | What is shipped today | Code evidence |
+|---|---|---|
+| Evidence artifacts | Tenant-scoped `CompanyArtifact` records with source/type labels, body hash, source URL, author, occurrence time, and audit event on ingest | [`company-operating-layer.routes.ts`](apps/api/src/routes/company-operating-layer.routes.ts), [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
+| Company graph | `CompanyGraphEntity` records for decisions, tasks, specs, customer signals, risks, owners, deadlines, code changes, customers, metrics, and requirements; entities must cite source artifacts | [`schema.prisma`](packages/db/prisma/schema.prisma), `apps/web/src/app/(dashboard)/company/page.tsx` |
+| Drift detection | Deterministic comparator flags unaddressed customer signals, decisions not operationalized, ungrounded execution, and stale high-priority tasks | `buildDriftCandidates()` in [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
+| Agent-executable specs | OpenAI-backed spec generation with objective, context, approach, acceptance criteria, test plan, agent task plan, approval gates, and evidence IDs. No template fallback. | `generateSpec()` + `/company/specs/generate` |
+| Review gate | Specs are reviewer-approved or rejected through `/company/specs/:id/decide`; review decisions are immutable after the first decision | `decideSpec()` + [`company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) |
+
+**Honest boundary:** full connector auto-sync is still a product build item. The API and `/company` UI can label evidence as GitHub, Linear, Jira, Slack, Notion, Google Drive, Gmail, meetings, customer calls, support, documents, manual notes, or other sources, but not every source has a first-party background sync job yet. Until those jobs are implemented and smoke-tested, the accurate claim is **Company OS beta foundation**, not “finished company AI OS.”
 
 ## 🛡️ JAK Shield — the trust layer
 
@@ -53,20 +67,22 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 
 ## 📖 About JAK Swarm
 
-**JAK Swarm is the operating system for human + AI workflows.** Most agent platforms make you choose: AI agents OR your team. JAK puts both on the same task graph, with the same approval flow, the same audit trail, and the same security boundary.
+**JAK Swarm is a beta closed-loop operating layer for product and engineering execution.** It makes company context legible to AI, converts evidence into specs, routes work to agents or humans, and keeps risky actions behind the same approval flow, audit trail, and security boundary.
 
 **What's actually unique:**
 
-- **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator. Both emit the same lifecycle events. Both feed the same signed audit pack. No tool-switching, no context loss between the AI work and the human work. (See [`docs/team-and-trial.md`](docs/team-and-trial.md))
+- **Evidence graph before agent action** — artifacts become graph entities; graph entities become drift findings; drift findings become agent-executable specs. This is the closed-loop Company OS foundation and it is intentionally citation-first, not chatbot memory. (See [`apps/api/src/services/company-brain/company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts))
+- **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator. Both emit lifecycle events. Both feed the signed audit pack. No tool-switching, no context loss between the AI work and the human work. (See [`docs/team-and-trial.md`](docs/team-and-trial.md))
 - **JAK Shield as the trust layer** — every agent action runs through six defenses (Agent Firewall · Risk-Based Approvals · Secure Tool Permissions · Sandboxed Execution · Defensive Vulnerability Triage · Audit Evidence Layer) before it touches your code, browser, files, or business tools. Defensive security work passes; offensive requests are refused at the boundary. (See [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
 - **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K LLM tokens) protect both your data AND your budget — when a cap hits, your workflow pauses with a clear "resets at UTC midnight" message, never silently fails. (See [`apps/api/src/services/trial/usage-counter.service.ts`](apps/api/src/services/trial/usage-counter.service.ts))
-- **Integrate, don't rebuild** — Slack/Teams for cross-team chat, HubSpot/Pipedrive for CRM, Gmail for customer email, Twilio for voice (next sprint). JAK is the cockpit; your existing stack stays intact. The unique value is in the orchestration + audit layer, not in re-implementing every category.
+- **Integrate, don't rebuild** — JAK is the cockpit for your existing stack, but connector maturity is explicit. Gmail, Google Calendar, Slack, WhatsApp, LinkedIn manual handoff, browser automation, and MCP-provider surfaces exist in code; deeper Company OS auto-sync jobs for every source remain a roadmap item until implemented and smoke-tested.
 
 **Who it's for:**
 
+- Product and engineering teams that need to compare customer/founder intent with what is actually being built
 - Solo founders and small ops teams who want AI to do real work, not just "give answers"
 - Compliance-aware teams that need a tamper-evident trail of every agent action (SOC 2 / HIPAA / ISO 27001 control mappings shipped, third-party audit certification not — see FAQ below)
-- Teams already using Slack + HubSpot + Gmail who want one place to drive workflows that span both AI and human steps
+- Teams already using Slack/GitHub/Notion/Linear/Gmail-style tools who want one place to turn evidence into approved execution
 
 **Built on the assumption** that AI agents on their own are not ready to be trusted with destructive actions, and humans on their own can't keep up with the volume — so the answer is to put them on the same graph with explicit, payload-bound human approval at the risky steps.
 
@@ -77,6 +93,7 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 ## 🚀 What's inside JAK Swarm
 
 - **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real_external` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
+- **Closed-loop Company OS foundation** — source-labeled artifacts, graph entities, deterministic drift findings, OpenAI-generated specs, reviewer decisions, and audit events. Current beta supports manual/API-fed evidence plus connector-labeled artifacts; full connector auto-sync is still in progress.
 - **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
 - **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **182 seeded controls** (63 SOC 2 + 37 HIPAA + 82 ISO 27001) of which **108 are operationally backed** (auto-mapping rules pull evidence from system activity) and **74 require reviewer attestation** (policy / paperwork / physical), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
 - **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
@@ -88,9 +105,11 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 
 > **Connector Runtime Phase 1 (29 Apr 2026):** unified ConnectorRegistry on top of the existing tool/MCP/integration layers · 21 MCP providers auto-mapped + Remotion + Blender first-class · ConnectorResolver that picks connectors from natural-language tasks · `/connectors` dashboard with honest status badges (`available` / `installed` / `configured` / `needs_user_setup` / `failed_validation` / `unavailable` / `disabled` / `blocked_by_policy`) · 43 unit tests pinning the registry + resolver + manifest contract. **Honest about what's not shipped yet:** the installer service + auto-publish + cloud-render adapters land in Phase 2/3. See [`docs/connector-runtime.md`](docs/connector-runtime.md) for the full design + [`qa/connector-runtime-phase1-status.md`](qa/connector-runtime-phase1-status.md) for the bluntly-rated closing report.
 
-> **Migration 106 — Team + 30-Day Free Trial (8 May 2026):** humans-on-task-graph wedge + landing-page free-trial CTA with daily caps. Departments + manager hierarchy (`/team`), per-employee Inbox (`/my-tasks`), human task assignment (`POST /task-assignments`), aggregated `/inbox` route (tasks + approvals + notifications in one round-trip), trial signup at `/trial` with email-only intake (no credit card), four daily caps enforced before workflow start (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K tokens / day), trial-cap guard returning structured `429 TRIAL_DAILY_CAP_HIT` + `402 TRIAL_EXPIRED` so the cockpit can render banners instead of silently failing. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (53 tests). Full design + file map + carry-overs in [`docs/team-and-trial.md`](docs/team-and-trial.md).
+> **Migration 106 — Team + 30-Day Free Trial (8 May 2026):** humans-on-task-graph wedge + landing-page free-trial CTA with daily caps. Departments + manager hierarchy (`/team`), per-employee Inbox (`/my-tasks`), human task assignment (`POST /task-assignments`), aggregated `/inbox` route (tasks + approvals + notifications in one round-trip), trial signup at `/trial` with email-only intake (no credit card), four daily caps enforced before workflow start (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K tokens / day), trial-cap guard returning structured `429 TRIAL_DAILY_CAP_HIT` + `402 TRIAL_EXPIRED` so the cockpit can render banners instead of silently failing. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts), now expanded by later migrations. Full design + file map + carry-overs in [`docs/team-and-trial.md`](docs/team-and-trial.md).
 
-> **Security + quality audit — 8 P0 hardening + test-coverage push (8 May 2026):** five parallel deep-survey agents (dead code · route safety · test gaps · security re-audit · schema integrity) drove a single-session pass that closed 8 P0 + 2 P1 findings AND wrote 17 previously-missing test files (+420 tests, total 2045 passing). **P0 hardening:** `Workflow.userId` + `TaskAssignment.assignedByUserId` schema declarations now match the live FK behaviour (truth-of-record); `/trial/verify` got `Cache-Control: no-store` + 80 ms response-time floor (kills cache-of-initialPassword + timing side-channel); `JAK_TRIAL_EMAIL_LOG_DIR` validated against an allowlist (tmpdir / cwd/tmp / `/var/log/jak` / `JAK_ALLOWED_DATA_ROOT`); per-IP (5/min signup, 10/min verify) + per-email (3/hr) rate limits added; `X-Forwarded-For` only honoured behind `JAK_TRUST_PROXY=true`; trial cap now enforced on `WorkflowSchedule` cron firing (`SKIPPED_TRIAL_CAP_HIT` / `SKIPPED_TRIAL_EXPIRED`); department parent-chain has full ancestor-cycle detection (depth-cap 64). **5 real bugs surfaced + fixed by writing tests:** `task-assignments` cancel notification mis-categorised as `task_assigned` (now distinct `task_completed`/`task_declined`/`task_cancelled` kinds); `inbox.routes` showed approvals to `OPERATOR` who can't decide them; `auth.service.register` echoed the email back in `ConflictError` (enumeration oracle — generic message + sha256-truncated-hash log); `DELETE /documents/:id` had no role check (now uploader-or-`REVIEWER+`); `update({where:{id}})` tenant-isolation invariant documented as load-bearing on the prior `findFirst`. **17 new test files** covering credential / bundle+bundle-signing / oauth-providers / sandbox / auth services + audit-run / workflow / workflow-timeline / artifact / 3 compliance services + 5 routes (task-assignments / team / inbox / trial / documents). **Honest carry-overs:** 30 service/route files still untested (~15-25 hours more focused work); OAuth refresh-token grant flow doesn't exist; `sandbox.service` is a thin lifecycle wrapper (real isolation lives in the adapter); `audit-run.transition()` has a read-then-write concurrency race. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (+9 audit-fix entries, total 53 tests).
+> **Migration 107 — Closed-loop Company OS foundation (20 May 2026):** evidence artifacts -> company graph entities -> deterministic drift findings -> OpenAI-generated agent specs -> reviewer decision gate. Hardening in this pass fixed recurring drift reopening, completed-work false positives, primary artifact evidence preservation, immutable spec review decisions, and `/company` source/type parity with the API schema. Truth-locked by [`tests/unit/services/company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) (17 tests), [`tests/integration/company-os-foundation.test.ts`](tests/integration/company-os-foundation.test.ts) (30 tests), and [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (59 tests).
+
+> **Security + quality audit — 8 P0 hardening + test-coverage push (8 May 2026):** five parallel deep-survey agents (dead code · route safety · test gaps · security re-audit · schema integrity) drove a single-session pass that closed 8 P0 + 2 P1 findings AND wrote 17 previously-missing test files (+420 tests, total 2045 passing at that time). **P0 hardening:** `Workflow.userId` + `TaskAssignment.assignedByUserId` schema declarations now match the live FK behaviour (truth-of-record); `/trial/verify` got `Cache-Control: no-store` + 80 ms response-time floor (kills cache-of-initialPassword + timing side-channel); `JAK_TRIAL_EMAIL_LOG_DIR` validated against an allowlist (tmpdir / cwd/tmp / `/var/log/jak` / `JAK_ALLOWED_DATA_ROOT`); per-IP (5/min signup, 10/min verify) + per-email (3/hr) rate limits added; `X-Forwarded-For` only honoured behind `JAK_TRUST_PROXY=true`; trial cap now enforced on `WorkflowSchedule` cron firing (`SKIPPED_TRIAL_CAP_HIT` / `SKIPPED_TRIAL_EXPIRED`); department parent-chain has full ancestor-cycle detection (depth-cap 64). **5 real bugs surfaced + fixed by writing tests:** `task-assignments` cancel notification mis-categorised as `task_assigned` (now distinct `task_completed`/`task_declined`/`task_cancelled` kinds); `inbox.routes` showed approvals to `OPERATOR` who can't decide them; `auth.service.register` echoed the email back in `ConflictError` (enumeration oracle — generic message + sha256-truncated-hash log); `DELETE /documents/:id` had no role check (now uploader-or-`REVIEWER+`); `update({where:{id}})` tenant-isolation invariant documented as load-bearing on the prior `findFirst`. **17 new test files** covering credential / bundle+bundle-signing / oauth-providers / sandbox / auth services + audit-run / workflow / workflow-timeline / artifact / 3 compliance services + 5 routes (task-assignments / team / inbox / trial / documents). **Honest carry-overs:** 30 service/route files still untested (~15-25 hours more focused work); OAuth refresh-token grant flow doesn't exist; `sandbox.service` is a thin lifecycle wrapper (real isolation lives in the adapter); `audit-run.transition()` has a read-then-write concurrency race. The landing truth-lock has since expanded with the Company OS checks named above.
 
 [Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
 
@@ -129,11 +148,11 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 
 ## 🏗️ How It Works
 
-JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. You give it a high-level goal in natural language. A Commander agent interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers (in parallel where possible), and a Verifier checks every output before it ships. The entire pipeline is observable through a real-time DAG visualization dashboard.
+JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. In the Company OS path, source-labeled evidence becomes graph entities, graph entities become drift findings, and drift findings become reviewer-gated execution specs. In the workflow path, you give it a high-level goal in natural language; a Commander interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers where supported, and a Verifier checks outputs before delivery.
 
 The orchestrator is a real native [`@langchain/langgraph`](https://langchain-ai.github.io/langgraphjs/) `StateGraph` — checkpoints persist to a `workflow_checkpoints` Postgres table via the `PostgresCheckpointSaver`; approval pauses use LangGraph's native `interrupt()` + `Command(resume=…)` cycle. The previous custom SwarmGraph state machine was deleted in Sprint 2.5/A.6 (commit `34491f2`); LangGraph is the only orchestration engine and the `JAK_WORKFLOW_RUNTIME` env-flag fallback no longer exists.
 
-It connects to real infrastructure — Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright — so agents do actual work, not demos.
+It can connect to real infrastructure when configured — Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright. Connector capability is explicit and config-dependent; the Company OS can label artifacts from many sources today, but first-party background sync for every source is not yet complete.
 
 ```mermaid
 flowchart TD
@@ -1535,16 +1554,39 @@ OPENAI_API_KEY=sk-... node tests/human-simulator/run-all.js      # Human simulat
 <details>
 <summary><b>What is JAK Swarm in one sentence?</b></summary>
 
-A multi-agent execution platform where AI agents AND your team complete steps of the same workflow, behind one approval flow, with one signed audit trail.
+A beta closed-loop company operating layer: JAK turns company evidence into drift findings, executable specs, approved agent/human work, and signed audit evidence.
 
 </details>
 
 <details>
 <summary><b>What's the unique thing JAK does that nothing else does?</b></summary>
 
-**A single task graph where AI agents and humans are interchangeable workers.** A CEO writes one prompt. The planner routes some steps to AI specialist agents (Research, CMO, CTO, Coder, ...) and others to teammates (HR signs the contract, CFO approves the budget). Both flow through the same orchestrator, both emit the same lifecycle events, both feed the same audit pack. Asana has humans only. LangGraph has AI only. JAK has both, on the same graph, with one approval flow.
+**A closed loop from company evidence to controlled execution.** JAK has two code-backed loops: the Company OS loop (artifacts -> graph entities -> drift findings -> agent-executable specs -> reviewer decision) and the workflow loop (Commander -> Planner -> Router -> agents/humans -> approval -> verifier -> audit). The point is not "more agents"; the point is keeping execution aligned with cited company context.
 
-The implementation lives in `TaskAssignment` (`packages/db/prisma/schema.prisma`) + `apps/api/src/routes/task-assignments.routes.ts`. UI is `/my-tasks` (`apps/web/src/app/(dashboard)/my-tasks/page.tsx`).
+The Company OS implementation lives in `CompanyArtifact`, `CompanyGraphEntity`, `ExecutionDriftFinding`, and `AgentExecutableSpec` (`packages/db/prisma/schema.prisma`) plus `apps/api/src/routes/company-operating-layer.routes.ts`. Human task execution lives in `TaskAssignment` + `apps/api/src/routes/task-assignments.routes.ts`; UI is `/company` and `/my-tasks`.
+
+</details>
+
+<details>
+<summary><b>Is the closed-loop Company OS complete?</b></summary>
+
+**No — it is a real beta foundation, not a finished company-wide OS.** Shipped today:
+
+- Tenant-scoped evidence artifacts with source/type labels and body hashes
+- Company graph entities that must cite artifacts
+- Deterministic drift detection for customer signals, decisions, execution work, and stale high-priority tasks
+- OpenAI-backed agent-executable spec generation with no template fallback
+- Reviewer approval/rejection for specs, now immutable after first review
+- `/company` UI for manual/API-fed evidence ingestion, extraction, drift analysis, and spec review
+
+Still not complete:
+
+- First-party background sync jobs for every connector source
+- Real customer-call/meeting transcript ingestion pipeline into the graph
+- Cross-tool drift monitors that run continuously without manual trigger
+- Production smoke tests against the hosted Vercel + Railway + Supabase + Upstash environment
+
+So the accurate public phrase is **"closed-loop Company OS beta foundation"**, not "finished company AI OS."
 
 </details>
 
@@ -1605,7 +1647,7 @@ Because a single bad-actor workflow can drain a 30-day budget in two hours. Per-
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**For solo founders / design partners running it themselves: BETA-YES, with eyes open.** The architecture is solid (LangGraph + Postgres checkpointer + signed evidence bundles + AES-256-GCM workflow encryption + JAK Shield trust boundary), 2059 local tests pass, all local type-checks are green, and the orchestrator has run real workflows.
+**For solo founders / design partners running it themselves: BETA-YES, with eyes open.** The architecture is solid (LangGraph + Postgres checkpointer + signed evidence bundles + AES-256-GCM workflow encryption + JAK Shield trust boundary). The 20 May 2026 Company OS hardening pass re-verified the full local test suite (`2090 passed, 99 skipped, 54 todo`), landing truth-lock, Company Operating Layer unit/integration tests, web/API type-checks, production web build, and `pnpm check:truth`.
 
 **For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers we name openly:
 
@@ -1671,7 +1713,7 @@ Plus `EXTERNAL_AUDITOR` (added in Sprint 2.6) — invite-token only, scoped to o
 <details>
 <summary><b>What integrations are real today vs roadmap?</b></summary>
 
-**Real (working in code):**
+**Working in code, but often credential/config dependent:**
 
 - Gmail (send + read via App Password)
 - Google Calendar
@@ -1680,15 +1722,17 @@ Plus `EXTERNAL_AUDITOR` (added in Sprint 2.6) — invite-token only, scoped to o
 - LinkedIn (manual-handoff only — never auto-publishes)
 - Browser automation (Playwright with full SSRF + DNS-rebind + disk-quota defenses)
 - 21 MCP providers via the Connector Runtime
+- Company OS source labels for GitHub, Linear, Jira, Slack, Notion, Google Drive, Gmail, meetings, customer calls, support, documents, manual notes, and other artifacts
 
-**Roadmap (next sprint):**
+**Roadmap / not complete yet:**
 
+- Background auto-sync jobs that continuously ingest every Company OS source into `CompanyArtifact`
 - HubSpot CRM read-through (adapter exists; UI integration is the missing piece)
 - Twilio voice (click-to-call + recorded calls + transcripts → Activity feed)
 - Embeddable customer chat widget
 - Pipedrive (alternative to HubSpot)
 
-The integration philosophy: **integrate, don't rebuild.** JAK is the cockpit; your existing stack stays intact. The unique value lives in the orchestration + audit layer, not in re-implementing Slack or HubSpot.
+The integration philosophy: **integrate, don't rebuild.** JAK is the cockpit; your existing stack stays intact. The unique value lives in the evidence graph, orchestration, approvals, and audit layer, not in re-implementing Slack or HubSpot.
 
 </details>
 

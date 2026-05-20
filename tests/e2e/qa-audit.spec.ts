@@ -194,7 +194,7 @@ test.describe('Pass 1 — Landing (unauthenticated)', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.locator('text=/Finished work, not chat output/i').scrollIntoViewIfNeeded();
+    await page.locator('text=/Evidence-backed artifacts, not chat output/i').scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
     await snap(page, 'landing', 'product-proof');
 

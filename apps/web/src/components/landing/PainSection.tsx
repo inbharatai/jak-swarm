@@ -3,12 +3,9 @@
 /**
  * PainSection — three-card pain framing block.
  *
- *   Title: "AI chat gives answers. JAK gets work done."
- *
- * Sets up the rest of the page by naming exactly why a chatbot isn't
- * enough. Three cards, each with a clear "what's broken" line + a one-
- * sentence "what JAK does instead" line so the framing reads as a real
- * differentiator, not a strawman attack on chat.
+ * Sets up the YC-style positioning: companies do not only need another
+ * chatbot; they need a trustworthy loop between scattered context and
+ * controlled execution.
  *
  * Visual language: dim slate cards with a colored glyph on the left.
  * No neon gradients here — this section's job is to land hard, not
@@ -21,23 +18,23 @@ const PAINS = [
   {
     accent: '#f87171',
     glyphPath: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2',
-    title: 'Chatbots don’t manage workflows',
-    pain: 'You ask a chatbot for help. It writes a great paragraph. Then you copy, paste, switch tabs, follow up, retry. The work doesn’t finish itself.',
-    fix: 'JAK turns one command into a multi-step plan, hands each step to the right agent, and pushes the result through to the finish.',
+    title: 'Company context is scattered',
+    pain: 'Meetings, tickets, GitHub, Slack, Notion, support, emails, and customer calls all hold different pieces of the truth. AI cannot reason well when the evidence is fragmented.',
+    fix: 'JAK starts with source-labeled artifacts and graph entities, so agents work from cited company evidence instead of vibes.',
   },
   {
     accent: '#fbbf24',
     glyphPath: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
-    title: 'Agents are dangerous without approval gates',
-    pain: 'An autonomous agent that can send email, post publicly, run code, or move money is a liability the moment it misreads context.',
-    fix: 'JAK pauses every external action behind an inline approval card that names the tool, the payload, and the file. No surprises, no replays.',
+    title: 'Teams drift from customer intent',
+    pain: 'Roadmaps often say one thing, customer pain says another, and code activity can quietly move in a third direction. That gap is where teams waste sprints.',
+    fix: 'JAK compares signals, decisions, tasks, specs, and code-change evidence, then flags drift before it becomes expensive.',
   },
   {
     accent: '#34d399',
     glyphPath: 'M3 13l4-4 4 4 7-7M21 6h-5M21 6v5',
-    title: 'Real work needs visibility, traceability, and control',
-    pain: 'You can’t hand business work to an opaque black box. You need to see who did what, when, and prove it later if a customer asks.',
-    fix: 'Every agent step lands in the cockpit timeline. Every workflow leaves a tamper-evident audit trail. Every output is replayable.',
+    title: 'Agents need a trust boundary',
+    pain: 'A system that can create specs, touch code, send messages, or operate tools must show evidence, ask approval, and leave a record.',
+    fix: 'JAK Shield puts risky tool calls behind permissions, approvals, sandboxing, risk scoring, defensive review, and tamper-evident audit trails.',
   },
 ];
 
@@ -45,15 +42,15 @@ export default function PainSection() {
   return (
     <section
       className="relative px-4 py-24 sm:px-6 lg:px-8"
-      aria-label="Why chat isn't enough"
+      aria-label="Why closed-loop execution matters"
     >
       <div className="mx-auto max-w-6xl">
         <div className="mb-14 max-w-3xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-3 font-sans">
-            Why chat isn&rsquo;t enough
+            Why this matters
           </p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight text-white leading-[1.15]">
-            AI chat gives answers.{' '}
+            Scattered context creates drift.{' '}
             <span
               className="landing-gradient-text"
               style={{
@@ -62,11 +59,11 @@ export default function PainSection() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              JAK gets work done.
+              JAK closes the loop.
             </span>
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-300 font-sans leading-relaxed">
-            A chatbot is a generator. JAK is an operator. Three things change the moment you stop chatting and start running workflows.
+            The goal is not another dashboard or another chatbot. The goal is an evidence-backed execution layer that knows what the company meant, what the team is doing, and what needs approval before agents act.
           </p>
         </div>
 

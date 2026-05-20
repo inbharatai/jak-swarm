@@ -249,4 +249,42 @@ describe('Company Operating Layer route/client wiring (Migration 107)', () => {
       expect(client).toContain(method);
     }
   });
+
+  it('/company UI exposes every Company OS source/type supported by the API schema', () => {
+    const page = read('apps/web/src/app/(dashboard)/company/page.tsx');
+    for (const source of [
+      'github',
+      'linear',
+      'jira',
+      'slack',
+      'notion',
+      'google_drive',
+      'gmail',
+      'meeting',
+      'customer_call',
+      'support',
+      'document',
+      'manual',
+      'other',
+    ]) {
+      expect(page).toContain(`value="${source}"`);
+    }
+    for (const artifactType of [
+      'ticket',
+      'issue',
+      'pull_request',
+      'commit',
+      'slack_thread',
+      'notion_page',
+      'document',
+      'meeting_transcript',
+      'customer_feedback',
+      'support_ticket',
+      'email',
+      'decision_note',
+      'other',
+    ]) {
+      expect(page).toContain(`value="${artifactType}"`);
+    }
+  });
 });

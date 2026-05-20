@@ -18,19 +18,19 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { useStillMode } from './useStillMode';
 
-const COMMAND = 'Research my top 3 competitors and draft a LinkedIn post';
+const COMMAND = 'Turn customer feedback and GitHub issues into an execution spec';
 
-// Each plan step maps to one of the real worker agents the cockpit ships.
+// Each plan step maps to the Company OS foundation that ships today.
 const PLAN = [
-  { n: 1, role: 'Research Agent', task: 'Find 3 competitors + pricing pages', color: '#38bdf8' },
-  { n: 2, role: 'CMO Agent', task: 'Draft LinkedIn post in your brand voice', color: '#f472b6' },
-  { n: 3, role: 'Verifier', task: 'Citation density + tone + safety check', color: '#34d399' },
-  { n: 4, role: 'Approval', task: 'Show draft to you before anything publishes', color: '#fbbf24' },
+  { n: 1, role: 'Company Brain', task: 'Load cited customer + code evidence', color: '#38bdf8' },
+  { n: 2, role: 'Drift Detector', task: 'Find customer pain without matching work', color: '#fbbf24' },
+  { n: 3, role: 'Spec Generator', task: 'Create acceptance criteria + test plan', color: '#34d399' },
+  { n: 4, role: 'Approval', task: 'Reviewer approves before agents execute', color: '#f472b6' },
 ];
 
 // Output snippet shown after approval — short enough to render at hero scale.
 const OUTPUT_SNIPPET =
-  'Three things every founder should know about positioning against {Competitor A}, {Competitor B}, and {Competitor C} — with one line you can copy into your next pitch.';
+  'Spec: reduce onboarding drop-off. Evidence: 6 customer calls + 4 GitHub issues. Acceptance criteria: guided import, empty-state copy, Playwright regression, rollout approval.';
 
 type Phase = 'typing' | 'plan' | 'executing' | 'approval' | 'output' | 'audit';
 
@@ -283,12 +283,12 @@ export default function HeroCockpit() {
             <div className="p-3 sm:p-4 space-y-2">
               <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] sm:text-xs font-sans">
                 <span className="text-slate-500">Tool</span>
-                <span className="text-white font-mono">linkedin_draft_handoff</span>
-                <span className="text-slate-500">Account</span>
-                <span className="text-white">Manual posting required</span>
-                <span className="text-slate-500">Draft handoff</span>
+                <span className="text-white font-mono">agent_spec_approval</span>
+                <span className="text-slate-500">Reviewer</span>
+                <span className="text-white">Product owner required</span>
+                <span className="text-slate-500">Spec scope</span>
                 <span className="text-slate-200 line-clamp-1">
-                  &ldquo;Three things every founder should know about positioning&hellip;&rdquo;
+                  &ldquo;Reduce onboarding drop-off with cited evidence&hellip;&rdquo;
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -302,7 +302,7 @@ export default function HeroCockpit() {
                   aria-label="Approve (demo)"
                   tabIndex={-1}
                 >
-                  Approve draft handoff
+                  Approve spec
                 </button>
                 <button
                   type="button"
@@ -334,7 +334,7 @@ export default function HeroCockpit() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
               <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-emerald-300">
-                Output ready · 248 words · LinkedIn-formatted
+                Output ready · spec + test plan
               </span>
             </div>
             <p className="p-3 sm:p-4 text-[11px] sm:text-xs text-slate-200 font-sans leading-relaxed">
