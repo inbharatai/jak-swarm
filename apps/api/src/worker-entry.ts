@@ -80,6 +80,16 @@ async function main(): Promise<void> {
   const metricsPort = Number(process.env['WORKER_METRICS_PORT'] ?? '9464');
   const concurrency = Number(process.env['WORKFLOW_QUEUE_CONCURRENCY'] ?? '2');
   const leaseTtlMs = Number(process.env['WORKFLOW_QUEUE_LEASE_TTL_MS'] ?? '60000');
+  const openaiKeyPresent = Boolean(process.env['OPENAI_API_KEY']);
+  const gitCommit =
+    process.env['RAILWAY_GIT_COMMIT_SHA'] ??
+    process.env['RENDER_GIT_COMMIT'] ??
+    process.env['GIT_COMMIT'] ??
+    'unknown';
+  const gitBranch =
+    process.env['RAILWAY_GIT_BRANCH'] ??
+    process.env['RENDER_GIT_BRANCH'] ??
+    'unknown';
 
   log.info(
     {
@@ -89,11 +99,20 @@ async function main(): Promise<void> {
       concurrency,
       leaseTtlMs,
       nodeEnv: config.nodeEnv,
+      openaiKeyPresent,
       redisConfigured: Boolean(config.redisUrl),
-      gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
-      gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
+      gitCommit,
+      gitBranch,
     },
     '[Worker] Starting',
+  );
+  log.info(
+    {
+      nodeEnv: config.nodeEnv,
+      openaiKeyPresent,
+      redisConfigured: Boolean(config.redisUrl),
+    },
+    '[Worker] Environment loaded',
   );
 
   await prisma.$connect();
@@ -172,6 +191,7 @@ async function main(): Promise<void> {
   // Start queue worker
   swarmService.startQueueWorker();
   log.info({ mode: 'standalone' }, '[Worker] Queue worker started');
+  log.info('[Worker] Waiting for jobs');
 
   // Apply workflow signals from other instances.
   // Unpause uses a distributed lock so only one instance resumes the workflow.

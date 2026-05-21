@@ -187,7 +187,14 @@ export const config = {
   salesforceOAuthDomain: (process.env['SALESFORCE_OAUTH_DOMAIN'] ?? 'login.salesforce.com').trim(),
 
   logLevel: process.env['LOG_LEVEL'] ?? (isProd ? 'info' : 'debug'),
-  corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(','),
+  corsOrigins: (() => {
+    const configured = parseCsv(process.env['CORS_ORIGINS']);
+    if (configured.length > 0) return configured;
+    if (isProd) {
+      return ['https://jakswarm.com', 'https://www.jakswarm.com'];
+    }
+    return ['http://localhost:3000'];
+  })(),
 
   supabaseUrl: process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim() ?? '',
   supabaseAnonKey: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim() ?? '',

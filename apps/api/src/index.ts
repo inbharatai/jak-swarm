@@ -360,6 +360,9 @@ async function buildApp() {
     fastify.log.warn({ err: brainErr instanceof Error ? brainErr.message : String(brainErr) }, '[CompanyBrain] Boot wiring failed (non-fatal)');
   }
 
+  const apiServiceName = 'jak-swarm-api';
+  const apiPackageVersion = process.env['JAK_API_VERSION'] ?? '0.1.0-beta.0';
+
   // -------------------------------------------------------------------------
   // Health check — probes DB + Redis connectivity
   // -------------------------------------------------------------------------
@@ -388,24 +391,21 @@ async function buildApp() {
       checks.redis = { status: 'disabled' };
     }
 
-    const allHealthy = Object.values(checks).every((c) => c.status === 'ok');
+    const allHealthy = Object.values(checks).every((c) => c.status !== 'error');
+    const timestamp = new Date().toISOString();
 
     return reply.status(allHealthy ? 200 : 503).send({
+      ok: allHealthy,
+      service: apiServiceName,
+      timestamp,
       status: allHealthy ? 'ok' : 'degraded',
-      timestamp: new Date().toISOString(),
-      version: '0.1.0',
+      version: apiPackageVersion,
       environment: config.nodeEnv,
       checks,
     });
   });
 
-  // /version - exposes git commit SHA so deploys can be verified end-to-end.
-  // Render injects RENDER_GIT_COMMIT during build; falls back to env var or 'unknown'.
-  //
-  // Surface both raw env knobs and the effective runtime. Legacy engine values
-  // are rejected by config/ignored by the package runtime; production execution
-  // is OpenAI-only and LangGraph-only.
-  fastify.get('/version', async (_request, reply) => {
+  const versionHandler = async (_request: unknown, reply: { status: (code: number) => { send: (body: unknown) => unknown } }) => {
     const hasOpenAIKey = Boolean(process.env['OPENAI_API_KEY']);
     // Read the raw env so admin diagnostics can show what operators set,
     // while `effectiveExecutionEngine` reports what actually runs.
@@ -419,9 +419,25 @@ async function buildApp() {
     //   - No key → still reports openai-first, calls fail until key is set
     const effectiveEngine = 'openai-first';
     return reply.status(200).send({
-      gitCommit: process.env['RENDER_GIT_COMMIT'] ?? process.env['GIT_COMMIT'] ?? 'unknown',
-      gitBranch: process.env['RENDER_GIT_BRANCH'] ?? 'unknown',
-      buildId: process.env['RENDER_INSTANCE_ID'] ?? 'unknown',
+      ok: true,
+      service: apiServiceName,
+      version: apiPackageVersion,
+      nodeEnv: config.nodeEnv,
+      nodeVersion: process.version,
+      gitCommit:
+        process.env['RAILWAY_GIT_COMMIT_SHA'] ??
+        process.env['RENDER_GIT_COMMIT'] ??
+        process.env['GIT_COMMIT'] ??
+        'unknown',
+      gitBranch:
+        process.env['RAILWAY_GIT_BRANCH'] ??
+        process.env['RENDER_GIT_BRANCH'] ??
+        'unknown',
+      buildId:
+        process.env['RAILWAY_DEPLOYMENT_ID'] ??
+        process.env['RENDER_INSTANCE_ID'] ??
+        'unknown',
+      timestamp: new Date().toISOString(),
       startedAt: new Date(process.uptime() * -1000 + Date.now()).toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
       // Raw env value. Empty string means unset.
@@ -434,8 +450,14 @@ async function buildApp() {
       effectiveExecutionEngine: effectiveEngine,
       openaiApiKeySet: hasOpenAIKey,
       strictWorkflowState: (process.env['JAK_STRICT_WORKFLOW_STATE'] ?? '').toLowerCase() === 'true',
+      environment: config.nodeEnv,
     });
-  });
+  };
+
+  // /version - exposes commit/build/runtime metadata.
+  fastify.get('/version', versionHandler);
+  // /api/version - Railway contract alias.
+  fastify.get('/api/version', versionHandler);
 
   // -------------------------------------------------------------------------
   // Global error handler

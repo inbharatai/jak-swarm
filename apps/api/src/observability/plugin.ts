@@ -82,13 +82,45 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get('/ready', async (_request: FastifyRequest, reply: FastifyReply) => {
     if (isShuttingDown) {
       return reply.status(503).send({
+        ok: false,
+        service: 'jak-swarm-api',
         status: 'shutting_down',
         message: 'Server is draining. Not accepting new work.',
       });
     }
 
-    const checks: Record<string, { status: string; latencyMs: number }> = {};
+    const checks: Record<string, { status: string; latencyMs: number; details?: string[] }> = {};
     let allHealthy = true;
+
+    // Required env validation for production readiness.
+    // Return only variable names, never values.
+    const requiredEnv = ['AUTH_SECRET', 'OPENAI_API_KEY', 'DATABASE_URL', 'CORS_ORIGINS'];
+
+    // Supabase is used by auth/storage flows in this deployment shape.
+    if (config.nodeEnv === 'production' || config.supabaseUrl || config.supabaseAnonKey || config.supabaseServiceRoleKey) {
+      requiredEnv.push(
+        'NEXT_PUBLIC_SUPABASE_URL',
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        'SUPABASE_SERVICE_ROLE_KEY',
+      );
+    }
+
+    // Redis is required for distributed coordination in standalone worker deployments.
+    if (config.redisUrl || config.requireRedisInProd || config.workflowWorkerMode === 'standalone') {
+      requiredEnv.push('REDIS_URL');
+    }
+
+    const uniqueRequiredEnv = [...new Set(requiredEnv)];
+    const missingEnv = uniqueRequiredEnv.filter((name) => !(process.env[name]?.trim()));
+
+    checks['env'] = {
+      status: missingEnv.length === 0 ? 'ok' : 'missing',
+      latencyMs: 0,
+      ...(missingEnv.length > 0 ? { details: missingEnv } : {}),
+    };
+    if (missingEnv.length > 0) {
+      allHealthy = false;
+    }
 
     // Database check
     try {
@@ -103,6 +135,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Redis check
+    const redisRequired = config.requireRedisInProd || config.workflowWorkerMode === 'standalone';
     if (config.redisUrl) {
       try {
         const redisStart = Date.now();
@@ -112,10 +145,15 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
         metrics.healthCheckDuration.observe({ dependency: 'redis' }, redisLatency / 1000);
       } catch {
         checks['redis'] = { status: 'unavailable', latencyMs: -1 };
-        // Redis is optional — don't fail readiness for it
+        if (redisRequired) {
+          allHealthy = false;
+        }
       }
     } else {
-      checks['redis'] = { status: 'disabled', latencyMs: 0 };
+      checks['redis'] = { status: redisRequired ? 'missing' : 'disabled', latencyMs: 0 };
+      if (redisRequired) {
+        allHealthy = false;
+      }
     }
 
     // LLM provider health
@@ -130,8 +168,12 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     return reply.status(allHealthy ? 200 : 503).send({
+      ok: allHealthy,
+      service: 'jak-swarm-api',
       status: allHealthy ? 'ready' : 'not_ready',
       checks,
+      requiredEnv: uniqueRequiredEnv,
+      missingEnv,
       activeWorkflows: activeWorkflowCount,
       timestamp: new Date().toISOString(),
     });

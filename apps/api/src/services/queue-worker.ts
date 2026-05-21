@@ -308,7 +308,7 @@ export class QueueWorker extends EventEmitter {
         } catch { /* swallow */ }
         this.log.info(
           { jobId: job.id, workflowId: job.workflowId, tenantId: job.tenantId, attempt: job.attempts, maxAttempts: job.maxAttempts },
-          '[QueueWorker] Job claimed',
+          '[QueueWorker] Job received',
         );
         this.emit('job:claimed', { jobId: job.id, workflowId: job.workflowId });
 

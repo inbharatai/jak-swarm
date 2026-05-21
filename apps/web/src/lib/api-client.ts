@@ -42,7 +42,7 @@ function resolveBaseUrl(): { url: string; misconfigured: boolean; reason?: strin
     return {
       url: 'http://localhost:4000',
       misconfigured: true,
-      reason: 'NEXT_PUBLIC_API_URL is not set in production — set it in your Vercel project env vars to your deployed API URL (e.g. https://jak-swarm-api.onrender.com)',
+      reason: 'NEXT_PUBLIC_API_URL is not set in production — set it in your Vercel project env vars to your deployed Railway API URL (e.g. https://your-railway-api-domain)',
     };
   }
   // Development default — keeps the local dev loop working.
