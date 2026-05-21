@@ -460,17 +460,32 @@ export default function HomePage() {
                 Start 30-Day Free Trial
                 <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
-              <a
-                href="https://github.com/inbharatai/jak-swarm"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-8 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-white/50"
-                aria-label="View JAK Swarm on GitHub"
-              >
-                <GitHubIcon className="h-5 w-5" />
-                View on GitHub
-              </a>
+              <div className="grid w-full sm:w-auto grid-cols-1 sm:grid-cols-2 gap-3">
+                <a
+                  href="https://github.com/inbharatai/jak-swarm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/35 bg-emerald-400/10 px-6 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-emerald-400/15 hover:border-emerald-200/50 focus-visible:ring-2 focus-visible:ring-emerald-300/70"
+                  aria-label="View JAK Swarm repository on GitHub"
+                >
+                  <GitHubIcon className="h-5 w-5" />
+                  JAK Swarm Repo
+                </a>
+                <a
+                  href="https://github.com/inbharatai/jak-shield"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/10 px-6 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-sky-400/15 hover:border-sky-200/50 focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                  aria-label="View JAK Shield repository on GitHub"
+                >
+                  <GitHubIcon className="h-5 w-5" />
+                  JAK Shield Repo
+                </a>
+              </div>
             </div>
+            <p className="mt-3 text-[11px] text-slate-400 font-mono text-center">
+              Open-source repos: JAK Swarm (control plane) + JAK Shield (trust layer)
+            </p>
 
             {/* Trial trust line — every claim here is real and grep-able:
                  - 30 days  : Subscription.trialEndsAt = trialStartedAt + 30 days
@@ -768,7 +783,13 @@ export default function HomePage() {
                   <li>
                     <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Swarm on GitHub">
                       <GitHubIcon className="h-4 w-4" />
-                      GitHub
+                      GitHub · JAK Swarm
+                    </a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/inbharatai/jak-shield" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Shield on GitHub">
+                      <GitHubIcon className="h-4 w-4" />
+                      GitHub · JAK Shield
                     </a>
                   </li>
                   <li>

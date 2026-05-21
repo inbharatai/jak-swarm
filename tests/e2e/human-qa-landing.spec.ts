@@ -87,9 +87,19 @@ test.describe('HumanQA — landing page', () => {
       .first()
       .getAttribute('href');
     qa.compareClaim({
-      claim: 'Hero "View on GitHub" CTA points at the canonical repo',
+      claim: 'Hero "JAK Swarm Repo" CTA points at the canonical repo',
       observed: String(githubHref),
       matches: !!githubHref && githubHref.includes('inbharatai/jak-swarm'),
+      section: 'hero-ctas',
+    });
+    const shieldHref = await page
+      .locator('section.gradient-bg a[href*="inbharatai/jak-shield"]')
+      .first()
+      .getAttribute('href');
+    qa.compareClaim({
+      claim: 'Hero "JAK Shield Repo" CTA points at the trust-layer repo',
+      observed: String(shieldHref),
+      matches: !!shieldHref && shieldHref.includes('inbharatai/jak-shield'),
       section: 'hero-ctas',
     });
 
