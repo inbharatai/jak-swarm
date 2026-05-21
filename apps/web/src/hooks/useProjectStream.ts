@@ -39,6 +39,10 @@ export function useProjectStream(projectId: string | undefined) {
     let abortController: AbortController | null = null;
 
     const getToken = async (): Promise<string | null> => {
+      if (process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1') {
+        return 'jak-dev-bypass';
+      }
+
       try {
         const { createClient } = await import('@/lib/supabase');
         const supabase = createClient();

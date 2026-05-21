@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/toast';
 export type WhatsAppStatus = 'starting' | 'qr' | 'connected' | 'disconnected' | 'error';
 
 interface WhatsAppStatusPayload {
-  status: WhatsAppStatus;
+  status?: WhatsAppStatus | string;
   qr?: string;
   message?: string;
 }
@@ -21,6 +21,17 @@ const STATUS_LABELS: Record<WhatsAppStatus, { label: string; variant: 'success' 
   disconnected: { label: 'Disconnected', variant: 'secondary' },
   error: { label: 'Error', variant: 'destructive' },
 };
+
+function normalizeWhatsappStatus(status: string | undefined): WhatsAppStatus {
+  const normalized = status?.trim().toLowerCase().replace(/[_\s-]+/g, '-') ?? '';
+  if (normalized === 'starting' || normalized === 'qr' || normalized === 'connected' || normalized === 'disconnected' || normalized === 'error') {
+    return normalized;
+  }
+  if (normalized === 'not-configured' || normalized === 'not-configured-yet') {
+    return 'disconnected';
+  }
+  return 'disconnected';
+}
 
 export function WhatsAppControl() {
   const toast = useToast();
@@ -50,8 +61,8 @@ export function WhatsAppControl() {
     }
   }, [hasEdited, numberData?.number]);
 
-  const status = data?.status ?? 'disconnected';
-  const statusMeta = STATUS_LABELS[status];
+  const status = normalizeWhatsappStatus(data?.status);
+  const statusMeta = STATUS_LABELS[status] ?? STATUS_LABELS.disconnected;
   const linkStatus = numberData?.status ?? 'PENDING';
   const isLinked = linkStatus === 'VERIFIED' && Boolean(numberData?.number);
   const isPending = linkStatus === 'PENDING';

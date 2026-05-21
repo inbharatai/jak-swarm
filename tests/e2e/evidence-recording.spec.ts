@@ -1,12 +1,14 @@
 /**
  * Step 6 — Video evidence surrogate.
  *
- * Honest framing (NOT a Remotion narrated marketing video — Remotion is
- * not installed in this repo, and adding it + composing a narrated
- * video is multi-day infrastructure work). This spec records a
- * Playwright `video: 'on'` + `trace: 'on'` capture of a real user
- * walking through the new StandingOrders panel + the existing
- * Schedules surface.
+ * Honest framing: this spec records a Playwright `video: 'on'` +
+ * `trace: 'on'` capture of a real user walking through the
+ * StandingOrders panel + the existing Schedules surface.
+ *
+ * The separate Remotion YC demo lives under qa/yc-demo-video and is built
+ * from captured product screenshots. Keep this Playwright recording as the
+ * raw test-evidence companion; it should not be mistaken for the polished
+ * narrative demo.
  *
  * Output:
  *   - test-results/evidence-recording-XXX/video.webm

@@ -1,0 +1,20 @@
+{
+  "name": "jak-swarm-yc-demo-video",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "render": "remotion render src/index.ts JAKSwarmYCDemo out/jak-swarm-yc-demo.mp4 --codec=h264 --pixel-format=yuv420p",
+    "preview": "remotion studio src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.399",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "remotion": "^4.0.399"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.7.3"
+  }
+}
