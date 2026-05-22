@@ -28,7 +28,7 @@ JAK Swarm captures evidence from company artifacts, maps decisions/tasks/risks/o
 
 ## 🔁 Closed-loop Company OS — beta foundation
 
-This is the YC-aligned wedge, stated honestly: JAK is not claiming finished company-wide auto-sync yet. The shipped beta foundation is an evidence-first operating layer that connectors, uploads, and manual notes can feed.
+JAK is not claiming finished company-wide auto-sync yet. The shipped beta foundation is an evidence-first operating layer that connectors, uploads, and manual notes can feed.
 
 | Layer | What is shipped today | Code evidence |
 |---|---|---|
