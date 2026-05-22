@@ -151,6 +151,35 @@ const GMAIL: OAuthProviderDef = {
   fetchIdentity: fetchGoogleEmail,
 };
 
+// ─── Provider: Google Drive (shares Google OAuth app) ───────────────────
+
+const DRIVE: OAuthProviderDef = {
+  id: 'DRIVE',
+  label: 'Google Drive',
+  authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  scopes: [
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  scopeSeparator: ' ',
+  extraAuthParams: {
+    access_type: 'offline',
+    prompt: 'consent',
+    include_granted_scopes: 'true',
+  },
+  usesPkce: true,
+  // Keep the same callback route as Gmail so existing Google OAuth app
+  // registrations continue to work without additional redirect URIs.
+  callbackPath: '/integrations/oauth/google/callback',
+  getClientCreds: (cfg) =>
+    cfg.googleOAuthClientId && cfg.googleOAuthClientSecret
+      ? { clientId: cfg.googleOAuthClientId, clientSecret: cfg.googleOAuthClientSecret }
+      : null,
+  parseTokenResponse: parseStandardTokenResponse,
+  fetchIdentity: fetchGoogleEmail,
+};
+
 // ─── Provider: Slack ──────────────────────────────────────────────────────
 
 async function fetchSlackTeamName(accessToken: string): Promise<string | null> {
@@ -552,6 +581,7 @@ function applySalesforceDomain(cfg: RuntimeConfig): void {
 
 export const OAUTH_PROVIDERS: Record<string, OAuthProviderDef> = {
   GMAIL,
+  DRIVE,
   SLACK,
   GITHUB,
   NOTION,

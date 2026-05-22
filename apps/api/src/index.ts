@@ -100,6 +100,7 @@ import externalAuditorRoutes from './routes/external-auditor.routes.js';
 import adminRetentionRoutes from './routes/admin-retention.routes.js';
 import companyBrainRoutes from './routes/company-brain.routes.js';
 import companyOperatingLayerRoutes from './routes/company-operating-layer.routes.js';
+import companySyncRoutes from './routes/company-sync.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
@@ -297,6 +298,10 @@ async function buildApp() {
   // Company Operating Layer (Migration 107) — YC closed-loop foundation:
   // artifacts -> graph entities -> drift findings -> executable specs.
   await fastify.register(companyOperatingLayerRoutes);
+  // Company connector sync control-plane (Migration 108):
+  // /company/sync status + enable/disable + manual trigger for wave-1
+  // providers (GitHub, Gmail, Google Drive).
+  await fastify.register(companySyncRoutes);
   // SYSTEM_ADMIN-only cross-tenant aggregate views (separate from
   // /audit/* which is tenant-scoped).
   await fastify.register(adminAggregateRoutes);

@@ -12,6 +12,7 @@ import {
   fetchSalesforceIdentity,
   applySalesforceDomain,
 } from '../services/oauth-providers.js';
+import { normalizeMcpProviderKey } from '../services/company-brain/sync-provider-normalization.js';
 import { ok, err } from '../types.js';
 
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
@@ -25,6 +26,14 @@ const INTEGRATION_MATURITY: Record<string, { maturity: IntegrationMaturity; note
   GITHUB: {
     maturity: 'beta',
     note: 'MCP-backed tools. Reliability depends on GitHub API and MCP server availability.',
+  },
+  DRIVE: {
+    maturity: 'partial',
+    note: 'Google Drive connector is available. Production readiness depends on tenant OAuth setup and sync/runtime adapter depth.',
+  },
+  GOOGLE_DRIVE: {
+    maturity: 'partial',
+    note: 'Google Drive connector is available. Production readiness depends on tenant OAuth setup and sync/runtime adapter depth.',
   },
   FILESYSTEM: {
     maturity: 'beta',
@@ -318,7 +327,9 @@ export async function integrationRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
     const { provider } = request.params as { provider: string };
-    const providerDef = MCP_PROVIDERS[provider.toUpperCase()];
+    const providerUpper = provider.toUpperCase();
+    const mcpProviderKey = normalizeMcpProviderKey(providerUpper);
+    const providerDef = MCP_PROVIDERS[mcpProviderKey];
     if (!providerDef) {
       return reply.code(404).send(err('NOT_FOUND', `Unknown provider: ${provider}`));
     }
@@ -328,7 +339,7 @@ export async function integrationRoutes(app: FastifyInstance) {
         credentialFields: providerDef.credentialFields,
         setupInstructions: providerDef.setupInstructions,
         isMcp: true,
-        ...getIntegrationMaturity(provider.toUpperCase()),
+        ...getIntegrationMaturity(providerUpper),
       }));
   });
 
@@ -348,7 +359,8 @@ export async function integrationRoutes(app: FastifyInstance) {
     const { provider, credentials } = parsed.data;
 
     const providerUpper = provider.toUpperCase();
-    const providerDef = MCP_PROVIDERS[providerUpper];
+    const mcpProviderKey = normalizeMcpProviderKey(providerUpper);
+    const providerDef = MCP_PROVIDERS[mcpProviderKey];
     if (!providerDef) {
       return reply.code(400).send(err('VALIDATION_ERROR', `Unsupported provider: ${provider}`));
     }

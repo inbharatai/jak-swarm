@@ -1319,6 +1319,35 @@ export interface AgentExecutableSpecClient {
   deletedAt: string | null;
 }
 
+export type CompanyConnectorSyncProviderClient = 'GMAIL' | 'GITHUB' | 'GOOGLE_DRIVE';
+
+export interface CompanyConnectorSyncRunClient {
+  id: string;
+  trigger: string;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  fetchedCount: number;
+  ingestedCount: number;
+  skippedCount: number;
+  errorMessage: string | null;
+}
+
+export interface CompanyConnectorSyncStatusClient {
+  provider: CompanyConnectorSyncProviderClient;
+  integrationProvider: string | null;
+  connected: boolean;
+  enabled: boolean;
+  status: string;
+  lastSyncedAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  consecutiveFailures: number;
+  cursor: Record<string, unknown> | null;
+  latestRun: CompanyConnectorSyncRunClient | null;
+}
+
 export interface DriftCandidateClient {
   fingerprint: string;
   driftType: string;
@@ -1428,6 +1457,21 @@ export const companyBrainApi = {
   },
   decideSpec: (id: string, body: { decision: 'APPROVED' | 'REJECTED'; comment?: string }) =>
     apiDataFetch<{ spec: AgentExecutableSpecClient }>(`/company/specs/${encodeURIComponent(id)}/decide`, { method: 'POST', body }),
+
+  // ── Connector sync control plane (Migration 108) ────────────────────
+  listConnectorSyncStatuses: () =>
+    apiDataFetch<{ items: CompanyConnectorSyncStatusClient[] }>('/company/sync'),
+  getConnectorSyncStatus: (provider: CompanyConnectorSyncProviderClient | 'DRIVE') =>
+    apiDataFetch<{ status: CompanyConnectorSyncStatusClient }>(`/company/sync?provider=${encodeURIComponent(provider)}`),
+  enableConnectorSync: (provider: CompanyConnectorSyncProviderClient | 'DRIVE') =>
+    apiDataFetch<{ status: CompanyConnectorSyncStatusClient }>(`/company/sync/${encodeURIComponent(provider)}/enable`, { method: 'POST', body: {} }),
+  disableConnectorSync: (provider: CompanyConnectorSyncProviderClient | 'DRIVE') =>
+    apiDataFetch<{ status: CompanyConnectorSyncStatusClient }>(`/company/sync/${encodeURIComponent(provider)}/disable`, { method: 'POST', body: {} }),
+  triggerConnectorSync: (provider: CompanyConnectorSyncProviderClient | 'DRIVE', body?: { mode?: 'incremental' | 'full' }) =>
+    apiDataFetch<{ run: { runId: string; status: string; fetchedCount: number; ingestedCount: number; skippedCount: number }; status: CompanyConnectorSyncStatusClient }>(
+      `/company/sync/${encodeURIComponent(provider)}/trigger`,
+      { method: 'POST', body: { mode: body?.mode ?? 'incremental' } },
+    ),
 
   // ── Knowledge sources (Sprint 2.3 / Item C) ──────────────────────────
   // URLs registered for the company brain crawler. The crawler service

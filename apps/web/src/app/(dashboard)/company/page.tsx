@@ -16,6 +16,7 @@
  */
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import {
   Brain, RefreshCw, CheckCircle, XCircle, AlertCircle, FileText, Sparkles, ShieldCheck, Network, Target, ListChecks,
@@ -24,6 +25,7 @@ import {
   companyBrainApi,
   type AgentExecutableSpecClient,
   type CompanyArtifactClient,
+  type CompanyConnectorSyncStatusClient,
   type CompanyGraphEntityClient,
   type CompanyProfileClient,
   type CompanyProfileFields,
@@ -40,6 +42,20 @@ const STATUS_BADGE: Record<string, { variant: 'default' | 'secondary' | 'destruc
   extracted:     { variant: 'secondary', label: 'Extracted — needs review', description: 'JAK auto-extracted this from your documents. Approve to make agents use it.' },
   user_approved: { variant: 'default',   label: 'Approved',                 description: 'Agents will ground their work in this profile.' },
   manual:        { variant: 'default',   label: 'Manual',                   description: 'You typed this profile by hand. Agents will use it.' },
+};
+
+const CONNECTOR_LABEL: Record<CompanyConnectorSyncStatusClient['provider'], string> = {
+  GITHUB: 'GitHub',
+  GMAIL: 'Gmail',
+  GOOGLE_DRIVE: 'Google Drive',
+};
+
+const SYNC_STATUS_BADGE: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+  running: { variant: 'secondary', label: 'Running' },
+  idle: { variant: 'default', label: 'Idle' },
+  error: { variant: 'destructive', label: 'Error' },
+  not_connected: { variant: 'outline', label: 'Not connected' },
+  disabled: { variant: 'secondary', label: 'Disabled' },
 };
 
 type ArtifactDraft = {
@@ -181,6 +197,7 @@ export default function CompanyBrainPage() {
       )}
 
       <ClosedLoopOsCard canEdit={canEdit} />
+      <ConnectorAutosyncCard canEdit={canEdit} />
 
       {/* Honest disclaimer */}
       <Card className="mt-6 border-blue-500/30 bg-blue-500/5">
@@ -411,7 +428,176 @@ function ClosedLoopOsCard({ canEdit }: { canEdit: boolean }) {
         </div>
 
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-100">
-          Blunt truth: this is the foundation for the YC thesis. It does not yet auto-sync every connector; it gives us the honest data model, API, UI, audit trail, drift detector, and OpenAI spec generator those connectors will feed.
+          Blunt truth: the closed-loop substrate is real and shipping. Auto-sync is now live for GitHub, Gmail, and Google Drive; other connectors still rely on manual ingestion until their provider pipelines are implemented.
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConnectorAutosyncCard({ canEdit }: { canEdit: boolean }) {
+  const toast = useToast();
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const sync = useSWR(
+    'company:connector-sync-statuses',
+    () => companyBrainApi.listConnectorSyncStatuses(),
+    { refreshInterval: 15_000 },
+  );
+
+  const orderedProviders: Array<CompanyConnectorSyncStatusClient['provider']> = ['GITHUB', 'GMAIL', 'GOOGLE_DRIVE'];
+  const byProvider = new Map((sync.data?.items ?? []).map((item) => [item.provider, item]));
+  const rows: CompanyConnectorSyncStatusClient[] = orderedProviders.map((provider) => (
+    byProvider.get(provider) ?? {
+      provider,
+      integrationProvider: null,
+      connected: false,
+      enabled: false,
+      status: 'not_connected',
+      lastSyncedAt: null,
+      lastSuccessAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      consecutiveFailures: 0,
+      cursor: null,
+      latestRun: null,
+    }
+  ));
+
+  async function runAction(name: string, key: string, fn: () => Promise<unknown>): Promise<void> {
+    setBusyKey(key);
+    try {
+      await fn();
+      await sync.mutate();
+      toast.success(`${name} succeeded`);
+    } catch (e) {
+      toast.error(`${name} failed`, e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  return (
+    <Card className="mt-6 border-cyan-500/30 bg-cyan-500/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <RefreshCw className="h-5 w-5" />
+          Connector autosync
+        </CardTitle>
+        <CardDescription>
+          Leader-gated background sync for GitHub, Gmail, and Google Drive. This keeps the Company OS evidence stream fresh without manual triggering.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {sync.error && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {sync.error instanceof Error ? sync.error.message : 'Could not load connector sync status.'}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={busyKey !== null || sync.isLoading}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh sync state
+          </Button>
+          <p className="text-xs text-slate-400">Scheduler cadence is deployment-controlled; status here updates every 15 seconds.</p>
+        </div>
+
+        <div className="space-y-3">
+          {rows.map((row) => {
+            const status = SYNC_STATUS_BADGE[row.status] ?? { variant: 'outline' as const, label: row.status };
+            const rowBusy = busyKey !== null && busyKey.startsWith(`${row.provider}:`);
+
+            return (
+              <div key={row.provider} className="rounded-md border border-slate-700/70 bg-slate-950/35 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{CONNECTOR_LABEL[row.provider]}</p>
+                    <p className="text-xs text-slate-400">
+                      {row.connected
+                        ? `Connected via ${row.integrationProvider ?? row.provider}`
+                        : 'Not connected in Integrations'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge variant={row.enabled ? 'default' : 'secondary'}>
+                      {row.enabled ? 'Auto-sync enabled' : 'Auto-sync disabled'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-2 xl:grid-cols-4">
+                  <p>Last sync: {formatDateTime(row.lastSyncedAt)}</p>
+                  <p>Last success: {formatDateTime(row.lastSuccessAt)}</p>
+                  <p>Last error: {formatDateTime(row.lastErrorAt)}</p>
+                  <p>Consecutive failures: {row.consecutiveFailures}</p>
+                </div>
+
+                {row.latestRun && (
+                  <p className="mt-2 text-xs text-cyan-200">
+                    Latest run: {row.latestRun.status} · fetched {row.latestRun.fetchedCount} · ingested {row.latestRun.ingestedCount} · skipped {row.latestRun.skippedCount}
+                  </p>
+                )}
+
+                {row.lastError && (
+                  <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                    {row.lastError}
+                  </p>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {!row.connected ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/integrations">Connect in Integrations</Link>
+                    </Button>
+                  ) : canEdit ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyKey !== null}
+                        onClick={() => runAction(
+                          row.enabled ? 'Disable auto-sync' : 'Enable auto-sync',
+                          `${row.provider}:toggle`,
+                          () => row.enabled
+                            ? companyBrainApi.disableConnectorSync(row.provider)
+                            : companyBrainApi.enableConnectorSync(row.provider),
+                        )}
+                      >
+                        {row.enabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={busyKey !== null || !row.enabled || row.status === 'running'}
+                        onClick={() => runAction(
+                          'Run incremental sync',
+                          `${row.provider}:trigger`,
+                          () => companyBrainApi.triggerConnectorSync(row.provider, { mode: 'incremental' }),
+                        )}
+                      >
+                        Run now
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyKey !== null || !row.enabled || row.status === 'running'}
+                        onClick={() => runAction(
+                          'Run full sync',
+                          `${row.provider}:full`,
+                          () => companyBrainApi.triggerConnectorSync(row.provider, { mode: 'full' }),
+                        )}
+                      >
+                        Full sync
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-400">Your role can view sync state but cannot trigger or change it.</p>
+                  )}
+                  {rowBusy && <Spinner size="sm" />}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -519,6 +705,19 @@ function formatShortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return 'Never';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function ProfileFieldsCard({

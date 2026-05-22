@@ -56,6 +56,8 @@ model Tenant {
   companyGraphEntities CompanyGraphEntity[]
   executionDriftFindings ExecutionDriftFinding[]
   agentExecutableSpecs AgentExecutableSpec[]
+  companyConnectorSyncStates CompanyConnectorSyncState[]
+  companyConnectorSyncRuns CompanyConnectorSyncRun[]
   // Migration 106 — team + trial
   departments     Department[]
   taskAssignments TaskAssignment[]
@@ -1725,6 +1727,62 @@ model AgentExecutableSpec {
   @@index([tenantId, status, createdAt])
   @@index([tenantId, driftFindingId])
   @@map("agent_executable_specs")
+}
+
+// CompanyConnectorSyncState — per-tenant sync cursor + health state for
+// provider ingestion into CompanyArtifact. Provider is canonicalized to
+// GITHUB | GMAIL | GOOGLE_DRIVE regardless of source alias (e.g. DRIVE).
+model CompanyConnectorSyncState {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  provider            String
+  integrationProvider String?
+  status              String    @default("not_connected") // not_connected | idle | running | error | disabled
+  cursorJson          Json?
+  lastSyncedAt        DateTime?
+  lastSuccessAt       DateTime?
+  lastError           String?   @db.Text
+  lastErrorAt         DateTime?
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs                CompanyConnectorSyncRun[]
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, status, updatedAt])
+  @@map("company_connector_sync_states")
+}
+
+// CompanyConnectorSyncRun — append-only execution history for sync jobs.
+// Lets operators inspect scheduled/manual runs, counts, and errors.
+model CompanyConnectorSyncRun {
+  id              String    @id @default(cuid())
+  syncStateId     String?
+  tenantId        String
+  provider        String
+  trigger         String    @default("scheduled") // scheduled | manual | bootstrap
+  status          String    @default("running") // running | success | partial | failed
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+  fetchedCount    Int       @default(0)
+  ingestedCount   Int       @default(0)
+  skippedCount    Int       @default(0)
+  errorMessage    String?   @db.Text
+  cursorBeforeJson Json?
+  cursorAfterJson Json?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+
+  syncState       CompanyConnectorSyncState? @relation(fields: [syncStateId], references: [id], onDelete: SetNull)
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, provider, startedAt])
+  @@index([tenantId, status, startedAt])
+  @@index([syncStateId, startedAt])
+  @@map("company_connector_sync_runs")
 }
 
 // IntentRecord — persists the Commander's intent classification per

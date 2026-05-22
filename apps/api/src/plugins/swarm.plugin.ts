@@ -11,6 +11,7 @@ import { Redis } from 'ioredis';
 import { SwarmExecutionService } from '../services/swarm-execution.service.js';
 import { SchedulerService } from '../services/scheduler.service.js';
 import { AttestationScheduler } from '../services/compliance/attestation-scheduler.service.js';
+import { CompanyConnectorSyncScheduler } from '../services/company-brain/company-connector-sync-scheduler.service.js';
 import { WorkflowService } from '../services/workflow.service.js';
 import {
   RedisSchedulerLeader,
@@ -260,6 +261,24 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   );
   attestationScheduler.start();
 
+  const companyConnectorSyncScheduler = config.companyConnectorSyncEnabled
+    ? new CompanyConnectorSyncScheduler(
+        fastify.db,
+        fastify.log,
+        {
+          isLeader: () => leader.isLeader(),
+          intervalMs: config.companyConnectorSyncIntervalMs,
+          staleRunningMs: config.companyConnectorSyncStaleRunningMs,
+          maxRunsPerTick: config.companyConnectorSyncMaxRunsPerTick,
+        },
+      )
+    : null;
+  if (companyConnectorSyncScheduler) {
+    companyConnectorSyncScheduler.start();
+  } else {
+    fastify.log.info('[company-sync-scheduler] disabled by COMPANY_CONNECTOR_SYNC_ENABLED=false');
+  }
+
   // Auto-reconnect previously connected MCP integrations (tenant-scoped)
   const db = fastify.db;
   setImmediate(async () => {
@@ -321,6 +340,8 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   // Clean up scheduler, purge interval, and coordination resources on server close
   fastify.addHook('onClose', async () => {
     scheduler.stop();
+    attestationScheduler.stop();
+    companyConnectorSyncScheduler?.stop();
     swarmService.stopQueueWorker();
     clearInterval(purgeInterval);
     await leader.stop();

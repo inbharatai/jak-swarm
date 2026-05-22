@@ -32,6 +32,11 @@ function normalizePhoneNumber(value: string): string {
   return value.replace(/^whatsapp:/i, '').replace('@s.whatsapp.net', '').replace(/\D/g, '');
 }
 
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function parseNumberMap(value?: string): Array<{ number: string; tenantId: string; userId: string }> {
   if (!value) return [];
   return value
@@ -214,6 +219,14 @@ export const config = {
   temporalAddress: process.env['TEMPORAL_ADDRESS'] ?? 'localhost:7233',
   temporalNamespace: process.env['TEMPORAL_NAMESPACE'] ?? 'jak-swarm',
   temporalTaskQueue: process.env['TEMPORAL_TASK_QUEUE'] ?? 'jak-main',
+
+  // Company connector autosync runtime (leader-gated in swarm.plugin).
+  // Defaults are conservative to keep API load predictable while still
+  // giving tenants a hands-free freshness loop for wave-1 providers.
+  companyConnectorSyncEnabled: (process.env['COMPANY_CONNECTOR_SYNC_ENABLED'] ?? 'true') === 'true',
+  companyConnectorSyncIntervalMs: parsePositiveInt(process.env['COMPANY_CONNECTOR_SYNC_INTERVAL_MS'], 5 * 60 * 1000),
+  companyConnectorSyncStaleRunningMs: parsePositiveInt(process.env['COMPANY_CONNECTOR_SYNC_STALE_RUNNING_MS'], 45 * 60 * 1000),
+  companyConnectorSyncMaxRunsPerTick: parsePositiveInt(process.env['COMPANY_CONNECTOR_SYNC_MAX_RUNS_PER_TICK'], 12),
 
   // Observability
   metricsEnabled: (process.env['METRICS_ENABLED'] ?? 'true') === 'true',
