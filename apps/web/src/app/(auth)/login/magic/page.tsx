@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,7 +20,7 @@ const tokenSchema = z.object({
 type EmailFormData = z.infer<typeof emailSchema>;
 type TokenFormData = z.infer<typeof tokenSchema>;
 
-export default function MagicLoginPage() {
+function MagicLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { requestMagicPin, verifyMagicPin } = useAuth();
@@ -196,5 +196,19 @@ export default function MagicLoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function MagicLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-primary/5 to-background px-4">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <MagicLoginPageContent />
+    </Suspense>
   );
 }
