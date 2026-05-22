@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,11 +22,27 @@ type TokenFormData = z.infer<typeof tokenSchema>;
 
 export default function MagicLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { requestMagicPin, verifyMagicPin } = useAuth();
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'request' | 'verify'>('request');
   const [serverError, setServerError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const authError = searchParams.get('error');
+
+  useEffect(() => {
+    if (!authError) return;
+    if (authError === 'auth_confirm_missing_token') {
+      setServerError('Magic link is incomplete. Enter the 6-digit PIN from your email or request a new code.');
+      return;
+    }
+    if (authError === 'auth_confirm_error') {
+      setServerError('Magic link verification failed. Enter the 6-digit PIN from your email or request a new code.');
+      return;
+    }
+    setServerError('Authentication failed. Enter the 6-digit PIN from your email or request a new code.');
+  }, [authError]);
 
   const emailForm = useForm<EmailFormData>({
     resolver: zodResolver(emailSchema),
@@ -43,7 +59,7 @@ export default function MagicLoginPage() {
       await requestMagicPin(data.email);
       setEmail(data.email);
       setStep('verify');
-      setMessage('Check your email for a magic link or 6-digit PIN.');
+      setMessage('Check your email and enter the 6-digit PIN. If the magic link fails, the PIN still works.');
     } catch (error: unknown) {
       setServerError((error as { message?: string })?.message ?? 'Unable to send sign-in email.');
     }

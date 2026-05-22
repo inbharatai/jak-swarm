@@ -82,6 +82,70 @@ function buildAuthApiUrl(path: string): string {
   return `${resolveAuthApiBaseUrl()}${normalized}`;
 }
 
+interface BackendAuthLoginPayload {
+  token?: unknown;
+  user?: unknown;
+}
+
+function unwrapApiEnvelope<T>(payload: unknown): T {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    (payload as { success?: unknown }).success === true &&
+    'data' in payload
+  ) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
+function extractApiErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const maybeMessage =
+    (payload as { error?: { message?: unknown } }).error?.message ??
+    (payload as { message?: unknown }).message;
+  return typeof maybeMessage === 'string' && maybeMessage.trim().length > 0
+    ? maybeMessage.trim()
+    : null;
+}
+
+function shouldFallbackToBackendAuth(error: unknown): boolean {
+  const message = getAuthErrorMessage(error, AUTH_SERVICE_UNAVAILABLE_MESSAGE).toLowerCase();
+  return (
+    message === AUTH_SERVICE_UNAVAILABLE_MESSAGE.toLowerCase() ||
+    /failed to fetch|fetch failed|network request failed|networkerror|load failed|auth profile lookup failed/.test(message)
+  );
+}
+
+async function loginWithBackendPassword(email: string, password: string): Promise<AuthUser> {
+  const response = await fetch(buildAuthApiUrl('/auth/login'), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      extractApiErrorMessage(payload) ??
+      `Login failed (${response.status})`,
+    );
+  }
+
+  const auth = unwrapApiEnvelope<BackendAuthLoginPayload | null>(payload);
+  const token = auth && typeof auth.token === 'string' ? auth.token : '';
+  const user = coerceAuthUser(auth?.user);
+  if (!token || !user) {
+    throw new Error('Login succeeded but auth payload was incomplete');
+  }
+  setToken(token, user);
+  return user;
+}
+
 async function fetchTrustedAuthUser(accessToken: string | null | undefined, fallbackUser?: SupabaseUser | null): Promise<AuthUser | null> {
   if (!accessToken) return fallbackUser ? mapSupabaseUser(fallbackUser) : null;
   const response = await fetch(buildAuthApiUrl('/auth/me'), {
@@ -384,20 +448,40 @@ export function useAuth(): UseAuthReturn {
   const login = useCallback(async (email: string, password: string) => {
     clearToken();
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-    const { data, error } = await runAuthRequest(
-      () => getClient().auth.signInWithPassword({ email, password }),
-    ).catch(error => failAuth(error));
-    if (error) {
-      failAuth(error);
+
+    // Primary path: Supabase password auth + trusted profile hydration.
+    // Fallback path: backend /auth/login when Supabase is unavailable.
+    if (hasUsableSupabaseConfig()) {
+      try {
+        const { data, error } = await runAuthRequest(
+          () => getClient().auth.signInWithPassword({ email, password }),
+        );
+        if (error) {
+          failAuth(error);
+        }
+
+        if (data.user) {
+          const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user);
+          setState({
+            user: trustedUser,
+            isLoading: false,
+            error: null,
+          });
+          return;
+        }
+      } catch (error) {
+        if (!shouldFallbackToBackendAuth(error)) {
+          failAuth(error);
+        }
+      }
     }
-    if (data.user) {
-      const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user).catch(error => failAuth(error));
-      setState({
-        user: trustedUser,
-        isLoading: false,
-        error: null,
-      });
-    }
+
+    const backendUser = await loginWithBackendPassword(email, password).catch((error) => failAuth(error));
+    setState({
+      user: backendUser,
+      isLoading: false,
+      error: null,
+    });
   }, [failAuth]);
 
   const requestMagicPin = useCallback(async (email: string) => {
