@@ -687,7 +687,10 @@ export async function integrationRoutes(app: FastifyInstance) {
   // Register a callback route per provider — providers need their exact
   // callback path pre-registered in their OAuth app dashboard, so we mount
   // them at the paths declared in the registry. The handler body is shared.
+  const registeredCallbackPaths = new Set<string>();
   for (const provider of Object.values(OAUTH_PROVIDERS)) {
+    if (registeredCallbackPaths.has(provider.callbackPath)) continue;
+    registeredCallbackPaths.add(provider.callbackPath);
     app.get(provider.callbackPath, handleOAuthCallback);
   }
 }
