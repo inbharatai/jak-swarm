@@ -112,7 +112,7 @@ afterEach(() => {
 describe('OAUTH_PROVIDERS registry', () => {
   it('exposes the full set of expected providers', () => {
     expect(Object.keys(OAUTH_PROVIDERS).sort()).toEqual([
-      'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK',
+      'DRIVE', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK',
     ]);
   });
 
@@ -151,9 +151,22 @@ describe('OAUTH_PROVIDERS registry', () => {
     expect(OAUTH_PROVIDERS['SALESFORCE']!.scopeSeparator).toBe(' ');
   });
 
-  it('callback paths are unique across providers (so OAuth app registrations stay stable)', () => {
-    const paths = Object.values(OAUTH_PROVIDERS).map((p) => p.callbackPath);
-    expect(new Set(paths).size).toBe(paths.length);
+  it('callback paths are stable and only the Google providers share one', () => {
+    const byPath = new Map<string, string[]>();
+    for (const provider of Object.values(OAUTH_PROVIDERS)) {
+      const list = byPath.get(provider.callbackPath) ?? [];
+      list.push(provider.id);
+      byPath.set(provider.callbackPath, list);
+    }
+
+    const shared = [...byPath.entries()]
+      .filter(([, ids]) => ids.length > 1)
+      .map(([path, ids]) => [path, [...ids].sort()] as const)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    expect(shared).toEqual([
+      ['/integrations/oauth/google/callback', ['DRIVE', 'GMAIL']],
+    ]);
   });
 
   it('getClientCreds returns null when client_id or secret env-fields are missing', () => {
@@ -568,7 +581,7 @@ describe('listOAuthProviders', () => {
     const list = listOAuthProviders(makeConfig());
     expect(list.every((p) => p.configured)).toBe(true);
     expect(list.map((p) => p.id).sort()).toEqual(
-      ['GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK'],
+      ['DRIVE', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK'],
     );
   });
 
