@@ -28,7 +28,11 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return null; // Redirecting
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   return <>{children}</>;

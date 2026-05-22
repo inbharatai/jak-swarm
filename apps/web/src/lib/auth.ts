@@ -389,13 +389,26 @@ export function useAuth(): UseAuthReturn {
         }
         return;
       }
-      const trustedUser = await fetchTrustedAuthUser(accessToken, supabaseUser);
-      if (!cancelled) {
-        setState({
-          user: trustedUser,
-          isLoading: false,
-          error: null,
-        });
+      try {
+        const trustedUser = await fetchTrustedAuthUser(accessToken, supabaseUser);
+        if (!cancelled) {
+          setState({
+            user: trustedUser,
+            isLoading: false,
+            error: null,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          // Never strand the dashboard on a blank/suspended loading view if
+          // trusted profile hydration fails. Fall back to a safe minimal user
+          // shape (role=VIEWER) so navigation can recover and show errors.
+          setState({
+            user: mapSupabaseUser(supabaseUser),
+            isLoading: false,
+            error: getAuthErrorMessage(error),
+          });
+        }
       }
     };
 
