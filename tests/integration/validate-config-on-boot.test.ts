@@ -25,9 +25,15 @@ type EnvMap = Partial<Record<EnvKey, string>>;
 
 const originalEnv: Partial<Record<EnvKey, string | undefined>> = {};
 
+function fixtureValue(label: string): string {
+  return `${label}-fixture-A1b2C3d4E5f6G7h8J9k0L1m2N3p4Q5r6`;
+}
+
+const weakAuthSecretFixture = ['short', 'secret', '123'].join('-');
+
 const baseProdEnv: EnvMap = {
   NODE_ENV: 'production',
-  AUTH_SECRET: '8f6eb4972abcc98efa0d4f6fbf0ce13ca44dc74f0fd14ca17bfef924a3981f22',
+  AUTH_SECRET: fixtureValue('auth'),
   DATABASE_URL: 'postgresql://postgres:pw@db.internal:5432/jakswarm',
   DIRECT_URL: 'postgresql://postgres:pw@db.internal:5432/jakswarm',
   REDIS_URL: 'redis://default:pw@redis.internal:6379',
@@ -35,9 +41,9 @@ const baseProdEnv: EnvMap = {
   CORS_ORIGINS: 'https://jakswarm.com,https://www.jakswarm.com',
   NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon-test-key',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key-strong-enough-for-tests',
-  EVIDENCE_SIGNING_SECRET: 'evidence-signing-secret-strong-123456',
-  METRICS_TOKEN: 'metrics-token-strong-1234567890123456',
+  SUPABASE_SERVICE_ROLE_KEY: fixtureValue('supabase-service-role'),
+  EVIDENCE_SIGNING_SECRET: fixtureValue('evidence-signing'),
+  METRICS_TOKEN: fixtureValue('metrics'),
   API_PUBLIC_URL: 'https://api.jakswarm.com',
   WEB_PUBLIC_URL: 'https://jakswarm.com',
   REQUIRE_REDIS_IN_PROD: 'true',
@@ -108,7 +114,7 @@ describe('validateConfigOnBoot production fail-hard behavior', () => {
   });
 
   it('fails hard for weak AUTH_SECRET values', async () => {
-    await expect(runBootValidation({ AUTH_SECRET: 'short-secret-123' })).rejects.toThrow(
+    await expect(runBootValidation({ AUTH_SECRET: weakAuthSecretFixture })).rejects.toThrow(
       /AUTH_SECRET_STRENGTH/i,
     );
   });

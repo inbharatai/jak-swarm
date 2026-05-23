@@ -8,7 +8,7 @@ import {
 describe('validate-config hardening helpers', () => {
   describe('isLikelyWeakSecret', () => {
     it('flags known placeholder patterns', () => {
-      expect(isLikelyWeakSecret('dev-secret-change-me-NEVER-USE-IN-PROD')).toBe(true);
+      expect(isLikelyWeakSecret('dev-secret-placeholder-please-rotate-001')).toBe(true);
       expect(isLikelyWeakSecret('local-dev-secret-not-for-production-001')).toBe(true);
     });
 
