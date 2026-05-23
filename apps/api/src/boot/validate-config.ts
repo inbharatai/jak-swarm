@@ -18,6 +18,56 @@ interface CheckResult {
   message: string;
 }
 
+const WEAK_SECRET_EXACT_VALUES = new Set([
+  'changeme',
+  'change-me',
+  'default',
+  'password',
+  'secret',
+  'test',
+  'dev',
+  'local',
+]);
+
+const WEAK_SECRET_FRAGMENTS = [
+  'dev-secret',
+  'change-me',
+  'changeme',
+  'local-dev',
+  'not-for-production',
+  'never-use-in-prod',
+  'placeholder',
+  'example-secret',
+  'test-secret',
+];
+
+export function isLikelyWeakSecret(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 32) return true;
+  if (/^(.)\1+$/.test(trimmed)) return true;
+  if (new Set(trimmed).size < 10) return true;
+
+  const lower = trimmed.toLowerCase();
+  if (WEAK_SECRET_EXACT_VALUES.has(lower)) return true;
+
+  return WEAK_SECRET_FRAGMENTS.some((fragment) => lower.includes(fragment));
+}
+
+export function hasSpaceSeparatedCorsOrigins(value: string | undefined): boolean {
+  if (!value) return false;
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes(',')) return false;
+
+  const urlMatches = trimmed.match(/https?:\/\/[^\s,]+/gi) ?? [];
+  return urlMatches.length > 1;
+}
+
+export function hasUnresolvedTemplateValue(value: string | undefined): boolean {
+  if (!value) return false;
+  return /\$\{\{[^}]+\}\}/.test(value);
+}
+
 export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<void> {
   const results: CheckResult[] = [];
   const isProd = config.nodeEnv === 'production';
@@ -33,6 +83,40 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
     });
   } else {
     results.push({ name: 'AUTH_SECRET', status: 'ok', message: 'JWT secret configured' });
+  }
+
+  const authSecret = process.env['AUTH_SECRET']?.trim();
+  if (isProd && authSecret && isLikelyWeakSecret(authSecret)) {
+    results.push({
+      name: 'AUTH_SECRET_STRENGTH',
+      status: 'error',
+      message: 'AUTH_SECRET appears weak or placeholder-like — use a high-entropy random value (32+ chars)',
+    });
+  }
+
+  if (isProd) {
+    const unresolvedTemplateVars = [
+      'DATABASE_URL',
+      'DIRECT_URL',
+      'REDIS_URL',
+      'AUTH_SECRET',
+      'OPENAI_API_KEY',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'EVIDENCE_SIGNING_SECRET',
+      'METRICS_TOKEN',
+    ].filter((name) => hasUnresolvedTemplateValue(process.env[name]));
+
+    if (unresolvedTemplateVars.length > 0) {
+      results.push({
+        name: 'ENV_TEMPLATE_RESOLUTION',
+        status: 'error',
+        message:
+          'Critical env vars still contain unresolved template expressions: ' +
+          unresolvedTemplateVars.join(', '),
+      });
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -107,11 +191,35 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   // -----------------------------------------------------------------------
   // 5. Security checks
   // -----------------------------------------------------------------------
+  if (isProd && hasSpaceSeparatedCorsOrigins(process.env['CORS_ORIGINS'])) {
+    results.push({
+      name: 'CORS_ORIGINS_FORMAT',
+      status: 'error',
+      message: 'CORS_ORIGINS appears space-separated without commas — use comma-separated origins',
+    });
+  }
+
   if (isProd && config.corsOrigins.includes('http://localhost:3000')) {
     results.push({
       name: 'CORS',
       status: 'warn',
       message: 'CORS allows localhost in production — set CORS_ORIGINS to your actual domain',
+    });
+  }
+
+  if (isProd && config.webPublicUrl.includes('localhost')) {
+    results.push({
+      name: 'WEB_PUBLIC_URL',
+      status: 'warn',
+      message: 'WEB_PUBLIC_URL still points at localhost in production — OAuth/callback links may break',
+    });
+  }
+
+  if (isProd && config.apiPublicUrl && !config.apiPublicUrl.startsWith('https://')) {
+    results.push({
+      name: 'API_PUBLIC_URL',
+      status: 'warn',
+      message: 'API_PUBLIC_URL is not https in production — browser and OAuth flows may fail',
     });
   }
 

@@ -10,7 +10,7 @@ This runbook is the active deployment path.
 - API: Railway web service (`jak-swarm-api`)
 - Worker: Railway background service (`jak-swarm-worker`)
 - Database: Supabase Postgres (`ttrhawuqydfecndehdhx`)
-- Queue/coordination: Redis
+- Queue/coordination: Railway managed Redis
 - LLM provider: OpenAI only
 
 ## Project
@@ -29,6 +29,7 @@ This runbook is the active deployment path.
 - Port: `PORT` from Railway (`API_PORT` optional)
 
 Health endpoints to verify:
+- `GET /healthz`
 - `GET /health`
 - `GET /ready`
 - `GET /api/version`
@@ -41,7 +42,7 @@ Recommended env vars:
 - `REQUIRE_REDIS_IN_PROD=true`
 - `DATABASE_URL=<secret>`
 - `DIRECT_URL=<secret>`
-- `REDIS_URL=<secret>`
+- `REDIS_URL=${{Redis.REDIS_URL}}`
 - `AUTH_SECRET=<secret>`
 - `OPENAI_API_KEY=<secret>`
 - `NEXT_PUBLIC_SUPABASE_URL=https://ttrhawuqydfecndehdhx.supabase.co`
@@ -51,6 +52,8 @@ Recommended env vars:
 - `METRICS_TOKEN=<secret>`
 - `API_PUBLIC_URL=https://<railway-api-domain>`
 - `WEB_PUBLIC_URL=https://jakswarm.com`
+
+`CORS_ORIGINS` must be comma-separated. Spaces after commas are fine; space-separated values without commas are invalid and will break browser CORS matching.
 
 ## Service 2: `jak-swarm-worker`
 
@@ -70,10 +73,11 @@ Worker env vars:
 - `WORKFLOW_QUEUE_POLL_INTERVAL_MS=1000`
 - `WORKFLOW_QUEUE_LEASE_TTL_MS=60000`
 - `WORKER_METRICS_PORT=9464`
+- `PORT=9464`
 - `REQUIRE_REDIS_IN_PROD=true`
 - `DATABASE_URL=<secret>`
 - `DIRECT_URL=<secret>`
-- `REDIS_URL=<secret>`
+- `REDIS_URL=${{Redis.REDIS_URL}}`
 - `AUTH_SECRET=<secret>`
 - `OPENAI_API_KEY=<secret>`
 - `NEXT_PUBLIC_SUPABASE_URL=https://ttrhawuqydfecndehdhx.supabase.co`
@@ -86,12 +90,13 @@ Worker env vars:
 
 Redis is required for this production topology because queue coordination and signal fan-out are distributed.
 
-- Create Railway Redis service (or use existing external Redis).
-- Set identical `REDIS_URL` on API and worker.
+- Create Railway Redis service (or use an external Redis with equivalent HA guarantees).
+- Set identical `REDIS_URL` on API and worker. For Railway-managed Redis, use `REDIS_URL=${{Redis.REDIS_URL}}` on both services.
 
 ## Validation checklist after deploy
 
 API:
+- `GET https://<railway-api-domain>/healthz` returns 200 with `ok=true`
 - `GET https://<railway-api-domain>/health` returns 200 with `ok=true`
 - `GET https://<railway-api-domain>/ready` returns 200 or a clear `missingEnv` list
 - `GET https://<railway-api-domain>/api/version` returns 200 with service/runtime metadata

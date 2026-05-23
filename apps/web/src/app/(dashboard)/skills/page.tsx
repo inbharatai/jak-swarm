@@ -70,6 +70,14 @@ interface Skill {
   createdAt: string;
 }
 
+interface SkillPack {
+  name: string;
+  description: string;
+  version: string;
+  riskLevel: string;
+  allowedTools: string[];
+}
+
 function buildSkillProposal(input: {
   name: string;
   description: string;
@@ -105,11 +113,21 @@ export default function SkillsPage() {
     '/skills',
     (url: string) => apiFetch<{ success: boolean; data: { items: Skill[]; total: number } }>(url),
   );
+  const { data: packsData, isLoading: packsLoading } = useSWR<{ success: boolean; data: { packs: SkillPack[]; count: number } }>(
+    '/skills/packs',
+    (url: string) => apiFetch<{ success: boolean; data: { packs: SkillPack[]; count: number } }>(url),
+  );
   const skills = skillsData?.data?.items ?? [];
+  const bundledPacks = packsData?.data?.packs ?? [];
 
   const filteredSkills = skills.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.description.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const filteredBundledPacks = bundledPacks.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.description.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const filteredMarketplace = SKILL_MARKETPLACE.filter(s =>
@@ -185,21 +203,55 @@ export default function SkillsPage() {
           {isLoading ? (
             <div className="flex items-center justify-center min-h-[200px]"><Spinner /></div>
           ) : filteredSkills.length === 0 ? (
-            <EmptyState
-              icon={<Package className="h-12 w-12" />}
-              title="No skills installed yet"
-              description={`Skills package groups of tools your agents use (PDF extraction, SEO audits, contract comparison, browser automation, and more). Browse ${SKILL_MARKETPLACE.length} ready-to-install skills in the Marketplace, or define your own.`}
-              action={
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button onClick={() => setActiveTab('marketplace')} className="gap-2">
-                    <Download className="h-4 w-4" /> Browse {SKILL_MARKETPLACE.length} Marketplace skills
-                  </Button>
-                  <Button variant="outline" onClick={() => setActiveTab('create')} className="gap-2">
-                    <Plus className="h-4 w-4" /> Create custom skill
-                  </Button>
-                </div>
-              }
-            />
+            <div className="space-y-4">
+              <EmptyState
+                icon={<Package className="h-12 w-12" />}
+                title="No tenant-installed skills yet"
+                description={`Install from Marketplace or create your own. Bundled packs are still available automatically to matching agent/tool runs.`}
+                action={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => setActiveTab('marketplace')} className="gap-2">
+                      <Download className="h-4 w-4" /> Browse {SKILL_MARKETPLACE.length} Marketplace skills
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveTab('create')} className="gap-2">
+                      <Plus className="h-4 w-4" /> Create custom skill
+                    </Button>
+                  </div>
+                }
+              />
+
+              {packsLoading ? (
+                <div className="flex items-center justify-center py-4"><Spinner /></div>
+              ) : filteredBundledPacks.length > 0 ? (
+                <Card>
+                  <CardContent className="p-4 space-y-3">
+                    <div>
+                      <h3 className="font-display font-semibold text-sm">Bundled skill packs (auto-loaded)</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        These ship with JAK and activate automatically when a run uses matching tools.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {filteredBundledPacks.map((pack) => (
+                        <div key={pack.name} className="rounded-lg border border-border p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium">{pack.name}</p>
+                              <p className="text-[11px] text-muted-foreground">v{pack.version}</p>
+                            </div>
+                            <Badge variant="secondary">{pack.riskLevel}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">{pack.description}</p>
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            {pack.allowedTools.length} allowed tools
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredSkills.map(skill => {

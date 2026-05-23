@@ -22,6 +22,7 @@ const UX_ROLE_TO_AGENT_ROLE: Record<string, string> = {
   design: 'WORKER_DESIGNER',
   automation: 'WORKER_OPS',
   auto: 'WORKER_OPS',
+  legal: 'WORKER_LEGAL',
 };
 
 /** Human-readable label for each UX role (used in the focus-text block). */
@@ -35,6 +36,7 @@ const UX_ROLE_LABEL: Record<string, string> = {
   design: 'Design',
   automation: 'Auto',
   auto: 'Auto',
+  legal: 'Legal',
 };
 
 function normalizeRoleMode(role: string): string {

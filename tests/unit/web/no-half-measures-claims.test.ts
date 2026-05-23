@@ -87,13 +87,14 @@ describe('No-half-measures truth lock', () => {
   });
 });
 
-describe('No-half-measures truth lock — UI must not regress to token-paste', () => {
-  it('ConnectModal layman view does not lay out token-paste fields outside the admin gate', () => {
+describe('No-half-measures truth lock — connector setup access', () => {
+  it('ConnectModal allows advanced setup without an admin role gate', () => {
     const modal = read('apps/web/src/components/integrations/ConnectModal.tsx');
-    // The admin form must be inside the isAdmin && showAdvanced branch.
-    expect(modal).toMatch(/isAdmin\s*&&\s*showAdvanced\s*&&/);
-    // The "Show advanced setup" toggle must be admin-only.
-    expect(modal).toMatch(/isAdmin\s*&&\s*fields\.length\s*>\s*0\s*&&/);
+    // No role check should gate the advanced setup form or toggle.
+    expect(modal).not.toMatch(/isAdmin\s*&&\s*showAdvanced\s*&&/);
+    expect(modal).not.toMatch(/isAdmin\s*&&\s*fields\.length\s*>\s*0\s*&&/);
+    // Advanced setup still remains opt-in behind an explicit toggle.
+    expect(modal).toMatch(/showAdvanced\s*&&\s*fields\.length\s*>\s*0\s*&&/);
   });
 
   it('Connector permissions table string VALUES never use developer jargon', () => {

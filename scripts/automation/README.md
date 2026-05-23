@@ -1,6 +1,6 @@
 # JAK Swarm — Deployment Automation
 
-The active beta deploy target is now Railway for API/worker, Vercel for frontend, Supabase Postgres, and Upstash Redis. See [`docs/railway-deployment.md`](../../docs/railway-deployment.md).
+The active beta deploy target is now Railway for API/worker, Vercel for frontend, Supabase Postgres, and Railway managed Redis. See [`docs/railway-deployment.md`](../../docs/railway-deployment.md).
 
 The Render scripts in this folder are **legacy rollback/migration helpers only**. Do not use them for the active beta path unless you are intentionally restoring the old Render setup.
 
@@ -41,7 +41,7 @@ All scripts are idempotent — safe to re-run.
 
 1. **Tokens via env only.** Never pass a secret on the command line (it would show up in shell history, `ps`, and system logs).
 2. **Scripts never persist tokens.** No temp files, no caching. Tokens live in your shell env for the duration of the script.
-3. **Rotated tokens only.** Do not use the `rnd_I38L…` / Supabase service-role / Upstash tokens that were pasted in Claude chat on 2026-04-18 and 2026-04-20 — those are burned. Rotate first (founder-action-list section A), then run these scripts with fresh tokens.
+3. **Rotated tokens only.** Do not use any credentials that were ever pasted in chat (Render key, Supabase service-role key, or historical Redis URLs/passwords). Rotate first (founder-action-list section A), then run these scripts with fresh tokens.
 4. **Pair-of-eyes recommended** on first run. Scripts print what they are about to do and ask for `y/N` confirmation before any mutating call (unless `--yes` is passed).
 
 ## Prerequisites
@@ -80,7 +80,7 @@ Example local file `.env.render-worker`:
 NODE_ENV=production
 LOG_LEVEL=info
 DATABASE_URL=postgresql://...
-REDIS_URL=rediss://default:...@...upstash.io:6379
+REDIS_URL=redis://default:...@redis.railway.internal:6379
 # LLM keys
 OPENAI_API_KEY=<openai-api-key>
 ```
@@ -95,6 +95,6 @@ Reads a `KEY=VALUE`-per-line .env file from STDIN and uploads each as a Vercel p
 
 ## What these scripts do NOT do
 
-- They do NOT touch Upstash — Upstash's management API can create/delete DBs but can't reset a password for a free-tier DB, and you've got one DB already. Faster to reset the password in the Upstash UI and copy the new URL into `REDIS_URL`.
+- They do NOT touch Redis provider settings or password rotation. Manage Railway Redis credentials in the Railway dashboard and then copy the current URL into `REDIS_URL` for each dependent service.
 - They do NOT run the smoke tests from section H step 18-21 of founder-action-list. Those require a real browser, a real user session, and eyeballs on a trace.
 - They do NOT provision Grafana Cloud. You still need to sign up once, grab the remote_write URL + user + API key, and paste those three values into the Grafana Agent service env (via `sync-env-to-render.sh`).

@@ -112,7 +112,7 @@ afterEach(() => {
 describe('OAUTH_PROVIDERS registry', () => {
   it('exposes the full set of expected providers', () => {
     expect(Object.keys(OAUTH_PROVIDERS).sort()).toEqual([
-      'DRIVE', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK',
+      'DRIVE', 'GCAL', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK',
     ]);
   });
 
@@ -134,6 +134,7 @@ describe('OAUTH_PROVIDERS registry', () => {
 
   it('PKCE flags match per-provider capability (Slack v2 + Notion lack PKCE; rest support it)', () => {
     expect(OAUTH_PROVIDERS['GMAIL']!.usesPkce).toBe(true);
+    expect(OAUTH_PROVIDERS['GCAL']!.usesPkce).toBe(true);
     expect(OAUTH_PROVIDERS['GITHUB']!.usesPkce).toBe(true);
     expect(OAUTH_PROVIDERS['LINEAR']!.usesPkce).toBe(true);
     expect(OAUTH_PROVIDERS['LINKEDIN']!.usesPkce).toBe(true);
@@ -145,6 +146,7 @@ describe('OAUTH_PROVIDERS registry', () => {
   it('Slack uses comma scope separator; everyone else with multi-scope uses space (or comma for Linear)', () => {
     expect(OAUTH_PROVIDERS['SLACK']!.scopeSeparator).toBe(',');
     expect(OAUTH_PROVIDERS['GMAIL']!.scopeSeparator).toBe(' ');
+    expect(OAUTH_PROVIDERS['GCAL']!.scopeSeparator).toBe(' ');
     expect(OAUTH_PROVIDERS['GITHUB']!.scopeSeparator).toBe(' ');
     expect(OAUTH_PROVIDERS['LINEAR']!.scopeSeparator).toBe(','); // Linear quirks: comma
     expect(OAUTH_PROVIDERS['LINKEDIN']!.scopeSeparator).toBe(' ');
@@ -165,7 +167,7 @@ describe('OAUTH_PROVIDERS registry', () => {
       .sort(([a], [b]) => a.localeCompare(b));
 
     expect(shared).toEqual([
-      ['/integrations/oauth/google/callback', ['DRIVE', 'GMAIL']],
+      ['/integrations/oauth/google/callback', ['DRIVE', 'GCAL', 'GMAIL']],
     ]);
   });
 
@@ -581,7 +583,7 @@ describe('listOAuthProviders', () => {
     const list = listOAuthProviders(makeConfig());
     expect(list.every((p) => p.configured)).toBe(true);
     expect(list.map((p) => p.id).sort()).toEqual(
-      ['DRIVE', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK'],
+      ['DRIVE', 'GCAL', 'GITHUB', 'GMAIL', 'LINEAR', 'LINKEDIN', 'NOTION', 'SALESFORCE', 'SLACK'],
     );
   });
 

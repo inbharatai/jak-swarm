@@ -67,6 +67,10 @@ export function ChatWorkspace() {
   // footer instead of 20 mid-run cost noise bubbles. Keyed by workflowId
   // so concurrent workflows don't mix numbers.
   const costRef = useRef<Map<string, { costUsd: number; calls: number; promptTokens: number; completionTokens: number }>>(new Map());
+  // Track terminal + final-message state per workflow to avoid duplicate
+  // assistant answers when both failed/completed signals race in noisy networks.
+  const terminalWorkflowsRef = useRef<Set<string>>(new Set());
+  const finalMessageSentRef = useRef<Set<string>>(new Set());
   // Stage 2.4: per-workflow cockpit state. Plan + step statuses + cost
   // are aggregated from SSE events as the workflow runs; the
   // DetailDrawer reads from cockpitByWorkflow[activeWorkflowId] to
@@ -176,6 +180,19 @@ export function ChatWorkspace() {
       // Create a real workflow via the API
       const workflow = await workflowApi.create(goalText, undefined, activeRoles);
       setActiveWorkflowId(workflow.id);
+      terminalWorkflowsRef.current.delete(workflow.id);
+      finalMessageSentRef.current.delete(workflow.id);
+
+      const addFinalMessageOnce = (content: string, agentRole: RoleId | null): void => {
+        if (finalMessageSentRef.current.has(workflow.id)) return;
+        finalMessageSentRef.current.add(workflow.id);
+        addMessage(convId, {
+          role: 'assistant',
+          agentRole,
+          content,
+          executionTrace: { workflowId: workflow.id },
+        });
+      };
 
       // Add initial acknowledgement
       addMessage(convId, {
@@ -384,6 +401,7 @@ export function ChatWorkspace() {
           // literal "did not produce a user-facing response" must never
           // be shown to the user per the QA brief.
           } else if (evType === 'completed') {
+            terminalWorkflowsRef.current.add(workflow.id);
             void workflowApi.get(workflow.id).then((w) => {
               const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
               const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
@@ -402,12 +420,7 @@ export function ChatWorkspace() {
                 : '';
 
               if (display.length > 0) {
-                addMessage(convId, {
-                  role: 'assistant',
-                  agentRole: activeRoles[0] ?? null,
-                  content: display + costFooter,
-                  executionTrace: { workflowId: workflow.id },
-                });
+                addFinalMessageOnce(display + costFooter, activeRoles[0] ?? null);
               }
               // Free the per-workflow cost slot so a second workflow on
               // the same page starts fresh.
@@ -432,6 +445,7 @@ export function ChatWorkspace() {
           // recovered from the trace when the graph routing failed). Fetch
           // it before showing the user a "failed" message.
           } else if (evType === 'failed') {
+            terminalWorkflowsRef.current.add(workflow.id);
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
             const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
             setCockpitByWorkflow((prev) =>
@@ -442,25 +456,15 @@ export function ChatWorkspace() {
             void workflowApi.get(workflow.id).then((w) => {
               const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
               if (raw.trim().length > 0 && !STUB_RE.test(raw)) {
-                addMessage(convId, {
-                  role: 'assistant',
-                  agentRole: activeRoles[0] ?? null,
-                  content: raw,
-                  executionTrace: { workflowId: workflow.id },
-                });
+                addFinalMessageOnce(raw, activeRoles[0] ?? null);
               } else {
-                addMessage(convId, {
-                  role: 'assistant',
-                  agentRole: null,
-                  content: `Workflow failed: ${fallbackError ?? 'Unknown error'}. You can view the detailed trace in [Run Inspector](/swarm).`,
-                });
+                addFinalMessageOnce(
+                  `Workflow failed: ${fallbackError ?? 'Unknown error'}. You can view the detailed trace in [Run Inspector](/swarm?workflowId=${workflow.id}).`,
+                  null,
+                );
               }
             }).catch(() => {
-              addMessage(convId, {
-                role: 'assistant',
-                agentRole: null,
-                content: `Workflow failed: ${fallbackError ?? 'Unknown error'}`,
-              });
+              addFinalMessageOnce(`Workflow failed: ${fallbackError ?? 'Unknown error'}`, null);
             });
             setIsSending(false);
             setIsStuck(false);
@@ -516,13 +520,20 @@ export function ChatWorkspace() {
           }
         },
         onError: () => {
-          // SSE disconnected — notify the user
+          // Stream disconnect should only notify if the workflow has not
+          // already reached a terminal event.
+          if (controller.signal.aborted || terminalWorkflowsRef.current.has(workflow.id)) {
+            setIsSending(false);
+            setIsStuck(false);
+            return;
+          }
           addMessage(convId, {
             role: 'assistant',
             agentRole: null,
-            content: 'Live stream disconnected. Check the Runs page for the latest status.',
+            content: `Live stream disconnected before completion. Open [Run Inspector](/swarm?workflowId=${workflow.id}) for the latest status.`,
           });
           setIsSending(false);
+          setIsStuck(false);
         },
       });
     } catch (err) {
@@ -613,7 +624,7 @@ export function ChatWorkspace() {
                   href={activeWorkflowId ? `/swarm?workflowId=${activeWorkflowId}` : '/swarm'}
                   className="text-xs text-primary hover:underline whitespace-nowrap"
                 >
-                  View in Runs →
+                  View in Run Inspector →
                 </a>
                 <button
                   type="button"

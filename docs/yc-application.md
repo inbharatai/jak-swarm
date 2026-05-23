@@ -276,3 +276,38 @@ or the `/metrics/yc-snapshot` numbers. If a number isn't real yet, say "design
 partner pilot" not "active users." If a feature isn't shipped, don't list it.
 The bar YC pattern-matches against is "does this founder cut through their own
 hype." Cut through yours.
+
+---
+
+## Summer 2026 experimental question (AI coding tools)
+
+Prompt context: "Optional: attach a coding agent session you're particularly proud of."
+
+### Paste-ready answer (strong + accurate)
+
+I use coding agents as an execution layer, not just autocomplete.
+
+In this repo, the workflow is: define the user-visible problem, let the agent map impacted files, apply the smallest safe patch, run the same test slices CI runs, and only then ship.
+
+A recent example: I added Google Drive OAuth support and updated provider tests, which passed locally. CI then failed in integration because two providers (GMAIL and DRIVE) shared the same callback path and Fastify rejected duplicate route registration.
+
+I used a coding agent to triage and fix it end-to-end:
+
+- traced failure from CI logs to the exact route registration loop in `apps/api/src/routes/integrations.routes.ts`
+- validated provider behavior in `apps/api/src/services/oauth-providers.ts`
+- shipped two small commits:
+  - `910e442` test alignment for DRIVE provider expectations
+  - `72c5c5e` runtime fix to dedupe callback route registration by path
+- re-ran the failing CI slice and regression slice locally:
+  - integration suite passed (duplicate-route error removed)
+  - unit + targeted integration suite passed (1885 tests)
+
+This is how I use AI tools in production: faster root-cause analysis, smaller safer diffs, and measurable reduction in time-to-recovery while keeping technical truth intact.
+
+### Short version (if character-limited)
+
+I use coding agents as a production execution tool, not autocomplete. Recent example: CI failed after I added DRIVE OAuth because DRIVE and GMAIL shared `/integrations/oauth/google/callback`, causing duplicate Fastify route registration. I used an agent to isolate root cause, patch route registration safely (dedupe by callback path), update tests, and rerun the same CI slices locally. Shipped in two commits (`910e442`, `72c5c5e`), with integration and regression suites passing after fix.
+
+### Optional attachment
+
+Attach: `docs/yc-coding-agent-session-2026-05-22.md`

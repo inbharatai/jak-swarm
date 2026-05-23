@@ -712,7 +712,9 @@ export const integrationApi = {
   oauthAuthorize: (provider: string) =>
     apiDataFetch<{ authUrl: string; state: string; provider: string }>(
       `/integrations/oauth/${provider}/authorize`,
-      { method: 'POST' },
+      // Fastify enforces media-type negotiation for POST routes; send an
+      // explicit JSON body to avoid 415 on body-less requests.
+      { method: 'POST', body: {} },
     ),
 
   // List which providers have an OAuth implementation configured on THIS

@@ -151,6 +151,33 @@ const GMAIL: OAuthProviderDef = {
   fetchIdentity: fetchGoogleEmail,
 };
 
+// ─── Provider: Google Calendar (shares Google OAuth app) ─────────────────
+
+const GCAL: OAuthProviderDef = {
+  id: 'GCAL',
+  label: 'Google Calendar',
+  authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  scopes: [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  scopeSeparator: ' ',
+  extraAuthParams: {
+    access_type: 'offline',
+    prompt: 'consent',
+    include_granted_scopes: 'true',
+  },
+  usesPkce: true,
+  callbackPath: '/integrations/oauth/google/callback',
+  getClientCreds: (cfg) =>
+    cfg.googleOAuthClientId && cfg.googleOAuthClientSecret
+      ? { clientId: cfg.googleOAuthClientId, clientSecret: cfg.googleOAuthClientSecret }
+      : null,
+  parseTokenResponse: parseStandardTokenResponse,
+  fetchIdentity: fetchGoogleEmail,
+};
+
 // ─── Provider: Google Drive (shares Google OAuth app) ───────────────────
 
 const DRIVE: OAuthProviderDef = {
@@ -581,6 +608,7 @@ function applySalesforceDomain(cfg: RuntimeConfig): void {
 
 export const OAUTH_PROVIDERS: Record<string, OAuthProviderDef> = {
   GMAIL,
+  GCAL,
   DRIVE,
   SLACK,
   GITHUB,

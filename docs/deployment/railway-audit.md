@@ -163,12 +163,12 @@ Not in repository by design:
 3. Enable public networking for API service.
 4. Set API env vars from `.env.railway.example` (API section).
 5. Configure health checks:
-   - `/health`
-   - `/ready`
-   - `/api/version`
+  - primary path: `/healthz`
+  - additional diagnostic probes: `/ready`, `/api/version`
 6. Create service `jak-swarm-worker` from same repo/image.
 7. Disable public networking on worker.
 8. Set worker env vars from `.env.railway.example` (worker section).
+  - ensure `PORT=9464` and `WORKER_METRICS_PORT=9464` are aligned.
 9. Provision Redis service and wire `REDIS_URL` to both API and worker.
 10. Verify API and worker logs show healthy startup and no secret leakage.
 11. Update Vercel production `NEXT_PUBLIC_API_URL` to Railway API URL.

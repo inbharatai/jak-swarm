@@ -8,7 +8,7 @@ This is the active beta deployment path for JAK Swarm:
 | API | Railway | One public service using the repo `Dockerfile`; default command starts `apps/api/dist/index.js`. |
 | Worker | Railway | One private/background service using the same image; start command is `node apps/api/dist/worker-entry.js`. |
 | Postgres | Supabase | Keep Supabase for now because JAK uses pgvector. Do not move DB until pgvector/backups/migration are proven. |
-| Redis | Upstash | Keep the existing Redis protocol `rediss://` URL. API and worker must share the same `REDIS_URL`. |
+| Redis | Railway managed Redis | Use `REDIS_URL=${{Redis.REDIS_URL}}` on API and worker (shared service in the same Railway project/environment). |
 | Models | OpenAI | Only `OPENAI_API_KEY` should be configured for LLM execution. |
 
 ## Why This Shape
@@ -43,7 +43,7 @@ WORKFLOW_WORKER_MODE=standalone
 REQUIRE_REDIS_IN_PROD=true
 DATABASE_URL=
 DIRECT_URL=
-REDIS_URL=
+REDIS_URL=${{Redis.REDIS_URL}}
 AUTH_SECRET=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
@@ -52,6 +52,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 EVIDENCE_SIGNING_SECRET=
 METRICS_TOKEN=
 ```
+
+`CORS_ORIGINS` must be comma-separated. Entry whitespace is trimmed, so spaces after commas are acceptable.
 
 ### `jak-swarm-worker`
 
@@ -72,10 +74,11 @@ WORKFLOW_QUEUE_CONCURRENCY=2
 WORKFLOW_QUEUE_POLL_INTERVAL_MS=1000
 WORKFLOW_QUEUE_LEASE_TTL_MS=60000
 WORKER_METRICS_PORT=9464
+PORT=9464
 REQUIRE_REDIS_IN_PROD=true
 DATABASE_URL=
 DIRECT_URL=
-REDIS_URL=
+REDIS_URL=${{Redis.REDIS_URL}}
 AUTH_SECRET=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
@@ -86,6 +89,7 @@ METRICS_TOKEN=
 ```
 
 `AUTH_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `OPENAI_API_KEY`, Supabase env, `SUPABASE_SERVICE_ROLE_KEY`, `EVIDENCE_SIGNING_SECRET`, and `METRICS_TOKEN` must match the API service.
+`PORT` should match `WORKER_METRICS_PORT` so Railway healthchecks probe the worker's metrics/health listener.
 
 ## Vercel Frontend
 
@@ -127,5 +131,5 @@ If Railway fails after Vercel cutover:
 ## Do Not Move Yet
 
 - Do not move Supabase Postgres until pgvector support, backups, restore, and migration timing are tested.
-- Do not move Upstash Redis during this migration; keep the existing `rediss://` URL.
+- Do not change Redis providers mid-beta unless you have a tested migration/rollback plan for queue + signal continuity.
 - Do not host the Next.js frontend on Railway for beta unless Vercel becomes a blocker.

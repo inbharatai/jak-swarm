@@ -6,7 +6,6 @@ import { Button } from '@/components/ui';
 import { integrationApi } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import type { IntegrationMaturity, IntegrationProvider } from '@/types';
-import { useAuth } from '@/lib/auth';
 import { getConnectorPermissions } from '@/lib/connector-permissions';
 
 interface CredentialField {
@@ -26,12 +25,8 @@ interface ConnectModalProps {
 }
 
 export function ConnectModal({ provider, providerName, providerEmoji, onClose, onConnected }: ConnectModalProps) {
-  const { user } = useAuth();
-  // Token-paste form is admin-only. Normal users see only the OAuth
-  // "Sign in with X" button or a "Coming soon" empty state — never raw
-  // credential placeholders like `xoxb-…` or `GOCSPX-…`. Defense in
-  // depth: even an admin must explicitly toggle the form open.
-  const isAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SYSTEM_ADMIN';
+  // Advanced setup is intentionally available to all users for now so
+  // teams can connect providers without admin gating.
   const [showAdvanced, setShowAdvanced] = useState(false);
   const permissions = getConnectorPermissions(provider);
 
@@ -266,8 +261,10 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
                 {oauthConfigured
                   ? `Sign in with ${oauthLabel} to connect safely. JAK will never see your password.`
                   : supportsOAuth
-                    ? `${providerName} sign-in is available, but this deployment needs an admin to finish setup before users can connect.`
-                    : `${providerName} needs workspace admin setup before users can connect.`}
+                    ? fields.length > 0
+                      ? `${providerName} sign-in is available, but not fully configured on this deployment yet. Use advanced setup below to connect now.`
+                      : `${providerName} sign-in is available, but OAuth is not configured on this deployment yet.`
+                    : `${providerName} can be connected using advanced setup below.`}
               </p>
             </div>
           )}
@@ -291,12 +288,7 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             </div>
           )}
 
-          {/* Primary connect path — layman-first. Three branches:
-              1. OAuth configured → big "Sign in with X" button
-              2. OAuth supported but not configured → "Coming soon" empty
-                 state for normal users; admins can toggle Advanced setup
-              3. OAuth not supported → admins see Advanced setup; users
-                 see "Coming soon" */}
+           {/* Primary connect path — OAuth-first when configured. */}
           {status !== 'connected' && status !== 'loading' && supportsOAuth && oauthConfigured && (
             <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm font-medium">Sign in with {oauthLabel}</p>
@@ -318,24 +310,8 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
             </div>
           )}
 
-          {/* Coming-soon empty state — shown to normal (non-admin) users
-              when OAuth isn't configured for this provider. Honest copy:
-              we don't pretend to be ready when we're not. */}
-          {status !== 'connected' && status !== 'loading' &&
-            (!supportsOAuth || !oauthConfigured) && !isAdmin && (
-            <div className="rounded-lg border bg-muted/30 p-6 text-center space-y-2" data-testid="coming-soon-empty-state">
-              <p className="text-sm font-medium">Coming soon</p>
-              <p className="text-xs text-muted-foreground">
-                {providerName} needs additional setup by your workspace admin before it can be connected.
-                Ping your admin or check back soon.
-              </p>
-            </div>
-          )}
-
-          {/* Admin-only Advanced setup toggle — token-paste form lives
-              behind this. Default collapsed even for admins so a casual
-              click doesn't surface developer credentials. */}
-          {status !== 'connected' && status !== 'loading' && isAdmin && fields.length > 0 && (
+          {/* Advanced setup toggle — token-paste form lives behind this. */}
+          {status !== 'connected' && status !== 'loading' && fields.length > 0 && (
             <div className="border-t pt-4">
               <button
                 type="button"
@@ -345,19 +321,19 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
                 aria-expanded={showAdvanced}
               >
                 <Settings2 className="h-3.5 w-3.5" />
-                {showAdvanced ? 'Hide' : 'Show'} advanced setup (admin only)
+                {showAdvanced ? 'Hide' : 'Show'} advanced setup
               </button>
 
               {showAdvanced && (
                 <div className="mt-3 space-y-3" data-testid="admin-token-paste-form">
                   {instructions && (
                     <div className="rounded-lg bg-muted/50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Admin setup notes</p>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Setup notes</p>
                       <div className="text-sm space-y-1 whitespace-pre-line text-foreground/80">{instructions}</div>
                     </div>
                   )}
                   <p className="text-[11px] text-muted-foreground">
-                    Manual credential setup. For OAuth, ask your platform team to set
+                    Manual credential setup. For OAuth, configure
                     the deployment's <code className="rounded bg-muted px-1">CLIENT_ID</code>
                     {' / '}
                     <code className="rounded bg-muted px-1">CLIENT_SECRET</code> env vars,
@@ -407,12 +383,11 @@ export function ConnectModal({ provider, providerName, providerEmoji, onClose, o
         </div>
 
         {/* Footer — Cancel always shown. Connect button only when admin
-            has the advanced token-paste form open (normal users use the
-            big OAuth button or see Coming Soon). */}
+            has the advanced token-paste form open. */}
         {status !== 'connected' && status !== 'loading' && (
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/30">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            {isAdmin && showAdvanced && fields.length > 0 && (
+            {showAdvanced && fields.length > 0 && (
               <Button
                 size="sm"
                 onClick={handleConnect}

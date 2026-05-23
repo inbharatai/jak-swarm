@@ -1,8 +1,8 @@
 # JAK Swarm — Production Deployment Guide
 
-## Active beta topology (Vercel + Railway + Supabase + Upstash)
+## Active beta topology (Vercel + Railway + Supabase + Railway Redis)
 
-The active beta path is Vercel for the frontend, Railway for the API and worker, Supabase Postgres for pgvector-backed state, and Upstash Redis for queue/signals/cache. See [`docs/railway-deployment.md`](railway-deployment.md) for the step-by-step Railway runbook.
+The active beta path is Vercel for the frontend, Railway for the API and worker, Supabase Postgres for pgvector-backed state, and Railway-managed Redis for queue/signals/cache. See [`docs/railway-deployment.md`](railway-deployment.md) for the step-by-step Railway runbook.
 
 | Piece | Where | What runs |
 |---|---|---|
@@ -10,12 +10,12 @@ The active beta path is Vercel for the frontend, Railway for the API and worker,
 | `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Railway** `jak-swarm-api` (public service) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
 | `apps/api/dist/worker-entry.js` (durable queue consumer) | **Railway** `jak-swarm-worker` (private/background service) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
 | Postgres (+ pgvector) | **Supabase** | `DATABASE_URL` = pooler:6543, `DIRECT_URL` = direct:5432 (migrations only) |
-| Redis | **Upstash** | `rediss://default:PASS@host.upstash.io:6379` — ioredis handles TLS transparently |
+| Redis | **Railway managed Redis** | `REDIS_URL=${{Redis.REDIS_URL}}` shared by API + worker over Railway private networking |
 | Observability | **Railway logs/metrics + optional Sentry/OTel** | Adequate pre-launch; add Grafana Cloud only after real user load. |
 
 **When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Railway logs/metrics plus Sentry cover the critical failure modes. The old Render blueprint remains as legacy rollback reference only; do not treat it as the active beta path.
 
-**CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. For production beta use `https://jakswarm.com,https://www.jakswarm.com`. The split is raw comma — NO spaces after commas ([apps/api/src/config.ts:92](apps/api/src/config.ts:92) splits without trimming).
+**CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. For production beta use `https://jakswarm.com,https://www.jakswarm.com`. Parsing is comma-separated with trim per entry, so spaces after commas are accepted, but commas are still required.
 
 **The whole migration runbook** (rotate credentials → provision worker → flip env → import dashboards → smoke test) is documented in [docs/founder-action-list.md](founder-action-list.md). Read it start-to-finish before touching any dashboard.
 
@@ -120,17 +120,17 @@ Worker start command: `pnpm --filter @jak-swarm/api worker` (dev) or `node apps/
 
 ---
 
-## Upstash Redis wiring (exactly)
+## Railway Redis wiring (active)
 
-JAK's Redis client ([apps/api/src/plugins/redis.plugin.ts:128](../apps/api/src/plugins/redis.plugin.ts), [apps/api/src/worker-entry.ts:90](../apps/api/src/worker-entry.ts)) is ioredis, which auto-detects `rediss://` (double `s`) and enables TLS + SNI with no extra config. Use the Redis-protocol endpoint from the Upstash UI — NOT the REST URL.
+JAK's Redis client ([apps/api/src/plugins/redis.plugin.ts:128](../apps/api/src/plugins/redis.plugin.ts), [apps/api/src/worker-entry.ts:90](../apps/api/src/worker-entry.ts)) is ioredis. In the active Railway topology, both API and worker should consume Railway's managed Redis URL via service reference.
 
 ```
-rediss://default:<PASSWORD>@<db-name>.upstash.io:6379
+${{Redis.REDIS_URL}}
 ```
 
-- Set the **identical** `REDIS_URL` on both `jak-swarm-api` and `jak-swarm-worker` (same Upstash DB — they coordinate through it).
+- Set the **identical** `REDIS_URL` expression on both `jak-swarm-api` and `jak-swarm-worker` (same Railway Redis service — they coordinate through it).
 - `REQUIRE_REDIS_IN_PROD=true` on both services. Without this, a missing `REDIS_URL` silently degrades to in-memory coordination which breaks cross-instance signals and SSE fan-out ([apps/api/src/config.ts:72](../apps/api/src/config.ts)).
-- Free-tier Upstash limits: 10k commands/day and (tier-dependent) 1 concurrent connection. ioredis reuses one connection per process, so API+Worker = 2 concurrent connections. Paid tier if you exceed.
+- If you intentionally use an external Redis provider, keep the same URL on API and worker and prefer TLS endpoints (`rediss://`) where supported.
 
 ## Legacy Render healthcheck gotcha
 
@@ -138,7 +138,7 @@ Render is no longer the active beta target. If you keep Render as rollback, reme
 
 ## CORS_ORIGINS gotcha
 
-`CORS_ORIGINS` splits on raw `,` without trimming. If you paste `https://jakswarm.com, https://www.jakswarm.com` with a space, the second origin becomes ` https://www.jakswarm.com` (leading space) which never matches — every www request gets rejected. Comma only, no space.
+`CORS_ORIGINS` is parsed as a comma-separated list and each entry is trimmed. Both `https://jakswarm.com,https://www.jakswarm.com` and `https://jakswarm.com, https://www.jakswarm.com` are valid. A space-separated value without commas (for example `https://jakswarm.com https://www.jakswarm.com`) is invalid and will fail origin matching.
 
 ---
 
@@ -162,7 +162,7 @@ docker compose -f docker-compose.staging.yml up -d
 | Service | Purpose | Recommended Setup |
 |---|---|---|
 | **PostgreSQL 15+ with pgvector** | Primary DB + vector search | Managed (RDS/Supabase/Neon), read replica |
-| **Redis 7+** | Cache + rate limiting | Managed (ElastiCache/Upstash), 1GB |
+| **Redis 7+** | Cache + rate limiting | Managed (Railway Redis / ElastiCache / Upstash), 1GB |
 | **Prometheus** | Metrics collection | Scrapes `/metrics` every 15s |
 | **Grafana** | Dashboards + alerting | Connect to Prometheus data source |
 
@@ -354,7 +354,7 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 |---|---|---|
 | PostgreSQL (Supabase) | 500MB | ~$25/mo (Pro) |
 | PostgreSQL (Neon) | 500MB | ~$19/mo |
-| Redis (Upstash) | 10K commands/day | ~$10/mo |
+| Redis (Railway managed / Upstash) | Varies by provider tier | Varies by usage/plan |
 | Prometheus + Grafana (Cloud) | 10K metrics | ~$0 (free tier) |
 | Sentry | 5K events/mo | ~$0 (free tier) |
 | Total staging | — | ~$0-25/mo |

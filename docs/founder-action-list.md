@@ -4,6 +4,8 @@ Ordered by risk first, then by blocking impact, then by effort. Each section nam
 
 Last reviewed: 2026-04-20.
 
+> Historical context note: this document captures an earlier Render + Upstash incident-response window. The active beta deployment path is Railway API + Railway worker + Railway managed Redis (see `docs/railway-deployment.md`).
+
 ---
 
 ## A. SECURITY (urgent — do now)

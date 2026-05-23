@@ -309,6 +309,69 @@ describe('DocumentAgent — forensic extraction', () => {
     expect(missing?.value).toBeNull();
     expect(missing?.sourceText).toBe('not found');
   });
+
+  it('returns a clear error when summarize/extract/classify are called without document content', async () => {
+    const agent = new DocumentAgent('stub-key');
+    const executeWithToolsSpy = vi.spyOn(
+      agent as unknown as { executeWithTools: (...args: unknown[]) => Promise<unknown> },
+      'executeWithTools',
+    );
+
+    const result = await agent.execute({ action: 'SUMMARIZE' }, stubContext());
+
+    expect(result.overallConfidence).toBe(0);
+    expect(result.summary).toContain('No document content was provided');
+    expect(executeWithToolsSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses tool loop when content is missing but query hint is present', async () => {
+    const agent = new DocumentAgent('stub-key');
+    const executeWithToolsSpy = vi
+      .spyOn(
+        agent as unknown as { executeWithTools: (...args: unknown[]) => Promise<unknown> },
+        'executeWithTools',
+      )
+      .mockResolvedValue({
+        content: JSON.stringify({ summary: 'resolved via query', overallConfidence: 0.7 }),
+        toolCalls: [],
+        totalTokens: { prompt: 0, completion: 0, total: 0 },
+        totalCostUsd: 0,
+      });
+
+    const result = await agent.execute(
+      { action: 'SUMMARIZE', query: 'upload-note.txt documentId: abc123' },
+      stubContext(),
+    );
+
+    expect(executeWithToolsSpy).toHaveBeenCalledOnce();
+    expect(result.summary).toContain('resolved via query');
+  });
+
+  it('declares document tool schemas with required content input', async () => {
+    const agent = new DocumentAgent('stub-key');
+    const executeWithToolsSpy = vi
+      .spyOn(
+        agent as unknown as { executeWithTools: (...args: unknown[]) => Promise<unknown> },
+        'executeWithTools',
+      )
+      .mockResolvedValue({
+        content: JSON.stringify({ summary: 'ok', overallConfidence: 0.9 }),
+        toolCalls: [],
+        totalTokens: { prompt: 0, completion: 0, total: 0 },
+        totalCostUsd: 0,
+      });
+
+    await agent.execute({ action: 'SUMMARIZE', documentContent: 'hello world' }, stubContext());
+
+    const tools = executeWithToolsSpy.mock.calls[0]?.[1] as Array<{
+      function: { name: string; parameters: { required?: string[] } };
+    }>;
+    const summarizeTool = tools.find((t) => t.function.name === 'summarize_document');
+    const extractTool = tools.find((t) => t.function.name === 'extract_document_data');
+
+    expect(summarizeTool?.function.parameters.required ?? []).toContain('content');
+    expect(extractTool?.function.parameters.required ?? []).toContain('content');
+  });
 });
 
 // ─── Support ───────────────────────────────────────────────────────────────

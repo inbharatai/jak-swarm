@@ -55,7 +55,7 @@ services:
       - key: LOG_LEVEL
         value: warn
       - key: CORS_ORIGINS
-        # comma-separated, NO spaces after commas — config.ts splits raw
+        # comma-separated origins; parser trims per entry.
         value: https://jakswarm.com,https://www.jakswarm.com
       # Queue-worker role is OFF in API. The separate jak-swarm-worker
       # service below owns all queue claims.

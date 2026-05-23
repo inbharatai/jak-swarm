@@ -9,6 +9,7 @@ export type DocumentAction = 'EXTRACT' | 'SUMMARIZE' | 'CLASSIFY' | 'GENERATE' |
 export interface DocumentTask {
   action: DocumentAction;
   documentContent?: string;
+  query?: string;
   documentType?: string;
   extractionSchema?: Record<string, string>;
   compareDocuments?: string[];
@@ -57,6 +58,13 @@ SUMMARIZE:
 - Structured output: TL;DR (2-3 sentences), key points (3-7 bullets), action items (who owes what by when), important dates (ISO 8601), open questions.
 - Do NOT reshape technical language into marketing copy. Preserve defined terms exactly as the document uses them.
 - If the document has sections, the summary should follow their weight — don't underweight a 10-page risk section to highlight a 1-paragraph benefit section.
+- If you call summarize_document, ALWAYS pass the full document text via the tool input field "content".
+- If documentContent is empty, call find_document first using query, filename, or document id hints.
+
+TOOL INPUT CONTRACTS:
+- summarize_document requires: content (string), optional focusArea (string).
+- extract_document_data requires: content (string), fields (string[]).
+- Never call document tools with empty {} arguments.
 
 CLASSIFY:
 - Document type: invoice | contract | MSA | SOW | NDA | purchase_order | resume | offer_letter | financial_statement | policy | intake_form | correspondence | meeting_notes | report | unknown
@@ -96,7 +104,49 @@ export class DocumentAgent extends BaseAgent {
       'Document agent executing task',
     );
 
+    const normalizedContent = typeof task.documentContent === 'string'
+      ? task.documentContent.trim()
+      : '';
+    const normalizedQuery = typeof task.query === 'string'
+      ? task.query.trim()
+      : '';
+
+    if (
+      ['EXTRACT', 'SUMMARIZE', 'CLASSIFY'].includes(task.action)
+      && normalizedContent.length === 0
+      && normalizedQuery.length === 0
+    ) {
+      const fallback: DocumentResult = {
+        action: task.action,
+        summary: 'No document content was provided. Resolve the uploaded file first and pass its content before running document analysis.',
+        overallConfidence: 0,
+      };
+      this.recordTrace(context, input, fallback, [], startedAt);
+      return fallback;
+    }
+
     const tools: OpenAI.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'find_document',
+          description: 'Find uploaded documents by name, id, or semantic query',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'Document name, id, or semantic search query',
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of matches to return',
+              },
+            },
+            required: ['query'],
+          },
+        },
+      },
       {
         type: 'function',
         function: {
@@ -105,13 +155,17 @@ export class DocumentAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              content: {
+                type: 'string',
+                description: 'Raw document text to extract fields from',
+              },
               fields: {
                 type: 'array',
                 items: { type: 'string' },
                 description: 'Fields to extract',
               },
             },
-            required: ['fields'],
+            required: ['content', 'fields'],
           },
         },
       },
@@ -123,11 +177,16 @@ export class DocumentAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              focus: {
+              content: {
+                type: 'string',
+                description: 'Raw document text to summarize',
+              },
+              focusArea: {
                 type: 'string',
                 description: 'Optional focus area for summarization',
               },
             },
+            required: ['content'],
           },
         },
       },
@@ -142,7 +201,8 @@ export class DocumentAgent extends BaseAgent {
         role: 'user',
         content: JSON.stringify({
           action: task.action,
-          documentContent: task.documentContent?.slice(0, 8000), // truncate for token limit
+          documentContent: normalizedContent.slice(0, 8000), // truncate for token limit
+          query: normalizedQuery,
           documentType: task.documentType,
           extractionSchema: task.extractionSchema,
           generatePrompt: task.generatePrompt,

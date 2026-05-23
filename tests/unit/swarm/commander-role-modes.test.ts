@@ -30,12 +30,13 @@ describe('buildCommanderInput', () => {
 
   it('emits the canonical AgentRole preference block for known UX roles', () => {
     const goal = 'Review the NDA I uploaded';
-    const input = buildCommanderInput(goal, ['cto', 'cmo', 'ceo']);
+    const input = buildCommanderInput(goal, ['cto', 'cmo', 'ceo', 'legal']);
 
     expect(input).toContain('PREFER these worker agents');
     expect(input).toContain('WORKER_TECHNICAL');
     expect(input).toContain('WORKER_MARKETING');
     expect(input).toContain('WORKER_STRATEGIST');
+    expect(input).toContain('WORKER_LEGAL');
   });
 
   it('maps every documented UX role to its canonical AgentRole', () => {
@@ -47,6 +48,7 @@ describe('buildCommanderInput', () => {
       ['research', 'WORKER_RESEARCH'],
       ['design', 'WORKER_DESIGNER'],
       ['automation', 'WORKER_OPS'],
+      ['legal', 'WORKER_LEGAL'],
     ];
     for (const [uxRole, agentRole] of cases) {
       const out = buildCommanderInput('do the thing', [uxRole]);

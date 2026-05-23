@@ -18,6 +18,18 @@ import { ok, err } from '../types.js';
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
 
 const INTEGRATION_MATURITY: Record<string, { maturity: IntegrationMaturity; note: string }> = {
+  GMAIL: {
+    maturity: 'production-ready',
+    note: 'OAuth-backed Gmail connection path with approval-gated actions.',
+  },
+  GCAL: {
+    maturity: 'production-ready',
+    note: 'OAuth-backed Google Calendar connection path with approval-gated writes.',
+  },
+  LINKEDIN: {
+    maturity: 'partial',
+    note: 'OAuth + browser-assisted flows are available; publishing remains manual handoff.',
+  },
   // MCP-backed servers
   SLACK: {
     maturity: 'production-ready',
@@ -330,17 +342,38 @@ export async function integrationRoutes(app: FastifyInstance) {
     const providerUpper = provider.toUpperCase();
     const mcpProviderKey = normalizeMcpProviderKey(providerUpper);
     const providerDef = MCP_PROVIDERS[mcpProviderKey];
+    if (providerDef) {
+      return reply.send(ok({
+          name: providerDef.name,
+          description: providerDef.description,
+          credentialFields: providerDef.credentialFields,
+          setupInstructions: providerDef.setupInstructions,
+          isMcp: true,
+          ...getIntegrationMaturity(providerUpper),
+        }));
+    }
+
+    // OAuth-only connectors are valid providers even when they are not MCP-backed.
+    const oauthProvider = OAUTH_PROVIDERS[providerUpper];
+    if (oauthProvider) {
+      return reply.send(ok({
+          name: oauthProvider.label,
+          description: `${oauthProvider.label} OAuth connection`,
+          // OAuth providers are configured via deployment env vars.
+          // Keep this empty so the UI does not offer unsupported token-paste
+          // connect flows for OAuth-only providers.
+          credentialFields: [],
+          setupInstructions:
+            `Use Sign in with ${oauthProvider.label} to connect. ` +
+            'If sign-in is unavailable, configure provider OAuth credentials on the deployment and refresh.',
+          isMcp: false,
+          ...getIntegrationMaturity(providerUpper),
+        }));
+    }
+
     if (!providerDef) {
       return reply.code(404).send(err('NOT_FOUND', `Unknown provider: ${provider}`));
     }
-    return reply.send(ok({
-        name: providerDef.name,
-        description: providerDef.description,
-        credentialFields: providerDef.credentialFields,
-        setupInstructions: providerDef.setupInstructions,
-        isMcp: true,
-        ...getIntegrationMaturity(providerUpper),
-      }));
   });
 
   // Connect integration with credentials

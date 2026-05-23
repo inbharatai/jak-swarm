@@ -103,6 +103,23 @@ describe('Product truth claims', () => {
     expect(beta).toContain('Use "beta", "design partner", or "self-hosted validation" language');
   });
 
+  it('keeps active deployment docs aligned on Railway Redis and CORS formatting truth', () => {
+    const deployment = readRepoFile('docs/DEPLOYMENT.md');
+    const railwayGuide = readRepoFile('docs/railway-deployment.md');
+    const railwayRunbook = readRepoFile('docs/deployment/railway.md');
+    const automationReadme = readRepoFile('scripts/automation/README.md');
+
+    expect(deployment).toContain('Railway managed Redis');
+    expect(railwayGuide).toContain('Railway managed Redis');
+    expect(railwayGuide).toContain('REDIS_URL=${{Redis.REDIS_URL}}');
+    expect(railwayRunbook).toContain('REDIS_URL=${{Redis.REDIS_URL}}');
+    expect(railwayGuide).toMatch(/CORS_ORIGINS.*comma-separated/i);
+    expect(railwayRunbook).toMatch(/CORS_ORIGINS.*comma-separated/i);
+
+    // Active deployment path must not claim Upstash as the current default.
+    expect(automationReadme).not.toMatch(/active beta deploy target[\s\S]{0,100}upstash/i);
+  });
+
   it('integration maturity map covers all major providers', () => {
     const integrationRoutes = readRepoFile('apps/api/src/routes/integrations.routes.ts');
     // Must have explicit maturity classifications for key providers

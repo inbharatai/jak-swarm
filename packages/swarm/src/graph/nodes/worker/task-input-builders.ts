@@ -65,6 +65,7 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
       return {
         action: inferDocumentAction(task),
         documentContent: extractDocumentContent(dependencyResults),
+        query: task.description,
         dependencyResults,
       };
     case AgentRole.WORKER_RESEARCH:
