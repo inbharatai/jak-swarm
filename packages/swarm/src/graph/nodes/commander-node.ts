@@ -1,5 +1,5 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
-import { CommanderAgent, AgentContext } from '@jak-swarm/agents';
+import { CommanderAgent, AgentContext, buildHelpfulClarification } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 
 /**
@@ -139,15 +139,16 @@ export async function commanderNode(
   }
 
   // Defensive: if Commander.execute somehow returned without missionBrief
-  // AND without directAnswer/clarification, terminate the workflow with a
-  // clear error instead of letting Planner choke on undefined missionBrief
-  // (the historical "Planner node received no mission brief" failure mode).
+  // AND without directAnswer/clarification, treat it as a clarification
+  // request rather than a generic error. This prevents the workflow from
+  // terminating with the unhelpful "I had trouble understanding" fallback.
   if (!result.missionBrief) {
+    const question = buildHelpfulClarification(state.goal, state.industry);
     return {
-      directAnswer: 'I had trouble understanding that request. Could you rephrase it with a bit more detail about what you want me to do?',
-      clarificationNeeded: false,
+      clarificationNeeded: true,
+      clarificationQuestion: question,
       status: WorkflowStatus.COMPLETED,
-      outputs: ['I had trouble understanding that request. Could you rephrase it with a bit more detail about what you want me to do?'],
+      outputs: [question],
       traces,
     };
   }

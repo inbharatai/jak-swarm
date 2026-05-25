@@ -67,6 +67,115 @@ const COMMANDER_INTENT_CATALOG = COMPANY_OS_INTENTS
   .map((i) => `  - "${i}": ${INTENT_DESCRIPTIONS[i]}`)
   .join('\n');
 
+/**
+ * Deterministic intent inference from raw user text.
+ * Runs BEFORE the LLM and AGAIN after LLM failure/ambiguity.
+ * This prevents simple business prompts from falling into the
+ * generic "I had trouble understanding your request" fallback.
+ */
+export function inferIntentFromKeywords(rawInput: string): {
+  intent: CompanyOSIntent;
+  confidence: number;
+  subFunction: string;
+} | null {
+  const lower = rawInput.toLowerCase();
+
+  // URL review patterns (CTO / browser)
+  if (/\b(review|audit|check|inspect|analyse|analyze)\b.*\b(http|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)\b/i.test(lower)) {
+    return { intent: 'website_review_and_improvement', confidence: 0.92, subFunction: 'Website Review' };
+  }
+  if (/\b(http|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)\b.*\b(review|audit|check|inspect|analyse|analyze)\b/i.test(lower)) {
+    return { intent: 'website_review_and_improvement', confidence: 0.92, subFunction: 'Website Review' };
+  }
+
+  // Marketing / campaign
+  if (/\b(marketing plan|campaign plan|go-to-market|gtm|brand audit|social strategy|content calendar|marketing calendar)\b/i.test(lower)) {
+    return { intent: 'marketing_campaign_generation', confidence: 0.9, subFunction: 'Marketing Campaign' };
+  }
+
+  // Content creation
+  if (/\b(write|draft|create|generate|compose)\b.*\b(linkedin post|blog post|tweet|newsletter|press release|ad copy|landing copy|email copy|caption|thread)\b/i.test(lower)) {
+    return { intent: 'marketing_campaign_generation', confidence: 0.88, subFunction: 'Content Creation' };
+  }
+
+  // Strategy / CEO
+  if (/\b(swot|okrs?|strategy|vision|roadmap|executive summary|board deck|market entry|positioning analysis|competitive positioning)\b/i.test(lower)) {
+    return { intent: 'company_strategy_review', confidence: 0.9, subFunction: 'Strategic Planning' };
+  }
+
+  // Investor materials
+  if (/\b(investor|pitch deck|one pager|fundraising|series [a-z]|valuation|term sheet)\b/i.test(lower)) {
+    return { intent: 'investor_material_generation', confidence: 0.9, subFunction: 'Investor Materials' };
+  }
+
+  // Competitor research
+  if (/\b(competitors?|competitive|benchmark|compare companies|market research|industry analysis)\b/i.test(lower)) {
+    return { intent: 'competitor_research', confidence: 0.88, subFunction: 'Competitive Research' };
+  }
+
+  // Code / technical
+  if (/\b(write|generate|build|fix|debug|refactor|review)\b.*\b(code|script|function|api|test|class|module|component|app|repository|repo)\b/i.test(lower)) {
+    return { intent: 'codebase_review_and_patch', confidence: 0.88, subFunction: 'Code Task' };
+  }
+
+  // Research
+  if (/\b(research|find|compare|investigate|benchmark)\b.*\b(topic|market|competitor|vendor|trends|data)\b/i.test(lower)) {
+    return { intent: 'research_and_report', confidence: 0.85, subFunction: 'Research' };
+  }
+
+  // Pricing
+  if (/\b(pricing|unit economics|cac|ltv|gross margin|burn rate|cashflow)\b/i.test(lower)) {
+    return { intent: 'pricing_and_unit_economics_review', confidence: 0.88, subFunction: 'Pricing Review' };
+  }
+
+  // Sales outreach
+  if (/\b(sales outreach|cold email|prospect|lead gen|outreach sequence|follow-up email)\b/i.test(lower)) {
+    return { intent: 'sales_outreach_draft_generation', confidence: 0.88, subFunction: 'Sales Outreach' };
+  }
+
+  // Operations / SOP
+  if (/\b(sop|standard operating procedure|operations manual|runbook|process doc|workflow doc)\b/i.test(lower)) {
+    return { intent: 'operations_sop_generation', confidence: 0.88, subFunction: 'Operations' };
+  }
+
+  // Customer persona
+  if (/\b(customer persona|user persona|buyer persona|target audience|ideal customer|icp)\b/i.test(lower)) {
+    return { intent: 'customer_persona_generation', confidence: 0.88, subFunction: 'Customer Persona' };
+  }
+
+  // Product positioning
+  if (/\b(product positioning|messaging hierarchy|value prop|value proposition|product copy)\b/i.test(lower)) {
+    return { intent: 'product_positioning_review', confidence: 0.88, subFunction: 'Product Positioning' };
+  }
+
+  // Legal / compliance
+  if (/\b(contract|nda|privacy policy|terms of service|compliance|regulation|gdpr|soc 2|iso 27001)\b/i.test(lower)) {
+    return { intent: 'audit_compliance_workflow', confidence: 0.85, subFunction: 'Legal / Compliance' };
+  }
+
+  // HR / hiring
+  if (/\b(hire|hiring|job description|jd|onboard|offer letter|resume|performance review|hr policy)\b/i.test(lower)) {
+    return { intent: 'operations_sop_generation', confidence: 0.82, subFunction: 'HR / People Ops' };
+  }
+
+  // Document analysis
+  if (/\b(summarise|summarize|extract|compare|analyze|analyse)\b.*\b(document|file|pdf|upload)\b/i.test(lower)) {
+    return { intent: 'document_analysis', confidence: 0.85, subFunction: 'Document Analysis' };
+  }
+
+  // Browser inspection (generic URL without "review")
+  if (/\b(visit|scrape|extract|screenshot)\b.*\b(http|www\.|\.com|\.io|\.co|\.ai)\b/i.test(lower)) {
+    return { intent: 'browser_inspection', confidence: 0.85, subFunction: 'Browser Inspection' };
+  }
+
+  return null;
+}
+
+/** Normalize bare URLs (www.x.com → https://www.x.com). */
+function normalizeUrls(text: string): string {
+  return text.replace(/\b(www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,})(\/[^\s]*)?\b/g, 'https://$1$2');
+}
+
 const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and either (a) answer trivial requests directly to avoid unnecessary orchestration, or (b) extract structured intelligence from raw user input so specialist agents can execute.
 
 Respond with strict JSON only — no markdown fences, no prose prefix, no explanation.
@@ -133,11 +242,14 @@ export class CommanderAgent extends BaseAgent {
     const startedAt = new Date();
     const rawInput = typeof input === 'string' ? input : JSON.stringify(input);
 
+    // Normalize URLs so the LLM sees full https:// URLs
+    const normalizedInput = normalizeUrls(rawInput);
+
     this.logger.info({ runId: context.runId }, 'Commander processing input');
 
     const detectedIndustry = context.industry
       ? (context.industry as Industry)
-      : detectIndustry(rawInput);
+      : detectIndustry(normalizedInput);
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
@@ -146,14 +258,15 @@ export class CommanderAgent extends BaseAgent {
       },
       {
         role: 'user',
-        content: `Industry context: ${detectedIndustry}\n\nUser input: ${rawInput}`,
+        content: `Industry context: ${detectedIndustry}\n\nUser input: ${normalizedInput}`,
       },
     ];
 
     // Phase 4: route via the LLMRuntime structured-output helper. Both
     // runtimes validate against the zod schema; OpenAIRuntime enforces
     // schema compliance at the model layer (no prose drift). On parse
-    // failure we fall back to the same defaults the legacy path used.
+    // failure we fall back to deterministic keyword inference instead of
+    // the generic ambiguous_request.
     let parsed: CommanderResponseT;
     try {
       parsed = await this.runtime.respondStructured(
@@ -169,7 +282,7 @@ export class CommanderAgent extends BaseAgent {
       );
     } catch (err) {
       // Distinguish recoverable schema mismatches (LLM responded with bad
-      // shape — fall back to default mission brief, workflow continues) from
+      // shape — fall back to keyword inference, workflow continues) from
       // fatal configuration errors (auth, model-not-found, network down —
       // re-throw so the workflow fails honestly instead of silently
       // continuing with a default brief).
@@ -180,20 +293,36 @@ export class CommanderAgent extends BaseAgent {
         this.logger.error({ err: msg }, 'Commander structured response hit a fatal configuration error; failing the workflow');
         throw err;
       }
-      this.logger.warn({ err: msg }, 'Commander structured response failed (recoverable schema/transient); using fallback mission brief');
-      parsed = {
-        directAnswer: null,
-        // Fallback intent: 'ambiguous_request' is honest — we genuinely
-        // failed to classify. The clarification gate will fire below.
-        intent: 'ambiguous_request',
-        intentConfidence: 0,
-        subFunction: 'General Task',
-        urgency: 3,
-        riskIndicators: [],
-        requiredOutputs: ['task completion'],
-        clarificationNeeded: true,
-        clarificationQuestion: 'I had trouble understanding your request. Could you rephrase what you\'d like me to do?',
-      };
+      this.logger.warn({ err: msg }, 'Commander structured response failed (recoverable schema/transient); using deterministic keyword inference');
+
+      // Try deterministic inference before giving up
+      const inferred = inferIntentFromKeywords(normalizedInput);
+      if (inferred) {
+        this.logger.info({ runId: context.runId, intent: inferred.intent, source: 'keyword_fallback' }, 'Commander inferred intent from keywords after LLM failure');
+        parsed = {
+          directAnswer: null,
+          intent: inferred.intent,
+          intentConfidence: inferred.confidence,
+          subFunction: inferred.subFunction,
+          urgency: 3,
+          riskIndicators: [],
+          requiredOutputs: ['task completion'],
+          clarificationNeeded: false,
+          clarificationQuestion: null,
+        };
+      } else {
+        parsed = {
+          directAnswer: null,
+          intent: 'ambiguous_request',
+          intentConfidence: 0,
+          subFunction: 'General Task',
+          urgency: 3,
+          riskIndicators: [],
+          requiredOutputs: ['task completion'],
+          clarificationNeeded: true,
+          clarificationQuestion: buildHelpfulClarification(normalizedInput, detectedIndustry),
+        };
+      }
     }
 
     const usageSummary = context.getLLMUsageSummary();
@@ -222,22 +351,35 @@ export class CommanderAgent extends BaseAgent {
       return output;
     }
 
+    // If the LLM asked for clarification, try deterministic inference
+    // one more time before accepting it. Many "ambiguous" prompts have
+    // enough signal in the raw text to route correctly.
     if (parsed.clarificationNeeded) {
-      const output: CommanderOutput = {
-        clarificationNeeded: true,
-        clarificationQuestion: parsed.clarificationQuestion ?? undefined,
-      };
+      const inferred = inferIntentFromKeywords(normalizedInput);
+      if (inferred && inferred.confidence >= 0.75) {
+        this.logger.info({ runId: context.runId, intent: inferred.intent, source: 'keyword_override' }, 'Commander overrode LLM clarification with keyword inference');
+        parsed.intent = inferred.intent;
+        parsed.intentConfidence = inferred.confidence;
+        parsed.subFunction = inferred.subFunction;
+        parsed.clarificationNeeded = false;
+        parsed.clarificationQuestion = null;
+      } else {
+        const output: CommanderOutput = {
+          clarificationNeeded: true,
+          clarificationQuestion: parsed.clarificationQuestion ?? buildHelpfulClarification(normalizedInput, detectedIndustry),
+        };
 
-      const trace = this.recordTrace(context, input, output, [], startedAt);
-      if (tokenUsage) trace.tokenUsage = tokenUsage;
-      if (usageSummary) trace.costUsd = usageSummary.costUsd;
+        const trace = this.recordTrace(context, input, output, [], startedAt);
+        if (tokenUsage) trace.tokenUsage = tokenUsage;
+        if (usageSummary) trace.costUsd = usageSummary.costUsd;
 
-      return output;
+        return output;
+      }
     }
 
     const missionBrief: MissionBrief = {
       id: this.generateId('mb_'),
-      goal: rawInput,
+      goal: normalizedInput,
       // parsed.intent is now constrained to a CompanyOSIntent by the schema;
       // null only when the LLM omits it (rare given strict json_schema). We
       // fall back to 'ambiguous_request' rather than free text to keep the
@@ -250,7 +392,7 @@ export class CommanderAgent extends BaseAgent {
       riskIndicators: parsed.riskIndicators ?? [],
       requiredOutputs: parsed.requiredOutputs ?? [],
       clarificationNeeded: false,
-      rawInput,
+      rawInput: normalizedInput,
       createdAt: new Date(),
     };
 
@@ -270,4 +412,31 @@ export class CommanderAgent extends BaseAgent {
 
     return output;
   }
+}
+
+/** Build a helpful, role-aware clarification question instead of the generic
+ *  "I had trouble understanding your request. Could you rephrase?" fallback.
+ */
+export function buildHelpfulClarification(rawInput: string, _industry?: string): string {
+  const lower = rawInput.toLowerCase();
+
+  // If the user mentioned a role, ask specifically about what deliverable
+  const roleMatch = lower.match(/\b(cto|cmo|ceo|code|research|design|auto|legal|hr|ops|product|sales|support|finance|security|compliance)\b/);
+  if (roleMatch && roleMatch[1]) {
+    const role = roleMatch[1].toUpperCase();
+    return `I can run this as a ${role} workflow, but I need one more detail to start: what deliverable would you like? (e.g., a report, a draft, a plan, or an audit)`;
+  }
+
+  // If the user mentioned a URL but no action
+  if (/https?:\/\/|www\./.test(rawInput) && !/\b(review|audit|check|inspect|analyse|analyze|visit|scrape)\b/.test(lower)) {
+    return `I see a URL in your message. Would you like me to review the website, extract data from it, or compare it to a competitor?`;
+  }
+
+  // If the input is very short
+  if (rawInput.trim().split(/\s+/).length <= 3) {
+    return `I can help with that. To route the right agent, could you tell me what you'd like produced — a report, a draft, a plan, or an analysis?`;
+  }
+
+  // Generic but helpful fallback
+  return `I can run this, but I want to make sure I use the right specialist. Could you tell me the main goal — for example: review something, write a draft, create a plan, or research a topic?`;
 }

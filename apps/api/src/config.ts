@@ -55,12 +55,38 @@ function parseNumberMap(value?: string): Array<{ number: string; tenantId: strin
     .filter((entry): entry is { number: string; tenantId: string; userId: string } => Boolean(entry));
 }
 
+function normalizeSupabaseProjectUrl(value: string | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed;
+  }
+}
+
+function hasSupabaseRestPathSuffix(value: string | undefined): boolean {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return false;
+
+  try {
+    const pathname = new URL(trimmed).pathname.toLowerCase();
+    return pathname === '/rest/v1' || pathname === '/rest/v1/';
+  } catch {
+    return /\/rest\/v1\/?$/i.test(trimmed);
+  }
+}
+
 const whatsappNumberMap = parseNumberMap(process.env['WHATSAPP_NUMBER_MAP']);
 const whatsappAllowedNumbers = (() => {
   const explicit = parseCsv(process.env['WHATSAPP_ALLOWED_NUMBERS']);
   if (explicit.length > 0) return explicit;
   return whatsappNumberMap.map((entry) => entry.number);
 })();
+const rawSupabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim() ?? '';
+const supabaseUrlUsedRestPath = hasSupabaseRestPathSuffix(rawSupabaseUrl);
+const normalizedSupabaseUrl = normalizeSupabaseProjectUrl(rawSupabaseUrl);
 
 export const config = {
   nodeEnv,
@@ -201,7 +227,8 @@ export const config = {
     return ['http://localhost:3000'];
   })(),
 
-  supabaseUrl: process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim() ?? '',
+  supabaseUrl: normalizedSupabaseUrl,
+  supabaseUrlUsedRestPath,
   supabaseAnonKey: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim() ?? '',
   // Service-role key — server-side only, NEVER exposed to the client.
   // Required for Supabase Storage uploads in the tenant-documents bucket.

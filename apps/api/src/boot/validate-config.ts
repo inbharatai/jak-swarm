@@ -247,6 +247,16 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
     });
   }
 
+  if (config.supabaseUrlUsedRestPath) {
+    results.push({
+      name: 'SUPABASE_URL_SHAPE',
+      status: 'warn',
+      message:
+        'NEXT_PUBLIC_SUPABASE_URL was provided as a REST endpoint (/rest/v1). ' +
+        'It was normalized to the project origin automatically, but env should be set to https://<project-ref>.supabase.co.',
+    });
+  }
+
   if (isProd && !config.supabaseServiceRoleKey) {
     results.push({
       name: 'SUPABASE_SERVICE_ROLE_KEY',

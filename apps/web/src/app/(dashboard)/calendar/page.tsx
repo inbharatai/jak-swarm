@@ -36,7 +36,12 @@ import {
   DialogCloseButton,
 } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { dataFetcher, workflowApi } from '@/lib/api-client';
+import {
+  dataFetcher,
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import type { Integration } from '@/types';
 
 interface CalEvent {
@@ -142,8 +147,18 @@ export default function CalendarPage() {
         `End: ${endIso}\n` +
         (newEvent.location ? `Location: ${newEvent.location}\n` : '') +
         (newEvent.description ? `Description: ${newEvent.description}\n` : '');
-      await workflowApi.create(goal, undefined, ['automation']);
-      toast.success('Event queued', 'Track the run in the Swarm Inspector. It will appear below on refresh.');
+      const createResult = await workflowApi.create(goal, undefined, ['automation']);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Calendar workflow did not return a valid workflow ID.');
+      }
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      toast.success(
+        isFollowup ? 'Command applied to active workflow' : 'Event queued',
+        isFollowup
+          ? `Tracking workflow ${workflowId.slice(0, 8)} in Run Inspector.`
+          : 'Track the run in the Swarm Inspector. It will appear below on refresh.',
+      );
       setCreateOpen(false);
       resetForm();
       // Optimistic refresh — the swarm may take a few seconds.

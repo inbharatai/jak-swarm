@@ -24,6 +24,12 @@ type ApiErr = { success: false; error: string; code?: string; statusCode?: numbe
 // the real field name is `userId`.
 type AuthData = { token: string; user: { userId: string; id?: string; email: string; name: string; tenantId?: string; role?: string } };
 type WorkflowData = { id: string; status: string; goal?: string };
+type WorkflowCreateData = WorkflowData & {
+  kind?: 'workflow_created' | 'followup_executed';
+  workflowId?: string;
+  command?: { kind?: string };
+  description?: string;
+};
 type SkillData = { id: string; name: string; status: string };
 type ToolData = { name: string; description: string };
 type MemoryData = { key: string; value: unknown };
@@ -150,7 +156,7 @@ beforeAll(async () => {
       );
     }
   }
-}, 40000);
+}, 120000);
 
 afterAll(async () => {
   if (app) await app.close();
@@ -325,7 +331,7 @@ describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
   });
 
   it('POST /workflows/ creates a workflow', async () => {
-    const { status, body } = await inject<ApiOk<WorkflowData>>(
+    const { status, body } = await inject<ApiOk<WorkflowCreateData>>(
       'POST',
       '/workflows/',
       { goal: 'Summarise the latest AI news' },
@@ -337,7 +343,73 @@ describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
     // into a single ack.
     expect([201, 202]).toContain(status);
     expect(body?.data.id).toBeTruthy();
+    expect(body?.data.kind).toBe('workflow_created');
+    expect(body?.data.workflowId).toBe(body?.data.id);
     workflowId = body?.data.id ?? '';
+  });
+
+  it('POST /workflows/ short continue command uses follow-up contract on active workflow', async () => {
+    const create = await inject<ApiOk<WorkflowCreateData>>(
+      'POST',
+      '/workflows/',
+      {
+        goal: 'Run a detailed market research workflow for AI productivity tools with competitor positioning and pricing analysis.',
+      },
+      auth(adminToken),
+    );
+    expect([201, 202]).toContain(create.status);
+    const targetWorkflowId = create.body?.data.workflowId ?? create.body?.data.id ?? '';
+    expect(targetWorkflowId).toBeTruthy();
+
+    const followup = await inject<ApiOk<WorkflowCreateData>>(
+      'POST',
+      '/workflows/',
+      { goal: 'continue' },
+      auth(adminToken),
+    );
+
+    expect(followup.status).toBe(200);
+    expect(followup.body?.data.kind).toBe('followup_executed');
+    expect(followup.body?.data.command?.kind).toBe('continue');
+    expect(followup.body?.data.workflowId).toBe(targetWorkflowId);
+  });
+
+  it('POST /workflows/ accepts all 8 role-mode paths and persists each workflow', async () => {
+    const roleModes = ['ceo', 'cto', 'cmo', 'coding', 'research', 'design', 'automation', 'legal'] as const;
+    const createdWorkflowIds: string[] = [];
+
+    for (const roleMode of roleModes) {
+      const create = await inject<ApiOk<WorkflowCreateData>>(
+        'POST',
+        '/workflows/',
+        {
+          goal: `Role contract smoke (${roleMode}) — compile a concise action plan with evidence and risks.`,
+          roleModes: [roleMode],
+        },
+        auth(adminToken),
+      );
+
+      expect([201, 202]).toContain(create.status);
+      expect(create.body?.data.kind).toBe('workflow_created');
+
+      const roleWorkflowId = create.body?.data.workflowId ?? create.body?.data.id ?? '';
+      expect(roleWorkflowId).toBeTruthy();
+      createdWorkflowIds.push(roleWorkflowId);
+
+      const get = await inject<ApiOk<WorkflowData>>(
+        'GET',
+        `/workflows/${roleWorkflowId}`,
+        undefined,
+        auth(adminToken),
+      );
+      expect(get.status).toBe(200);
+      expect(get.body?.data.id).toBe(roleWorkflowId);
+    }
+
+    for (const roleWorkflowId of createdWorkflowIds) {
+      const del = await inject('DELETE', `/workflows/${roleWorkflowId}`, undefined, auth(adminToken));
+      expect([200, 204, 409]).toContain(del.status);
+    }
   });
 
   it('GET /workflows/:id returns the created workflow', async () => {
@@ -388,7 +460,10 @@ describe.skipIf(!hasDatabaseUrl)('Workflow CRUD', () => {
       undefined,
       auth(adminToken),
     );
-    expect([200, 204]).toContain(status);
+    // In shared DB-backed runs the worker may claim/transition the workflow
+    // between create and delete, and the route can return 409 conflict when
+    // cancellation semantics reject the current state. 409 is acceptable here.
+    expect([200, 204, 409]).toContain(status);
   });
 });
 

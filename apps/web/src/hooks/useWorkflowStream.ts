@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { getRawToken } from '@/lib/auth';
 import { connectSSE } from '@/lib/sse-fetch';
 
 export interface WorkflowEvent {
@@ -12,6 +13,8 @@ export interface WorkflowEvent {
 }
 
 const TERMINAL_TYPES = new Set(['completed', 'failed', 'cancelled']);
+const DEV_BYPASS_ACTIVE = process.env['NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS'] === '1';
+const DEV_BYPASS_TOKEN = 'jak-dev-bypass';
 
 export function useWorkflowStream(workflowId: string | null) {
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
@@ -30,6 +33,11 @@ export function useWorkflowStream(workflowId: string | null) {
     let abortController: AbortController | null = null;
 
     const getToken = async (): Promise<string | null> => {
+      if (DEV_BYPASS_ACTIVE) return DEV_BYPASS_TOKEN;
+
+      const localToken = getRawToken();
+      if (localToken) return localToken;
+
       try {
         const { createClient } = await import('@/lib/supabase');
         const supabase = createClient();

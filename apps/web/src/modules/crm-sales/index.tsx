@@ -4,7 +4,12 @@ import React, { useState } from 'react';
 import { HandCoins, UserPlus, Search, Phone, Mail, Building2, TrendingUp } from 'lucide-react';
 import { Card, CardContent, Button, Badge, Input, Spinner, EmptyState } from '@/components/ui';
 import useSWR from 'swr';
-import { workflowApi, fetcher } from '@/lib/api-client';
+import {
+  fetcher,
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
 import type { ModuleProps } from '@/modules/registry';
@@ -81,21 +86,39 @@ export default function CRMSalesModule({ moduleId, isActive }: ModuleProps) {
 
   const handleEnrich = async (leadId: string) => {
     try {
-      await workflowApi.create(`Enrich lead ${leadId} with company data`);
-      eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: 'Lead enrichment' }, 'crm-sales');
-      toast.success('Enrichment workflow started');
-    } catch {
-      toast.error('Failed to start enrichment');
+      const createResult = await workflowApi.create(`Enrich lead ${leadId} with company data`);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      if (!isFollowup) {
+        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: 'Lead enrichment', workflowId }, 'crm-sales');
+      }
+
+      toast.success(isFollowup ? 'Command applied to active workflow' : 'Enrichment workflow started');
+    } catch (err) {
+      toast.error('Failed to start enrichment', err instanceof Error ? err.message : undefined);
     }
   };
 
   const handleOutreach = async (lead: Lead) => {
     try {
-      await workflowApi.create(`Draft personalized outreach email for ${lead.name} at ${lead.company}`);
-      eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: 'Outreach draft' }, 'crm-sales');
-      toast.success('Outreach workflow started');
-    } catch {
-      toast.error('Failed to start outreach');
+      const createResult = await workflowApi.create(`Draft personalized outreach email for ${lead.name} at ${lead.company}`);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      if (!isFollowup) {
+        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: 'Outreach draft', workflowId }, 'crm-sales');
+      }
+
+      toast.success(isFollowup ? 'Command applied to active workflow' : 'Outreach workflow started');
+    } catch (err) {
+      toast.error('Failed to start outreach', err instanceof Error ? err.message : undefined);
     }
   };
 

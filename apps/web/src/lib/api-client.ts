@@ -1,4 +1,12 @@
-import type { ApiError, ApprovalRequest, Integration, PaginatedResult, Workflow } from '@/types';
+import type {
+  ApiError,
+  ApprovalRequest,
+  Integration,
+  PaginatedResult,
+  Workflow,
+  WorkflowCreateResponse,
+  WorkflowFollowupResponse,
+} from '@/types';
 import { createClient } from './supabase';
 import { clearToken, getRawToken } from './auth';
 
@@ -376,11 +384,14 @@ export const workflowApi = {
   get: (id: string) => apiDataFetch<Workflow>(`/workflows/${id}`),
 
   /**
-   * POST /workflows — returns 202 Accepted immediately.
-   * Use workflowApi.get() to poll for status changes.
+    * POST /workflows.
+    *
+    * Returns one of:
+    * - workflow_created: canonical new-workflow response (typically 202)
+    * - followup_executed: short follow-up command routed to active workflow (typically 200)
    */
   create: (goal: string, industry?: string, roleModes?: string[]) =>
-    apiDataFetch<Workflow & { estimatedCredits?: number; creditsReserved?: number; taskType?: string; model?: string }>(
+    apiDataFetch<WorkflowCreateResponse>(
       '/workflows',
       { method: 'POST', body: { goal, industry, roleModes } },
     ),
@@ -415,6 +426,23 @@ export const workflowApi = {
   /** GET /workflows/:id/approvals */
   approvals: (id: string) => apiDataFetch<ApprovalRequest[]>(`/workflows/${id}/approvals`),
 };
+
+export function isWorkflowFollowupResponse(value: WorkflowCreateResponse): value is WorkflowFollowupResponse {
+  return value.kind === 'followup_executed' && typeof value.workflowId === 'string';
+}
+
+export function getWorkflowIdFromCreateResponse(value: WorkflowCreateResponse): string | null {
+  if (isWorkflowFollowupResponse(value)) {
+    return value.workflowId;
+  }
+  if (typeof value.workflowId === 'string' && value.workflowId.length > 0) {
+    return value.workflowId;
+  }
+  if (typeof value.id === 'string' && value.id.length > 0) {
+    return value.id;
+  }
+  return null;
+}
 
 export const approvalApi = {
   /** GET /approvals?status=PENDING */

@@ -32,7 +32,11 @@ import { VoiceInput } from '@/components/voice/VoiceInput';
 import { useWorkflow, useActiveWorkflows, useApprovals } from '@/hooks/useWorkflow';
 import { useWorkflowStream } from '@/hooks/useWorkflowStream';
 import { useVoice } from '@/hooks/useVoice';
-import { workflowApi } from '@/lib/api-client';
+import {
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
 import type { Industry } from '@/types';
@@ -127,11 +131,15 @@ export function WorkspaceDashboard({ title, moduleId }: WorkspaceDashboardProps)
   const handleSubmit = useCallback(async (command: string, industry: Industry) => {
     setIsSubmitting(true);
     try {
-      const result = await workflowApi.create(command, industry) as { id: string };
-      setActiveWorkflowId(result.id);
+      const result = await workflowApi.create(command, industry);
+      const workflowId = getWorkflowIdFromCreateResponse(result);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+      setActiveWorkflowId(workflowId);
       refreshWorkflow();
-      if (moduleId) {
-        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { workflowId: result.id, goal: command }, moduleId);
+      if (moduleId && !isWorkflowFollowupResponse(result)) {
+        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { workflowId, goal: command }, moduleId);
       }
     } catch (err) {
       toast.error('Failed to create workflow', err instanceof Error ? err.message : 'Please try again.');

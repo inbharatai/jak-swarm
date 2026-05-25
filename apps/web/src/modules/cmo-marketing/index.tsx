@@ -4,7 +4,12 @@ import React, { useState } from 'react';
 import { Megaphone, Send, BarChart3, Globe, Mail, Users, TrendingUp, Calendar, Sparkles, ExternalLink } from 'lucide-react';
 import { Card, CardContent, Button, Badge, Spinner, Textarea, Input } from '@/components/ui';
 import useSWR from 'swr';
-import { workflowApi, fetcher } from '@/lib/api-client';
+import {
+  fetcher,
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
 import type { ModuleProps } from '@/modules/registry';
@@ -67,12 +72,21 @@ export default function CMOMarketingModule({ moduleId, isActive }: ModuleProps) 
   const launchTask = async (goal: string) => {
     setSending(true);
     try {
-      await workflowApi.create(goal);
-      eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal }, 'cmo-marketing');
-      toast.success('Marketing task launched');
+      const createResult = await workflowApi.create(goal);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      if (!isFollowup) {
+        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal, workflowId }, 'cmo-marketing');
+      }
+
+      toast.success(isFollowup ? 'Command applied to active workflow' : 'Marketing task launched');
       setPrompt('');
-    } catch {
-      toast.error('Failed to launch task');
+    } catch (err) {
+      toast.error('Failed to launch task', err instanceof Error ? err.message : undefined);
     } finally {
       setSending(false);
     }

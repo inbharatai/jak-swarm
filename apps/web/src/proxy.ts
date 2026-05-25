@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { normalizeSupabaseProjectUrl } from '@/lib/supabase-url';
 
 // ─── Supabase Auth Proxy ───────────────────────────────────────────────────
 // Refreshes the user's session on every request so it doesn't expire.
@@ -56,9 +57,10 @@ export async function proxy(request: NextRequest) {
   }
 
   let supabaseResponse = NextResponse.next({ request });
+  const supabaseUrl = normalizeSupabaseProjectUrl(process.env['NEXT_PUBLIC_SUPABASE_URL']);
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {

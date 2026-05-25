@@ -228,6 +228,41 @@ export interface Workflow {
   costUsd?: number;
 }
 
+/**
+ * POST /workflows normal create response. `kind` and `workflowId` are
+ * canonical fields; `id` is kept for backwards compatibility with older
+ * callers that still read workflow.id.
+ */
+export interface WorkflowCreatedResponse extends Workflow {
+  kind?: 'workflow_created';
+  workflowId?: string;
+  estimatedCredits?: number;
+  creditsReserved?: number;
+  taskType?: string;
+  model?: string;
+}
+
+export interface WorkflowFollowupCommand {
+  kind: string;
+  [key: string]: unknown;
+}
+
+/**
+ * POST /workflows follow-up command response.
+ * Returned when short commands (approve/resume/continue/etc.) are routed
+ * against the active workflow instead of creating a new one.
+ */
+export interface WorkflowFollowupResponse {
+  kind: 'followup_executed';
+  workflowId: string;
+  description: string;
+  command: WorkflowFollowupCommand;
+  hint?: string;
+  [key: string]: unknown;
+}
+
+export type WorkflowCreateResponse = WorkflowCreatedResponse | WorkflowFollowupResponse;
+
 // ─── Tool Call Types ──────────────────────────────────────────────────────────
 
 export interface ToolCall {

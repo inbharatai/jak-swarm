@@ -35,7 +35,12 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, Button, Input, Textarea, EmptyState } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { dataFetcher, workflowApi } from '@/lib/api-client';
+import {
+  dataFetcher,
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import type { Integration } from '@/types';
 
 type View = 'inbox' | 'read' | 'compose';
@@ -137,14 +142,18 @@ export default function InboxPage() {
         const goal =
           `Draft a concise, natural email for sending via Gmail. Output a JSON object with fields "subject" and "body" only. ` +
           `Angle: ${aiPrompt || '(use the context)'}\n\nContext:\n${context || '(none)'}`;
-        const wf = await workflowApi.create(goal, undefined, ['cmo']);
+        const createResult = await workflowApi.create(goal, undefined, ['cmo']);
+        const workflowId = getWorkflowIdFromCreateResponse(createResult);
+        if (!workflowId) {
+          throw new Error('AI draft workflow did not return a valid workflow ID.');
+        }
 
         // Poll
         const deadline = Date.now() + 90_000;
         let finalOut = '';
         while (Date.now() < deadline) {
           await new Promise((r) => setTimeout(r, 2_000));
-          const updated = await workflowApi.get(wf.id);
+          const updated = await workflowApi.get(workflowId);
           if (updated.status === 'COMPLETED' && typeof updated.finalOutput === 'string') {
             finalOut = updated.finalOutput;
             break;
@@ -194,8 +203,19 @@ export default function InboxPage() {
         `Send this email via the connected Gmail integration. Do not alter the content.` +
         (replyId ? ` Thread as a reply to message id "${replyId}".` : '') +
         `\n\nTo: ${composeTo}\nSubject: ${composeSubject}\n\n${composeBody}`;
-      await workflowApi.create(goal, undefined, ['automation']);
-      toast.success('Send queued', 'Track the run in the Swarm Inspector. Required approvals will surface there.');
+      const createResult = await workflowApi.create(goal, undefined, ['automation']);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Send workflow did not return a valid workflow ID.');
+      }
+
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      toast.success(
+        isFollowup ? 'Command applied to active workflow' : 'Send queued',
+        isFollowup
+          ? `Tracking workflow ${workflowId.slice(0, 8)} in Run Inspector.`
+          : 'Track the run in the Swarm Inspector. Required approvals will surface there.',
+      );
       setView('inbox');
       setComposeTo('');
       setComposeSubject('');

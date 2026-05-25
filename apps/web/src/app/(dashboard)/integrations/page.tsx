@@ -5,7 +5,12 @@ import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import { Plug } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { dataFetcher, integrationApi, workflowApi } from '@/lib/api-client';
+import {
+  dataFetcher,
+  getWorkflowIdFromCreateResponse,
+  integrationApi,
+  workflowApi,
+} from '@/lib/api-client';
 import { IntegrationCard, PROVIDER_META } from '@/components/integrations/IntegrationCard';
 import { ConnectModal } from '@/components/integrations/ConnectModal';
 import { WhatsAppControl } from '@/components/integrations/WhatsAppControl';
@@ -85,8 +90,12 @@ export default function IntegrationsPage() {
     try {
       const goal = getAuditGoal(provider);
       const result = await workflowApi.create(goal);
+      const workflowId = getWorkflowIdFromCreateResponse(result);
+      if (!workflowId) {
+        throw new Error('Audit command did not return a valid workflow ID.');
+      }
       toast.success('Audit started', `${PROVIDER_META[provider].name}: agents are working on your report.`);
-      router.push(`/workspace?workflowId=${result.id}`);
+      router.push(`/workspace?workflowId=${workflowId}`);
     } catch (err) {
       toast.error('Could not start audit', err instanceof Error ? err.message : 'Please try again.');
     } finally {

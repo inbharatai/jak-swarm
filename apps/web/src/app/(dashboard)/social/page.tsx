@@ -34,7 +34,7 @@ import { Card, CardContent } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { workflowApi } from '@/lib/api-client';
+import { getWorkflowIdFromCreateResponse, workflowApi } from '@/lib/api-client';
 
 // ─── Network definitions ────────────────────────────────────────────────────
 
@@ -156,7 +156,11 @@ export default function SocialHubPage() {
 
       try {
         const goal = `${def.workflowGoalPrefix}${state.input.trim()}`;
-        const wf = await workflowApi.create(goal, undefined, [def.agentRole]);
+        const createResult = await workflowApi.create(goal, undefined, [def.agentRole]);
+        const workflowId = getWorkflowIdFromCreateResponse(createResult);
+        if (!workflowId) {
+          throw new Error('Social draft workflow did not return a valid workflow ID.');
+        }
         // Poll for completion — SSE would be nicer, matching existing pattern
         // in ChatWorkspace would require sharing the connectSSE helper. Short
         // polling is fine for a single-turn draft flow.
@@ -164,7 +168,7 @@ export default function SocialHubPage() {
         let draft = '';
         while (Date.now() < deadline) {
           await new Promise((r) => setTimeout(r, 2_500));
-          const updated = await workflowApi.get(wf.id);
+          const updated = await workflowApi.get(workflowId);
           if (updated.status === 'COMPLETED' && typeof updated.finalOutput === 'string') {
             draft = updated.finalOutput;
             break;
@@ -181,7 +185,7 @@ export default function SocialHubPage() {
             ...prev[def.id],
             draft,
             status: 'ready',
-            workflowId: wf.id,
+            workflowId,
           },
         }));
       } catch (e) {

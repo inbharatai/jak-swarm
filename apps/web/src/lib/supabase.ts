@@ -1,12 +1,15 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { normalizeSupabaseProjectUrl } from './supabase-url';
 
 // ─── Browser client (used in Client Components) ────────────────────────────
 // This is a singleton that lives for the lifetime of the browser tab.
 // It automatically handles token refresh via cookies.
 
 export function createClient() {
+  const supabaseUrl = normalizeSupabaseProjectUrl(process.env['NEXT_PUBLIC_SUPABASE_URL']);
+
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 }
@@ -22,5 +25,5 @@ export function getSupabaseClient() {
 }
 
 export const isSupabaseConfigured = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  normalizeSupabaseProjectUrl(process.env['NEXT_PUBLIC_SUPABASE_URL']) && process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
 );

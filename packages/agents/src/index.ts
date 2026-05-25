@@ -34,7 +34,7 @@ export {
 } from './base/token-optimizer.js';
 
 // Orchestrator agents
-export { CommanderAgent } from './roles/commander.agent.js';
+export { CommanderAgent, inferIntentFromKeywords, buildHelpfulClarification } from './roles/commander.agent.js';
 export type { MissionBrief, CommanderOutput } from './roles/commander.agent.js';
 
 // Intent vocabulary — canonical 18 named intents for the company OS.

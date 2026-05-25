@@ -60,9 +60,9 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
         // Failures: parser is rule-based and pure; can never throw.
         // If no command matches → fall through to normal workflow creation.
         if (goal.length < 200) {
-          const ACTIVE_STATUSES: Array<WorkflowStatus> = ['PENDING', 'RUNNING', 'PAUSED'];
+          const ACTIVE_STATUSES = ['PENDING', 'RUNNING', 'EXECUTING', 'PAUSED'] as const;
           const activeWorkflow = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ id: string; status: string; goal: string } | null>)({
-            where: { tenantId, userId, status: { in: ACTIVE_STATUSES } },
+            where: { tenantId, userId, status: { in: ACTIVE_STATUSES as unknown as WorkflowStatus[] } },
             orderBy: { startedAt: 'desc' },
             select: { id: true, status: true, goal: true },
           });
@@ -76,6 +76,17 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             const { parseFollowup, describeFollowup } = await import('../services/conversation/followup-parser.js');
             const cmd = parseFollowup(goal, { hasPendingApproval: Boolean(pendingApproval) });
             if (cmd) {
+              fastify.log.info(
+                {
+                  requestId: request.id,
+                  tenantId,
+                  userId,
+                  workflowId: activeWorkflow.id,
+                  command: cmd.kind,
+                  kind: 'followup_executed',
+                },
+                '[workflows.create] follow-up command matched active workflow',
+              );
               const description = describeFollowup(cmd);
               const baseResult = {
                 kind: 'followup_executed' as const,
@@ -297,8 +308,21 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           subscriptionTier,
         });
 
+        fastify.log.info(
+          {
+            requestId: request.id,
+            tenantId,
+            userId,
+            workflowId: workflow.id,
+            kind: 'workflow_created',
+          },
+          '[workflows.create] workflow accepted and enqueued',
+        );
+
         // 3. Return 202 with the created workflow + cost estimate
         return reply.status(202).send(ok({
+          kind: 'workflow_created' as const,
+          workflowId: workflow.id,
           ...workflow,
           estimatedCredits: estimate.estimatedCredits,
           creditsReserved: reservation.reserved,

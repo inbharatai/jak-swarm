@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { AuthUser } from '@/types';
 import { createClient } from './supabase';
 import type { User as SupabaseUser, SupabaseClient } from '@supabase/supabase-js';
+import { normalizeSupabaseProjectUrl } from './supabase-url';
 
 let _supabase: SupabaseClient | null = null;
 function getClient(): SupabaseClient {
@@ -299,7 +300,7 @@ const AUTH_SERVICE_UNAVAILABLE_MESSAGE =
   'Authentication service is unavailable. Please try again shortly.';
 
 function hasUsableSupabaseConfig(): boolean {
-  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
+  const url = normalizeSupabaseProjectUrl(process.env['NEXT_PUBLIC_SUPABASE_URL']);
   const anonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']?.trim();
   if (!url || !anonKey) return false;
 

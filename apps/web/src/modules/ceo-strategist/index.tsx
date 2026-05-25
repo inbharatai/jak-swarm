@@ -4,7 +4,12 @@ import React, { useState, useCallback } from 'react';
 import { Crown, Target, TrendingUp, AlertTriangle, CheckCircle2, Clock, Send, Lightbulb, BarChart3, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Spinner, Textarea } from '@/components/ui';
 import useSWR from 'swr';
-import { workflowApi, fetcher } from '@/lib/api-client';
+import {
+  fetcher,
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
 import type { ModuleProps } from '@/modules/registry';
@@ -58,13 +63,22 @@ export default function CEOStrategistModule({ moduleId, isActive }: ModuleProps)
     if (!directive.trim()) return;
     setSending(true);
     try {
-      await workflowApi.create(directive);
-      eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: directive }, 'ceo-strategist');
+      const createResult = await workflowApi.create(directive);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+
+      const isFollowup = isWorkflowFollowupResponse(createResult);
+      if (!isFollowup) {
+        eventBus.emit(SHELL_EVENTS.WORKFLOW_STARTED, { goal: directive, workflowId }, 'ceo-strategist');
+      }
+
       eventBus.emit(SHELL_EVENTS.NOTIFICATION_PUSH, { title: 'Directive sent', body: directive, moduleId: 'ceo-strategist', priority: 'info' as const }, 'ceo-strategist');
-      toast.success('Directive dispatched to swarm');
+      toast.success(isFollowup ? 'Command applied to active workflow' : 'Directive dispatched to swarm');
       setDirective('');
-    } catch {
-      toast.error('Failed to dispatch directive');
+    } catch (err) {
+      toast.error('Failed to dispatch directive', err instanceof Error ? err.message : undefined);
     } finally {
       setSending(false);
     }

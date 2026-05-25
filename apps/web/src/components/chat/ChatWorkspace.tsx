@@ -8,7 +8,12 @@ import { MessageThread } from './MessageThread';
 import { EmptyState } from './EmptyState';
 import { RolePicker } from './RolePicker';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { workflowApi } from '@/lib/api-client';
+import {
+  getWorkflowIdFromCreateResponse,
+  isWorkflowFollowupResponse,
+  workflowApi,
+} from '@/lib/api-client';
+import { getRawToken } from '@/lib/auth';
 import { connectSSE } from '@/lib/sse-fetch';
 import { createClient } from '@/lib/supabase';
 import type { RoleId } from '@/lib/role-config';
@@ -178,10 +183,35 @@ export function ChatWorkspace() {
 
     try {
       // Create a real workflow via the API
-      const workflow = await workflowApi.create(goalText, undefined, activeRoles);
-      setActiveWorkflowId(workflow.id);
-      terminalWorkflowsRef.current.delete(workflow.id);
-      finalMessageSentRef.current.delete(workflow.id);
+      const createResult = await workflowApi.create(goalText, undefined, activeRoles);
+      const workflowId = getWorkflowIdFromCreateResponse(createResult);
+      if (!workflowId) {
+        throw new Error('Workflow API did not return a valid workflow ID.');
+      }
+
+      setActiveWorkflowId(workflowId);
+      terminalWorkflowsRef.current.delete(workflowId);
+      finalMessageSentRef.current.delete(workflowId);
+
+      if (isWorkflowFollowupResponse(createResult)) {
+        const followupSummary =
+          (typeof createResult.hint === 'string' && createResult.hint.trim().length > 0
+            ? createResult.hint
+            : createResult.description) ??
+          'Applied your follow-up command to the active workflow.';
+
+        addMessage(convId, {
+          role: 'assistant',
+          agentRole: activeRoles[0] ?? null,
+          content:
+            `${followupSummary} ` +
+            `View live status in [Run Inspector](/swarm?workflowId=${workflowId}).`,
+          executionTrace: { workflowId },
+        });
+        return;
+      }
+
+      const workflow = createResult;
 
       const addFinalMessageOnce = (content: string, agentRole: RoleId | null): void => {
         if (finalMessageSentRef.current.has(workflow.id)) return;
@@ -220,9 +250,12 @@ export function ChatWorkspace() {
       if (DEV_BYPASS_ACTIVE) {
         token = 'jak-dev-bypass';
       } else {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getSession();
-        token = data?.session?.access_token ?? '';
+        token = getRawToken() ?? '';
+        if (!token) {
+          const supabase = createClient();
+          const { data } = await supabase.auth.getSession();
+          token = data?.session?.access_token ?? '';
+        }
       }
 
       await connectSSE({
