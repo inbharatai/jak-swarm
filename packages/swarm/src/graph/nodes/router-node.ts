@@ -13,7 +13,13 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
   }
 
   const industry = (state.industry as Industry | undefined) ?? Industry.GENERAL;
-  const industryPack = getIndustryPack(industry);
+  let industryPack = getIndustryPack(industry);
+
+  // TENANT_ADMIN bypasses industry-pack restrictions so visible roles
+  // (CEO, CTO, CMO, etc.) can use the full toolset on the landing page.
+  if (state.userRole === 'TENANT_ADMIN') {
+    industryPack = { ...industryPack, restrictedTools: [] };
+  }
 
   const agent = new RouterAgent();
 

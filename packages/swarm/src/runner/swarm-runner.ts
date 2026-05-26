@@ -71,6 +71,7 @@ export interface RunParams {
   allowedToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
+  userRole?: string;
   loadState?: (id: string) => Promise<unknown | undefined>;
   circuitBreakerFactory?: (
     name: string,
@@ -298,6 +299,7 @@ export class SwarmRunner {
           ...(params.allowedToolNames !== undefined ? { allowedToolNames: params.allowedToolNames } : {}),
           ...(params.connectedProviders !== undefined ? { connectedProviders: params.connectedProviders } : {}),
           ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
+          ...(params.userRole !== undefined ? { userRole: params.userRole } : {}),
           ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
         }),
         timeoutMs,

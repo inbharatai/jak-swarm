@@ -90,6 +90,12 @@ export interface SwarmState {
    * 'free' forces DDG-only search; 'paid' or undefined allows full chain.
    */
   subscriptionTier?: 'free' | 'paid';
+  /**
+   * User role for privilege-aware routing. TENANT_ADMIN bypasses industry
+   * pack restrictions so visible roles (CEO, CTO, etc.) can use the full
+   * toolset on the landing page and in demos.
+   */
+  userRole?: string;
 
   // Final state
   status: WorkflowStatus;
@@ -124,6 +130,7 @@ export function createInitialSwarmState(params: {
   allowedToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
+  userRole?: string;
 }): SwarmState {
   return {
     goal: params.goal,
@@ -158,6 +165,7 @@ export function createInitialSwarmState(params: {
     allowedToolNames: params.allowedToolNames ?? [],
     connectedProviders: params.connectedProviders ?? [],
     subscriptionTier: params.subscriptionTier,
+    userRole: params.userRole,
     status: WS.PENDING,
     error: undefined,
     outputs: [],

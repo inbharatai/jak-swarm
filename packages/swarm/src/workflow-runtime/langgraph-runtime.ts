@@ -99,6 +99,7 @@ export class LangGraphRuntime implements WorkflowRuntime {
       disabledToolNames: ctx.disabledToolNames,
       connectedProviders: ctx.connectedProviders,
       subscriptionTier: ctx.subscriptionTier,
+      userRole: ctx.userRole,
     });
 
     const config = makeRunnableConfig(ctx.workflowId, ctx.tenantId);

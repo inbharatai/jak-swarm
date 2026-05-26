@@ -1009,6 +1009,8 @@ export class SwarmExecutionService extends EventEmitter {
       });
       const connectedProviders = connectedIntegrations.map((i) => i.provider).filter((p): p is string => Boolean(p));
 
+      const user = await this.db.user.findUnique({ where: { id: userId }, select: { role: true } });
+
       const result = await this.runner.run({
         workflowId,
         tenantId,
@@ -1019,6 +1021,7 @@ export class SwarmExecutionService extends EventEmitter {
         maxCostUsd: params.maxCostUsd,
         idempotencyKey: params.idempotencyKey,
         subscriptionTier: params.subscriptionTier,
+        userRole: user?.role ?? undefined,
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {

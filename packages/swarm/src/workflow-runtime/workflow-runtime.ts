@@ -47,6 +47,7 @@ export interface StartContext {
   disabledToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
+  userRole?: string;
   /**
    * Sink for canonical lifecycle events. Wired by SwarmExecutionService
    * to persist the events into AuditLog + emit SSE for the cockpit. The
