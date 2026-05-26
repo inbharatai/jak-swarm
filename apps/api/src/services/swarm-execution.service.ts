@@ -1261,11 +1261,14 @@ export class SwarmExecutionService extends EventEmitter {
           finalOutput = directAnswer.trim();
           directAnswerOverride = finalOutput;
         } else {
-          const traceRecords = await this.db.agentTrace.findMany({
-            where: { workflowId },
-            orderBy: { stepIndex: 'asc' },
-            select: { agentRole: true, outputJson: true, stepIndex: true },
-          });
+          // Prefer in-memory traces from the runner over a second DB round-trip.
+          // This defends against silent persistence gaps (e.g. one trace
+          // failing to write) while still producing a useful finalOutput.
+          const traceRecords = result.traces.map((t: { agentRole: string | unknown; output: unknown; stepIndex: number }) => ({
+            agentRole: String(t.agentRole),
+            outputJson: t.output,
+            stepIndex: t.stepIndex,
+          }));
 
           // Short-circuit #2 (defensive): even when the graph DIDN'T route
           // to __end__ — e.g. because a stale @jak-swarm/swarm dist on the
@@ -1284,7 +1287,7 @@ export class SwarmExecutionService extends EventEmitter {
             finalOutput = traceDirectAnswer;
             directAnswerOverride = finalOutput;
           } else {
-            finalOutput = this.compileFinalOutput(traceRecords as Array<{ agentRole: string; outputJson: unknown; stepIndex: number }>);
+            finalOutput = this.compileFinalOutput(traceRecords);
           }
         }
         await (this.db.workflow.update as any)({
@@ -1970,6 +1973,11 @@ export class SwarmExecutionService extends EventEmitter {
     workflowId: string,
   ): Promise<void> {
     const traces = result.traces as SharedAgentTrace[];
+    this.log.info(
+      { workflowId, traceCount: traces.length, roles: traces.map((t) => t.agentRole) },
+      '[Swarm] Persisting agent traces',
+    );
+    let savedCount = 0;
     for (const trace of traces) {
       try {
         await this.workflowService.saveTrace({
@@ -1991,6 +1999,11 @@ export class SwarmExecutionService extends EventEmitter {
             : undefined,
           error: trace.error,
         });
+        savedCount += 1;
+        this.log.debug(
+          { workflowId, agentRole: trace.agentRole, stepIndex: trace.stepIndex },
+          '[Swarm] Agent trace persisted successfully',
+        );
       } catch (err) {
         this.log.warn(
           { workflowId, agentRole: trace.agentRole, err },
@@ -1998,6 +2011,10 @@ export class SwarmExecutionService extends EventEmitter {
         );
       }
     }
+    this.log.info(
+      { workflowId, expected: traces.length, saved: savedCount },
+      '[Swarm] Agent trace persistence complete',
+    );
   }
 
   private async persistApprovals(
