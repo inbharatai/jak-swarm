@@ -202,6 +202,12 @@ How to choose:
 - When directAnswer is set (greeting/trivial) → use "general_question".
 - When the user request is "audit my compliance" / "run a SOC 2 audit" → use "audit_compliance_workflow" (this routes to the dedicated /audit/runs API surface).
 
+ABSOLUTE RULE — Forbidden fallback phrase:
+NEVER return "I had trouble understanding your request. Could you rephrase what you'd like me to do?" or any variation of it (e.g., "I had trouble understanding", "Could you rephrase", "I'm not sure what you mean"). These phrases are FORBIDDEN. If the input is not a trivial greeting or obvious fact, you MUST return a missionBrief (structured plan) or set clarificationNeeded=true with a SPECIFIC question — never a generic "rephrase" request.
+
+ABSOLUTE RULE — Website / URL requests are NEVER ambiguous:
+Any request that mentions a website, URL, or domain name (e.g., "check mysite.com", "review www.example.com", "audit the website", "visit jakswarm.com") MUST ALWAYS produce a missionBrief with intent "website_review_and_improvement" or "browser_inspection". NEVER directAnswer these. NEVER ask the user to rephrase. NEVER return clarificationNeeded for these. Proceed immediately.
+
 CRITICAL RULE — Direct-answer short-circuit:
 Set \`directAnswer\` to a non-empty string ONLY when the input can be answered from general knowledge WITHOUT needing to search the web, run tools, write code, fetch user documents, or consult other agents.
 
@@ -219,6 +225,7 @@ Examples that MUST NOT get a directAnswer (use the structured plan path instead)
 - Multi-step workflows ("plan a launch", "audit competitors")
 - Tasks referencing external systems (Slack, GitHub, Gmail, CRM)
 - Anything ambiguous where clarification might help
+- Website / URL review or audit requests ("check mysite.com", "review www.example.com")
 
 When directAnswer is set, you may leave intent/subFunction/urgency/etc at minimal sensible defaults — the workflow will terminate after you and the other fields are ignored.
 
@@ -245,11 +252,41 @@ export class CommanderAgent extends BaseAgent {
     // Normalize URLs so the LLM sees full https:// URLs
     const normalizedInput = normalizeUrls(rawInput);
 
-    this.logger.info({ runId: context.runId }, 'Commander processing input');
+    this.logger.info({ runId: context.runId, inputPreview: normalizedInput.slice(0, 120) }, 'Commander processing input');
 
     const detectedIndustry = context.industry
       ? (context.industry as Industry)
       : detectIndustry(normalizedInput);
+
+    // Phase 4-pre: deterministic keyword inference BEFORE calling the LLM.
+    // Obvious inputs (website review, marketing plan, legal contract, etc.)
+    // are routed immediately without wasting tokens on an LLM call that may
+    // hallucinate a generic fallback. Confidence threshold is intentionally
+    // high (>= 0.85) so we only skip the LLM when the signal is unambiguous.
+    const preInferred = inferIntentFromKeywords(normalizedInput);
+    if (preInferred && preInferred.confidence >= 0.85) {
+      this.logger.info(
+        { runId: context.runId, intent: preInferred.intent, confidence: preInferred.confidence, source: 'pre_llm_keyword' },
+        'Commander routed via pre-LLM keyword inference — skipping LLM call',
+      );
+      const missionBrief: MissionBrief = {
+        id: this.generateId('mb_'),
+        goal: normalizedInput,
+        intent: preInferred.intent as CompanyOSIntent,
+        intentConfidence: preInferred.confidence,
+        industry: detectedIndustry,
+        subFunction: preInferred.subFunction,
+        urgency: 3,
+        riskIndicators: [],
+        requiredOutputs: ['task completion'],
+        clarificationNeeded: false,
+        rawInput: normalizedInput,
+        createdAt: new Date(),
+      };
+      const output: CommanderOutput = { missionBrief, clarificationNeeded: false };
+      this.recordTrace(context, input, output, [], startedAt);
+      return output;
+    }
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       {
@@ -340,6 +377,39 @@ export class CommanderAgent extends BaseAgent {
       ? parsed.directAnswer.trim()
       : '';
     if (directAnswer.length > 0) {
+      // Guard: intercept any directAnswer that smells like the old generic
+      // fallback phrase. If keyword inference would have matched, produce a
+      // missionBrief instead so the workflow continues to the specialist
+      // agents rather than terminating with an unhelpful message.
+      if (/had trouble understanding|could you rephrase|i.m not sure what you mean/i.test(directAnswer)) {
+        const inferred = inferIntentFromKeywords(normalizedInput);
+        if (inferred) {
+          this.logger.warn(
+            { runId: context.runId, directAnswer: directAnswer.slice(0, 80), intent: inferred.intent, source: 'directAnswer_guard' },
+            'Commander blocked generic fallback directAnswer; routing via keyword inference instead',
+          );
+          const missionBrief: MissionBrief = {
+            id: this.generateId('mb_'),
+            goal: normalizedInput,
+            intent: inferred.intent as CompanyOSIntent,
+            intentConfidence: inferred.confidence,
+            industry: detectedIndustry,
+            subFunction: inferred.subFunction,
+            urgency: 3,
+            riskIndicators: [],
+            requiredOutputs: ['task completion'],
+            clarificationNeeded: false,
+            rawInput: normalizedInput,
+            createdAt: new Date(),
+          };
+          const output: CommanderOutput = { missionBrief, clarificationNeeded: false };
+          const trace = this.recordTrace(context, input, output, [], startedAt);
+          if (tokenUsage) trace.tokenUsage = tokenUsage;
+          if (usageSummary) trace.costUsd = usageSummary.costUsd;
+          return output;
+        }
+      }
+
       const output: CommanderOutput = {
         clarificationNeeded: false,
         directAnswer,
