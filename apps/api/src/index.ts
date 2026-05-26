@@ -145,18 +145,22 @@ async function buildApp() {
     sign: { expiresIn: config.jwtExpiresIn },
   });
 
-  await fastify.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: '1 minute',
-    errorResponseBuilder: (_request, _context) => ({
-      success: false,
-      error: {
-        code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Rate limit exceeded. Please try again later.',
-      },
-    }),
-  });
+  // Rate limiter: active in production and development, disabled in test
+  // so integration suites can run 300+ requests without artificial throttling.
+  if (config.nodeEnv !== 'test') {
+    await fastify.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: '1 minute',
+      errorResponseBuilder: (_request, _context) => ({
+        success: false,
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Rate limit exceeded. Please try again later.',
+        },
+      }),
+    });
+  }
 
   // -------------------------------------------------------------------------
   // OpenAPI / Swagger
