@@ -16,3 +16,9 @@ apps/web/node_modules
 apps/web/.next
 apps/web/dist
 packages/docs
+qa
+eng.traineddata
+coverage
+deck-assets
+ops
+audits
