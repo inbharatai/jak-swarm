@@ -83,6 +83,7 @@ async function pollWorkflowTerminalState(workflowId, token) {
   const deadline = Date.now() + pollMs;
   let status = 'UNKNOWN';
   let finalOutputLen = 0;
+  let finalOutput = '';
 
   while (Date.now() < deadline) {
     const result = await call(`/workflows/${workflowId}`, {
@@ -92,16 +93,17 @@ async function pollWorkflowTerminalState(workflowId, token) {
 
     const workflow = result.json?.data;
     status = workflow?.status || status;
-    finalOutputLen = typeof workflow?.finalOutput === 'string' ? workflow.finalOutput.length : 0;
+    finalOutput = workflow?.finalOutput || '';
+    finalOutputLen = typeof finalOutput === 'string' ? finalOutput.length : 0;
 
     if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(status)) {
-      return { status, finalOutputLen };
+      return { status, finalOutputLen, finalOutput };
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollStepMs));
   }
 
-  return { status, finalOutputLen };
+  return { status, finalOutputLen, finalOutput };
 }
 
 async function main() {
@@ -199,6 +201,7 @@ async function main() {
     workflowCountDelta: totalAfter >= 0 && totalBefore >= 0 ? totalAfter - totalBefore : null,
     terminalStatus: terminal.status,
     finalOutputLen: terminal.finalOutputLen,
+    finalOutputPreview: terminal.finalOutput?.slice(0, 200),
   };
 
   console.log(JSON.stringify(result, null, 2));

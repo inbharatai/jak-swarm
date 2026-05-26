@@ -71,6 +71,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get('/healthz', async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.status(200).send({
       status: 'alive',
+      version: '2026-05-26-v2', // deployment marker for cache-busting verification
       uptime: process.uptime(),
       shuttingDown: isShuttingDown,
       timestamp: new Date().toISOString(),
