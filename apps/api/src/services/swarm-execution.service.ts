@@ -2103,11 +2103,15 @@ export class SwarmExecutionService extends EventEmitter {
       'architecture',  // TechnicalAgent / AppArchitectAgent — system design prose
       'analysis',      // Finance/Legal/HR
       'strategy',      // MarketingAgent / StrategistAgent
-      'recommendation', 'conclusion',  // Strategy
+      'recommendation', 'recommendations', 'conclusion',  // Strategy / TechnicalAgent
       'explanation',   // CoderAgent / any agent explaining its work
       'plan',          // Planner-ish
       'text', 'body',  // Generic
       'report',        // Analytics/PR
+      'risks',         // TechnicalAgent — prioritized risk list
+      'tradeoffs',     // TechnicalAgent — decision trade-offs
+      'scalabilityNotes', // TechnicalAgent — scaling observations
+      'diagramDescription', // TechnicalAgent — architecture diagram prose
     ];
 
     type Section = { role: string; content: string };
