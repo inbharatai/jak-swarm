@@ -89,6 +89,7 @@ export class AuthService {
           name: tenantName,
           slug: tenantSlug,
           status: 'ACTIVE',
+          enableBrowserAutomation: true,
         },
       });
 
@@ -340,6 +341,7 @@ export class AuthService {
             name: tenantName,
             slug: tenantSlug,
             status: 'ACTIVE',
+            enableBrowserAutomation: true,
           },
         });
       }
