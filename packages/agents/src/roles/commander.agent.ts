@@ -78,6 +78,7 @@ export function inferIntentFromKeywords(rawInput: string): {
   confidence: number;
   subFunction: string;
 } | null {
+  // DEPLOYMENT_MARKER: v3-2026-05-26 — verify this line appears in production logs
   const lower = rawInput.toLowerCase();
 
   // URL review patterns (CTO / browser)

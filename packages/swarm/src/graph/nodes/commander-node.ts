@@ -1,6 +1,7 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
 import { CommanderAgent, AgentContext, buildHelpfulClarification } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
+// DEPLOYMENT_MARKER: v3-2026-05-26 — swarm commander-node marker
 
 /**
  * Mapping from UX role IDs (what the dashboard role picker surfaces) to the
