@@ -82,5 +82,8 @@
         "GHSA-rp9m-7r4c-75qg"
       ]
     }
+  },
+  "dependencies": {
+    "playwright": "^1.59.1"
   }
 }
