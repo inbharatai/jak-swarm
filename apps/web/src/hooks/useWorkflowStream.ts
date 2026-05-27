@@ -66,6 +66,7 @@ export function useWorkflowStream(workflowId: string | null) {
           url,
           token,
           signal: abortController.signal,
+          maxRetries: 5,
           onOpen: () => {
             setIsConnected(true);
             retryCount.current = 0;
@@ -83,11 +84,6 @@ export function useWorkflowStream(workflowId: string | null) {
           },
           onError: () => {
             setIsConnected(false);
-            if (!terminalRef.current && !cancelled && retryCount.current < 5) {
-              const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
-              retryCount.current++;
-              retryTimer.current = setTimeout(connect, delay);
-            }
           },
         });
         // Stream ended gracefully (server closed)
@@ -95,13 +91,8 @@ export function useWorkflowStream(workflowId: string | null) {
           setIsConnected(false);
         }
       } catch {
-        // connectSSE threw (non-200, no body, etc.)
+        // connectSSE threw after all retries exhausted (non-200, no body, etc.)
         setIsConnected(false);
-        if (!terminalRef.current && !cancelled && retryCount.current < 5) {
-          const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
-          retryCount.current++;
-          retryTimer.current = setTimeout(connect, delay);
-        }
       }
     }
 

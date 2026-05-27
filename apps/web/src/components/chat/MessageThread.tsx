@@ -61,6 +61,66 @@ export function MessageThread({ messages }: MessageThreadProps) {
   );
 }
 
+// ─── Markdown Link Renderer ──────────────────────────────────────────────────
+
+function sanitizeText(text: string): string {
+  // Fix common LLM spacing errors where camelCase words leak through
+  return text
+    .replace(/\bwith([A-Z][a-z]+)/g, 'with $1')
+    .replace(/\bcontinue([A-Z][a-z]+)/g, 'continue $1')
+    .replace(/\bthe([A-Z][a-z]+)/g, 'the $1')
+    .replace(/\band([A-Z][a-z]+)/g, 'and $1');
+}
+
+function MarkdownText({ text }: { text: string }) {
+  const sanitized = sanitizeText(text);
+  const parts: React.ReactNode[] = [];
+  // Match markdown links [label](url) and bare URLs
+  const regex = /\[([^\]]+)\]\(([^)]+)\)|(\bhttps?:\/\/[^\s]+)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(sanitized)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(sanitized.slice(lastIndex, match.index));
+    }
+    if (match[1] && match[2]) {
+      // Markdown link [label](url)
+      parts.push(
+        <a
+          key={parts.length}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline text-primary hover:text-primary/80"
+        >
+          {match[1]}
+        </a>,
+      );
+    } else if (match[3]) {
+      // Bare URL
+      parts.push(
+        <a
+          key={parts.length}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline text-primary hover:text-primary/80"
+        >
+          {match[3]}
+        </a>,
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < sanitized.length) {
+    parts.push(sanitized.slice(lastIndex));
+  }
+
+  return <span className="whitespace-pre-wrap">{parts}</span>;
+}
+
 // ─── User Message ────────────────────────────────────────────────────────────
 
 function UserMessage({ content }: { content: string }) {
@@ -124,7 +184,9 @@ function AssistantMessage({
             agentRole && `role-border-${agentRole}`,
           )}
         >
-          <p className="whitespace-pre-wrap">{content}</p>
+          <div className="text-sm leading-relaxed">
+            <MarkdownText text={content} />
+          </div>
 
           {/* P1-4: inline approval UI. Only renders when the message
               carries `approvalAction`. Buttons hit the existing

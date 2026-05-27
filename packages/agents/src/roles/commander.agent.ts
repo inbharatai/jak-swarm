@@ -80,7 +80,18 @@ export function inferIntentFromKeywords(rawInput: string): {
 } | null {
   const lower = rawInput.toLowerCase();
 
-  // URL review patterns (CTO / browser)
+  // URL review patterns (CTO / browser) — hardened to catch bare domains like
+  // "check jakswarm.com" without requiring http:// or www. prefixes.
+  const URL_REVIEW_WORDS = /\b(review|audit|check|inspect|analyse|analyze)\b/;
+  const URL_PATTERN = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.(com|io|co|ai|net|org|dev|app|xyz|info)(\/[a-zA-Z0-9._~:/?#[\]@!$&'()*+,;=-]*)?)/i;
+  if (URL_REVIEW_WORDS.test(lower) && URL_PATTERN.test(rawInput)) {
+    return { intent: 'website_review_and_improvement', confidence: 0.92, subFunction: 'Website Review' };
+  }
+  if (URL_PATTERN.test(rawInput) && URL_REVIEW_WORDS.test(lower)) {
+    return { intent: 'website_review_and_improvement', confidence: 0.92, subFunction: 'Website Review' };
+  }
+
+  // Legacy regex fallbacks (kept for backwards compatibility)
   if (/\b(review|audit|check|inspect|analyse|analyze)\b.*\b(http|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)\b/i.test(lower)) {
     return { intent: 'website_review_and_improvement', confidence: 0.92, subFunction: 'Website Review' };
   }

@@ -1,5 +1,5 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
-import { CommanderAgent, AgentContext, buildHelpfulClarification } from '@jak-swarm/agents';
+import { CommanderAgent, AgentContext, buildHelpfulClarification, inferIntentFromKeywords } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 
 /**
@@ -143,6 +143,34 @@ export async function commanderNode(
   // request rather than a generic error. This prevents the workflow from
   // terminating with the unhelpful "I had trouble understanding" fallback.
   if (!result.missionBrief) {
+    // Hardened URL defense: any input that looks like a website review
+    // MUST produce a missionBrief, never a clarification. This catches
+    // cases where the LLM returns an empty missionBrief despite the
+    // hardened prompt and pre-LLM keyword inference.
+    const urlInferred = inferIntentFromKeywords(state.goal);
+    if (urlInferred && (urlInferred.intent === 'website_review_and_improvement' || urlInferred.intent === 'browser_inspection')) {
+      const mb = {
+        id: `mb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        goal: state.goal,
+        intent: urlInferred.intent,
+        intentConfidence: urlInferred.confidence,
+        industry: (state.industry ?? 'GENERAL') as import('@jak-swarm/shared').Industry,
+        subFunction: urlInferred.subFunction,
+        urgency: 3 as const,
+        riskIndicators: [],
+        requiredOutputs: ['task completion'],
+        clarificationNeeded: false,
+        rawInput: state.goal,
+        createdAt: new Date(),
+      };
+      return {
+        missionBrief: mb,
+        clarificationNeeded: false,
+        status: WorkflowStatus.PLANNING,
+        traces,
+      };
+    }
+
     const question = buildHelpfulClarification(state.goal, state.industry);
     return {
       clarificationNeeded: true,

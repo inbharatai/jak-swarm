@@ -262,6 +262,7 @@ export function ChatWorkspace() {
         url: buildApiUrl(`/workflows/${workflow.id}/stream`),
         token,
         signal: controller.signal,
+        maxRetries: 5,
         onMessage: (event: unknown) => {
           const ev = event as Record<string, unknown>;
           const evType = ev.type as string;
@@ -553,8 +554,8 @@ export function ChatWorkspace() {
           }
         },
         onError: () => {
-          // Stream disconnect should only notify if the workflow has not
-          // already reached a terminal event.
+          // Stream disconnect after all retries exhausted — only notify if the
+          // workflow has not already reached a terminal event.
           if (controller.signal.aborted || terminalWorkflowsRef.current.has(workflow.id)) {
             setIsSending(false);
             setIsStuck(false);
@@ -563,7 +564,7 @@ export function ChatWorkspace() {
           addMessage(convId, {
             role: 'assistant',
             agentRole: null,
-            content: `Live stream disconnected before completion. Open [Run Inspector](/swarm?workflowId=${workflow.id}) for the latest status.`,
+            content: `Live stream disconnected before completion after multiple retry attempts. Open [Run Inspector](/swarm?workflowId=${workflow.id}) for the latest status.`,
           });
           setIsSending(false);
           setIsStuck(false);
