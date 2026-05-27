@@ -145,8 +145,8 @@ export class RouterAgent extends BaseAgent {
     if (lower.includes('email')) return 'email';
     if (lower.includes('calendar')) return 'calendar';
     if (lower.includes('crm') || lower.includes('contact') || lower.includes('deal')) return 'crm';
+    if (lower.startsWith('browser_') || lower.includes('navigate') || lower.includes('playwright')) return 'browser';
     if (lower.includes('document') || lower.includes('doc') || lower.includes('extract')) return 'document';
-    if (lower.includes('browser_') || lower.startsWith('browser') || lower.includes('navigate') || lower.includes('playwright')) return 'browser';
     if (lower.includes('webhook')) return 'webhook';
     if (lower.includes('research') || lower.includes('classify')) return 'research';
     if (lower.includes('knowledge') || lower.includes('memory') || (lower.includes('search') && !lower.includes('web'))) return 'knowledge';
