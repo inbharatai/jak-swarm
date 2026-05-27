@@ -90,6 +90,7 @@ export class AuthService {
           slug: tenantSlug,
           status: 'ACTIVE',
           enableBrowserAutomation: true,
+          allowedDomains: ['*'],
         },
       });
 
@@ -342,6 +343,7 @@ export class AuthService {
             slug: tenantSlug,
             status: 'ACTIVE',
             enableBrowserAutomation: true,
+            allowedDomains: ['*'],
           },
         });
       }
