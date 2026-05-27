@@ -292,7 +292,7 @@ describe('Landing — top-line counts', () => {
 
   it('product-truth.ts STATS array contains the expected count cards', () => {
     const truth = read('apps/web/src/lib/product-truth.ts');
-    expect(truth).toMatch(/value:\s*38,\s*label:\s*'Specialist Agents'/);
+    expect(truth).toMatch(/value:\s*38,\s*label:\s*'Agents'/);
     expect(truth).toMatch(/value:\s*122,\s*label:\s*'Classified Tools'/);
     expect(truth).toMatch(/value:\s*22,\s*label:\s*'Connectors'/);
   });
