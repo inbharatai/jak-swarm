@@ -502,7 +502,9 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             const FIELDS = ['content', 'answer', 'response', 'message', 'findings', 'summary', 'document',
                             'result', 'output', 'draft', 'code', 'architecture', 'analysis', 'strategy',
                             'recommendation', 'conclusion', 'explanation', 'plan', 'text', 'body', 'report',
-                            'markdown', 'reply', 'finalOutput', 'directAnswer'];
+                            'markdown', 'reply', 'finalOutput', 'directAnswer',
+                            'designSpec', 'layoutGrid', 'userFlowDescription',
+                            'overallDescription', 'layoutAnalysis', 'diagnosis', 'rootCause'];
             const MIN_CONTENT_LEN = 30;
             const MAX_DEPTH = 4;
 

@@ -137,7 +137,7 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
     case AgentRole.WORKER_DESIGNER:
       return {
         action: inferDesignerAction(task),
-        brief: task.description,
+        description: task.description,
         dependencyResults,
       };
     case AgentRole.WORKER_STRATEGIST:

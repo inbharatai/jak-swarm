@@ -2115,6 +2115,13 @@ export class SwarmExecutionService extends EventEmitter {
       'tradeoffs',     // TechnicalAgent — decision trade-offs
       'scalabilityNotes', // TechnicalAgent — scaling observations
       'diagramDescription', // TechnicalAgent — architecture diagram prose
+      'designSpec',    // DesignerAgent — design specification
+      'layoutGrid',    // DesignerAgent — responsive layout rules
+      'userFlowDescription', // DesignerAgent — user flow prose
+      'overallDescription', // ScreenshotToCodeAgent — image-to-layout prose
+      'layoutAnalysis', // ScreenshotToCodeAgent — pixel analysis
+      'diagnosis',     // AppDebuggerAgent — error diagnosis
+      'rootCause',     // AppDebuggerAgent — root cause statement
     ];
 
     type Section = { role: string; content: string };
