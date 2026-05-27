@@ -121,7 +121,7 @@ function NetworkBackground({ isActive }: { isActive: boolean }) {
 // 21 MCP + Remotion + Blender = 23, and we'd rather understate than
 // dance on a fence.
 const CTA_STATS = [
-  { value: '38', label: 'Specialist Agents' },
+  { value: '38', label: 'Agents' },
   { value: '122', label: 'Classified Tools' },
   { value: '20+', label: 'Connectors' },
   { value: 'MIT', label: 'Open Source' },

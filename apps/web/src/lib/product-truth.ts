@@ -35,7 +35,7 @@
 // ─── Stat counts ────────────────────────────────────────────────────────────
 
 export const STATS = [
-  { value: 38, label: 'Specialist Agents', suffix: '' },
+  { value: 38, label: 'Agents', suffix: '' },
   // 122 total tools. Every tool carries an honest maturity label —
   // real / heuristic / llm_passthrough / config_dependent / experimental —
   // CI-enforced against the live registry.
