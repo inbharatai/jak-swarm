@@ -65,7 +65,7 @@ User Input (natural language goal)
 
 The core execution engine. Contains:
 
-- **SwarmGraph** (`graph/swarm-graph.ts`): Builds a directed acyclic graph of node handlers. Each node (Commander, Planner, Router, Worker, Verifier, Guardrail, Approval, Replanner) is a function that receives SwarmState and returns updated state + next node name.
+- **LangGraph StateGraph** (`packages/swarm/src/graph/`): Native `@langchain/langgraph` orchestration with node handlers for Commander, Planner, Router, Worker, Verifier, Guardrail, Approval, and Replanner. Checkpoints persist to Postgres via `PostgresCheckpointSaver`; approval pauses use native `interrupt()` + `Command(resume=…)`. The previous custom SwarmGraph state machine was deleted in Sprint 2.5.
 
 - **Task Scheduler** (`graph/task-scheduler.ts`): Given the current plan and task statuses, resolves which tasks are ready to execute (all dependencies complete) and which should be skipped (dependency failed).
 
@@ -75,22 +75,22 @@ The core execution engine. Contains:
 
 ### `packages/agents` -- Agent Implementations
 
-39 agents organized by role:
+38 agents organized by role:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
-  - `LLMProvider` interface: Unified API across providers. Each provider (OpenAI, Anthropic, Gemini, DeepSeek, Ollama, OpenRouter) implements `chatCompletion()` with tool calling support.
-  - `ProviderRouter`: Tier-based routing. Selects the cheapest available provider for a given tier. Tiers are assigned per agent role (Commander=Tier3, workers=Tier1).
+  - `OpenAIRuntime`: The only active LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry. Anthropic, Gemini, DeepSeek, Ollama, and OpenRouter adapters were removed to keep execution predictable and auditable.
+  - `ModelRouter`: Tier-based routing within the OpenAI runtime. Tier 3 orchestration defaults to GPT-5.5; Tier 1/2 worker and balanced paths default to GPT-5.4.
   - `AntiHallucination`: Four detection layers run on every agent output before it's accepted.
   - `TokenOptimizer`: Estimates token counts, compresses context when approaching limits, selects optimal model based on input size.
 
 - **Orchestrator Agents** (`roles/`): Commander, Planner, Router, Verifier, Guardrail, Approval. Each extends BaseAgent with role-specific system prompts and output schemas.
 
-- **Worker Agents** (`workers/`): 33 domain specialists. Each declares which tools it needs and has a specialized system prompt for its domain.
+- **Worker Agents** (`workers/`): 32 domain specialists. Each declares which tools it needs and has a specialized system prompt for its domain.
 
 ### `packages/tools` -- Tool System
 
-119 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
+122 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
 
 - **ToolRegistry** (`registry/tool-registry.ts`): Singleton. Tools register with metadata (name, description, category, risk class, input/output schemas) and an executor function. Supports input validation and execution timing.
 
@@ -113,7 +113,7 @@ The core execution engine. Contains:
 
 TypeScript enums and interfaces used across all packages:
 
-- `AgentRole` (33 roles), `AgentStatus`, `AgentHandoff`, `ToolCall`, `AgentTrace`
+- `AgentRole` (38 agent roles + `WAITING_APPROVAL`), `AgentStatus`, `AgentHandoff`, `ToolCall`, `AgentTrace`
 - `ToolCategory` (11 categories), `ToolRiskClass` (4 levels), `ToolMetadata`, `ToolResult`
 - `WorkflowStatus`, `TaskStatus`, `RiskLevel`, `WorkflowTask`, `WorkflowPlan`, `ApprovalRequest`
 
@@ -135,7 +135,7 @@ Routes: `apps/api/src/routes/audit-runs.routes.ts` (14 endpoints, REVIEWER+ on w
 
 ### `packages/workflows` -- Temporal Integration (Optional)
 
-Optional Temporal workflow and activity definitions for durable, long-running workflows (batch processing, scheduled reports, multi-day approval escalations). The primary workflow engine is the in-process SwarmGraph + QueueWorker in `packages/swarm` and `apps/api`. Temporal is only needed for jobs that must survive full process restarts.
+Optional Temporal workflow and activity definitions for durable, long-running workflows (batch processing, scheduled reports, multi-day approval escalations). The primary workflow engine is LangGraph + QueueWorker in `packages/swarm` and `apps/api`. Temporal is only needed for jobs that must survive full process restarts.
 
 ### `packages/security` -- Security Layer
 
@@ -157,27 +157,24 @@ Pre-configured agent behaviors and tool permissions for specific industries (e.g
 ## LLM Provider Routing
 
 ```
-                        ProviderRouter
+                        ModelRouter
                              |
               ┌──────────────┼──────────────┐
               v              v              v
           Tier 1         Tier 2         Tier 3
-       (cheap/fast)    (balanced)     (premium)
+       (cost opt)      (balanced)     (premium)
               |              |              |
-     ┌────┬──┴──┐     ┌────┼────┐    ┌────┼────┐
-     v    v     v     v    v    v    v    v    v
-   Olla  Deep  Open  Gemi Open Open  Open Anth Open
-   ma    Seek  Rtr   ni   Rtr  AI    AI   rop  AI
-                                          ic
+              v              v              v
+          GPT-5.4       GPT-5.4        GPT-5.5
+       lower-cost      standard          +
+       routing        worker          vision
 ```
 
-The router detects which providers have API keys configured, then for each tier picks the cheapest available option:
+The runtime is intentionally OpenAI-only. No Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter fallbacks are wired in the execution path. Tier assignments are:
 
-- **Tier 1** (workers): Ollama > DeepSeek > OpenRouter > Gemini > OpenAI
-- **Tier 2** (balanced): Gemini > OpenRouter > OpenAI > Anthropic
-- **Tier 3** (orchestrators): OpenAI (GPT-4o) > Anthropic (Claude) > Gemini
-
-Strategy overrides (`quality_first`, `local_first`) reorder these preferences.
+- **Tier 1** (parallel workers, email, calendar, CRM): GPT-5.4 with lower-cost routing
+- **Tier 2** (code generator, designer, architect): GPT-5.4 standard
+- **Tier 3** (Commander, Planner, Verifier, vision tasks): GPT-5.5
 
 ---
 

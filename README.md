@@ -248,7 +248,7 @@ flowchart LR
 | 🧠 | **Company Brain** | Per-tenant `CompanyProfile` (name, industry, brand voice, target customers, competitors, pricing, products, goals, constraints, preferred channels). LLM-extracts from uploaded documents → user approves → `BaseAgent.injectCompanyContext` grounds every agent's prompt in the approved profile. Refuses to load extracted-but-unapproved profiles into agent prompts (no silent overwrite). Memory items now have an `approval_status` field (`extracted` / `suggested` / `user_approved` / `rejected`); agent-suggested memories require reviewer approval before agents see them. UI at `/company`. See [qa/company-brain-verification.md](qa/company-brain-verification.md). |
 | 🎯 | **Intent vocabulary + WorkflowTemplate library** | 18 named CompanyOSIntents (`company_strategy_review`, `marketing_campaign_generation`, `audit_compliance_workflow`, …) constrained at the LLM layer via strict zod `CompanyOSIntentSchema`. `IntentRecord` Prisma model persists every classification. 6 system-seeded `WorkflowTemplate`s (strategy review, marketing campaign, website review, code review, competitor research, sales outreach drafts) provide pre-tuned decompositions; tenants can override per-intent. Cockpit emits `intent_detected`, `workflow_selected`, `clarification_required`, `company_context_missing` lifecycle events. |
 | 💬 | **Follow-up command NL parser** | Rule-based parser maps short chat inputs to actions on the active workflow: `approve`, `reject`, `continue`, `pause`, `resume`, `cancel`, `show graph`, `show failed`, `show cost`, `download report`, `finalize workpaper`, `why is this waiting`, `what is the CMO/CTO/VibeCoder doing` (resolves role keyword → `agentRole`). Approval-pending bias: short positive responses (`yes`, `go ahead`) auto-route to approve. |
-| 🛡️ | **Audit & Compliance Agent Pack** | Full audit engagement workflow: `AuditRun` lifecycle (PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED), 167 controls seeded across SOC 2 Type 2 (48), HIPAA Security Rule (37), and ISO/IEC 27001:2022 (82). LLM-driven control test evaluation (deterministic fallback when no key), auto-created `AuditException` rows on test failure, per-control workpaper PDFs gated by reviewer approval, HMAC-SHA256 signed final evidence pack. End-to-end e2e test passes. Live SSE on `/audit/runs/[id]` (was 15s SWR poll). See [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md). |
+| 🛡️ | **Audit & Compliance Agent Pack** | Full audit engagement workflow: `AuditRun` lifecycle (PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED), 182 controls seeded across SOC 2 Type 2 (63), HIPAA Security Rule (37), and ISO/IEC 27001:2022 (82). LLM-driven control test evaluation (deterministic fallback when no key), auto-created `AuditException` rows on test failure, per-control workpaper PDFs gated by reviewer approval, HMAC-SHA256 signed final evidence pack. End-to-end e2e test passes. Live SSE on `/audit/runs/[id]` (was 15s SWR poll). See [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md). |
 | 🔒 | **Document content sanitization** | Every document chunk returned by `find_document` is wrapped in `<UNTRUSTED_DOCUMENT_CONTENT>` tags + scrubbed of ANSI/zero-width chars + scanned for 8 prompt-injection patterns (ignore-previous-instructions, role-override, fake-system-message, chat-template-injection, prompt-extraction, data-exfiltration). `BaseAgent` system prompt instructs every agent to treat tagged content as DATA, never instructions. |
 | 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
 | 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
@@ -1504,9 +1504,9 @@ pnpm --filter @jak-swarm/swarm test
 1. Create `packages/agents/src/workers/your-agent.ts` following the pattern in `growth.agent.ts`
 2. Export from `packages/agents/src/index.ts`
 3. Add `AgentRole.WORKER_YOUR_ROLE` to `packages/shared/src/types/agent.ts`
-4. Add case to `createWorkerAgent()` in `packages/swarm/src/graph/nodes/worker-node.ts`
-5. Add case to `buildTaskInput()` in the same file
-6. Add `infer*Action()` function at the end of the same file
+4. Add case to `createWorkerAgent()` in `packages/swarm/src/graph/nodes/worker/agent-factory.ts`
+5. Add case to `buildTaskInput()` in `packages/swarm/src/graph/nodes/worker/task-input-builders.ts`
+6. Add `infer*Action()` function in `packages/swarm/src/graph/nodes/worker/intent-inference/text.ts`
 7. Add role description to `packages/agents/src/roles/planner.agent.ts`
 8. Run `pnpm turbo build` to verify
 
@@ -1856,7 +1856,7 @@ Honest deferrals (named, not faked): live SSE on the audit detail page (~1 day; 
 <details>
 <summary><b>How do I add a new agent?</b></summary>
 
-Subclass `BaseAgent` in `packages/agents/src/`, register it in `packages/agents/src/agents-registry.ts`. Pattern: every agent has an `agentRole`, a system prompt, a list of tools it's allowed to call, and (optionally) a `needsGrounding` flag for citation enforcement.
+Subclass `BaseAgent` in `packages/agents/src/`, register it in `packages/agents/src/index.ts`. Pattern: every agent has an `agentRole`, a system prompt, a list of tools it's allowed to call, and (optionally) a `needsGrounding` flag for citation enforcement.
 
 </details>
 
