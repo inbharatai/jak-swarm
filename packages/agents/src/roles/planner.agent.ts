@@ -268,6 +268,20 @@ export class PlannerAgent extends BaseAgent {
         /\b401\b|\b403\b|incorrect api key|invalid api key|model_not_found|model not found|model[- ]?that[- ]?does[- ]?not[- ]?exist|insufficient_quota|api key/i.test(msg);
       if (isFatalConfig) {
         this.logger.error({ err: msg }, 'Planner structured response hit a fatal configuration error; failing the workflow');
+        // Record a trace so the workflow doesn't complete silently with 0 traces.
+        const errorOutput: PlannerOutput = {
+          plan: {
+            id: this.generateId('plan_'),
+            name: 'Fatal Error Plan',
+            goal: missionBrief.goal,
+            industry: missionBrief.industry,
+            tasks: [],
+            estimatedDuration: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+        this.recordTrace(context, input, errorOutput, [], startedAt);
         throw err;
       }
       this.logger.warn(
@@ -343,6 +357,99 @@ export class PlannerAgent extends BaseAgent {
         maxRetries: t.maxRetries ?? 2,
       };
     });
+
+    // ── Preferred-role enforcement ───────────────────────────────────────
+    // When the user explicitly selected role(s) in the dashboard, EVERY
+    // preferred agent MUST appear in the plan at least once. If the LLM
+    // routed away from a preferred agent (e.g., WORKER_OPS for a website
+    // review), we add a best-effort supporting task so the user sees the
+    // role they selected contribute to the workflow.
+    const preferredMatch = missionBrief.goal?.match(/PREFER these worker agents: ([^.]+)/i);
+    if (preferredMatch && typeof preferredMatch[1] === 'string') {
+      const preferredRoles = preferredMatch[1]
+        .split(/,\s*/)
+        .map((r) => r.trim().toUpperCase())
+        .filter((r) => r.length > 0);
+      const assignedRoles = new Set(tasks.map((t) => t.agentRole));
+      for (const preferred of preferredRoles) {
+        if (!assignedRoles.has(preferred as AgentRole)) {
+          const lastTaskId = tasks.length > 0 ? tasks[tasks.length - 1]?.id : undefined;
+          // For URL-review goals, give the supporting task actual tools so
+          // it contributes meaningfully instead of producing empty output.
+          const isUrlReview = /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(
+            (missionBrief.goal ?? '').toLowerCase(),
+          );
+          const supportingTools: string[] = [];
+          if (isUrlReview && preferred === 'WORKER_OPS') {
+            supportingTools.push('web_search', 'web_fetch');
+          }
+          const supportingTask: WorkflowTask = {
+            id: `task_support_${preferred.toLowerCase()}`,
+            name: `${this.friendlyRoleName(preferred)} contribution`,
+            description: `Apply ${this.friendlyRoleName(preferred)} expertise to support the overall goal: ${missionBrief.goal?.slice(0, 200) ?? ''}`,
+            agentRole: this.parseAgentRole(preferred),
+            toolsRequired: supportingTools,
+            riskLevel: RiskLevel.LOW,
+            requiresApproval: false,
+            status: TaskStatus.PENDING,
+            dependsOn: lastTaskId ? [lastTaskId] : [],
+            retryable: true,
+            maxRetries: 2,
+          };
+          tasks.push(supportingTask);
+          assignedRoles.add(preferred as AgentRole);
+          this.logger.info(
+            { runId: context.runId, role: preferred },
+            'Planner: added supporting task for preferred role that LLM omitted',
+          );
+        }
+      }
+    }
+
+    // ── SIMPLICITY RULE enforcement (deterministic) ────────────────────
+    // The LLM intermittently ignores the SIMPLICITY RULE in its prompt.
+    // When the goal is a single concrete deliverable, trim over-decomposed
+    // plans so the workflow doesn't drown in research/verification padding.
+    const isSimpleDeliverable =
+      wantsContent || wantsCode || wantsSwot || wantsOkr ||
+      /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(goalLower) ||
+      /\b(write|draft|create|generate|compose)\b.*\b(post|blog|article|tweet|linkedin|caption|thread|newsletter|press release|ad copy|landing copy|email copy|headline|script)\b/i.test(goalLower) ||
+      /\b(generate|build|create|fix|debug|refactor|review)\b.*\b(code|script|function|api|test|class|module|component|app)\b/i.test(goalLower);
+    if (isSimpleDeliverable && tasks.length > 2) {
+      // Keep the primary task + one supporting task max.
+      const trimmed = tasks.slice(0, 2);
+      this.logger.info(
+        { runId: context.runId, before: tasks.length, after: trimmed.length },
+        'Planner: SIMPLICITY RULE trimmed over-decomposed plan',
+      );
+      tasks.length = 0;
+      tasks.push(...trimmed);
+    }
+
+    // ── Zero-task guard ─────────────────────────────────────────────────
+    // If every post-processing step above somehow produced zero tasks,
+    // add a sensible fallback so the graph doesn't silently complete.
+    if (tasks.length === 0) {
+      const isUrlReview = /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(goalLower);
+      const fallbackTask: WorkflowTask = {
+        id: 'task_fallback_1',
+        name: isUrlReview ? 'Website review and analysis' : 'Research and execute goal',
+        description: missionBrief.goal ?? 'Execute the requested task',
+        agentRole: isUrlReview ? AgentRole.WORKER_RESEARCH : AgentRole.WORKER_OPS,
+        toolsRequired: isUrlReview ? ['web_search', 'web_fetch'] : ['search_knowledge'],
+        riskLevel: RiskLevel.LOW,
+        requiresApproval: false,
+        status: TaskStatus.PENDING,
+        dependsOn: [],
+        retryable: true,
+        maxRetries: 2,
+      };
+      tasks.push(fallbackTask);
+      this.logger.warn(
+        { runId: context.runId },
+        'Planner: zero-task guard triggered — added fallback task',
+      );
+    }
 
     if (overridden.length > 0) {
       this.logger.info(
@@ -533,5 +640,43 @@ export class PlannerAgent extends BaseAgent {
     const upper = raw.toUpperCase();
     if (valid.includes(upper)) return upper as AgentRole;
     return AgentRole.WORKER_OPS;
+  }
+
+  private friendlyRoleName(raw: string): string {
+    const map: Record<string, string> = {
+      WORKER_OPS: 'Ops',
+      WORKER_TECHNICAL: 'Technical',
+      WORKER_MARKETING: 'Marketing',
+      WORKER_STRATEGIST: 'Strategist',
+      WORKER_CODER: 'Coder',
+      WORKER_RESEARCH: 'Research',
+      WORKER_DESIGNER: 'Designer',
+      WORKER_LEGAL: 'Legal',
+      WORKER_CONTENT: 'Content',
+      WORKER_SEO: 'SEO',
+      WORKER_PR: 'PR',
+      WORKER_FINANCE: 'Finance',
+      WORKER_HR: 'HR',
+      WORKER_GROWTH: 'Growth',
+      WORKER_SUCCESS: 'Success',
+      WORKER_ANALYTICS: 'Analytics',
+      WORKER_PRODUCT: 'Product',
+      WORKER_PROJECT: 'Project',
+      WORKER_BROWSER: 'Browser',
+      WORKER_EMAIL: 'Email',
+      WORKER_CALENDAR: 'Calendar',
+      WORKER_CRM: 'CRM',
+      WORKER_DOCUMENT: 'Document',
+      WORKER_SPREADSHEET: 'Spreadsheet',
+      WORKER_SUPPORT: 'Support',
+      WORKER_VOICE: 'Voice',
+      WORKER_KNOWLEDGE: 'Knowledge',
+      WORKER_APP_ARCHITECT: 'App Architect',
+      WORKER_APP_GENERATOR: 'App Generator',
+      WORKER_APP_DEBUGGER: 'App Debugger',
+      WORKER_APP_DEPLOYER: 'App Deployer',
+      WORKER_SCREENSHOT_TO_CODE: 'Screenshot-to-Code',
+    };
+    return map[raw.toUpperCase()] ?? raw;
   }
 }

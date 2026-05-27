@@ -17,7 +17,7 @@ import { getRawToken } from '@/lib/auth';
 import { connectSSE } from '@/lib/sse-fetch';
 import { createClient } from '@/lib/supabase';
 import type { RoleId } from '@/lib/role-config';
-import type { WorkflowPlan, WorkflowPlanStep, AgentRole, TaskStatus, RiskLevel } from '@/types';
+import type { WorkflowPlan, WorkflowPlanStep, AgentRole, TaskStatus, RiskLevel, WorkflowStatus } from '@/types';
 import { getAgentFriendlyLabel } from '@/lib/agent-friendly-names';
 import { TaskList } from '@/components/workspace/TaskList';
 import { WorkflowDAG } from '@/components/graph/WorkflowDAG';
@@ -95,10 +95,17 @@ export function ChatWorkspace() {
   const hasHydrated = useConversationStore((s) => s._hasHydrated);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const abortRef = useRef<AbortController | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Cleanup SSE on unmount
+  // Cleanup SSE + polling on unmount
   useEffect(() => {
-    return () => { abortRef.current?.abort(); };
+    return () => {
+      abortRef.current?.abort();
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, []);
 
   // "Stuck workflow" detector — QA finding from live demo: user sent "hi",
@@ -162,11 +169,26 @@ export function ChatWorkspace() {
       ? `${text}${text ? '\n\n' : ''}📎 ${readyAttachments.map((a) => a.fileName).join(', ')}`
       : text;
 
+    // Build conversation context from previous messages so the Commander
+    // remembers what was discussed in this thread. Only include messages
+    // before the current one we're about to send.
+    const existingMessages = messages ?? [];
+    const priorMessages = existingMessages.filter((m) => m.role === 'user' || m.role === 'assistant');
+    const contextMessages = priorMessages.slice(-6); // last 3 turns (user + assistant pairs)
+    let contextPrefix = '';
+    if (contextMessages.length > 0) {
+      const lines = contextMessages.map((m) => {
+        const label = m.role === 'user' ? 'User' : 'Assistant';
+        return `${label}: ${m.content}`;
+      });
+      contextPrefix = `Previous conversation:\n${lines.join('\n')}\n\n`;
+    }
+
     const goalText = readyAttachments.length > 0
-      ? `${text || 'Analyze the attached file(s).'}\n\n` +
+      ? `${contextPrefix}${text || 'Analyze the attached file(s).'}\n\n` +
         `[Attached files — resolve via the find_document tool by name or ID]\n` +
         readyAttachments.map((a) => `  - ${a.fileName} (documentId: ${a.id})`).join('\n')
-      : text;
+      : `${contextPrefix}${text}`;
 
     // Add user message
     addMessage(convId, {
@@ -564,10 +586,120 @@ export function ChatWorkspace() {
           addMessage(convId, {
             role: 'assistant',
             agentRole: null,
-            content: `Live stream disconnected before completion after multiple retry attempts. Open [Run Inspector](/swarm?workflowId=${workflow.id}) for the latest status.`,
+            content: `Live stream disconnected. Switching to polling fallback…`,
           });
-          setIsSending(false);
-          setIsStuck(false);
+
+          // Clear any previous poll for this workflow
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+
+          let pollCount = 0;
+          const MAX_POLLS = 60; // 5 minutes at 5s intervals
+
+          const poll = async () => {
+            if (terminalWorkflowsRef.current.has(workflow.id)) {
+              if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+              }
+              setIsSending(false);
+              setIsStuck(false);
+              return;
+            }
+
+            pollCount += 1;
+            if (pollCount > MAX_POLLS) {
+              if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+              }
+              addMessage(convId, {
+                role: 'assistant',
+                agentRole: null,
+                content: `Polling timed out after 5 minutes. Open [Run Inspector](/swarm?workflowId=${workflow.id}) for the latest status.`,
+              });
+              setIsSending(false);
+              setIsStuck(false);
+              return;
+            }
+
+            try {
+              const w = await workflowApi.get(workflow.id);
+
+              // Replay plan into cockpit if SSE missed plan_created
+              const planJson = (w as unknown as { planJson?: unknown }).planJson;
+              if (planJson) {
+                const plan = typeof planJson === 'string' ? JSON.parse(planJson) : planJson;
+                if (
+                  plan &&
+                  typeof plan === 'object' &&
+                  Array.isArray((plan as { tasks?: unknown }).tasks) &&
+                  ((plan as { tasks?: unknown[] }).tasks ?? []).length > 0
+                ) {
+                  setCockpitByWorkflow((prev) => {
+                    if (prev[workflow.id]?.plan) return prev; // already have plan
+                    const tasks = (plan as { tasks: Array<{ id: string; name?: string; description?: string; agentRole?: string; dependsOn?: string[]; status?: string; riskLevel?: string }> }).tasks;
+                    const steps: WorkflowPlanStep[] = tasks.map((t, i) => ({
+                      id: t.id,
+                      stepNumber: i + 1,
+                      taskName: t.name ?? t.description ?? `Task ${i + 1}`,
+                      description: t.description ?? '',
+                      agentRole: (t.agentRole ?? 'WORKER_OPS') as AgentRole,
+                      riskLevel: ((t.riskLevel ?? 'LOW').toUpperCase()) as RiskLevel,
+                      status: (mapPlanStatus(t.status ?? 'PENDING')) as TaskStatus,
+                      dependsOn: t.dependsOn ?? [],
+                    }));
+                    const wfPlan: WorkflowPlan = {
+                      id: `plan_${workflow.id}`,
+                      workflowId: workflow.id,
+                      steps,
+                      createdAt: new Date().toISOString(),
+                    };
+                    return {
+                      ...prev,
+                      [workflow.id]: {
+                        ...(prev[workflow.id] ?? { plan: null, status: 'running', costUsd: 0, calls: 0, promptTokens: 0, completionTokens: 0 }),
+                        plan: wfPlan,
+                        status: 'running',
+                      },
+                    };
+                  });
+                }
+              }
+
+              const terminalStatuses: WorkflowStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
+              if (terminalStatuses.includes(w.status)) {
+                terminalWorkflowsRef.current.add(workflow.id);
+                if (pollRef.current) {
+                  clearInterval(pollRef.current);
+                  pollRef.current = null;
+                }
+
+                const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
+                const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
+                const display = raw.trim().length === 0 || STUB_RE.test(raw)
+                  ? (w.status === 'COMPLETED'
+                    ? 'JAK completed the run, but no final response was generated. You can view the detailed trace in [Run Inspector](/swarm).'
+                    : `Workflow ended with status **${w.status}**. No final response was generated.`)
+                  : raw;
+                addFinalMessageOnce(display, activeRoles[0] ?? null);
+                setCockpitByWorkflow((prev) =>
+                  prev[workflow.id]
+                    ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: w.status === 'COMPLETED' ? 'completed' : 'failed' } }
+                    : prev,
+                );
+                setIsSending(false);
+                setIsStuck(false);
+              }
+            } catch (err) {
+              console.warn('[ChatWorkspace] Polling fallback error:', err);
+            }
+          };
+
+          pollRef.current = setInterval(poll, 5000);
+          void poll(); // immediate first poll
         },
       });
     } catch (err) {

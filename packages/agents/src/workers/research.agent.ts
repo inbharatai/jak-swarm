@@ -244,6 +244,21 @@ export class ResearchAgent extends BaseAgent {
       this.recordTrace(context, input, result, [], startedAt);
     }
 
+    // Defensive: if findings are empty or trivial after all recovery paths,
+    // synthesize a meaningful fallback so the user sees SOMETHING instead of
+    // a blank output or stub text.
+    if (!result.findings || result.findings.trim().length < 30) {
+      result.findings = `I searched for "${task.query}" but did not find any relevant web results. This could mean the topic is very new, highly niche, or not indexed by the search providers currently configured. I recommend trying a broader query or checking back later when more sources may be available.`;
+      result.confidence = Math.min(result.confidence, 0.3);
+      if (!result.limitations.includes('No relevant web sources found.')) {
+        result.limitations.push('No relevant web sources found.');
+      }
+      this.logger.warn(
+        { runId: context.runId, query: task.query },
+        'ResearchAgent: empty-findings fallback applied',
+      );
+    }
+
     return result;
   }
 }

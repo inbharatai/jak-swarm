@@ -967,6 +967,22 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
 
       sendEvent({ type: 'connected', workflowId, status: workflow.status });
 
+      // Replay already-persisted plan so reconnecting clients don't sit on
+      // "Waiting for the planner..." when the plan was created before they
+      // connected (common on network blip / reverse-proxy timeout).
+      if (workflow.planJson) {
+        try {
+          const plan = typeof workflow.planJson === 'string'
+            ? JSON.parse(workflow.planJson)
+            : workflow.planJson;
+          if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
+            sendEvent({ type: 'plan_created', workflowId, plan });
+          }
+        } catch {
+          // Malformed planJson — non-fatal, live events will still fire.
+        }
+      }
+
       // If already terminal, close immediately
       if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(workflow.status)) {
         sendEvent({ type: workflow.status.toLowerCase(), workflowId });

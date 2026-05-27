@@ -248,7 +248,15 @@ function wrapNode(
 
     let updates: Partial<SwarmState>;
     try {
-      updates = await fn(condensed);
+      // Node-level timeout — prevents any single node from hanging the workflow.
+      // 120s matches the documented NODE_TIMEOUT_MS in ARCHITECTURE.md.
+      const NODE_TIMEOUT_MS = 120_000;
+      updates = await Promise.race([
+        fn(condensed),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Node '${name}' exceeded ${NODE_TIMEOUT_MS}ms timeout`)), NODE_TIMEOUT_MS),
+        ),
+      ]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       // Node-level failure: return a status patch the next node sees.
