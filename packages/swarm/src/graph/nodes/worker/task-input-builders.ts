@@ -116,7 +116,7 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
     case AgentRole.WORKER_OPS:
       return {
         action: inferOpsAction(task),
-        instructions: task.description,
+        description: task.description,
         context: state.missionBrief?.subFunction,
         dependencyResults,
       };
@@ -143,7 +143,7 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
     case AgentRole.WORKER_STRATEGIST:
       return {
         action: inferStrategyAction(task),
-        question: task.description,
+        description: task.description,
         context: state.missionBrief?.subFunction,
         industry: state.industry,
         dependencyResults,
@@ -151,14 +151,14 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
     case AgentRole.WORKER_MARKETING:
       return {
         action: inferMarketingAction(task),
-        brief: task.description,
+        description: task.description,
         industry: state.industry,
         dependencyResults,
       };
     case AgentRole.WORKER_TECHNICAL:
       return {
         action: inferTechnicalAction(task),
-        question: task.description,
+        description: task.description,
         dependencyResults,
       };
     case AgentRole.WORKER_FINANCE:
@@ -171,7 +171,7 @@ export function buildTaskInput(task: WorkflowTask, state: SwarmState): unknown {
     case AgentRole.WORKER_HR:
       return {
         action: inferHRAction(task),
-        request: task.description,
+        description: task.description,
         dependencyResults,
       };
     case AgentRole.WORKER_GROWTH:
