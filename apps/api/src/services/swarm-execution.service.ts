@@ -2159,6 +2159,18 @@ export class SwarmExecutionService extends EventEmitter {
             pieces.push(v.trim());
             break;
           }
+          // Some fields (risks, tradeoffs, etc.) are string arrays — join them.
+          if (Array.isArray(v)) {
+            const joined = v
+              .filter((item): item is string => typeof item === 'string')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0 && !isStub(s))
+              .join('\n');
+            if (joined.length > 0) {
+              pieces.push(joined);
+              break;
+            }
+          }
         }
         // Always also render keyPoints if present — they frequently carry
         // the actual substance even when findings/summary is a stub.
