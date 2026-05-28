@@ -20,7 +20,7 @@ describe('QueueWorker lifecycle contracts', () => {
   const queueWorker = readRepoFile('apps/api/src/services/queue-worker.ts');
   const execService = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
   const swarmPlugin = readRepoFile('apps/api/src/plugins/swarm.plugin.ts');
-  const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+  const workflowQueryRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-query.routes.ts');
   const workerEntry = readRepoFile('apps/api/src/worker-entry.ts');
 
   it('provides a standalone QueueWorker class with explicit lifecycle methods', () => {
@@ -89,9 +89,9 @@ describe('QueueWorker lifecycle contracts', () => {
   });
 
   it('exposes worker health endpoint for operators', () => {
-    expect(workflowRoutes).toContain("'/queue/health'");
-    expect(workflowRoutes).toContain('getWorkerHealth()');
-    expect(workflowRoutes).toContain("fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')");
+    expect(workflowQueryRoutes).toContain("'/queue/health'");
+    expect(workflowQueryRoutes).toContain('getWorkerHealth()');
+    expect(workflowQueryRoutes).toContain("fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')");
   });
 
   it('supports configurable concurrency and poll interval', () => {

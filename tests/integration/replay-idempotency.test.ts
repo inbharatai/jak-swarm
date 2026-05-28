@@ -19,6 +19,7 @@ function readRepoFile(relativePath: string): string {
 describe('Replay safety and idempotency contracts', () => {
   const execService = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
   const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+  const workflowCreationService = readRepoFile('apps/api/src/services/workflow-creation.service.ts');
   const queueWorker = readRepoFile('apps/api/src/services/queue-worker.ts');
 
   it('classifies replay safety into 4 tiers', () => {
@@ -50,8 +51,8 @@ describe('Replay safety and idempotency contracts', () => {
   });
 
   it('propagates idempotency key from HTTP request header to execution', () => {
-    expect(workflowRoutes).toContain("request.headers['idempotency-key']");
-    expect(workflowRoutes).toContain('idempotencyKey');
+    expect(workflowCreationService).toContain("request.headers['idempotency-key']");
+    expect(workflowCreationService).toContain('idempotencyKey');
     expect(execService).toContain('idempotencyKey');
   });
 
@@ -64,10 +65,10 @@ describe('Replay safety and idempotency contracts', () => {
 
   it('propagates idempotency key into tool execution context', () => {
     const agentContext = readRepoFile('packages/agents/src/base/agent-context.ts');
-    const baseAgent = readRepoFile('packages/agents/src/base/base-agent.ts');
+    const toolExecutionService = readRepoFile('packages/agents/src/base/tool-execution.service.ts');
 
     expect(agentContext).toContain('idempotencyKey');
-    expect(baseAgent).toContain('idempotencyKey: context.idempotencyKey');
+    expect(toolExecutionService).toContain('idempotencyKey: context.idempotencyKey');
   });
 
   it('prevents duplicate execution when idempotency key matches completed workflow', () => {

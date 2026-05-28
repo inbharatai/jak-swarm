@@ -103,26 +103,26 @@ describe('Route surface verification', () => {
   });
 
   it('SSE stream routes support both header auth and query token fallback', () => {
-    const workflows = readRepoFile('apps/api/src/routes/workflows.routes.ts');
-    expect(workflows).toContain('!request.headers.authorization && query.token');
-    expect(workflows).toContain('text/event-stream');
-    expect(workflows).toContain('reply.hijack()');
-    expect(workflows).toContain('X-Accel-Buffering');
+    const workflowStreamRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-stream.routes.ts');
+    expect(workflowStreamRoutes).toContain('!request.headers.authorization && query.token');
+    expect(workflowStreamRoutes).toContain('text/event-stream');
+    expect(workflowStreamRoutes).toContain('reply.hijack()');
+    expect(workflowStreamRoutes).toContain('X-Accel-Buffering');
   });
 
   it('queue stats and health endpoints require admin roles', () => {
-    const workflows = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowQueryRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-query.routes.ts');
 
     // Both /queue/stats and /queue/health should be admin-only
-    const queueStatsSection = workflows.substring(
-      workflows.indexOf("'/queue/stats'"),
-      workflows.indexOf("'/queue/health'"),
+    const queueStatsSection = workflowQueryRoutes.substring(
+      workflowQueryRoutes.indexOf("'/queue/stats'"),
+      workflowQueryRoutes.indexOf("'/queue/health'"),
     );
     expect(queueStatsSection).toContain("fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')");
 
-    const queueHealthSection = workflows.substring(
-      workflows.indexOf("'/queue/health'"),
-      workflows.indexOf("'/:workflowId'", workflows.indexOf("'/queue/health'")),
+    const queueHealthSection = workflowQueryRoutes.substring(
+      workflowQueryRoutes.indexOf("'/queue/health'"),
+      workflowQueryRoutes.indexOf("'/:workflowId'", workflowQueryRoutes.indexOf("'/queue/health'")),
     );
     expect(queueHealthSection).toContain("fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN')");
   });

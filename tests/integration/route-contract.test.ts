@@ -17,6 +17,10 @@ describe('JAK Swarm route contract checks', () => {
   it('keeps workflow frontend paths aligned with backend workflow routes', () => {
     const apiClient = readRepoFile('apps/web/src/lib/api-client.ts');
     const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowControlRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-control.routes.ts');
+    const workflowQueryRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-query.routes.ts');
+    const workflowStreamRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-stream.routes.ts');
+    const workflowCreationService = readRepoFile('apps/api/src/services/workflow-creation.service.ts');
 
     // Frontend API paths in api-client.ts
     expect(apiClient).toContain("'/workflows'");
@@ -28,23 +32,24 @@ describe('JAK Swarm route contract checks', () => {
     expect(apiClient).toContain('`/workflows/${id}/traces`');
     expect(apiClient).toContain('`/workflows/${id}/approvals`');
 
-    // Backend route handlers in workflows.routes.ts
+    // Backend route handlers — Migration 108 split workflows.routes.ts into sub-routers
     expect(workflowRoutes).toContain("fastify.post(\n    '/'");
-    expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId'");
-    expect(workflowRoutes).toContain("fastify.post(\n    '/:workflowId/resume'");
-    expect(workflowRoutes).toContain("fastify.post(\n    '/:workflowId/pause'");
-    expect(workflowRoutes).toContain("fastify.post(\n    '/:workflowId/unpause'");
-    expect(workflowRoutes).toContain("fastify.post(\n    '/:workflowId/stop'");
-    expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/traces'");
-    expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/approvals'");
-    expect(workflowRoutes).toContain("fastify.get(\n    '/:workflowId/stream'");
-    expect(workflowRoutes).toContain("fastify.get(\n    '/queue/stats'");
-    expect(workflowRoutes).toContain('fastify.swarm.enqueueExecution(');
+    expect(workflowQueryRoutes).toContain("fastify.get(\n    '/:workflowId'");
+    expect(workflowControlRoutes).toContain("fastify.post(\n    '/:workflowId/resume'");
+    expect(workflowControlRoutes).toContain("fastify.post(\n    '/:workflowId/pause'");
+    expect(workflowControlRoutes).toContain("fastify.post(\n    '/:workflowId/unpause'");
+    expect(workflowControlRoutes).toContain("fastify.post(\n    '/:workflowId/stop'");
+    expect(workflowQueryRoutes).toContain("fastify.get(\n    '/:workflowId/traces'");
+    expect(workflowQueryRoutes).toContain("fastify.get(\n    '/:workflowId/approvals'");
+    expect(workflowStreamRoutes).toContain("'/:workflowId/stream'");
+    expect(workflowQueryRoutes).toContain("'/queue/stats'");
+    expect(workflowCreationService).toContain('fastify.swarm.enqueueExecution(');
   });
 
   it('ensures role modes are propagated from API request into swarm execution', () => {
     const webApiClient = readRepoFile('apps/web/src/lib/api-client.ts');
     const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowCreationService = readRepoFile('apps/api/src/services/workflow-creation.service.ts');
     const executionService = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
     const runner = readRepoFile('packages/swarm/src/runner/swarm-runner.ts');
     const state = readRepoFile('packages/swarm/src/state/swarm-state.ts');
@@ -52,6 +57,7 @@ describe('JAK Swarm route contract checks', () => {
 
     expect(webApiClient).toContain('roleModes');
     expect(workflowRoutes).toContain('roleModes');
+    expect(workflowCreationService).toContain('roleModes');
     expect(executionService).toContain('roleModes');
     expect(runner).toContain('roleModes');
     expect(state).toContain('roleModes');
@@ -61,25 +67,25 @@ describe('JAK Swarm route contract checks', () => {
   it('ensures stream endpoints used by hooks are present in backend routes', () => {
     const workflowHook = readRepoFile('apps/web/src/hooks/useWorkflowStream.ts');
     const projectHook = readRepoFile('apps/web/src/hooks/useProjectStream.ts');
-    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowStreamRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-stream.routes.ts');
     const projectRoutes = readRepoFile('apps/api/src/routes/projects.routes.ts');
 
     expect(workflowHook).toContain('/workflows/${workflowId}/stream');
-    expect(workflowRoutes).toContain("'/:workflowId/stream'");
+    expect(workflowStreamRoutes).toContain("'/:workflowId/stream'");
 
     expect(projectHook).toContain('/projects/${projectId}/stream');
     expect(projectRoutes).toContain("'/:id/stream'");
   });
 
   it('guards stream auth and UI trace rendering contracts against runtime crashes', () => {
-    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowStreamRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-stream.routes.ts');
     const swarmMonitor = readRepoFile('apps/web/src/modules/swarm-monitor/index.tsx');
     const tracesPage = readRepoFile('apps/web/src/app/(dashboard)/traces/page.tsx');
 
     // Stream route should support header auth with query fallback and structured errors.
-    expect(workflowRoutes).toContain('!request.headers.authorization && query.token');
-    expect(workflowRoutes).toContain("err('UNAUTHORIZED', 'Unauthorized')");
-    expect(workflowRoutes).toContain("err('NOT_FOUND', 'Workflow not found')");
+    expect(workflowStreamRoutes).toContain('!request.headers.authorization && query.token');
+    expect(workflowStreamRoutes).toContain("err('UNAUTHORIZED', 'Unauthorized')");
+    expect(workflowStreamRoutes).toContain("err('NOT_FOUND', 'Workflow not found')");
 
     // UI must guard against non-array traces to prevent .map runtime crash.
     expect(swarmMonitor).toContain('Array.isArray(wf.traces)');
@@ -113,14 +119,15 @@ describe('JAK Swarm route contract checks', () => {
 
   it('aligns workflow list pagination query naming between hook and backend', () => {
     const workflowHook = readRepoFile('apps/web/src/hooks/useWorkflow.ts');
-    const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowQueryRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-query.routes.ts');
 
     expect(workflowHook).toContain("params.set('limit', String(filters.pageSize))");
-    expect(workflowRoutes).toContain("parseInt(query.limit ?? '20', 10)");
+    expect(workflowQueryRoutes).toContain("parseInt(query.limit ?? '20', 10)");
   });
 
   it('prevents generic resume/unpause paths from bypassing pending approvals', () => {
     const workflowRoutes = readRepoFile('apps/api/src/routes/workflows.routes.ts');
+    const workflowControlRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-control.routes.ts');
     const whatsappRoutes = readRepoFile('apps/api/src/routes/whatsapp.routes.ts');
     const executionService = readRepoFile('apps/api/src/services/swarm-execution.service.ts');
     const runner = readRepoFile('packages/swarm/src/runner/swarm-runner.ts');
@@ -128,8 +135,8 @@ describe('JAK Swarm route contract checks', () => {
     const edges = readRepoFile('packages/swarm/src/graph/edges.ts');
 
     expect(workflowRoutes).toContain('APPROVAL_REQUIRED');
-    expect(workflowRoutes).toContain('approvalRequest.findFirst');
-    expect(workflowRoutes).toContain("status: 'PENDING'");
+    expect(workflowControlRoutes).toContain('approvalRequest.findFirst');
+    expect(workflowControlRoutes).toContain("status: 'PENDING'");
     expect(workflowRoutes).toContain('enqueueControl({');
     expect(workflowRoutes).toContain("action: 'resume'");
 
