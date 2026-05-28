@@ -56,6 +56,17 @@ function resolveAgentRoles(roleModes: string[]): string[] {
   return [...new Set(resolved)];
 }
 
+function buildConversationPrefix(history: Array<{ role: string; content: string }>): string {
+  if (!history || history.length <= 1) return '';
+  // Exclude the last entry — it's the current goal which is passed separately.
+  const prior = history.slice(0, -1);
+  const lines = prior.map((m) => {
+    const label = m.role === 'user' ? 'User' : 'Assistant';
+    return `${label}: ${m.content}`;
+  });
+  return `Previous conversation:\n${lines.join('\n')}\n\n`;
+}
+
 /**
  * Build the Commander's input goal string, augmented with role-mode context
  * when the user's picked one or more roles in the dashboard.
@@ -106,7 +117,8 @@ export async function commanderNode(
     allowedDomains: state.allowedDomains,
   });
 
-  const commanderInput = buildCommanderInput(state.goal, state.roleModes);
+  const prefix = buildConversationPrefix(state.conversationHistory ?? []);
+  const commanderInput = buildCommanderInput(prefix + state.goal, state.roleModes);
   const result = await agent.execute(commanderInput, context);
 
   const traces = context.getTraces();

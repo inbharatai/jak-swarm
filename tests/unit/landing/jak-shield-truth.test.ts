@@ -85,13 +85,13 @@ describe('JAK Shield landing — truth-lock', () => {
   });
 
   it('BaseAgent wires the offensive-cyber guard before the LLM call', () => {
-    const baseAgent = readFileSync(
-      join(REPO_ROOT, 'packages/agents/src/base/base-agent.ts'),
+    const toolExec = readFileSync(
+      join(REPO_ROOT, 'packages/agents/src/base/tool-execution.service.ts'),
       'utf8',
     );
-    expect(baseAgent).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
-    expect(baseAgent).toMatch(/getShieldGateway/);
-    expect(baseAgent).toMatch(/offensiveCyber/);
-    expect(baseAgent).toMatch(/JAK Shield/);
+    expect(toolExec).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
+    expect(toolExec).toMatch(/getShieldGateway/);
+    expect(toolExec).toMatch(/offensiveCyber/);
+    expect(toolExec).toMatch(/JAK Shield/);
   });
 });

@@ -20,6 +20,9 @@ export interface SwarmState {
   industry: string | undefined;
   roleModes: string[];
   idempotencyKey?: string;
+  /** Conversation thread history — injected by the backend so the graph
+   *  replays with full context instead of an isolated goal string. */
+  conversationHistory?: Array<{ role: string; content: string }>;
 
   // Commander output
   missionBrief: MissionBrief | undefined;
@@ -131,6 +134,7 @@ export function createInitialSwarmState(params: {
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
   userRole?: string;
+  conversationHistory?: Array<{ role: string; content: string }>;
 }): SwarmState {
   return {
     goal: params.goal,
@@ -140,6 +144,7 @@ export function createInitialSwarmState(params: {
     industry: params.industry,
     roleModes: params.roleModes ?? [],
     idempotencyKey: params.idempotencyKey,
+    conversationHistory: params.conversationHistory,
     missionBrief: undefined,
     clarificationNeeded: false,
     clarificationQuestion: undefined,

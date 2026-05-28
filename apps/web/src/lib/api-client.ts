@@ -390,10 +390,10 @@ export const workflowApi = {
     * - workflow_created: canonical new-workflow response (typically 202)
     * - followup_executed: short follow-up command routed to active workflow (typically 200)
    */
-  create: (goal: string, industry?: string, roleModes?: string[]) =>
+  create: (goal: string, industry?: string, roleModes?: string[], conversationId?: string) =>
     apiDataFetch<WorkflowCreateResponse>(
       '/workflows',
-      { method: 'POST', body: { goal, industry, roleModes } },
+      { method: 'POST', body: { goal, industry, roleModes, conversationId } },
     ),
 
   /**

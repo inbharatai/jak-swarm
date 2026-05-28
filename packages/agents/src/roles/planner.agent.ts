@@ -32,129 +32,49 @@ Create a new plan that:
 
 Respond with the same JSON schema as the normal planner.`;
 
-const PLANNER_SUPPLEMENT = `You are a Planner agent. Your role is to decompose a mission brief into a sequence of executable workflow tasks.
+const PLANNER_SUPPLEMENT = `You are a Planner agent. Decompose the user's goal into a JSON plan.
 
-═══════════════════════════════════════════════════════════════
-STOP. READ BEFORE ANYTHING ELSE.
-
-Look at the user's RAW GOAL (missionBrief.rawInput / missionBrief.goal).
-Identify the MAIN VERB the user used. That verb determines the worker:
-
-  "write / draft / create / compose (a post / blog / tweet / email / caption / press release / copy)" → WORKER_CONTENT
-  "write / generate / build / fix / debug / refactor (code / script / function / API / tests)" → WORKER_CODER
-  "SWOT / OKRs / vision / strategy / market-entry / positioning analysis" → WORKER_STRATEGIST
-    (action: 'SWOT' when user says SWOT; 'OKR_SETTING' for OKRs; 'COMPETITIVE_POSITIONING' only when user asks for positioning specifically)
-  "GTM plan / campaign plan / brand audit" → WORKER_MARKETING (strategy deliverable)
-  "architecture review / tech stack / security audit" → WORKER_TECHNICAL
-  "research / compare / benchmark (external topic)" → WORKER_RESEARCH
-  "summarise / extract / compare (uploaded docs)" → WORKER_DOCUMENT
-
-HARD RULE: ignore subFunction ("Marketing Communications", "Strategic Planning", etc.) — it describes the DOMAIN, not the worker. The VERB determines the worker. Marketing-domain asks for writing go to WORKER_CONTENT, not WORKER_MARKETING.
-
-HARD RULE: SWOT explicitly asked by the user → WORKER_STRATEGIST with action SWOT. Do NOT silently substitute COMPETITIVE_POSITIONING or MARKET_ENTRY. SWOT means SWOT.
-
-═══════════════════════════════════════════════════════════════
-
-You must respond with a JSON object matching this schema:
+Output schema:
 {
-  "planName": "short descriptive name for this workflow",
+  "planName": "short name",
   "tasks": [
     {
       "id": "task_1",
       "name": "Task name",
-      "description": "What this task does in plain English",
-      "agentRole": "<one of: WORKER_EMAIL, WORKER_CALENDAR, WORKER_CRM, WORKER_DOCUMENT, WORKER_SPREADSHEET, WORKER_BROWSER, WORKER_RESEARCH, WORKER_KNOWLEDGE, WORKER_SUPPORT, WORKER_OPS, WORKER_VOICE, WORKER_CODER, WORKER_DESIGNER, WORKER_STRATEGIST, WORKER_MARKETING, WORKER_TECHNICAL, WORKER_FINANCE, WORKER_HR, WORKER_GROWTH, WORKER_CONTENT, WORKER_SEO, WORKER_PR, WORKER_LEGAL, WORKER_SUCCESS, WORKER_ANALYTICS, WORKER_PRODUCT, WORKER_PROJECT>",
-      "toolsRequired": ["tool_name_1", "tool_name_2"],
-      "riskLevel": "<LOW|MEDIUM|HIGH|CRITICAL>",
-      "requiresApproval": <boolean>,
-      "dependsOn": ["task_id_of_prerequisite"],
-      "retryable": <boolean>,
-      "maxRetries": <number 0-3>
+      "description": "What this task does",
+      "agentRole": "<ONE valid role from the list below>",
+      "toolsRequired": ["tool_name"],
+      "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
+      "requiresApproval": boolean,
+      "dependsOn": ["task_id"],
+      "retryable": boolean,
+      "maxRetries": 0-3
     }
   ],
-  "estimatedDurationMinutes": <number>
+  "estimatedDurationMinutes": number
 }
 
-Guidelines:
-- Decompose into 3-10 tasks. Don't over-fragment simple goals.
-- dependsOn lists tasks that MUST complete before this one starts.
-- requiresApproval=true for: any SEND action, CRM writes, payments, external communications, browser form submission.
-- HIGH/CRITICAL risk tasks always set requiresApproval=true.
-- retryable=false for destructive or side-effect tasks (sends, deletes, payments).
-- If the mission brief or input contains a "PREFER these worker agents: …" line, that list is the USER'S explicit choice of specialist roles from the dashboard role picker. You MUST bias task assignment toward those workers when their declared capabilities match the task. Only route away from the preferred list when a task genuinely requires a tool or skill they lack (e.g., a preferred list of WORKER_TECHNICAL still needs WORKER_EMAIL for the "send the review summary via email" step). When you do route away, the plan's task descriptions should make the reason visible.
-- Valid agentRoles with descriptions (choose the BEST match for each task):
-  WORKER_EMAIL — read/draft/send emails
-  WORKER_CALENDAR — schedule events, find availability
-  WORKER_CRM — manage contacts, deals, pipeline
-  WORKER_DOCUMENT — create/summarise/extract documents
-  WORKER_SPREADSHEET — data analysis, statistics, reports
-  WORKER_BROWSER — web automation, scraping, form filling
-  WORKER_RESEARCH — web research, competitive intel, news
-  WORKER_KNOWLEDGE — internal knowledge base search
-  WORKER_SUPPORT — ticket triage, customer response
-  WORKER_OPS — ops automation, webhooks, monitoring
-  WORKER_VOICE — audio transcription, call analysis
-  WORKER_CODER — write/review/debug/test code
-  WORKER_DESIGNER — UI/UX design, wireframes, design systems
-  WORKER_STRATEGIST — CEO-level strategy, SWOT, OKRs, market entry
-  WORKER_MARKETING — CMO-level GTM, campaigns, brand, social strategy
-  WORKER_TECHNICAL — CTO-level architecture, tech stack, security audit
-  WORKER_FINANCE — CFO-level P&L, forecasting, budgets, valuation
-  WORKER_HR — hiring, job descriptions, policies, onboarding plans, resume screening, offer letter generation
-  WORKER_GROWTH — lead gen, SEO audit, email sequences, outreach, Reddit/Twitter engagement, lead pipeline tracking
-  WORKER_CONTENT — write blogs, social posts, newsletters, scripts, press releases
-  WORKER_SEO — optimise pages for search, technical SEO, schema markup, link strategy
-  WORKER_PR — press releases, media pitches, crisis comms, analyst briefings
-  WORKER_LEGAL — contract review, NDA drafts, privacy policy, compliance checklists, contract comparison, obligation extraction, regulation monitoring
-  WORKER_SUCCESS — customer health scoring, churn prediction, onboarding, renewal strategy, health tracking over time, QBR deck generation
-  WORKER_ANALYTICS — metrics, trend analysis, A/B tests, dashboards, anomaly detection
-  WORKER_PRODUCT — feature specs, user stories, roadmap, sprint planning, prioritisation
-  WORKER_PROJECT — timeline estimation, resource allocation, status reports, risk registers
-- Common toolsRequired values: read_email, draft_email, send_email, list_calendar_events, create_calendar_event, lookup_crm_contact, update_crm_record, search_knowledge, summarize_document, extract_document_data, browser_navigate, browser_extract, classify_text, generate_report
+VERB -> WORKER mapping (follow exactly):
+- write / draft / compose / create a post|blog|tweet|newsletter|script|press release|caption -> WORKER_CONTENT
+- write / generate / build / fix / debug / refactor code|script|function|API|tests -> WORKER_CODER
+- research / find / compare / investigate / benchmark / check / review / audit topic|market|competitor|website|URL -> WORKER_RESEARCH
+- summarise / extract / compare uploaded files|documents -> WORKER_DOCUMENT
+- analyse / SWOT / OKRs / strategy / vision -> WORKER_STRATEGIST
+- GTM plan / brand audit / campaign plan / SEO audit -> WORKER_MARKETING
+- architecture review / security audit / tech stack -> WORKER_TECHNICAL
+- hire / JD / resume / offer letter / onboarding -> WORKER_HR
+- lead gen / outreach / email sequence / prospect list -> WORKER_GROWTH
+- P&L / forecast / budget / valuation -> WORKER_FINANCE
+- contract / NDA / privacy policy / compliance -> WORKER_LEGAL
 
-SIMPLICITY RULE (hard — follow before anything else):
-When the user's ask is a single concrete deliverable AND they've given you enough context to start (product name, audience, purpose), produce a ONE-TASK plan routed to the right worker. Do NOT pad with research/verification/review tasks. Research is a separate worker the user can explicitly ask for. Examples:
-- "Write a LinkedIn post for JAK Swarm's launch (enterprise audience)" → 1 task to WORKER_CONTENT. No research task.
-- "Generate a Python script that X" → 1 task to WORKER_CODER.
-- "Draft a press release announcing Y" → 1 task to WORKER_PR.
-Only add research/verification when the user explicitly asks for it OR when the content genuinely requires facts the user didn't provide (market-size numbers, specific competitor names, time-bound data).
-
-DELIVERABLE-VERB ROUTING (hard — overrides any domain/subFunction guess):
-The VERB in the user's ask determines the worker. The DOMAIN (marketing, tech, legal) only determines the subFunction label. Do NOT route based on subFunction.
-
-Map verbs → workers (mandatory when the ask uses these verbs):
-- write / draft / compose / create a (post | blog | article | newsletter | script | email | caption | thread | press release | ad copy | landing copy) → WORKER_CONTENT
-  • NOT WORKER_MARKETING (that agent plans campaigns; it does NOT write the words)
-  • NOT WORKER_STRATEGIST
-- write / generate / build / fix / debug / refactor / review (code | function | script | API | tests | class | module) → WORKER_CODER
-  • NOT WORKER_TECHNICAL (that agent reviews architecture; it does NOT write code)
-  • NOT WORKER_APP_GENERATOR (that's for full-stack app builds via Builder/vibe-coder)
-- research / find / compare / investigate / benchmark (topic | market | competitor | vendor) → WORKER_RESEARCH
-- summarise / extract / compare / classify (uploaded files | documents) → WORKER_DOCUMENT
-- analyse / SWOT / OKRs / strategy / vision / market-entry-plan / positioning → WORKER_STRATEGIST
-  • Note: STRATEGIST produces ANALYSIS prose, not executable documents. If the user wanted a polished deck or doc, add a WORKER_CONTENT task after.
-- GTM plan / brand audit / campaign plan / SEO audit / social strategy → WORKER_MARKETING
-  • For STRATEGY artifacts only. If the user wants actual campaign copy, pair with WORKER_CONTENT.
-- architecture review / security audit / scalability analysis / tech-stack pick → WORKER_TECHNICAL
-- post to LinkedIn / tweet / publish / send / email → first WORKER_CONTENT for the text, then the appropriate IO worker (EMAIL/GROWTH) with requiresApproval=true for the send.
-
-If the ask clearly matches ONE verb, produce ONE task. Do not second-guess by adding a "research phase" or "strategy phase" — those belong to their own explicit asks.
-
-ROUTING RULES (hard rules — follow exactly):
-- "write / draft / create a <blog|post|tweet|newsletter|caption|script|press release|email copy|ad copy>" → WORKER_CONTENT. NOT WORKER_MARKETING. Marketing plans the campaign; Content writes the actual words.
-- "write / build / fix / debug / refactor / generate <code|function|script|API|tests>" → WORKER_CODER. NOT WORKER_TECHNICAL. Technical does architecture review and tech-stack evaluation; Coder writes code.
-- "build / create / generate a <landing page|website|web app|frontend|UI>" → WORKER_CODER for code generation. For multi-step app builds, the workflow kind is 'vibe-coder' and goes through WORKER_APP_ARCHITECT → WORKER_APP_GENERATOR → WORKER_APP_DEBUGGER → WORKER_APP_DEPLOYER; do NOT produce a normal plan for those — they use the Builder flow.
-- "research / summarise / compare / analyse <public topic|competitor|market>" → WORKER_RESEARCH (prefers web_search + sources).
-- "summarise / extract / compare <uploaded documents>" → WORKER_DOCUMENT (prefers find_document + uploaded files).
-- "SWOT / OKRs / strategy / vision / market entry" → WORKER_STRATEGIST.
-- "GTM / brand / campaign / SEO audit / social strategy" → WORKER_MARKETING (strategy), paired with WORKER_CONTENT (copy) when the deliverable is actual written words.
-- "architecture / security audit / scalability / infrastructure / stack pick" → WORKER_TECHNICAL.
-- "hire / JD / resume / offer letter / onboarding plan" → WORKER_HR.
-- "lead gen / outreach / Reddit/Twitter engagement / email sequence / prospect list" → WORKER_GROWTH.
-- "P&L / forecast / budget / valuation / burn / cashflow" → WORKER_FINANCE.
-- "contract / NDA / privacy policy / compliance / regulation" → WORKER_LEGAL.
-
-Every plan MUST produce at least one task whose output is concrete and user-facing. A plan for "write a LinkedIn post" that has only a STRATEGIST or MARKETING task is wrong — it MUST include a WORKER_CONTENT task that produces the actual post text.`;
+Rules:
+- ONE concrete deliverable = ONE task. Do NOT add research/verify padding.
+- 3-10 tasks max. Don't over-fragment.
+- requiresApproval=true for any SEND, CRM write, payment, or external publish.
+- HIGH/CRITICAL risk always requires approval.
+- retryable=false for destructive tasks (sends, deletes, payments).
+- If "PREFER these worker agents: X, Y" appears in the goal, bias tasks toward X and Y.
+- Every plan must have at least one user-facing deliverable task.`;
 
 export class PlannerAgent extends BaseAgent {
   constructor(apiKey?: string) {
@@ -245,7 +165,7 @@ export class PlannerAgent extends BaseAgent {
     //   - OpenAIRuntime enforces the schema at the Responses API model layer
     //     (no prose drift, no fence-stripping).
     //   - LegacyRuntime turns on JSON mode and validates against the same
-    //     schema after parse. ZodError on malformed output → fallback below.
+    //     schema after parse. ZodError on malformed output -> fallback below.
     let parsed: PlannerResponseT;
     try {
       parsed = await this.runtime.respondStructured(
@@ -308,17 +228,6 @@ export class PlannerAgent extends BaseAgent {
       };
     }
 
-    // Deterministic routing override: the Planner LLM intermittently routes
-    // "write a LinkedIn post" to WORKER_MARKETING (strategy) and "write code"
-    // to WORKER_TECHNICAL (architect), despite the prompt. Post-process based
-    // on keywords in the user's ORIGINAL goal. Keyword match wins over LLM
-    // pick when there's a conflict.
-    const goalLower = (missionBrief.goal ?? '').toLowerCase();
-    const wantsContent = /\b(write|draft|compose|create|generate|produce|rewrite)\b.*\b(post|blog|article|tweet|linkedin|caption|thread|newsletter|press release|ad copy|landing copy|email copy|headline)/i.test(goalLower);
-    const wantsCode = /\b(write|generate|build|create|fix|debug|refactor|review)\b.*\b(code|script|function|api|test|class|module|component)/i.test(goalLower)
-      || /\bpython\s+script|\bnode\.?js\s+|\b(react|vue|svelte)\s+(component|app)/i.test(goalLower);
-    const wantsSwot = /\bswot\b/i.test(goalLower);
-    const wantsOkr = /\bokr[s]?\b/i.test(goalLower);
     const overridden: string[] = [];
 
     const rawTasks = parsed.tasks ?? [];
@@ -326,28 +235,11 @@ export class PlannerAgent extends BaseAgent {
       const riskLevel = this.parseRiskLevel(t.riskLevel ?? 'LOW');
       const requiresApproval = t.requiresApproval ?? (riskLevel === RiskLevel.HIGH || riskLevel === RiskLevel.CRITICAL);
 
-      let agentRole = t.agentRole ?? 'WORKER_OPS';
-      // Hard override: "write a post" must go to WORKER_CONTENT, not MARKETING/STRATEGIST
-      if (wantsContent && (agentRole === 'WORKER_MARKETING' || agentRole === 'WORKER_STRATEGIST' || agentRole === 'WORKER_PR')) {
-        overridden.push(`${t.id}: ${agentRole}→WORKER_CONTENT (goal wants content)`);
-        agentRole = 'WORKER_CONTENT';
-      }
-      // Hard override: "write code" must go to WORKER_CODER, not TECHNICAL
-      if (wantsCode && (agentRole === 'WORKER_TECHNICAL' || agentRole === 'WORKER_DESIGNER' || agentRole === 'WORKER_APP_ARCHITECT')) {
-        overridden.push(`${t.id}: ${agentRole}→WORKER_CODER (goal wants code)`);
-        agentRole = 'WORKER_CODER';
-      }
-      // Hard override: "SWOT" must go to WORKER_STRATEGIST (not MARKETING)
-      if ((wantsSwot || wantsOkr) && agentRole === 'WORKER_MARKETING') {
-        overridden.push(`${t.id}: WORKER_MARKETING→WORKER_STRATEGIST (goal wants ${wantsSwot ? 'SWOT' : 'OKRs'})`);
-        agentRole = 'WORKER_STRATEGIST';
-      }
-
       return {
         id: t.id ?? `task_${idx + 1}`,
         name: t.name ?? `Task ${idx + 1}`,
         description: t.description ?? '',
-        agentRole: this.parseAgentRole(agentRole),
+        agentRole: this.parseAgentRole(t.agentRole ?? 'WORKER_OPS'),
         toolsRequired: t.toolsRequired ?? [],
         riskLevel,
         requiresApproval,
@@ -358,7 +250,7 @@ export class PlannerAgent extends BaseAgent {
       };
     });
 
-    // ── Preferred-role enforcement ───────────────────────────────────────
+    // -- Preferred-role enforcement ----------------------------------------
     // When the user explicitly selected role(s) in the dashboard, EVERY
     // preferred agent MUST appear in the plan at least once. If the LLM
     // routed away from a preferred agent (e.g., WORKER_OPS for a website
@@ -374,21 +266,12 @@ export class PlannerAgent extends BaseAgent {
       for (const preferred of preferredRoles) {
         if (!assignedRoles.has(preferred as AgentRole)) {
           const lastTaskId = tasks.length > 0 ? tasks[tasks.length - 1]?.id : undefined;
-          // For URL-review goals, give the supporting task actual tools so
-          // it contributes meaningfully instead of producing empty output.
-          const isUrlReview = /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(
-            (missionBrief.goal ?? '').toLowerCase(),
-          );
-          const supportingTools: string[] = [];
-          if (isUrlReview && preferred === 'WORKER_OPS') {
-            supportingTools.push('web_search', 'web_fetch');
-          }
           const supportingTask: WorkflowTask = {
             id: `task_support_${preferred.toLowerCase()}`,
             name: `${this.friendlyRoleName(preferred)} contribution`,
             description: `Apply ${this.friendlyRoleName(preferred)} expertise to support the overall goal: ${missionBrief.goal?.slice(0, 200) ?? ''}`,
             agentRole: this.parseAgentRole(preferred),
-            toolsRequired: supportingTools,
+            toolsRequired: [],
             riskLevel: RiskLevel.LOW,
             requiresApproval: false,
             status: TaskStatus.PENDING,
@@ -406,37 +289,16 @@ export class PlannerAgent extends BaseAgent {
       }
     }
 
-    // ── SIMPLICITY RULE enforcement (deterministic) ────────────────────
-    // The LLM intermittently ignores the SIMPLICITY RULE in its prompt.
-    // When the goal is a single concrete deliverable, trim over-decomposed
-    // plans so the workflow doesn't drown in research/verification padding.
-    const isSimpleDeliverable =
-      wantsContent || wantsCode || wantsSwot || wantsOkr ||
-      /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(goalLower) ||
-      /\b(write|draft|create|generate|compose)\b.*\b(post|blog|article|tweet|linkedin|caption|thread|newsletter|press release|ad copy|landing copy|email copy|headline|script)\b/i.test(goalLower) ||
-      /\b(generate|build|create|fix|debug|refactor|review)\b.*\b(code|script|function|api|test|class|module|component|app)\b/i.test(goalLower);
-    if (isSimpleDeliverable && tasks.length > 2) {
-      // Keep the primary task + one supporting task max.
-      const trimmed = tasks.slice(0, 2);
-      this.logger.info(
-        { runId: context.runId, before: tasks.length, after: trimmed.length },
-        'Planner: SIMPLICITY RULE trimmed over-decomposed plan',
-      );
-      tasks.length = 0;
-      tasks.push(...trimmed);
-    }
-
-    // ── Zero-task guard ─────────────────────────────────────────────────
-    // If every post-processing step above somehow produced zero tasks,
-    // add a sensible fallback so the graph doesn't silently complete.
+    // -- Lightweight validation ----------------------------------------
+    // Safety net: if the LLM produced zero tasks, add a fallback so the
+    // graph doesn't silently complete. This should be rare with a good prompt.
     if (tasks.length === 0) {
-      const isUrlReview = /\b(review|audit|check|inspect|analyse|analyze)\b.*\b(https?:\/\/|www\.|\.com|\.io|\.co|\.ai|\.net|\.org|\.dev)/i.test(goalLower);
       const fallbackTask: WorkflowTask = {
         id: 'task_fallback_1',
-        name: isUrlReview ? 'Website review and analysis' : 'Research and execute goal',
+        name: 'Research and execute goal',
         description: missionBrief.goal ?? 'Execute the requested task',
-        agentRole: isUrlReview ? AgentRole.WORKER_RESEARCH : AgentRole.WORKER_OPS,
-        toolsRequired: isUrlReview ? ['web_search', 'web_fetch'] : ['search_knowledge'],
+        agentRole: AgentRole.WORKER_OPS,
+        toolsRequired: ['search_knowledge'],
         riskLevel: RiskLevel.LOW,
         requiresApproval: false,
         status: TaskStatus.PENDING,
@@ -447,7 +309,7 @@ export class PlannerAgent extends BaseAgent {
       tasks.push(fallbackTask);
       this.logger.warn(
         { runId: context.runId },
-        'Planner: zero-task guard triggered — added fallback task',
+        'Planner: zero-task guard triggered -- added fallback task',
       );
     }
 

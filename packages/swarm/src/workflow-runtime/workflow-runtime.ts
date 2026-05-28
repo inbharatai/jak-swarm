@@ -48,6 +48,9 @@ export interface StartContext {
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
   userRole?: string;
+  /** Conversation thread history loaded by the service layer and injected
+   *  into the graph state so agents see prior turns. */
+  conversationHistory?: Array<{ role: string; content: string }>;
   /**
    * Sink for canonical lifecycle events. Wired by SwarmExecutionService
    * to persist the events into AuditLog + emit SSE for the cockpit. The

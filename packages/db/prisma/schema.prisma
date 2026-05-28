@@ -33,6 +33,7 @@ model Tenant {
   updatedAt               DateTime @updatedAt
 
   users            User[]
+  conversations    Conversation[]
   workflows        Workflow[]
   workflowJobs     WorkflowJob[]
   skills           Skill[]
@@ -92,9 +93,10 @@ model User {
   jobTitle     String?
   managerId    String?
 
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessions  Session[]
-  workflows Workflow[]
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions     Session[]
+  conversations Conversation[]
+  workflows    Workflow[]
   workflowJobs WorkflowJob[]
   approvals ApprovalRequest[] @relation("reviewer")
   projects  Project[]
@@ -144,10 +146,11 @@ model ApiKey {
 }
 
 model Workflow {
-  id            String    @id @default(cuid())
-  tenantId      String
-  userId        String
-  goal          String
+  id             String    @id @default(cuid())
+  tenantId       String
+  userId         String
+  conversationId String?
+  goal           String
   industry      String?
   status        String    @default("PENDING") // WorkflowStatus
   planJson      Json?     // WorkflowPlan serialized
@@ -170,9 +173,12 @@ model Workflow {
   approvalRequests ApprovalRequest[]
   jobs             WorkflowJob[]
   artifacts        WorkflowArtifact[]
+  conversation     Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  messages         ConversationMessage[]
 
   @@index([tenantId, status])
   @@index([updatedAt])
+  @@index([conversationId])
   @@map("workflows")
 }
 
@@ -260,6 +266,43 @@ model WorkflowArtifact {
   @@index([tenantId, artifactType])
   @@index([tenantId, status])
   @@map("workflow_artifacts")
+}
+
+// Conversation thread memory for the main JAK chat.
+// One conversation spans multiple workflow runs; each workflow links back
+// to its parent conversation so checkpoints can replay with full context.
+model Conversation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ConversationMessage[]
+  workflows Workflow[]
+
+  @@index([tenantId, userId, updatedAt])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  workflowId     String?
+  role           String   // "user" | "assistant" | "system"
+  content        String   @db.Text
+  agentRole      String?  // worker role label for assistant messages
+  metadata       Json?    // cost, tokens, traceId, etc.
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  workflow     Workflow?    @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
 }
 
 model WorkflowJob {

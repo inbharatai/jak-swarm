@@ -268,10 +268,10 @@ describe('Landing — JAK Shield (6 defenses) — the new front-and-center secti
   });
 
   it('BaseAgent wires the JAK Shield offensive guard before the LLM call', () => {
-    const baseAgent = read('packages/agents/src/base/base-agent.ts');
-    expect(baseAgent).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
-    expect(baseAgent).toMatch(/getShieldGateway/);
-    expect(baseAgent).toMatch(/offensiveCyber/);
+    const toolExec = read('packages/agents/src/base/tool-execution.service.ts');
+    expect(toolExec).toMatch(/JAK_SHIELD_OFFENSIVE_GUARD_DISABLED/);
+    expect(toolExec).toMatch(/getShieldGateway/);
+    expect(toolExec).toMatch(/offensiveCyber/);
   });
 
   it('PlaywrightBrowserOperator implements the SSRF + DNS-rebind + disk-quota defenses', () => {
@@ -427,11 +427,11 @@ describe('Landing — Free trial CTA (Migration 106)', () => {
     expect(sql).toMatch(/trialEndsAt/);
   });
 
-  it('workflows.routes wires the trial-cap guard before credit check', () => {
-    const route = read('apps/api/src/routes/workflows.routes.ts');
-    expect(route).toMatch(/UsageCounterService/);
-    expect(route).toMatch(/TRIAL_DAILY_CAP_HIT/);
-    expect(route).toMatch(/TRIAL_EXPIRED/);
+  it('workflow creation service wires the trial-cap guard before credit check', () => {
+    const svc = read('apps/api/src/services/workflow-creation.service.ts');
+    expect(svc).toMatch(/UsageCounterService/);
+    expect(svc).toMatch(/TRIAL_DAILY_CAP_HIT/);
+    expect(svc).toMatch(/TRIAL_EXPIRED/);
   });
 
   it('Migration 106 also adds the team primitives (Department, TaskAssignment, Notification)', () => {

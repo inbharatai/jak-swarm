@@ -1,23 +1,25 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { WorkflowService } from '../services/workflow.service.js';
-import { config } from '../config.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
 import type { WorkflowStatus } from '../types.js';
-import { CreditService } from '../billing/credit-service.js';
-import { detectTaskType, estimateCredits } from '../billing/model-router.js';
-import { UsageCounterService } from '../services/trial/usage-counter.service.js';
+import { createWorkflowOrchestration } from '../services/workflow-creation.service.js';
+import workflowControlRoutes from './workflows/workflow-control.routes.js';
+import workflowQueryRoutes from './workflows/workflow-query.routes.js';
+import workflowStreamRoutes from './workflows/workflow-stream.routes.js';
+import conversationRoutes from './workflows/conversation.routes.js';
 
-const createWorkflowBodySchema = z.object({
+export const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
   industry: z.string().max(120).optional(),
   roleModes: z.array(z.string().min(1).max(64)).max(10).optional(),
   maxCostUsd: z.number().positive().max(1000).optional(),
+  conversationId: z.string().cuid().optional(),
 });
 
-const resumeWorkflowBodySchema = z.object({
+export const resumeWorkflowBodySchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED', 'DEFERRED']),
   comment: z.string().max(2000).optional(),
 });
@@ -42,23 +44,11 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
       }
 
-      const { goal, industry, roleModes, maxCostUsd } = parseResult.data;
+      const { goal, industry, roleModes, maxCostUsd, conversationId } = parseResult.data;
       const { tenantId, userId } = request.user;
 
       try {
         // Sprint 2.1 / Item J — Follow-up command short-circuit.
-        // Before spending credits or creating a new workflow, see if the
-        // user typed a short follow-up command ("approve", "show graph",
-        // "what is the CMO doing?", etc.) against an already-running
-        // workflow. If so, dispatch to the matching action handler and
-        // return without creating a new workflow.
-        //
-        // Gating:
-        //   - input must be < 200 chars (parser returns null for longer)
-        //   - there must be an active workflow on this tenant+user
-        //
-        // Failures: parser is rule-based and pure; can never throw.
-        // If no command matches → fall through to normal workflow creation.
         if (goal.length < 200) {
           const ACTIVE_STATUSES = ['PENDING', 'RUNNING', 'EXECUTING', 'PAUSED'] as const;
           const activeWorkflow = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ id: string; status: string; goal: string } | null>)({
@@ -67,7 +57,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
             select: { id: true, status: true, goal: true },
           });
           if (activeWorkflow) {
-            // Look up most-recent pending approval (informs parser bias)
             const pendingApproval = await (fastify.db.approvalRequest.findFirst as unknown as (a: unknown) => Promise<{ id: string; status: string } | null>)({
               where: { workflowId: activeWorkflow.id, status: 'PENDING' },
               orderBy: { createdAt: 'desc' },
@@ -138,9 +127,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     return reply.status(200).send(ok(baseResult));
                   }
                   case 'show_graph': {
-                    // Return the plan + statuses; the cockpit already
-                    // renders the DAG component from these fields when
-                    // the user navigates to the workflow detail.
                     const wf = await (fastify.db.workflow.findFirst as unknown as (a: unknown) => Promise<{ id: string; planJson: unknown; status: string } | null>)({
                       where: { id: activeWorkflow.id, tenantId },
                       select: { id: true, planJson: true, status: true },
@@ -177,10 +163,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     return reply.status(200).send(ok({ ...baseResult, downloadUrl: `/workflows/${activeWorkflow.id}/output` }));
                   }
                   case 'finalize_workpaper': {
-                    // Workpaper finalization happens per-audit-run via
-                    // POST /audit/runs/:id/workpapers/:wpId/decide. The
-                    // chat surface doesn't know which workpaper without
-                    // more context, so we honestly say so.
                     return reply.status(200).send(ok({
                       ...baseResult,
                       hint: 'To finalize a workpaper, open the audit run detail page and use the per-workpaper Approve button. The chat shortcut cannot infer which workpaper to finalize.',
@@ -196,8 +178,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                     return reply.status(200).send(ok({ ...baseResult, pendingApproval: fullApproval }));
                   }
                   case 'continue': {
-                    // Workflows continue automatically once unpaused or
-                    // approval-resolved. No explicit "continue" action.
                     return reply.status(200).send(ok({
                       ...baseResult,
                       hint: 'Workflows continue automatically. If this run is paused, use "resume". If it is awaiting approval, use "approve" or "reject".',
@@ -205,9 +185,6 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
                   }
                 }
               } catch (followupErr) {
-                // If the dispatch fails, log but do NOT silently fall
-                // through to creating a new workflow — that would be a
-                // false success. Surface the error.
                 fastify.log.warn({ workflowId: activeWorkflow.id, err: followupErr instanceof Error ? followupErr.message : String(followupErr) }, '[followup] dispatch failed');
                 return reply.status(500).send(err('FOLLOWUP_FAILED', followupErr instanceof Error ? followupErr.message : 'Follow-up command failed'));
               }
@@ -215,120 +192,16 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        // ── Migration 106 — trial daily-cap + expiry guard ───────────────
-        // Runs BEFORE the credit check so trial-expired tenants see the
-        // correct error code (TRIAL_EXPIRED) and trial-cap-hit tenants see
-        // TRIAL_DAILY_CAP_HIT, not a generic CREDIT_LIMIT.
-        //
-        // Paid plans skip both branches inside `check()`.
-        const usageCounter = new UsageCounterService(fastify.db);
-        const capCheck = await usageCounter.check(tenantId, 'agentRuns', 1);
-        if (capCheck.trial.expired) {
-          return reply.status(402).send(err('TRIAL_EXPIRED', 'Your 30-day free trial has ended. Please upgrade to continue.', {
-            trialEndsAt: capCheck.trial.trialEndsAt?.toISOString() ?? null,
-          }));
-        }
-        if (!capCheck.allowed) {
-          return reply.status(429).send(err('TRIAL_DAILY_CAP_HIT', `Daily ${capCheck.blockedBy} cap reached. Resets at UTC midnight.`, {
-            resource: capCheck.blockedBy,
-            counters: capCheck.counters,
-            resetsAt: capCheck.resetsAt,
-            daysRemaining: capCheck.trial.daysRemaining,
-          }));
-        }
-
-        // ── Credit check: estimate cost and verify user has budget ───────
-        const creditService = new CreditService(fastify.db);
-
-        const taskType = detectTaskType(goal);
-        const usage = await creditService.getUsage(tenantId);
-        const maxTier = usage?.maxModelTier ?? 1;
-        const estimate = estimateCredits(goal, taskType, maxTier);
-
-        const creditCheck = await creditService.checkCredits(tenantId, estimate.estimatedCredits);
-        if (!creditCheck.allowed) {
-          return reply.status(429).send(err('CREDIT_LIMIT', creditCheck.message ?? 'Credit limit reached', {
-            reason: creditCheck.reason,
-            remaining: creditCheck.remaining,
-            estimatedCost: estimate.estimatedCredits,
-          }));
-        }
-
-        // Reserve credits before execution
-        const reservation = await creditService.reserveCredits(tenantId, estimate.estimatedCredits);
-        if (!reservation.allowed) {
-          return reply.status(429).send(err('CREDIT_RESERVE_FAILED', reservation.message ?? 'Could not reserve credits'));
-        }
-
-        // 1. Persist the workflow record (PENDING)
-        const workflow = await workflowService.createWorkflow(tenantId, userId, goal, industry);
-
-        // Migration 106 — increment trial counter on success. Fire-and-forget
-        // so a counter-write hiccup never rolls back a successful workflow.
-        void usageCounter.recordUsage(tenantId, 'agentRuns', 1).catch((e) => {
-          fastify.log.warn({ tenantId, err: e }, '[trial-cap] recordUsage(agentRuns) failed');
-        });
-
-        // Persist queue execution intent so restart recovery can re-enqueue with
-        // the same user-selected parameters even before the first state update.
-        await (fastify.db.workflow.update as any)({
-          where: { id: workflow.id },
-          data: {
-            maxCostUsd: maxCostUsd ?? null,
-            stateJson: {
-              roleModes: roleModes ?? [],
-              requestedAt: new Date().toISOString(),
-              requestedBy: userId,
-            },
-          },
-        });
-
-        await fastify.auditLog(request, 'CREATE_WORKFLOW', 'Workflow', workflow.id, {
-          goal, maxCostUsd, estimatedCredits: estimate.estimatedCredits, taskType,
-        });
-
-        // 2. Enqueue execution for queue-backed background processing
-        const idempotencyKey = typeof request.headers['idempotency-key'] === 'string'
-          ? request.headers['idempotency-key']
-          : undefined;
-
-        // Coarse subscription tier for gating paid external services (Serper / Tavily).
-        // maxModelTier 1 = FREE plan → 'free' (DDG only); >= 2 = paid plan → 'paid'.
-        const subscriptionTier: 'free' | 'paid' = maxTier >= 2 ? 'paid' : 'free';
-
-        fastify.swarm.enqueueExecution({
-          workflowId: workflow.id,
-          tenantId,
-          userId,
+        // Orchestration: credits, conversation, creation, enqueue
+        const result = await createWorkflowOrchestration(fastify, request, workflowService, {
           goal,
           industry,
           roleModes,
           maxCostUsd,
-          idempotencyKey,
-          subscriptionTier,
+          conversationId,
         });
 
-        fastify.log.info(
-          {
-            requestId: request.id,
-            tenantId,
-            userId,
-            workflowId: workflow.id,
-            kind: 'workflow_created',
-          },
-          '[workflows.create] workflow accepted and enqueued',
-        );
-
-        // 3. Return 202 with the created workflow + cost estimate
-        return reply.status(202).send(ok({
-          kind: 'workflow_created' as const,
-          workflowId: workflow.id,
-          ...workflow,
-          estimatedCredits: estimate.estimatedCredits,
-          creditsReserved: reservation.reserved,
-          taskType,
-          model: estimate.model,
-        }));
+        return reply.status(result.statusCode).send(result.body);
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;
@@ -336,705 +209,10 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  /**
-   * GET /workflows
-   * Paginated list of workflows for the authenticated tenant.
-   */
-  fastify.get(
-    '/',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const query = request.query as {
-        page?: string;
-        limit?: string;
-        status?: string;
-      };
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const statuses = query.status
-        ?.split(',')
-        .map((value) => value.trim().toUpperCase())
-        .filter(Boolean) as WorkflowStatus[] | undefined;
-
-      const VALID_STATUSES: WorkflowStatus[] = [
-        'PENDING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED',
-      ];
-
-      const invalidStatus = statuses?.find((value) => !VALID_STATUSES.includes(value));
-      if (invalidStatus) {
-        return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${invalidStatus}'`));
-      }
-
-      try {
-        const result = await workflowService.listWorkflows(request.user.tenantId, {
-          page,
-          limit,
-          status: statuses?.length === 1 ? statuses[0] : statuses,
-        });
-        return reply.status(200).send(ok(result));
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * GET /workflows/queue/stats
-   * Operational queue depth and running worker count.
-   */
-  fastify.get(
-    '/queue/stats',
-    {
-      preHandler: [
-        fastify.authenticate,
-        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
-        enforceTenantIsolation,
-      ],
-    },
-    async (_request: FastifyRequest, reply: FastifyReply) => {
-      const stats = await fastify.swarm.getQueueStats();
-      return reply.status(200).send(ok(stats));
-    },
-  );
-
-  /**
-   * GET /workflows/queue/health
-   * Dedicated worker health diagnostics (counters, uptime, running jobs).
-   */
-  fastify.get(
-    '/queue/health',
-    {
-      preHandler: [
-        fastify.authenticate,
-        fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN'),
-        enforceTenantIsolation,
-      ],
-    },
-    async (_request: FastifyRequest, reply: FastifyReply) => {
-      const health = fastify.swarm.getWorkerHealth();
-      return reply.status(200).send(ok({
-        ...health,
-        mode: config.workflowWorkerMode,
-      }));
-    },
-  );
-
-  /**
-   * GET /workflows/:workflowId
-   * Full workflow record including traces and approvals.
-   */
-  fastify.get(
-    '/:workflowId',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-
-      try {
-        const [workflow, traces, approvals] = await Promise.all([
-          workflowService.getWorkflow(request.user.tenantId, workflowId),
-          workflowService.getWorkflowTraces(request.user.tenantId, workflowId),
-          workflowService.getWorkflowApprovals(request.user.tenantId, workflowId),
-        ]);
-
-        // Recovery: if the worker's stale @jak-swarm/swarm dist resulted in
-        // a stub finalOutput, surface real content from the trace history
-        // before responding to the client. Two recovery levels:
-        //   1) Commander.directAnswer — for trivial inputs that should have
-        //      short-circuited at __end__.
-        //   2) Worker output — for non-trivial multi-agent workflows where
-        //      Commander → Planner → Worker actually ran but the swarm graph
-        //      reported FAILED for downstream reasons.
-        const responseBody: Record<string, unknown> = { ...workflow, traces, approvals };
-        const stub = /Agents completed their work but did not produce|No output produced/i;
-        const fo = responseBody['finalOutput'];
-        const isStubFinal = typeof fo !== 'string' || fo.trim().length === 0 || stub.test(fo);
-        const wfTopError = (workflow as { error?: unknown }).error;
-        const hasTopError = (typeof wfTopError === 'string' && wfTopError.trim().length > 0)
-          || (wfTopError !== null && typeof wfTopError === 'object');
-
-        // Special case: workflow has a top-level error AND no useful traces
-        // (the planner / commander crashed before recording anything). Surface
-        // the raw error to the chat — never let the stub through.
-        if (isStubFinal && traces.length === 0 && hasTopError) {
-          const errMsg = typeof wfTopError === 'string'
-            ? wfTopError
-            : ((wfTopError as { message?: unknown })?.message as string | undefined) ?? 'Unknown error';
-          const isModel404 = /404|not found|does not exist/i.test(errMsg);
-          const isAuthError = /401|unauthorized|invalid.*key/i.test(errMsg);
-          const hint = isModel404
-            ? ' The configured AI model returned 404 — check OPENAI_MODEL / OPENAI_BASE_URL / OPENAI_API_KEY in your environment.'
-            : isAuthError
-              ? ' The AI provider rejected the API key. Check OPENAI_API_KEY.'
-              : '';
-          responseBody['finalOutput'] =
-            `**Workflow couldn\'t complete.**${hint}\n\n` +
-            `**Underlying error:** \`${errMsg}\`\n\n` +
-            `[View the full trace in Run Inspector](/swarm).`;
-          responseBody['recoveryFallback'] = true;
-          responseBody['recoveredErrorPreTrace'] = true;
-        } else if (isStubFinal && traces.length > 0) {
-          // Recovery #1: Commander directAnswer (trivial inputs)
-          const cmd = traces.find((t) => t.agentRole === 'COMMANDER');
-          const cmdOut = (cmd?.output ?? null) as { directAnswer?: unknown; clarificationNeeded?: unknown; clarificationQuestion?: unknown } | null;
-          const da = typeof cmdOut?.directAnswer === 'string' ? cmdOut.directAnswer.trim() : '';
-          const clarQ = typeof cmdOut?.clarificationQuestion === 'string' ? cmdOut.clarificationQuestion.trim() : '';
-          if (da.length > 0) {
-            responseBody['finalOutput'] = da;
-            responseBody['status'] = 'COMPLETED';
-            responseBody['error'] = null;
-            responseBody['recoveredFromCommanderTrace'] = true;
-          } else if (cmdOut?.clarificationNeeded === true && clarQ.length > 0) {
-            // Recovery #1b: Commander requested clarification — surface the
-            // question as the final answer so the user sees it in chat
-            // instead of the generic "did not produce" stub.
-            responseBody['finalOutput'] = clarQ;
-            responseBody['status'] = 'COMPLETED';
-            responseBody['error'] = null;
-            responseBody['recoveredAsClarification'] = true;
-          } else {
-            // Recovery #2: pull substantive content from the worker traces
-            // (skip orchestration roles). Walks nested objects + parses
-            // stringified JSON so we catch outputs the legacy SwarmGraph
-            // stores under arbitrary nested shapes (`output.result.content`,
-            // `output.data.answer`, JSON-stringified payloads, etc.).
-            const ORCH = new Set(['COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'GUARDRAIL', 'APPROVAL', 'SWARMRUNNER', 'SUPERVISOR']);
-            const FIELDS = ['content', 'answer', 'response', 'message', 'findings', 'summary', 'document',
-                            'result', 'output', 'draft', 'code', 'architecture', 'analysis', 'strategy',
-                            'recommendation', 'conclusion', 'explanation', 'plan', 'text', 'body', 'report',
-                            'markdown', 'reply', 'finalOutput', 'directAnswer',
-                            'designSpec', 'layoutGrid', 'userFlowDescription',
-                            'overallDescription', 'layoutAnalysis', 'diagnosis', 'rootCause'];
-            const MIN_CONTENT_LEN = 30;
-            const MAX_DEPTH = 4;
-
-            // Recursively walk an unknown value and return the best
-            // substantive string it contains. Tries known field names first,
-            // then any string > MIN_CONTENT_LEN. Parses JSON-string fields
-            // up to MAX_DEPTH so worker outputs serialized as strings still
-            // get unwrapped.
-            const extractContent = (val: unknown, depth: number): string => {
-              if (depth > MAX_DEPTH) return '';
-              if (typeof val === 'string') {
-                const trimmed = val.trim();
-                if (trimmed.length === 0) return '';
-                // Try to unwrap JSON-stringified payloads
-                if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 64_000) {
-                  try {
-                    const parsed = JSON.parse(trimmed);
-                    const inner = extractContent(parsed, depth + 1);
-                    if (inner.length >= MIN_CONTENT_LEN) return inner;
-                  } catch { /* not JSON, treat as plain text */ }
-                }
-                return trimmed.length >= MIN_CONTENT_LEN ? trimmed : '';
-              }
-              if (Array.isArray(val)) {
-                let best = '';
-                for (const item of val) {
-                  const c = extractContent(item, depth + 1);
-                  if (c.length > best.length) best = c;
-                }
-                return best;
-              }
-              if (val && typeof val === 'object') {
-                const obj = val as Record<string, unknown>;
-                // Pass 1: known field names
-                for (const f of FIELDS) {
-                  const c = extractContent(obj[f], depth + 1);
-                  if (c.length >= MIN_CONTENT_LEN) return c;
-                }
-                // Pass 2: any string field
-                let best = '';
-                for (const v of Object.values(obj)) {
-                  const c = extractContent(v, depth + 1);
-                  if (c.length > best.length) best = c;
-                }
-                return best;
-              }
-              return '';
-            };
-
-            const sections: Array<{ role: string; content: string }> = [];
-            for (const t of traces) {
-              if (ORCH.has(t.agentRole)) continue;
-              const o = t.output as unknown;
-              if (!o) continue;
-              const content = extractContent(o, 0);
-              if (content.length >= MIN_CONTENT_LEN) {
-                const displayRole = t.agentRole.replace(/^WORKER_/, '').replace(/_/g, ' ');
-                sections.push({ role: displayRole, content });
-              }
-            }
-            if (sections.length > 0) {
-              responseBody['finalOutput'] = sections.length === 1 && sections[0]
-                ? sections[0]!.content
-                : sections.map((s) => `## ${s.role}\n\n${s.content}`).join('\n\n---\n\n');
-              responseBody['status'] = 'COMPLETED';
-              responseBody['error'] = null;
-              responseBody['recoveredFromWorkerTraces'] = true;
-            } else {
-              // Recovery #3: when no worker output is recoverable, surface
-              // the FIRST diagnostic error from the traces so the user can
-              // act on it instead of seeing a generic "no response" message.
-              // Common case: an LLM provider 404 (model not found / wrong
-              // base URL) — the user can fix that instantly given the right
-              // signal. The literal "did not produce a user-facing response"
-              // string must NEVER reach the chat UI per the QA brief.
-              type TraceLike = { agentRole?: string; error?: unknown; output?: unknown };
-              const firstTraceError = (traces as TraceLike[]).find((t) => {
-                const e = t.error;
-                if (typeof e === 'string' && e.trim().length > 0) return true;
-                if (e && typeof e === 'object' && 'message' in (e as Record<string, unknown>)) return true;
-                return false;
-              });
-              const wfError = (workflow as { error?: unknown }).error;
-              const errMsg = (() => {
-                if (firstTraceError) {
-                  const e = firstTraceError.error;
-                  if (typeof e === 'string') return e;
-                  if (e && typeof e === 'object') {
-                    const o = e as Record<string, unknown>;
-                    if (typeof o['message'] === 'string') return o['message'];
-                  }
-                }
-                if (typeof wfError === 'string' && wfError.trim().length > 0) return wfError;
-                return null;
-              })();
-              const failingRole = firstTraceError?.agentRole ?? null;
-
-              if (errMsg) {
-                // Surface the diagnostic in plain English. Most-common pattern
-                // is `OpenAI request failed (model: gpt-5.4): 404 status code
-                // (no body)` → keep the technical detail but add a
-                // user-actionable explanation + Inspector link.
-                const isModel404 = /404|not found|does not exist/i.test(errMsg);
-                const isAuthError = /401|unauthorized|invalid.*key/i.test(errMsg);
-                const isRateLimit = /429|rate.*limit/i.test(errMsg);
-                const hint = isModel404
-                  ? 'The configured AI model returned 404 — the model name in OPENAI_MODEL or the OPENAI_BASE_URL is likely wrong. '
-                  : isAuthError
-                    ? 'The AI provider rejected the API key. Check OPENAI_API_KEY in your environment. '
-                    : isRateLimit
-                      ? 'The AI provider rate-limited the request. Try again in a moment, or upgrade the API key tier. '
-                      : '';
-                responseBody['finalOutput'] =
-                  `**Workflow couldn\'t complete.** ${hint}` +
-                  (failingRole ? `Failed at **${failingRole}** node.\n\n` : '') +
-                  `**Underlying error:** \`${errMsg}\`\n\n` +
-                  `[View the full trace in Run Inspector](/swarm).`;
-                responseBody['recoveryFallback'] = true;
-                responseBody['recoveredErrorFromTrace'] = true;
-              } else {
-                responseBody['finalOutput'] =
-                  `JAK completed the run, but no final response was generated. ` +
-                  `You can view the detailed trace in [Run Inspector](/swarm).`;
-                responseBody['recoveryFallback'] = true;
-              }
-            }
-          }
-        }
-
-        return reply.status(200).send(ok(responseBody));
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * POST /workflows/:workflowId/resume
-   * Resume a PAUSED workflow after a human-in-the-loop approval decision.
-   * The reviewer submits their decision here; the swarm then continues.
-   */
-  fastify.post(
-    '/:workflowId/resume',
-    {
-      config: {
-        rateLimit: {
-          max: 5,
-          timeWindow: '1 minute',
-          keyGenerator: (req: FastifyRequest) => {
-            const { workflowId } = req.params as { workflowId: string };
-            return `resume:${req.user?.userId ?? req.ip}:${workflowId}`;
-          },
-        },
-      },
-      preHandler: [
-        fastify.authenticate,
-        fastify.requireRole('REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN'),
-        enforceTenantIsolation,
-      ],
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const parseResult = resumeWorkflowBodySchema.safeParse(request.body);
-
-      if (!parseResult.success) {
-        return reply
-          .status(422)
-          .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
-      }
-
-      const { decision, comment } = parseResult.data;
-
-      try {
-        // Verify workflow exists and belongs to this tenant
-        const workflow = await workflowService.getWorkflow(request.user.tenantId, workflowId);
-
-        if (workflow.status !== 'PAUSED') {
-          return reply
-            .status(409)
-            .send(
-              err(
-                'WORKFLOW_NOT_PAUSED',
-                `Workflow is not awaiting approval (status: ${workflow.status})`,
-              ),
-            );
-        }
-
-        await fastify.auditLog(
-          request,
-          `WORKFLOW_RESUME_${decision}`,
-          'Workflow',
-          workflowId,
-          { decision, comment },
-        );
-
-        // Enqueue the resume as a durable control job. The queue worker picks it up
-        // and calls swarmService.resumeAfterApproval() with the same parameters, but
-        // now it survives an API crash between the 202 and the actual resume.
-        const enqueued = await fastify.swarm.enqueueControl({
-          action: 'resume',
-          workflowId,
-          tenantId: request.user.tenantId,
-          userId: request.user.userId,
-          decision,
-          reviewedBy: request.user.userId,
-          comment,
-        });
-        if (!enqueued) {
-          return reply.status(503).send(err('RESUME_ENQUEUE_FAILED', 'Workflow resume could not be queued. Try again or contact support.'));
-        }
-
-        return reply.status(202).send(
-          ok({
-            workflowId,
-            decision,
-            message: decision === 'APPROVED'
-              ? 'Workflow resuming — poll GET /workflows/:id for status'
-              : decision === 'REJECTED'
-              ? 'Workflow has been rejected and will be cancelled'
-              : 'Approval deferred — workflow remains paused',
-          }),
-        );
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * POST /workflows/:workflowId/pause
-   * Pause a running workflow (pauses between nodes).
-   */
-  fastify.post(
-    '/:workflowId/pause',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
-
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-      if (workflow.status !== 'RUNNING' && workflow.status !== 'EXECUTING') {
-        return reply.code(400).send(err('BAD_REQUEST', `Cannot pause workflow in ${workflow.status} status`));
-      }
-
-      // Broadcast pause signal to ALL instances (the one running the workflow will act on it)
-      fastify.swarm.pauseWorkflow(workflowId); // Local instance
-      await fastify.coordination.signals.publish({
-        type: 'pause',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'PAUSED' } });
-
-      // Notify SSE listeners that workflow is paused
-      fastify.swarm.emit(`workflow:${workflowId}`, { type: 'paused', workflowId, timestamp: new Date().toISOString() });
-
-      return reply.send(ok({ success: true, message: 'Workflow will pause after current node completes' }));
-    },
-  );
-
-  /**
-   * POST /workflows/:workflowId/unpause
-   * Resume a paused workflow.
-   */
-  fastify.post(
-    '/:workflowId/unpause',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
-
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-      if (workflow.status !== 'PAUSED') {
-        return reply.code(400).send(err('BAD_REQUEST', `Cannot unpause workflow in ${workflow.status} status`));
-      }
-
-      // Broadcast unpause signal — whichever instance holds the paused workflow will resume it
-      // under a distributed lock (see subscriber in plugins/swarm.plugin.ts and worker-entry.ts).
-      const pendingApproval = await fastify.db.approvalRequest.findFirst({
-        where: { workflowId, tenantId, status: 'PENDING' },
-        select: { id: true },
-      });
-      if (pendingApproval) {
-        return reply.code(409).send(err(
-          'APPROVAL_REQUIRED',
-          'This workflow is paused for a pending approval. Use /approvals/:approvalId/decide or /workflows/:workflowId/resume with a reviewer role.',
-          { approvalId: pendingApproval.id },
-        ));
-      }
-
-      fastify.swarm.unpauseWorkflow(workflowId); // Local instance (idempotent)
-      await fastify.coordination.signals.publish({
-        type: 'unpause',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING' } });
-
-      return reply.send(ok({ success: true, message: 'Workflow resumed' }));
-    },
-  );
-
-  /**
-   * POST /workflows/:workflowId/stop
-   * Stop a running workflow immediately.
-   */
-  fastify.post(
-    '/:workflowId/stop',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
-
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-
-      // Broadcast stop signal to ALL instances
-      fastify.swarm.stopWorkflow(workflowId); // Local instance
-      await fastify.coordination.signals.publish({
-        type: 'stop',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({
-        where: { id: workflowId },
-        data: { status: 'CANCELLED', error: 'Stopped by user', completedAt: new Date() },
-      });
-
-      return reply.send(ok({ success: true, message: 'Workflow stopped' }));
-    },
-  );
-
-  /**
-   * DELETE /workflows/:workflowId
-   * Cancel a running or pending workflow.
-   */
-  fastify.delete(
-    '/:workflowId',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-
-      try {
-        const workflow = await workflowService.cancelWorkflow(request.user.tenantId, workflowId);
-        await fastify.auditLog(request, 'CANCEL_WORKFLOW', 'Workflow', workflowId);
-
-        // Cross-instance stop signal — whichever instance owns the runner will cancel.
-        // Matches the pause/stop routes which already use the signal bus, and replaces
-        // the previous setImmediate(swarm.cancelWorkflow) which only reached the local
-        // instance.
-        await fastify.coordination.signals.publish({
-          type: 'stop',
-          workflowId,
-          issuedBy: request.user.userId,
-          timestamp: new Date().toISOString(),
-        });
-
-        return reply.status(200).send(ok(workflow));
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * GET /workflows/:workflowId/traces
-   * Agent traces for a workflow.
-   */
-  fastify.get(
-    '/:workflowId/traces',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-
-      try {
-        const traces = await workflowService.getWorkflowTraces(request.user.tenantId, workflowId);
-        return reply.status(200).send(ok(traces));
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * GET /workflows/:workflowId/approvals
-   * Approval requests for a workflow.
-   */
-  fastify.get(
-    '/:workflowId/approvals',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-
-      try {
-        const approvals = await workflowService.getWorkflowApprovals(
-          request.user.tenantId,
-          workflowId,
-        );
-        return reply.status(200).send(ok(approvals));
-      } catch (e) {
-        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
-        throw e;
-      }
-    },
-  );
-
-  /**
-   * GET /workflows/:workflowId/stream
-   * SSE stream for real-time workflow updates.
-   * Accepts Bearer auth headers and supports token query fallback for legacy EventSource clients.
-   */
-  fastify.get(
-    '/:workflowId/stream',
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      // Support legacy EventSource token query param if no Authorization header is present.
-      const query = request.query as { token?: string };
-      if (!request.headers.authorization && query.token) {
-        request.headers.authorization = `Bearer ${query.token}`;
-      }
-      try {
-        await fastify.authenticate(request, reply);
-      } catch {
-        return reply.code(401).send(err('UNAUTHORIZED', 'Unauthorized'));
-      }
-
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
-
-      // Verify workflow exists and belongs to tenant
-      const workflow = await fastify.db.workflow.findFirst({
-        where: { id: workflowId, tenantId },
-      });
-      if (!workflow) {
-        return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-      }
-
-      // SSE stream — hijack the response so Fastify doesn't try to auto-close it
-      reply.hijack();
-      reply.raw.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
-        'Access-Control-Allow-Origin': '*',
-      });
-
-      // Send initial event
-      const sendEvent = (data: unknown) => {
-        try { reply.raw.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* closed */ }
-      };
-
-      sendEvent({ type: 'connected', workflowId, status: workflow.status });
-
-      // Replay already-persisted plan so reconnecting clients don't sit on
-      // "Waiting for the planner..." when the plan was created before they
-      // connected (common on network blip / reverse-proxy timeout).
-      if (workflow.planJson) {
-        try {
-          const plan = typeof workflow.planJson === 'string'
-            ? JSON.parse(workflow.planJson)
-            : workflow.planJson;
-          if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
-            sendEvent({ type: 'plan_created', workflowId, plan });
-          }
-        } catch {
-          // Malformed planJson — non-fatal, live events will still fire.
-        }
-      }
-
-      // If already terminal, close immediately
-      if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(workflow.status)) {
-        sendEvent({ type: workflow.status.toLowerCase(), workflowId });
-        reply.raw.end();
-        return;
-      }
-
-      // Listen for events from the execution service
-      const handler = (event: unknown) => sendEvent(event);
-      fastify.swarm.on(`workflow:${workflowId}`, handler);
-
-      // Heartbeat every 15s to keep connection alive
-      const heartbeat = setInterval(() => {
-        try { reply.raw.write(`: heartbeat\n\n`); } catch { clearInterval(heartbeat); }
-      }, 15000);
-
-      // Cleanup on close
-      request.raw.on('close', () => {
-        fastify.swarm.removeListener(`workflow:${workflowId}`, handler);
-        clearInterval(heartbeat);
-      });
-    },
-  );
-
-  /**
-   * GET /workflows/:workflowId/output
-   * Download workflow output as markdown text.
-   */
-  fastify.get(
-    '/:workflowId/output',
-    { preHandler: preHandlerBase },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
-
-      const workflow = await (fastify.db.workflow.findFirst as any)({
-        where: { id: workflowId, tenantId },
-        select: { finalOutput: true, goal: true, status: true },
-      });
-
-      if (!workflow) {
-        return reply.code(404).send({ error: 'Workflow not found' });
-      }
-
-      if (!workflow.finalOutput) {
-        return reply.code(404).send({ error: 'No output available yet. Workflow may still be running.' });
-      }
-
-      reply.header('Content-Type', 'text/markdown; charset=utf-8');
-      return reply.send(`# ${workflow.goal ?? 'Workflow Output'}\n\n${workflow.finalOutput}`);
-    },
-  );
+  await fastify.register(workflowControlRoutes);
+  await fastify.register(workflowQueryRoutes);
+  await fastify.register(workflowStreamRoutes);
+  await fastify.register(conversationRoutes);
 };
 
 export default workflowsRoutes;

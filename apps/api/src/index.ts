@@ -165,6 +165,10 @@ async function buildApp() {
   // -------------------------------------------------------------------------
   // OpenAPI / Swagger
   // -------------------------------------------------------------------------
+  const { generateOpenAPISpec } = await import('./openapi/generate-spec.js');
+  await generateOpenAPISpec();
+  const { buildOpenAPIComponents } = await import('./openapi/schema-registry.js');
+
   await fastify.register(swagger, {
     openapi: {
       info: {
@@ -176,6 +180,7 @@ async function buildApp() {
         ? [{ url: config.corsOrigins[0]?.replace(/^https:\/\/(?:www\.)?/, 'https://api.') || `http://localhost:${config.port}` }]
         : [{ url: `http://localhost:${config.port}` }],
       components: {
+        ...buildOpenAPIComponents(),
         securitySchemes: {
           bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         },

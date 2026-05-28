@@ -103,11 +103,13 @@ export class WorkflowService {
     userId: string,
     goal: string,
     industry?: string,
+    conversationId?: string,
   ): Promise<Workflow> {
     const workflow = await this.db.workflow.create({
       data: {
         tenantId,
         userId,
+        conversationId: conversationId ?? null,
         goal,
         industry: industry ?? null,
         status: 'PENDING',

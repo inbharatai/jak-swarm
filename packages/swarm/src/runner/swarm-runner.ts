@@ -72,6 +72,8 @@ export interface RunParams {
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
   userRole?: string;
+  /** Prior conversation turns injected into graph state for multi-turn memory. */
+  conversationHistory?: Array<{ role: string; content: string }>;
   loadState?: (id: string) => Promise<unknown | undefined>;
   circuitBreakerFactory?: (
     name: string,
@@ -300,6 +302,7 @@ export class SwarmRunner {
           ...(params.connectedProviders !== undefined ? { connectedProviders: params.connectedProviders } : {}),
           ...(params.subscriptionTier !== undefined ? { subscriptionTier: params.subscriptionTier } : {}),
           ...(params.userRole !== undefined ? { userRole: params.userRole } : {}),
+          ...(params.conversationHistory !== undefined ? { conversationHistory: params.conversationHistory } : {}),
           ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
         }),
         timeoutMs,

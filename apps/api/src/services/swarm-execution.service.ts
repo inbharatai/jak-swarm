@@ -99,6 +99,7 @@ export interface ExecuteAsyncParams {
   industry?: string;
   roleModes?: string[];
   maxCostUsd?: number;
+  conversationId?: string;
   /** Caller-provided idempotency key to prevent duplicate execution on replays. */
   idempotencyKey?: string;
   /**
@@ -1011,6 +1012,21 @@ export class SwarmExecutionService extends EventEmitter {
 
       const user = await this.db.user.findUnique({ where: { id: userId }, select: { role: true } });
 
+      // Load conversation thread history when this workflow belongs to a
+      // conversation. This replaces the frontend goal-string concatenation
+      // hack with real server-side memory across graph replays.
+      let conversationHistory: Array<{ role: string; content: string }> | undefined;
+      if (params.conversationId) {
+        const messages = await this.db.conversationMessage.findMany({
+          where: { conversationId: params.conversationId },
+          orderBy: { createdAt: 'asc' },
+          select: { role: true, content: true },
+        });
+        if (messages.length > 0) {
+          conversationHistory = messages.map((m) => ({ role: m.role, content: m.content }));
+        }
+      }
+
       const result = await this.runner.run({
         workflowId,
         tenantId,
@@ -1022,6 +1038,7 @@ export class SwarmExecutionService extends EventEmitter {
         idempotencyKey: params.idempotencyKey,
         subscriptionTier: params.subscriptionTier,
         userRole: user?.role ?? undefined,
+        ...(conversationHistory ? { conversationHistory } : {}),
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
@@ -1297,6 +1314,21 @@ export class SwarmExecutionService extends EventEmitter {
           where: { id: workflowId },
           data: { finalOutput },
         });
+
+        // Persist assistant response into the conversation thread so
+        // subsequent turns have full memory.
+        if (params.conversationId && finalOutput) {
+          await this.db.conversationMessage.create({
+            data: {
+              conversationId: params.conversationId,
+              workflowId,
+              role: 'assistant',
+              content: finalOutput,
+            },
+          }).catch((err) => {
+            this.log.warn({ workflowId, err: err instanceof Error ? err.message : String(err) }, '[Swarm] Failed to persist assistant message to conversation');
+          });
+        }
       } catch (outErr) {
         this.log.warn({ workflowId, err: outErr instanceof Error ? outErr.message : String(outErr) },
           '[Swarm] Failed to persist final output');

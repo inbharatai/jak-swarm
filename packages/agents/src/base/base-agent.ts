@@ -1,23 +1,22 @@
 import OpenAI from 'openai';
-import type { AgentRole, AgentTrace, ToolCall, ToolExecutionContext } from '@jak-swarm/shared';
+import type { AgentRole, AgentTrace, ToolCall } from '@jak-swarm/shared';
 import {
   generateId,
   createLogger,
-  calculateCost,
-  openAIChatTokenLimitParam,
-  openAISamplingParams,
 } from '@jak-swarm/shared';
 import type { Logger } from '@jak-swarm/shared';
 import type { AgentContext } from './agent-context.js';
 import type { LLMProvider } from './llm-provider.js';
 import {
   ProviderRouter,
-  getModelOverride,
   getProviderForTier,
   getTierForAgent,
 } from './provider-router.js';
 import { getRuntime, type LLMRuntime } from '../runtime/index.js';
-import { modelForTier } from '../runtime/model-resolver.js';
+
+import { LLMCallService, type OnLLMCallComplete } from './llm-call.service.js';
+import { ToolExecutionService } from './tool-execution.service.js';
+import { PromptBuilder } from './prompt-builder.service.js';
 
 /** Memory provider interface — injected by the API layer at boot */
 export interface MemoryProvider {
@@ -52,9 +51,6 @@ export interface CompanyContextProvider {
     preferredChannels: unknown;
   } | null>;
 }
-
-/** Loop detection: fingerprint → count */
-type ToolCallFingerprints = Map<string, number>;
 
 /**
  * Extract the first balanced JSON object or array blob from a string.
@@ -108,7 +104,6 @@ export function extractFirstJsonBlob(text: string): string | null {
   // Unbalanced — no matching closer found.
   return null;
 }
-const LOOP_DETECTION_THRESHOLD = 3;
 
 /** Result of a multi-turn tool execution loop */
 export interface ToolLoopResult {
@@ -122,16 +117,14 @@ export interface ToolLoopResult {
   totalCostUsd: number;
 }
 
-/** Maximum number of retries for transient LLM errors */
-const LLM_MAX_RETRIES = 3;
-/** Base delay in ms for exponential backoff (1s, 2s, 4s) */
-const LLM_RETRY_BASE_DELAY_MS = 1000;
-
 export abstract class BaseAgent {
   protected readonly role: AgentRole;
   protected readonly logger: Logger;
   protected readonly openai: OpenAI;
   protected readonly provider?: LLMProvider;
+  protected readonly llmCallService: LLMCallService;
+  protected readonly promptBuilder: PromptBuilder;
+  protected readonly toolExecutionService: ToolExecutionService;
 
   constructor(role: AgentRole, apiKey?: string, provider?: LLMProvider) {
     this.role = role;
@@ -167,8 +160,30 @@ export abstract class BaseAgent {
 
     this.openai = new OpenAI({ apiKey: resolvedKey });
 
+    // Initialize composable services before runtime, because runtime
+    // delegates back to BaseAgent's protected callLLM/executeWithTools.
+    this.llmCallService = new LLMCallService(
+      this.role,
+      this.openai,
+      this.provider,
+      this.logger,
+      () => BaseAgent.onLLMCallComplete,
+    );
+    this.promptBuilder = new PromptBuilder(
+      this.role,
+      () => BaseAgent.memoryProvider,
+      () => BaseAgent.companyContextProvider,
+    );
+    this.toolExecutionService = new ToolExecutionService(
+      this.llmCallService,
+      this.promptBuilder,
+      this.logger,
+      this.role,
+      () => this.runtime,
+    );
+
     // Phase 2: every agent gets an LLMRuntime. In Phase 2 this is always
-    // LegacyRuntime that delegates back to BaseAgent's existing private
+    // LegacyRuntime that delegates back to BaseAgent's existing protected
     // callLLM/executeWithTools. Future phases (4, 7) start returning
     // OpenAIRuntime instead, agent-by-agent. Callers that want the new
     // surface use `this.runtime.respond(...)` / `this.runtime.callTools(...)`
@@ -188,17 +203,7 @@ export abstract class BaseAgent {
    * Set by the API layer to track per-call credit usage.
    * When not set, cost is still logged but not deducted from credits.
    */
-  static onLLMCallComplete: ((info: {
-    model: string;
-    provider: string;
-    promptTokens: number;
-    completionTokens: number;
-    costUsd: number;
-    agentRole: string;
-    tenantId?: string;
-    userId?: string;
-    workflowId?: string;
-  }) => void) | null = null;
+  static onLLMCallComplete: OnLLMCallComplete = null;
 
   /**
    * Memory provider — injected at application boot.
@@ -218,896 +223,59 @@ export abstract class BaseAgent {
 
   abstract execute(input: unknown, context: AgentContext): Promise<unknown>;
 
-  /**
-   * Inject the tenant's approved CompanyProfile as a `<company_context>`
-   * system block. Inserts AFTER the agent's primary system prompt so it
-   * reads as supplementary grounding, not primary instructions.
-   * Non-blocking — any failure swallows + returns the messages unchanged.
-   */
-  protected async injectCompanyContext(
-    messages: OpenAI.ChatCompletionMessageParam[],
-    context: AgentContext,
-  ): Promise<{ messages: OpenAI.ChatCompletionMessageParam[]; fieldsUsed: string[] }> {
-    if (!BaseAgent.companyContextProvider || !context.tenantId) return { messages, fieldsUsed: [] };
-    try {
-      const profile = await BaseAgent.companyContextProvider.getApprovedProfile(context.tenantId);
-      if (!profile) return { messages, fieldsUsed: [] };
-
-      const lines: string[] = [];
-      const fieldsUsed: string[] = [];
-      const push = (field: string, label: string, value: unknown): void => {
-        if (value === null || value === undefined) return;
-        if (typeof value === 'string' && value.trim().length === 0) return;
-        if (Array.isArray(value) && value.length === 0) return;
-        const str = typeof value === 'string' ? value : JSON.stringify(value);
-        if (str.length > 1500) return; // skip overly long fields
-        lines.push(`- ${label}: ${str}`);
-        fieldsUsed.push(field);
-      };
-      push('name',             'Company name',      profile.name);
-      push('industry',         'Industry',          profile.industry);
-      push('description',      'What the company does', profile.description);
-      push('productsServices', 'Products / services', profile.productsServices);
-      push('targetCustomers',  'Target customers',  profile.targetCustomers);
-      push('brandVoice',       'Brand voice',       profile.brandVoice);
-      push('competitors',      'Known competitors', profile.competitors);
-      push('pricing',          'Pricing context',   profile.pricing);
-      push('websiteUrl',       'Website',           profile.websiteUrl);
-      push('goals',            'Stated goals',      profile.goals);
-      push('constraints',      'Stated constraints', profile.constraints);
-      push('preferredChannels','Preferred channels', profile.preferredChannels);
-
-      if (lines.length === 0) return { messages, fieldsUsed: [] };
-
-      const block: OpenAI.ChatCompletionMessageParam = {
-        role: 'system',
-        content: `<company_context>
-The user's company has approved the following context for use across all agents.
-Ground your output in this context — match brand voice, target audience, and product positioning.
-Do not invent additional facts about the company; if a needed field is missing here, say so honestly.
-
-${lines.join('\n')}
-</company_context>`,
-      };
-
-      const result = [...messages];
-      const sysIdx = result.findIndex((m) => m.role === 'system');
-      result.splice(sysIdx + 1, 0, block);
-      return { messages: result, fieldsUsed };
-    } catch {
-      return { messages, fieldsUsed: [] };
-    }
-  }
-
-  /**
-   * Inject bundled SKILL.md packs into the message array — Item A of the
-   * OpenClaw-inspired Phase 1.
-   *
-   * For each bundled skill pack whose `allowed-tools` overlaps with the
-   * tools this agent has declared for this run, append the skill's
-   * system-prompt block AFTER the agent's primary system prompt. The
-   * resulting block reads as additional guidance, not primary
-   * instructions.
-   *
-   * Non-blocking: any failure (filesystem absent, parse failure, no
-   * matching skill) returns the messages unchanged. The cockpit doesn't
-   * need to know whether skills fired — the trace records the full
-   * system message so an operator can confirm post-hoc.
-   *
-   * Lazy-loaded so a stripped-down test environment that doesn't link
-   * `@jak-swarm/skills` doesn't blow up on import. The Phase 1 plan ships
-   * only the bundled tier; the full precedence cascade (workspace > project
-   * > org > tenant > user > bundled) composes by passing additional
-   * directories into `loadSkills()`.
-   */
-  protected async injectBundledSkills(
-    messages: OpenAI.ChatCompletionMessageParam[],
-    declaredToolNames: Set<string>,
-  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
-    if (declaredToolNames.size === 0) return messages;
-    try {
-      const skillsModule = await import('@jak-swarm/skills');
-      const formatBundledSkillsForAgent = (
-        skillsModule as { formatBundledSkillsForAgent?: (tools: string[]) => string }
-      ).formatBundledSkillsForAgent;
-      if (typeof formatBundledSkillsForAgent !== 'function') return messages;
-
-      const block = formatBundledSkillsForAgent([...declaredToolNames]);
-      if (!block) return messages;
-
-      const skillBlock: OpenAI.ChatCompletionMessageParam = {
-        role: 'system',
-        content: block,
-      };
-      const result = [...messages];
-      const sysIdx = result.findIndex((m) => m.role === 'system');
-      // Insert AFTER any company-context block (which is already at sysIdx+1
-      // by injectCompanyContext convention) so skills sit below it.
-      const insertAt = sysIdx === -1 ? 0 : Math.min(sysIdx + 2, result.length);
-      result.splice(insertAt, 0, skillBlock);
-      return result;
-    } catch {
-      return messages;
-    }
-  }
-
-  /**
-   * Inject tenant memories into the message array.
-   * Inserts a <memory> block after the system message with ranked, token-budgeted facts.
-   * Non-blocking — memory fetch failures never break the LLM call.
-   */
-  protected async injectMemories(
-    messages: OpenAI.ChatCompletionMessageParam[],
-    context: AgentContext,
-  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
-    if (!BaseAgent.memoryProvider || !context.tenantId) return messages;
-
-    try {
-      const memories = await BaseAgent.memoryProvider.getMemories(context.tenantId, 15);
-      if (memories.length === 0) return messages;
-
-      // Build token-budgeted memory block (max ~2000 tokens / ~8000 chars)
-      const lines: string[] = [];
-      let charCount = 0;
-      const MAX_CHARS = 8000;
-
-      for (const mem of memories) {
-        const valStr = typeof mem.value === 'string' ? mem.value : JSON.stringify(mem.value);
-        const line = `- [${mem.memoryType}] ${mem.key}: ${valStr}`;
-        if (charCount + line.length > MAX_CHARS) break;
-        lines.push(line);
-        charCount += line.length;
-      }
-
-      if (lines.length === 0) return messages;
-
-      const memoryBlock: OpenAI.ChatCompletionMessageParam = {
-        role: 'system',
-        content: `<memory>
-The following facts were learned from previous workflows for this organization.
-Use them to inform your decisions but do not reference them explicitly.
-
-${lines.join('\n')}
-</memory>`,
-      };
-
-      // Insert after the first system message
-      const result = [...messages];
-      const sysIdx = result.findIndex(m => m.role === 'system');
-      result.splice(sysIdx + 1, 0, memoryBlock);
-      return result;
-    } catch {
-      // Memory is non-critical — never block agent execution
-      return messages;
-    }
-  }
+  // ─── DELEGATES TO COMPOSABLE SERVICES ──────────────────────────────────────
 
   protected async callLLM(
     messages: OpenAI.ChatCompletionMessageParam[],
     tools?: OpenAI.ChatCompletionTool[],
     options?: { maxTokens?: number; temperature?: number; jsonMode?: boolean },
   ): Promise<OpenAI.ChatCompletion> {
-    // If an LLM provider is configured, use it and convert the response
-    if (this.provider) {
-      return this.callLLMViaProvider(messages, tools, options);
-    }
-
-    // Fail loudly if no API key is configured — do not silently return empty results
-    if (!process.env['OPENAI_API_KEY']) {
-      throw new Error(
-        `[${this.role}] No OPENAI_API_KEY set. Cannot make LLM calls. ` +
-        'Set OPENAI_API_KEY in your environment or configure an LLM provider.',
-      );
-    }
-
-    // When no tools are passed, enable JSON mode if the system prompt asks for JSON.
-    // This forces OpenAI to return valid JSON — no extra text, no markdown fences.
-    const hasTools = tools && tools.length > 0;
-    const systemMsg = messages.find(m => m.role === 'system');
-    const systemContent = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
-    const wantsJson = options?.jsonMode ??
-      (!hasTools && /respond with json|output.*json|return.*json/i.test(systemContent));
-
-    // Direct OpenAI SDK path with retry logic.
-    // Per-agent model resolution order:
-    //   1. AGENT_MODEL_MAP override for this exact role (if any)
-    //   2. OPENAI_MODEL env (operator-wide override)
-    //   3. ModelResolver pick for this role's tier (GPT-5.5/5.4 family only)
-    const agentModel =
-      getModelOverride(this.role) ??
-      process.env['OPENAI_MODEL']?.trim() ??
-      modelForTier(getTierForAgent(this.role));
-
-    const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-      model: agentModel,
-      messages,
-      ...openAIChatTokenLimitParam(agentModel, options?.maxTokens ?? 4096),
-      ...openAISamplingParams(agentModel, { temperature: options?.temperature ?? 0.2 }),
-      ...(hasTools ? { tools, tool_choice: 'auto' } : {}),
-      ...(wantsJson && !hasTools ? { response_format: { type: 'json_object' as const } } : {}),
-    };
-
-    this.logger.debug({ messageCount: messages.length }, 'Calling LLM');
-
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
-      try {
-        const completion = await this.openai.chat.completions.create(params);
-
-        const model = params.model ?? process.env['OPENAI_MODEL'] ?? 'gpt-5.4';
-        const promptTok = completion.usage?.prompt_tokens ?? 0;
-        const completionTok = completion.usage?.completion_tokens ?? 0;
-        const costUsd = calculateCost(model, promptTok, completionTok);
-
-        this.logger.debug(
-          {
-            model,
-            tokens: { prompt: promptTok, completion: completionTok },
-            costUsd,
-            finishReason: completion.choices[0]?.finish_reason,
-          },
-          'LLM call cost',
-        );
-
-        // Notify billing hook if registered (for per-call credit tracking)
-        if (BaseAgent.onLLMCallComplete) {
-          try {
-            BaseAgent.onLLMCallComplete({
-              model,
-              provider: 'openai',
-              promptTokens: promptTok,
-              completionTokens: completionTok,
-              costUsd,
-              agentRole: this.role,
-            });
-          } catch { /* billing hook failure must not break LLM calls */ }
-        }
-
-        return completion;
-      } catch (err) {
-        lastError = err;
-
-        if (attempt < LLM_MAX_RETRIES && this.isRetryableError(err)) {
-          const delayMs = LLM_RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-          this.logger.warn(
-            { attempt: attempt + 1, delayMs, error: err instanceof Error ? err.message : String(err) },
-            'LLM call failed with retryable error, backing off',
-          );
-          await this.sleep(delayMs);
-          continue;
-        }
-
-        throw err;
-      }
-    }
-
-    // Should not reach here, but satisfy TypeScript
-    throw lastError;
+    return this.llmCallService.callLLM(messages, tools, options);
   }
 
-  /**
-   * Call LLM via the pluggable provider interface and convert the response
-   * to OpenAI ChatCompletion format for backward compatibility.
-   */
-  private async callLLMViaProvider(
-    messages: OpenAI.ChatCompletionMessageParam[],
-    tools?: OpenAI.ChatCompletionTool[],
-    options?: { maxTokens?: number; temperature?: number; jsonMode?: boolean },
-  ): Promise<OpenAI.ChatCompletion> {
-    this.logger.debug(
-      { messageCount: messages.length, provider: this.provider!.name },
-      'Calling LLM via provider',
-    );
-
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
-      try {
-        const response = await this.provider!.chatCompletion({
-          messages: messages as Array<{ role: string; content: string | unknown }>,
-          tools: tools as unknown[],
-          maxTokens: options?.maxTokens,
-          temperature: options?.temperature,
-          jsonMode: options?.jsonMode,
-        });
-
-        // Convert LLMResponse to OpenAI ChatCompletion shape
-        const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = (response.toolCalls ?? []).map((tc) => ({
-          id: tc.id,
-          type: 'function' as const,
-          function: { name: tc.name, arguments: tc.arguments },
-        }));
-
-        const completion: OpenAI.ChatCompletion = {
-          id: `provider-${Date.now()}`,
-          object: 'chat.completion',
-          created: Math.floor(Date.now() / 1000),
-          model: response.model ?? this.provider!.name,
-          choices: [
-            {
-              index: 0,
-              message: {
-                role: 'assistant',
-                content: response.content,
-                refusal: null,
-                ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-              },
-              finish_reason: (response.finishReason === 'end_turn' ? 'stop' : response.finishReason) as 'stop' | 'length' | 'tool_calls' | 'content_filter',
-              logprobs: null,
-            },
-          ],
-          usage: {
-            prompt_tokens: response.usage.promptTokens,
-            completion_tokens: response.usage.completionTokens,
-            total_tokens: response.usage.totalTokens,
-          },
-        };
-
-        const providerModel = response.model ?? completion.model ?? this.provider!.name;
-        const costUsd = calculateCost(providerModel, response.usage.promptTokens, response.usage.completionTokens);
-
-        this.logger.debug(
-          {
-            model: providerModel,
-            tokens: { prompt: response.usage.promptTokens, completion: response.usage.completionTokens },
-            costUsd,
-            finishReason: response.finishReason,
-            provider: this.provider!.name,
-          },
-          'LLM call cost',
-        );
-
-        // Notify billing hook if registered
-        if (BaseAgent.onLLMCallComplete) {
-          try {
-            BaseAgent.onLLMCallComplete({
-              model: providerModel,
-              provider: this.provider!.name,
-              promptTokens: response.usage.promptTokens,
-              completionTokens: response.usage.completionTokens,
-              costUsd,
-              agentRole: this.role,
-            });
-          } catch { /* billing hook failure must not break LLM calls */ }
-        }
-
-        return completion;
-      } catch (err) {
-        lastError = err;
-
-        if (attempt < LLM_MAX_RETRIES && this.isRetryableError(err)) {
-          const delayMs = LLM_RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-          this.logger.warn(
-            { attempt: attempt + 1, delayMs, provider: this.provider!.name, error: err instanceof Error ? err.message : String(err) },
-            'Provider LLM call failed with retryable error, backing off',
-          );
-          await this.sleep(delayMs);
-          continue;
-        }
-
-        throw err;
-      }
-    }
-
-    throw lastError;
-  }
-
-  /**
-   * Check if an error is retryable (429 rate limit or 5xx server error).
-   */
-  private isRetryableError(err: unknown): boolean {
-    if (!(err instanceof Error)) return false;
-
-    const message = err.message.toLowerCase();
-    if (message.includes('429') || message.includes('rate limit')) return true;
-    if (message.includes('500') || message.includes('502') || message.includes('503') || message.includes('504')) return true;
-    if (message.includes('internal server error') || message.includes('service unavailable')) return true;
-    if (message.includes('overloaded') || message.includes('capacity')) return true;
-
-    const errWithStatus = err as { status?: number };
-    if (errWithStatus.status) {
-      return errWithStatus.status === 429 || errWithStatus.status >= 500;
-    }
-
-    return false;
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Multi-turn tool execution loop.
-   *
-   * 1. Sends messages + tools to the LLM
-   * 2. If the LLM returns tool_calls, executes each via ToolRegistry
-   * 3. Appends tool results as `role: 'tool'` messages
-   * 4. Calls the LLM again with the extended conversation
-   * 5. Repeats until the LLM responds with text (no more tool_calls) or maxIterations
-   *
-   * Returns the final text content and all tool call records for tracing.
-   */
   protected async executeWithTools(
     messages: OpenAI.ChatCompletionMessageParam[],
     tools: OpenAI.ChatCompletionTool[],
     context: AgentContext,
     options?: { maxTokens?: number; temperature?: number; maxIterations?: number },
   ): Promise<ToolLoopResult> {
-    const maxIterations = options?.maxIterations ?? 10;
-    const allToolCalls: ToolCall[] = [];
-    const totalTokens = { prompt: 0, completion: 0, total: 0 };
-    let totalCostUsd = 0;
-    // Migration 16 — inject approved CompanyProfile into the system prompt
-    // so every tool-using agent grounds in the user's company context.
-    // Best-effort: failure or absence of provider returns messages unchanged.
-    // The company_context_loaded lifecycle event is emitted at the workflow
-    // level (swarm-execution.persistIntentAndContext); agent-level emit
-    // is intentionally omitted to avoid double-counting.
-    const grounded = await this.injectCompanyContext(messages, context);
-    // Item A (OpenClaw-inspired Phase 1) — inject bundled skills BEFORE the
-    // tool loop starts so the system prompt the LLM sees is the same on
-    // every iteration. Skills fire only when at least one declared tool
-    // overlaps with the pack's `allowed-tools`, so non-matching agents
-    // pay no token overhead.
-    const declaredToolNamesForSkills = new Set(tools.map((t) => t.function.name));
-    const enriched = await this.injectBundledSkills(grounded.messages, declaredToolNamesForSkills);
-    const conversation = [...enriched];
-    const toolCallFingerprints: ToolCallFingerprints = new Map();
+    return this.toolExecutionService.executeWithTools(messages, tools, context, options);
+  }
 
-    // P0-D fix — scan user-role messages for prompt injection BEFORE the
-    // first LLM call. Catches the documented attack patterns
-    // (ignore-previous-instructions, role-override, fake-system-message,
-    // chat-template-injection, prompt-extraction, data-exfiltration,
-    // DAN/jailbreak). High-confidence HIGH-risk hits abort the run with
-    // a structured error; low-risk hits are logged but allowed through
-    // so legitimate requests like "ignore the failing test for now" are
-    // not blocked. Off-switch via JAK_INJECTION_GUARD_DISABLED=1 for
-    // operators who need raw passthrough during incident debugging.
-    // JAK Shield — defensive-only boundary. Detects offensive-cyber
-    // requests (malware / exploits / credential-theft / unauthorized
-    // scanning / phishing) BEFORE the LLM sees them. Defensive
-    // requests (audit my repo, find vulnerable deps, harden auth)
-    // are explicitly NOT blocked — defensive markers down-weight the
-    // confidence score. See
-    //   packages/security/src/guardrails/offensive-cyber-detector.ts
-    // Off-switch: JAK_SHIELD_OFFENSIVE_GUARD_DISABLED=1
-    const offensiveGuardEnabled = process.env['JAK_SHIELD_OFFENSIVE_GUARD_DISABLED'] !== '1';
-    const injectionGuardEnabled = process.env['JAK_INJECTION_GUARD_DISABLED'] !== '1';
-    if (offensiveGuardEnabled || injectionGuardEnabled) {
-      const { getShieldGateway } = await import('@jak-swarm/security');
-      const shieldGateway = getShieldGateway();
-      for (const msg of conversation) {
-        if (msg.role !== 'user' || typeof msg.content !== 'string') continue;
-        const scan = await shieldGateway.scanInput(msg.content, {
-          tenantId: context.tenantId,
-          userId: context.userId,
-          workflowId: context.workflowId,
-          runId: context.runId,
-          source: 'agent_user_message',
-        });
+  protected async injectCompanyContext(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    context: AgentContext,
+  ): Promise<{ messages: OpenAI.ChatCompletionMessageParam[]; fieldsUsed: string[] }> {
+    return this.promptBuilder.injectCompanyContext(messages, context);
+  }
 
-        const offensive = scan.offensiveCyber;
-        if (offensiveGuardEnabled && offensive.detected && offensive.confidence >= 0.7) {
-          throw new Error(
-            `Input blocked by JAK Shield: this looks like a request to ${offensive.reason} ` +
-            `(category: ${offensive.category}). JAK Shield is built for defensive ` +
-            `security and safe automation; offensive cyber work is out of scope. ` +
-            `If this is a legitimate defensive task, rephrase to make the scope ` +
-            `explicit (e.g. "audit my repo for vulnerable dependencies").`,
-          );
-        }
+  protected async injectBundledSkills(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    declaredToolNames: Set<string>,
+  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
+    return this.promptBuilder.injectBundledSkills(messages, declaredToolNames);
+  }
 
-        const injection = scan.injection;
-        if (
-          injectionGuardEnabled &&
-          injection.detected &&
-          injection.risk === 'HIGH' &&
-          injection.confidence >= 0.7
-        ) {
-          throw new Error(
-            `Input blocked for safety: prompt-injection patterns detected ` +
-            `(${injection.patterns.slice(0, 3).join('; ')}). If this was a ` +
-            `legitimate request, rephrase without instruction-override ` +
-            `language.`,
-          );
-        }
-      }
-    }
+  protected async injectMemories(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    context: AgentContext,
+  ): Promise<OpenAI.ChatCompletionMessageParam[]> {
+    return this.promptBuilder.injectMemories(messages, context);
+  }
 
-    // Sprint 2.4 / Item G + P0-B fix — PII auto-redaction in LLM prompts.
-    // One redactor per executeWithTools call. Disabled via env when
-    // operators want raw passthrough for debugging.
-    // The redactor lives on the LLM boundary: messages are redacted just
-    // before they cross to the model, the assistant response is restored
-    // before tool execution. Tools see ORIGINAL values; the LLM sees
-    // PLACEHOLDER values. Originals are NOT preserved into the persisted
-    // trace — `WorkflowService.saveTrace` runs `redactJsonForPersistence`
-    // on every JSON column at the DB-write boundary so raw PII never
-    // reaches the AgentTrace table even if restoration ran upstream.
-    const redactor = process.env['JAK_PII_REDACTION_DISABLED'] === '1'
-      ? null
-      : new (await import('@jak-swarm/security')).RuntimePIIRedactor();
+  protected buildSystemMessage(supplement?: string): string {
+    return this.promptBuilder.buildSystemMessage(supplement);
+  }
 
-    // Lazy-import tool registries to avoid circular dep at module load time
-    const { getTenantToolRegistry } = await import('@jak-swarm/tools');
+  protected async buildRAGContext(query: string, tenantId: string, topK = 3): Promise<string> {
+    return this.promptBuilder.buildRAGContext(query, tenantId, topK);
+  }
 
-    const declaredToolNames = new Set(tools.map((t) => t.function.name));
-    const tenantToolRegistry = getTenantToolRegistry(
-      context.tenantId ?? '',
-      context.connectedProviders,
-      {
-        browserAutomationEnabled: context.browserAutomationEnabled,
-        restrictedCategories: context.restrictedCategories,
-        disabledToolNames: context.disabledToolNames,
-        // Item C (OpenClaw-inspired Phase 1) — when a StandingOrder
-        // restricts the run to a specific tool whitelist, the registry
-        // refuses anything not in the list. Empty array = no whitelist.
-        allowedToolNames: context.allowedToolNames,
-      },
-    );
-
-    const toolExecContext: ToolExecutionContext = {
-      tenantId: context.tenantId ?? '',
-      userId: context.userId ?? '',
-      workflowId: context.workflowId ?? '',
-      runId: context.runId,
-      approvalId: context.approvalId,
-      idempotencyKey: context.idempotencyKey,
-      allowedDomains: context.allowedDomains,
-      subscriptionTier: context.subscriptionTier,
-    };
-
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
-      // Sprint 2.4 / Item G — redact PII in messages JUST before sending
-      // to LLM. We pass the redacted view to callLLM, but conversation[]
-      // (the running array) keeps the originals so the trace store + the
-      // worker-step persistence sees real values.
-      const llmInput = redactor ? redactor.redactMessages(conversation) : conversation;
-      const completion = await this.callLLM(
-        llmInput,
-        tools.length > 0 ? tools : undefined,
-        { maxTokens: options?.maxTokens, temperature: options?.temperature },
-      );
-
-      // Accumulate token usage and cost
-      if (completion.usage) {
-        const iterPrompt = completion.usage.prompt_tokens ?? 0;
-        const iterCompletion = completion.usage.completion_tokens ?? 0;
-        totalTokens.prompt += iterPrompt;
-        totalTokens.completion += iterCompletion;
-        totalTokens.total += completion.usage.total_tokens ?? 0;
-
-        const iterModel = completion.model || this.provider?.name || 'gpt-5.4';
-        // Sprint 2.2 / Item I — read OpenAI prompt-cache + reasoning
-        // token breakdown that OpenAIRuntime preserves on the completion
-        // via the JakAdaptedChatCompletion extension fields. LegacyRuntime
-        // never sets these so iterCached/iterReasoning remain 0 there.
-        const adapted = completion as unknown as {
-          _jakCachedInputTokens?: number;
-          _jakReasoningTokens?: number;
-        };
-        const iterCached = typeof adapted._jakCachedInputTokens === 'number'
-          ? adapted._jakCachedInputTokens
-          : 0;
-        const iterReasoning = typeof adapted._jakReasoningTokens === 'number'
-          ? adapted._jakReasoningTokens
-          : 0;
-        const iterCost = calculateCost(iterModel, iterPrompt, iterCompletion, iterCached);
-        totalCostUsd += iterCost;
-
-        // Stage 2.3 + hardening pass: complete cost telemetry — runtime
-        // name, model, token breakdown, run + step ids. The cockpit can
-        // reconstruct per-step spend after the fact.
-        const runtimeName = this.runtime?.name ?? 'legacy';
-        // Sprint 2.4 / Item G — surface PII redaction stats on the cost
-        // event when redactor caught something this iteration. Only emit
-        // the field when there was redaction; absent field signals
-        // "nothing was found" (which is also valid info, but we don't
-        // bloat events with empty objects).
-        const piiStats = redactor?.getStats();
-        const hasPii = piiStats && piiStats.totalMatches > 0;
-
-        context.emitActivity({
-          type: 'cost_updated',
-          agentRole: this.role,
-          runtime: runtimeName,
-          model: iterModel,
-          promptTokens: iterPrompt,
-          completionTokens: iterCompletion,
-          totalTokens: iterPrompt + iterCompletion,
-          ...(iterCached > 0 ? { cachedReadTokens: iterCached } : {}),
-          ...(iterReasoning > 0 ? { reasoningTokens: iterReasoning } : {}),
-          ...(hasPii && piiStats
-            ? {
-                piiRedacted: {
-                  byType: piiStats.byType as Record<string, number>,
-                  totalMatches: piiStats.totalMatches,
-                  uniquePlaceholders: piiStats.uniquePlaceholders,
-                },
-              }
-            : {}),
-          costUsd: iterCost,
-          runId: context.runId,
-          // The "step id" inside a workflow is the agent role for now;
-          // when WorkflowRuntime adds a per-task step id we'll use that.
-          stepId: this.role,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      const choice = completion.choices[0];
-      if (!choice) break;
-
-      // Sprint 2.4 / Item G — restore PII placeholders in the assistant
-      // response BEFORE we use it (tool execution, trace persistence, or
-      // final return). Tools must operate on real values; the trace must
-      // show real values. Only the LLM ever saw placeholders.
-      let assistantMsg = choice.message;
-      if (redactor && redactor.hasRedactions()) {
-        const restoredContent = typeof assistantMsg.content === 'string'
-          ? redactor.restoreInResponse(assistantMsg.content)
-          : assistantMsg.content;
-        const restoredToolCalls = assistantMsg.tool_calls
-          ? redactor.restoreInToolCalls(assistantMsg.tool_calls)
-          : undefined;
-        assistantMsg = {
-          ...assistantMsg,
-          content: restoredContent,
-          ...(restoredToolCalls ? { tool_calls: restoredToolCalls } : {}),
-        };
-      }
-
-      // If the LLM returned content without tool calls, we're done
-      if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
-        return {
-          content: assistantMsg.content ?? '',
-          toolCalls: allToolCalls,
-          totalTokens,
-          totalCostUsd,
-        };
-      }
-
-      // LLM wants to call tools — add assistant message to conversation
-      conversation.push(assistantMsg);
-
-      // ── Loop Detection (DeerFlow LoopDetectionMiddleware pattern) ──────
-      // Track tool-call fingerprints to detect infinite loops.
-      // If the same tool+args is called 3+ times, inject a hard-stop message.
-      let loopDetected = false;
-      for (const tc of assistantMsg.tool_calls) {
-        const fp = `${tc.function.name}:${tc.function.arguments}`;
-        const count = (toolCallFingerprints.get(fp) ?? 0) + 1;
-        toolCallFingerprints.set(fp, count);
-        if (count >= LOOP_DETECTION_THRESHOLD) {
-          loopDetected = true;
-        }
-      }
-
-      if (loopDetected) {
-        this.logger.warn(
-          { iteration, fingerprints: toolCallFingerprints.size },
-          'Loop detected — same tool call repeated 3+ times, forcing stop',
-        );
-        // Clear tool_calls and force a text response
-        conversation.push({
-          role: 'system' as const,
-          content: 'STOP: You are repeating the same tool call in a loop. This wastes resources. Summarize what you have so far and provide your best answer with the information available. Do NOT call any more tools.',
-        });
-        // Still need to provide tool results for the pending calls
-        for (const tc of assistantMsg.tool_calls) {
-          conversation.push({
-            role: 'tool' as const,
-            tool_call_id: tc.id,
-            content: JSON.stringify({ _loopDetected: true, message: 'Tool call skipped — loop detected. Provide your best answer now.' }),
-          });
-        }
-        // Do one more LLM call to get the summary, then exit
-        try {
-          const finalCompletion = await this.callLLM(conversation, undefined, { maxTokens: options?.maxTokens, temperature: options?.temperature });
-          const finalContent = finalCompletion.choices[0]?.message?.content ?? 'Agent stopped due to tool call loop.';
-          return { content: finalContent, toolCalls: allToolCalls, totalTokens, totalCostUsd };
-        } catch {
-          return { content: 'Agent stopped due to tool call loop.', toolCalls: allToolCalls, totalTokens, totalCostUsd };
-        }
-      }
-
-      // Execute each tool call with error normalization
-      for (const tc of assistantMsg.tool_calls) {
-        const toolStartedAt = new Date();
-        let parsedArgs: Record<string, unknown> = {};
-        try {
-          parsedArgs = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-        } catch {
-          parsedArgs = { _raw: tc.function.arguments };
-        }
-
-        const toolName = tc.function.name;
-        let resultStr: string;
-        let toolError: string | undefined;
-        // Hardening pass: capture the registry's honest outcome so the
-        // tool_completed event carries it through to the cockpit.
-        let toolOutcome: import('@jak-swarm/shared').ToolOutcome | undefined;
-
-        // Stage 2.2: emit tool_called BEFORE execution so the client
-        // cockpit renders a live "running" row. inputSummary is capped
-        // at 500 chars to keep SSE payloads small.
-        const inputSummary = JSON.stringify(parsedArgs).slice(0, 500);
-        context.emitActivity({
-          type: 'tool_called',
-          agentRole: this.role,
-          toolName,
-          inputSummary,
-          timestamp: toolStartedAt.toISOString(),
-        });
-
-        try {
-          if (!declaredToolNames.has(toolName)) {
-            resultStr = JSON.stringify({
-              error: `Tool '${toolName}' is not allowed for this agent run. Allowed tools: ${[...declaredToolNames].join(', ')}`,
-              _toolNotAllowed: true,
-            });
-            toolError = `Tool '${toolName}' is outside agent allowlist`;
-          } else if (tenantToolRegistry.has(toolName)) {
-            // Execute through tenant-scoped registry with provider/category/browser gates
-            const result = await tenantToolRegistry.execute(toolName, parsedArgs, toolExecContext);
-            // Capture the honest tool outcome — registry sets it via inferOutcome.
-            // Used below to stamp the tool_completed SSE event so the cockpit
-            // can render a real/draft/mock/not_configured badge instead of
-            // guessing from substring matches.
-            toolOutcome = result.outcome;
-
-            // Phase 4 follow-up — Centralized ApprovalPolicy gate. The
-            // tool registry returns outcome:'approval_required' when a
-            // sensitive tool was called without an approvalId in
-            // context. The executor was NOT invoked — we surface a
-            // structured stop signal to the LLM AND emit a
-            // tool_approval_required activity event so the worker-node
-            // / API layer can create an ApprovalRequest row + pause
-            // the workflow. This closes the "registry returns the
-            // outcome but nothing pauses" gap.
-            if (!result.success && result.outcome === 'approval_required') {
-              const data = (result.data ?? {}) as Record<string, unknown>;
-              const category = (data['category'] as string | undefined) ?? 'WRITE';
-              const reason = result.error ?? 'Approval required.';
-              context.emitActivity({
-                type: 'tool_approval_required',
-                agentRole: this.role,
-                toolName,
-                category,
-                reason,
-                inputSummary,
-                timestamp: toolStartedAt.toISOString(),
-              });
-              resultStr = JSON.stringify({
-                _approvalRequired: true,
-                toolName,
-                category,
-                reason,
-                message:
-                  `Tool '${toolName}' requires user approval before it can run. ` +
-                  `An approval request has been created — wait for the user to decide. ` +
-                  `Do not retry this tool without an approvalId.`,
-              });
-              // Mark this iteration as paused-by-approval. The agent
-              // sees the result and should NOT keep calling the same
-              // tool — the loop-detection guard will also catch a
-              // pathological retry.
-              toolError = `approval_required: ${reason}`;
-              // Skip the regular success/failure branches below by
-              // jumping past the response-handling block.
-            } else if (result.success) {
-              const data = result.data as Record<string, unknown> | string | undefined;
-              // Detect mock/demo data — inform the agent honestly
-              if (data && typeof data === 'object' && (data as Record<string, unknown>)._mock) {
-                const notice = (data as Record<string, unknown>)._notice ?? 'This is demo data — real integration not connected.';
-                resultStr = JSON.stringify({ ...data as Record<string, unknown>, _warning: notice });
-              } else {
-                resultStr = typeof data === 'string'
-                  ? data
-                  : JSON.stringify(data ?? { success: true });
-              }
-            } else {
-              resultStr = JSON.stringify({ error: result.error, _toolFailed: true, message: `Tool '${toolName}' failed: ${result.error}. Try a different approach or use an alternative tool.` });
-              toolError = result.error;
-            }
-          } else {
-            // Tool not available for tenant policy/integrations — return helpful error
-            resultStr = JSON.stringify({
-              error: `Tool '${toolName}' is not available for this tenant or current policy constraints. Allowed tools: ${[...declaredToolNames].join(', ')}.`,
-              _toolNotFound: true,
-            });
-            toolError = `Tool '${toolName}' not available for tenant`;
-          }
-        } catch (toolExecErr) {
-          // ── Tool Error Normalization (DeerFlow ToolErrorHandlingMiddleware) ──
-          // Convert exceptions to recoverable error messages instead of crashing.
-          // The agent can decide to retry, use an alternative tool, or give up.
-          const errMsg = toolExecErr instanceof Error ? toolExecErr.message : String(toolExecErr);
-          resultStr = JSON.stringify({
-            error: errMsg,
-            _toolCrashed: true,
-            message: `Tool '${toolName}' threw an exception: ${errMsg}. Try a different approach or use an alternative tool.`,
-          });
-          toolError = errMsg;
-          this.logger.warn({ toolName, error: errMsg }, 'Tool execution crashed — normalized to error message');
-        }
-
-        const toolCompletedAt = new Date();
-
-        // Record for tracing
-        allToolCalls.push({
-          toolName,
-          input: parsedArgs,
-          output: toolError ? { error: toolError } : resultStr,
-          startedAt: toolStartedAt,
-          completedAt: toolCompletedAt,
-          durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
-          error: toolError,
-        });
-
-        // Stage 2.2: emit tool_completed AFTER execution so the cockpit
-        // flips the row from running → success/failure. outputSummary
-        // is capped at 500 chars; if the tool returned an `_mock` /
-        // `_warning` / `_notice` flag we surface it honestly so the UI
-        // can render the "draft only" / "mock data" state correctly.
-        context.emitActivity({
-          type: 'tool_completed',
-          agentRole: this.role,
-          toolName,
-          success: !toolError,
-          // Honest outcome from the tool registry — 'real_success',
-          // 'draft_created', 'mock_provider', 'not_configured', etc.
-          // The cockpit reads this directly instead of guessing from
-          // substrings in outputSummary. Falls back to 'failed' when
-          // the tool errored without classification.
-          outcome: toolOutcome ?? (toolError ? 'failed' : 'real_success'),
-          durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
-          outputSummary: resultStr.slice(0, 500),
-          ...(toolError ? { error: toolError } : {}),
-          timestamp: toolCompletedAt.toISOString(),
-        });
-
-        // Stage 3.2 cost fix: truncate large tool outputs before
-        // re-injection into the next LLM call. Tools like web_search +
-        // web_fetch commonly return 20-100KB of content, which gets
-        // resent in full on EVERY subsequent tool-loop iteration.
-        // Truncating at 8KB (~2000 tokens) cuts per-iteration costs by
-        // 40-80% on research-heavy workflows while preserving enough
-        // context for the LLM to continue. Override via
-        // JAK_TOOL_OUTPUT_MAX_CHARS if a caller genuinely needs full
-        // context (e.g. VibeCoder reading a specific file).
-        const maxChars = Number(process.env['JAK_TOOL_OUTPUT_MAX_CHARS'] ?? '8000');
-        const truncatedResultStr =
-          resultStr.length > maxChars
-            ? resultStr.slice(0, maxChars) +
-              `\n\n[… tool output truncated at ${maxChars} chars. Full output in trace; ${resultStr.length} chars original.]`
-            : resultStr;
-
-        // Append tool result to conversation so LLM can use it
-        conversation.push({
-          role: 'tool' as const,
-          tool_call_id: tc.id,
-          content: truncatedResultStr,
-        });
-      }
-
-      this.logger.debug(
-        { iteration, toolCallCount: assistantMsg.tool_calls.length },
-        'Tool loop iteration complete, calling LLM again',
-      );
-    }
-
-    // Max iterations reached — return whatever content we have
-    this.logger.warn(
-      { maxIterations },
-      'executeWithTools reached max iterations without final response',
-    );
-
-    return {
-      content: 'Agent reached maximum tool call iterations. Partial results may be available in tool call outputs.',
-      toolCalls: allToolCalls,
-      totalTokens,
-      totalCostUsd,
-    };
+  protected buildChainOfThoughtPrompt(
+    taskDescription: string,
+    constraints: string[],
+  ): string {
+    return this.promptBuilder.buildChainOfThoughtPrompt(taskDescription, constraints);
   }
 
   // ─── AUTONOMOUS COWORK CAPABILITIES ────────────────────────────────────────
@@ -1130,22 +298,7 @@ ${lines.join('\n')}
     const reflectionMessages: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `You are a critical reviewer. Analyze the following output for errors, gaps, hallucinations, or quality issues. Think step by step.
-
-Respond with JSON:
-{
-  "hasIssues": <boolean>,
-  "issues": ["specific issue 1", "specific issue 2"],
-  "severity": "none" | "minor" | "major" | "critical",
-  "suggestion": "brief description of what needs fixing"
-}
-
-Be strict. Check for:
-- Factual accuracy and logical consistency
-- Completeness relative to the task description
-- Format compliance (proper JSON, required fields present)
-- Hallucinated data (made-up statistics, names, dates)
-- Vague or non-actionable recommendations`,
+        content: `You are a critical reviewer. Analyze the following output for errors, gaps, hallucinations, or quality issues. Think step by step.\n\nRespond with JSON:\n{\n  "hasIssues": <boolean>,\n  "issues": ["specific issue 1", "specific issue 2"],\n  "severity": "none" | "minor" | "major" | "critical",\n  "suggestion": "brief description of what needs fixing"\n}\n\nBe strict. Check for:\n- Factual accuracy and logical consistency\n- Completeness relative to the task description\n- Format compliance (proper JSON, required fields present)\n- Hallucinated data (made-up statistics, names, dates)\n- Vague or non-actionable recommendations`,
       },
       {
         role: 'user',
@@ -1183,22 +336,11 @@ Be strict. Check for:
       const correctionMessages: OpenAI.ChatCompletionMessageParam[] = [
         {
           role: 'system',
-          content: `You are the ${this.role} agent. Your previous output had issues. Fix them and produce a corrected version.
-Maintain the same JSON format. Only fix the identified issues — don't change things that were correct.`,
+          content: `You are the ${this.role} agent. Your previous output had issues. Fix them and produce a corrected version.\nMaintain the same JSON format. Only fix the identified issues — don't change things that were correct.`,
         },
         {
           role: 'user',
-          content: `ORIGINAL TASK: ${taskDescription}
-
-YOUR PREVIOUS OUTPUT:
-${originalOutput}
-
-ISSUES FOUND:
-${(reflection.issues ?? []).map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
-
-SUGGESTION: ${reflection.suggestion ?? 'Fix the issues above'}
-
-Produce a corrected output in the same format.`,
+          content: `ORIGINAL TASK: ${taskDescription}\n\nYOUR PREVIOUS OUTPUT:\n${originalOutput}\n\nISSUES FOUND:\n${(reflection.issues ?? []).map((i, idx) => `${idx + 1}. ${i}`).join('\n')}\n\nSUGGESTION: ${reflection.suggestion ?? 'Fix the issues above'}\n\nProduce a corrected output in the same format.`,
         },
       ];
 
@@ -1326,100 +468,6 @@ Produce a corrected output in the same format.`,
       // Non-critical
     }
     return memories;
-  }
-
-  /**
-   * Chain-of-thought reasoning before answering.
-   * Prepends a thinking phase that forces the LLM to reason step by step
-   * before producing the final output.
-   */
-  protected buildChainOfThoughtPrompt(
-    taskDescription: string,
-    constraints: string[],
-  ): string {
-    return `Before answering, reason step-by-step through this task:
-
-TASK: ${taskDescription}
-
-CONSTRAINTS:
-${constraints.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-
-REASONING PROCESS:
-1. What is being asked? (restate in your own words)
-2. What information do I need?
-3. What are the key constraints and edge cases?
-4. What is my approach?
-5. Execute the approach.
-6. Verify my output against the constraints.
-
-Now produce your final output as valid JSON.`;
-  }
-
-  protected buildSystemMessage(supplement?: string): string {
-    const base = `You are the ${this.role} agent in the JAK Swarm autonomous agent platform.
-You are a world-class expert in your domain. Your output should be better than what 95% of human professionals would produce.
-
-CORE PRINCIPLES:
-1. ACCURACY — Never hallucinate. If you don't know, say so. Cite sources when possible.
-2. COMPLETENESS — Address every aspect of the task. Don't leave gaps.
-3. ACTIONABILITY — Every recommendation must be specific and implementable.
-4. STRUCTURE — Always output valid JSON when requested. Use clear hierarchies.
-5. SELF-AWARENESS — State your confidence level. Flag assumptions explicitly.
-6. CHAIN-OF-THOUGHT — Think step-by-step before producing output.
-
-QUALITY STANDARDS:
-- Your work will be verified by a Verifier agent. Anticipate what it checks: completeness, accuracy, format, hallucination detection.
-- If a task is ambiguous, make your best interpretation AND note the ambiguity.
-- If a task requires information you don't have, say what's missing rather than guessing.
-- Always consider edge cases, risks, and failure modes.
-
-ANTI-HALLUCINATION RULES (NON-NEGOTIABLE):
-1. NEVER invent statistics, percentages, or specific numbers. If you cite a number, it must come from a tool result or be explicitly marked as "estimated based on general knowledge."
-2. NEVER claim you performed an action (sent email, created event, wrote file) unless a tool_call in this conversation proves it. If a tool returned {connected: false}, say "tool not connected" — do NOT fabricate what the tool would have returned.
-3. NEVER cite specific studies, papers, reports, or named sources unless they appeared in web_search results. Say "based on general knowledge" instead.
-4. ALWAYS state your confidence level: 0.3-0.5 for general knowledge, 0.6-0.8 for tool-backed claims, 0.9+ only with verified sources.
-5. When a task is ambiguous, state your interpretation AND flag the ambiguity — never silently assume.
-6. PREFER saying "I don't know" or "insufficient data" over fabricating a plausible-sounding answer.
-7. Every recommendation must be SPECIFIC and ACTIONABLE — no vague platitudes like "consider improving efficiency."
-
-RESEARCH & PLANNING METHODOLOGY:
-1. THINK step by step before producing output. Show your reasoning.
-2. GATHER information before concluding. Use web_search when available.
-3. PLAN before executing. Break complex tasks into steps.
-4. VALIDATE your output against the original task requirements before returning.
-5. DOUBLE-CHECK numbers, dates, and factual claims.`;
-
-    return supplement ? `${base}\n\n${supplement}` : base;
-  }
-
-  /**
-   * Retrieve semantically relevant context from the vector knowledge base.
-   * Returns a formatted string ready to inject into system prompts.
-   * Returns empty string if no relevant context found or vector search unavailable.
-   */
-  protected async buildRAGContext(query: string, tenantId: string, topK = 3): Promise<string> {
-    try {
-      // Dynamic import to avoid circular deps and handle missing vector module gracefully
-      const toolsModule = await import('@jak-swarm/tools');
-      const getAdapter = (toolsModule as Record<string, unknown>)['getVectorMemoryAdapter'] as
-        | (() => { search: (tenantId: string, query: string, topK: number, threshold: number) => Promise<Array<{ content: string; score: number }>> })
-        | undefined;
-
-      if (!getAdapter) return '';
-
-      const adapter = getAdapter();
-      const results = await adapter.search(tenantId, query, topK, 0.55);
-
-      if (results.length === 0) return '';
-
-      const contextBlocks = results.map((r: { content: string; score: number }, i: number) =>
-        `[${i + 1}] (relevance: ${Math.round(r.score * 100)}%) ${r.content}`,
-      );
-
-      return `\n\n## Relevant Knowledge Base Context\nThe following was retrieved from the organization's knowledge base. Use it to inform your response:\n${contextBlocks.join('\n\n')}`;
-    } catch {
-      return '';
-    }
   }
 
   protected recordTrace(
