@@ -50,13 +50,15 @@ function fakeCompletion(content: string): OpenAI.Chat.Completions.ChatCompletion
 }
 
 function stubLLMJson<T>(agent: T, payload: unknown): void {
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM = vi.fn(
     async () => fakeCompletion(JSON.stringify(payload)),
   );
 }
 
 function stubLLMRaw<T>(agent: T, text: string): void {
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM = vi.fn(
     async () => fakeCompletion(text),
   );
 }
@@ -355,7 +357,8 @@ describe('BrowserAgent — disallowed-domain precheck (upgrade coverage)', () =>
     const callSpy = vi.fn(async () => {
       throw new Error('LLM should not be invoked for a disallowed-domain NAVIGATE');
     });
-    (agent as unknown as { callLLM: typeof callSpy }).callLLM = callSpy;
+    const svc = (agent as unknown as { llmCallService: { callLLM: typeof callSpy } }).llmCallService;
+    svc.callLLM = callSpy;
 
     const result = await agent.execute(
       {
@@ -375,7 +378,8 @@ describe('BrowserAgent — disallowed-domain precheck (upgrade coverage)', () =>
   it('emits manual-review marker in blockedActions on non-JSON parse failure', async () => {
     const agent = new BrowserAgent('stub-key');
     // Use an allowed-domain EXTRACT so we reach the LLM path, then force a parse failure.
-    (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+    const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+    svc.callLLM = vi.fn(
       async () => fakeCompletion('I cannot structure this response right now.'),
     );
     const result = await agent.execute(

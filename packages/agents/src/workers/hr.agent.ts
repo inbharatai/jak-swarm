@@ -133,7 +133,7 @@ GENERATE_OFFER:
 - legalNotes MUST include "Counsel to review offer language before sending" and any jurisdiction-specific requirements (e.g. CA wage theft protection form, NYC pay transparency).
 
 Tools you have:
-- search_knowledge, generate_report, web_search, screen_resume, post_job_listing, generate_offer_letter
+- search_knowledge, generate_report, web_search, screen_resume, post_job_listing, generate_offer_letter, find_document
 
 Return STRICT JSON matching HRResult. Populate legalNotes with concrete, actionable items (never empty on POLICY_DRAFT / GENERATE_OFFER / COMPENSATION_ANALYSIS). No markdown fences.`;
 

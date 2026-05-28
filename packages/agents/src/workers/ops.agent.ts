@@ -173,8 +173,9 @@ export class OpsAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter (e.g. runbook, procedure, config)' },
-              limit: { type: 'number', description: 'Max results to return' },
+              maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+              scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+              scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
             },
             required: ['query'],
           },
@@ -188,11 +189,11 @@ export class OpsAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              title: { type: 'string' },
-              findings: { type: 'object' },
-              format: { type: 'string', enum: ['summary', 'detailed', 'incident'] },
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
+              title: { type: 'string', description: 'Report title' },
             },
-            required: ['title', 'findings'],
+            required: ['reportType'],
           },
         },
       },
@@ -214,15 +215,16 @@ export class OpsAgent extends BaseAgent {
       {
         type: 'function',
         function: {
-          name: 'check_runbook',
-          description: 'Look up a runbook by known-issue signature (error message, stack trace, alert name). Returns matching runbookId + steps if found. USE FIRST on TROUBLESHOOT — a known-issue match bypasses new hypothesizing.',
+          name: 'track_okrs',
+          description: 'Track OKR progress and correlate ops incidents with OKR impact',
           parameters: {
             type: 'object',
             properties: {
-              signature: { type: 'string', description: 'Error message, alert name, or stack trace hash' },
-              service: { type: 'string', description: 'Optional service name for narrower match' },
+              action: { type: 'string', description: 'Action: list, update, or check_progress' },
+              okrId: { type: 'string', description: 'OKR identifier for update/check' },
+              data: { type: 'object', description: 'Update data (progress, notes)' },
             },
-            required: ['signature'],
+            required: ['action'],
           },
         },
       },

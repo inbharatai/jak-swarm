@@ -50,7 +50,8 @@ function fakeCompletion(content: string): OpenAI.Chat.Completions.ChatCompletion
 }
 
 function stubLLM<T>(agent: T, jsonPayload: unknown): void {
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM =
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM =
     vi.fn(async () => fakeCompletion(JSON.stringify(jsonPayload)));
 }
 
@@ -91,7 +92,8 @@ describe('StrategistAgent (CEO) — strategic analysis output schema', () => {
 
   it('falls back with confidence lowered on non-JSON output', async () => {
     const agent = new StrategistAgent('stub-key');
-    (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+    const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+    svc.callLLM = vi.fn(
       async () => fakeCompletion('Not JSON at all'),
     );
     const result = await agent.execute({ action: 'STRATEGIC_ANALYSIS' }, stubContext());

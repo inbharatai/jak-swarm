@@ -120,6 +120,8 @@ You have access to these tools:
 - predict_churn: Predict churn probability from customer signals
 - memory_store: Persist learnings and account insights for future reference
 - memory_retrieve: Recall previous account insights and learnings
+- track_customer_health: Track customer health scores over time with trend detection
+- generate_qbr_deck: Compile customer data into QBR format
 
 Respond with JSON:
 {

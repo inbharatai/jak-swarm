@@ -291,6 +291,35 @@ export default function HomePage() {
         Skip to main content
       </a>
 
+      {/* JSON-LD Structured Data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: 'JAK Swarm',
+            description: 'The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
+            applicationCategory: 'BusinessApplication',
+            operatingSystem: 'Web',
+            offers: [
+              { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free' },
+              { '@type': 'Offer', price: '29', priceCurrency: 'USD', name: 'Starter' },
+              { '@type': 'Offer', price: '99', priceCurrency: 'USD', name: 'Professional' },
+              { '@type': 'Offer', price: '249', priceCurrency: 'USD', name: 'Enterprise' },
+            ],
+            featureList: [
+              '38 specialist agents',
+              '122 classified tools',
+              '22 integrations',
+              'Human approval gates',
+              'Audit trail',
+              'SOC 2 compliance',
+            ],
+          }),
+        }}
+      />
+
       <main id="main-content" className="landing-root min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
         {/* ── Nav ──────────────────────────────────────────────────────────── */}
         <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(9,9,11,0.6)' }} role="navigation" aria-label="Main navigation">

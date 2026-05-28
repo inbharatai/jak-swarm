@@ -232,8 +232,8 @@ export function registerBuiltinTools(): void {
       name: 'create_calendar_event',
       description: 'Create a new calendar event and optionally invite attendees.',
       category: ToolCategory.CALENDAR,
-      riskClass: ToolRiskClass.WRITE,
-      requiresApproval: false,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
+      requiresApproval: true,
       maturity: 'config_dependent',
       requiredEnvVars: ['CALDAV_USERNAME', 'CALDAV_PASSWORD', 'CALDAV_URL'],
       liveTested: false,
@@ -295,7 +295,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: true,
       maturity: 'llm_passthrough',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1402,7 +1402,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1519,7 +1519,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'write',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1777,7 +1777,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'write',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2054,7 +2054,7 @@ export function registerBuiltinTools(): void {
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      requiredEnvVars: ['OPENAI_API_KEY'],
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -3822,8 +3822,8 @@ export function registerBuiltinTools(): void {
     {
       name: 'generate_image',
       description: 'Generate an image using DALL-E 3. Returns a URL to the generated image. Use for social media posts, blog headers, presentations.',
-      category: 'DOCUMENT' as any,
-      riskClass: 'WRITE' as any,
+      category: ToolCategory.DOCUMENT,
+      riskClass: ToolRiskClass.WRITE,
       requiresApproval: false,
       maturity: 'config_dependent',
       requiredEnvVars: ['OPENAI_API_KEY'],
@@ -3894,8 +3894,8 @@ export function registerBuiltinTools(): void {
     {
       name: 'post_to_twitter',
       description: 'Post a tweet to Twitter/X using browser automation. Requires being logged into Twitter in the browser profile. Can include text and optionally attach an image.',
-      category: 'BROWSER' as any,
-      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
       maturity: 'config_dependent',
       liveTested: false,
@@ -3952,8 +3952,8 @@ export function registerBuiltinTools(): void {
     {
       name: 'post_to_linkedin',
       description: 'Post content to LinkedIn using browser automation. Requires being logged into LinkedIn in the browser profile.',
-      category: 'BROWSER' as any,
-      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
       maturity: 'config_dependent',
       liveTested: false,
@@ -4017,8 +4017,8 @@ export function registerBuiltinTools(): void {
     {
       name: 'post_to_reddit',
       description: 'Create a Reddit post in a specified subreddit using browser automation. Requires being logged into Reddit in the browser profile.',
-      category: 'BROWSER' as any,
-      riskClass: 'EXTERNAL_SIDE_EFFECT' as any,
+      category: ToolCategory.BROWSER,
+      riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
       maturity: 'config_dependent',
       liveTested: false,
@@ -4082,8 +4082,8 @@ export function registerBuiltinTools(): void {
     {
       name: 'discover_posting_platforms',
       description: 'Search the web for new platforms, forums, and communities where JAK Swarm content should be posted to grow the community.',
-      category: 'RESEARCH' as any,
-      riskClass: 'READ_ONLY' as any,
+      category: ToolCategory.RESEARCH,
+      riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
@@ -5434,7 +5434,7 @@ Date: _______________`;
       requiresApproval: false,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5462,7 +5462,7 @@ Date: _______________`;
       requiresApproval: false,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5565,7 +5565,7 @@ Date: _______________`;
       requiresApproval: true,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'external',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5626,7 +5626,7 @@ Date: _______________`;
       requiresApproval: true,
       maturity: 'real_external',
       liveTested: false,
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'destructive',
       inputSchema: {
         type: 'object',
         properties: { sandboxId: { type: 'string', description: 'Sandbox ID to destroy' } },

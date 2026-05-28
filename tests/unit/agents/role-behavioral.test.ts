@@ -59,9 +59,9 @@ function stubLLM<T extends { [k: string]: unknown }>(
   agent: T,
   jsonPayload: unknown,
 ): void {
-  // BaseAgent.callLLM is protected — cast through unknown to override on the instance.
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM =
-    vi.fn(async () => fakeCompletion(JSON.stringify(jsonPayload)));
+  // BaseAgent.callLLM routes through llmCallService — stub the service instead.
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM = vi.fn(async () => fakeCompletion(JSON.stringify(jsonPayload)));
 }
 
 describe('EmailAgent — expert-mode output schema', () => {
@@ -231,7 +231,8 @@ describe('ResearchAgent — expert-mode output schema', () => {
 
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const agent = new ResearchAgent('stub-key');
-    (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+    const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+    svc.callLLM = vi.fn(
       async () => fakeCompletion('This is definitely not JSON at all'),
     );
     const result = await agent.execute({ query: 'anything' }, stubContext());

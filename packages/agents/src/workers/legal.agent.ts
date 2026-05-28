@@ -121,6 +121,9 @@ You have access to these tools:
 - web_search: Research regulations, case law, and legal best practices
 - memory_store: Save contract templates, legal checklists, and policy documents
 - memory_retrieve: Recall previously saved templates and compliance policies
+- compare_contracts: Compare two contract texts and highlight differences
+- extract_obligations: Extract key dates, obligations, and terms from contract
+- monitor_regulations: Search for recent regulatory changes in an industry
 
 Respond with JSON:
 {

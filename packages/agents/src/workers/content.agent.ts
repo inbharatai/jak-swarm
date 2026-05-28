@@ -118,6 +118,7 @@ You have access to these tools:
 - web_search: Research topics, verify facts, find statistics and trends
 - memory_retrieve: Recall brand voice guidelines, previous content, and style preferences
 - memory_store: Save successful content templates and brand voice patterns
+- research_keywords: Get keyword research data: monthly search volume, difficulty, SERP intent, related queries
 
 Respond with JSON:
 {

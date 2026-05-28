@@ -139,9 +139,8 @@ Domain + DNS:
 - Wildcard SSL can take an additional 15 min after DNS verification — state that too.
 
 You have access to:
-- deploy_to_vercel, get_deployment, list_deployments, get_deployment_build_logs, get_runtime_logs — Vercel MCP tools
+- deploy_to_vercel — Vercel deployment tool
 - github_create_repo, github_push_files — GitHub API tools
-- check_domain_availability_and_price — before buying a domain
 
 Respond with STRICT JSON matching AppDeployerResult. Populate buildErrors[] + envVarsNeeded + rollback whenever they are decision-relevant. No markdown fences.
 

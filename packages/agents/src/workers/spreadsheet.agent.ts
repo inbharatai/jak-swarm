@@ -161,18 +161,11 @@ export class SpreadsheetAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              spreadsheetId: { type: 'string', description: 'ID of the spreadsheet to parse' },
-              data: {
-                type: 'array',
-                items: { type: 'object' },
-                description: 'Inline data rows if no spreadsheetId',
-              },
-              columns: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Subset of columns to analyze',
-              },
+              data: { type: 'string', description: 'CSV or TSV data as a string' },
+              delimiter: { type: 'string', description: 'Column delimiter (default: auto-detect)' },
+              hasHeaders: { type: 'boolean', description: 'Whether the first row contains headers (default: true)' },
             },
+            required: ['data'],
           },
         },
       },
@@ -184,11 +177,10 @@ export class SpreadsheetAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              data: { type: 'array', items: { type: 'object' } },
-              columns: { type: 'array', items: { type: 'string' } },
-              includeCorrelations: { type: 'boolean' },
+              values: { type: 'array', items: { type: 'number' }, description: 'Numeric values to analyze' },
+              label: { type: 'string', description: 'Label for the dataset' },
             },
-            required: ['data', 'columns'],
+            required: ['values'],
           },
         },
       },
@@ -200,11 +192,27 @@ export class SpreadsheetAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              title: { type: 'string' },
-              analysisResults: { type: 'object' },
-              format: { type: 'string', enum: ['summary', 'detailed', 'executive'] },
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
+              title: { type: 'string', description: 'Report title' },
             },
-            required: ['title', 'analysisResults'],
+            required: ['reportType'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'forecast_cashflow',
+          description: 'Time-series forecasting for cashflow (linear regression / moving average)',
+          parameters: {
+            type: 'object',
+            properties: {
+              data: { type: 'object', description: 'Historical cashflow data' },
+              method: { type: 'string', description: 'Forecasting method: linear, moving_average, exponential' },
+              periods: { type: 'number', description: 'Number of periods to forecast' },
+            },
+            required: ['data'],
           },
         },
       },

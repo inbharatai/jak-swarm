@@ -42,7 +42,8 @@ function fakeCompletion(content: string): OpenAI.Chat.Completions.ChatCompletion
 }
 
 function stubLLM<T>(agent: T, payload: unknown): void {
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM =
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM =
     vi.fn(async () => fakeCompletion(JSON.stringify(payload)));
 }
 
@@ -96,7 +97,8 @@ describe('AppArchitectAgent — architecture + fileTree + dataModels + apiEndpoi
 
   it('falls back with low confidence on non-JSON output', async () => {
     const agent = new AppArchitectAgent('stub-key');
-    (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+    const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+    svc.callLLM = vi.fn(
       async () => fakeCompletion('Architecture: use Next.js.'),
     );
     const result = await agent.execute(
@@ -154,7 +156,8 @@ describe('AppGeneratorAgent — files[] + explanation output schema', () => {
 
   it('degrades gracefully when LLM returns plain text', async () => {
     const agent = new AppGeneratorAgent('stub-key');
-    (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM = vi.fn(
+    const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+    svc.callLLM = vi.fn(
       async () => fakeCompletion('Sorry, I could not generate code.'),
     );
     const result = await agent.execute(

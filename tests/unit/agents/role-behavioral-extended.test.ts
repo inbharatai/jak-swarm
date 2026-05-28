@@ -44,7 +44,8 @@ function fakeCompletion(content: string): OpenAI.Chat.Completions.ChatCompletion
 }
 
 function stubLLM<T>(agent: T, jsonPayload: unknown): void {
-  (agent as unknown as { callLLM: (...a: unknown[]) => Promise<unknown> }).callLLM =
+  const svc = (agent as unknown as { llmCallService: { callLLM: (...a: unknown[]) => Promise<unknown> } }).llmCallService;
+  svc.callLLM =
     vi.fn(async () => fakeCompletion(JSON.stringify(jsonPayload)));
 }
 
