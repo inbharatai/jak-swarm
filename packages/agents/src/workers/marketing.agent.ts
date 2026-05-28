@@ -145,8 +145,9 @@ You have access to these tools:
 - search_knowledge: search the internal knowledge base for brand assets and past campaigns
 - generate_report: compile your marketing strategy into a structured report
 - monitor_brand_mentions: track brand mentions across Reddit, Twitter, HN, and news
-- auto_reply_reddit: find Reddit threads and draft contextual replies
-- auto_reply_twitter: find Twitter discussions and draft engagement replies
+- auto_engage_reddit: find Reddit threads and draft contextual replies
+- auto_engage_twitter: find Twitter discussions and draft engagement replies
+- auto_engage_linkedin: find LinkedIn posts about topics and draft professional engagement comments
 - generate_seo_report: generate comprehensive SEO report combining audit, keywords, and SERP analysis
 - track_content_performance: track published content URLs and performance over time
 
@@ -221,7 +222,9 @@ export class MarketingAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter' },
+              maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+              scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+              scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
             },
             required: ['query'],
           },
@@ -235,17 +238,17 @@ export class MarketingAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },
       { type: 'function' as const, function: { name: 'monitor_brand_mentions', description: 'Track brand mentions across Reddit, Twitter, HN, and news', parameters: { type: 'object', properties: { brand: { type: 'string' }, platforms: { type: 'array', items: { type: 'string' } } }, required: ['brand'] } } },
-      { type: 'function' as const, function: { name: 'auto_engage_reddit', description: 'Find Reddit threads and draft contextual replies', parameters: { type: 'object', properties: { topic: { type: 'string' }, product: { type: 'string' }, tone: { type: 'string' } }, required: ['topic'] } } },
-      { type: 'function' as const, function: { name: 'auto_engage_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { topic: { type: 'string' }, product: { type: 'string' } }, required: ['topic'] } } },
+      { type: 'function' as const, function: { name: 'auto_engage_reddit', description: 'Find Reddit threads and draft contextual replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' }, maxThreads: { type: 'number' } }, required: ['keywords'] } } },
+      { type: 'function' as const, function: { name: 'auto_engage_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' } }, required: ['keywords'] } } },
       { type: 'function' as const, function: { name: 'auto_engage_linkedin', description: 'Find LinkedIn posts about topics and draft professional engagement comments', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' }, tone: { type: 'string' } }, required: ['keywords'] } } },
       { type: 'function' as const, function: { name: 'generate_seo_report', description: 'Generate comprehensive SEO report combining audit, keywords, and SERP analysis', parameters: { type: 'object', properties: { url: { type: 'string' }, keywords: { type: 'array', items: { type: 'string' } } }, required: ['url'] } } },
       { type: 'function' as const, function: { name: 'track_content_performance', description: 'Track published content URLs and performance over time', parameters: { type: 'object', properties: { url: { type: 'string' }, title: { type: 'string' }, platform: { type: 'string' }, action: { type: 'string' } }, required: ['url', 'title', 'platform', 'action'] } } },

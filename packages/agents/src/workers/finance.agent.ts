@@ -121,6 +121,9 @@ You have access to these tools:
 - parse_spreadsheet: extract and parse data from spreadsheet inputs
 - search_knowledge: search the internal knowledge base for financial benchmarks and historical data
 - generate_report: compile your financial analysis into a structured report
+- parse_financial_csv: parse CSV financial data into structured format
+- track_budget: track budget vs actuals in persistent memory
+- forecast_cashflow: forecast cashflow based on historical data
 
 Respond with JSON:
 {
@@ -176,11 +179,10 @@ export class FinanceAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              operation: { type: 'string', description: 'The calculation to perform (e.g., "dcf", "irr", "npv", "cagr", "mean", "percentile")' },
-              data: { type: 'object', description: 'Input data for the calculation' },
-              parameters: { type: 'object', description: 'Additional parameters for the calculation' },
+              values: { type: 'array', description: 'Array of numbers to compute statistics for' },
+              label: { type: 'string', description: 'Optional label for the dataset' },
             },
-            required: ['operation', 'data'],
+            required: ['values'],
           },
         },
       },
@@ -192,11 +194,11 @@ export class FinanceAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              source: { type: 'string', description: 'Spreadsheet identifier or path' },
-              sheet: { type: 'string', description: 'Sheet name to parse' },
-              range: { type: 'string', description: 'Cell range to extract (e.g., "A1:F50")' },
+              data: { type: 'string', description: 'CSV string or raw data to parse' },
+              delimiter: { type: 'string', description: 'Column delimiter (default: comma)' },
+              hasHeaders: { type: 'boolean', description: 'Whether the first row is headers (default: true)' },
             },
-            required: ['source'],
+            required: ['data'],
           },
         },
       },
@@ -209,7 +211,9 @@ export class FinanceAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter (e.g., "benchmarks", "financials", "industry")' },
+              maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+              scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+              scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
             },
             required: ['query'],
           },
@@ -223,11 +227,11 @@ export class FinanceAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },

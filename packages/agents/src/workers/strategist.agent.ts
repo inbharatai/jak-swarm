@@ -109,6 +109,9 @@ You have access to these tools:
 - web_search: search the web for market data, competitor information, and industry trends
 - search_knowledge: search the internal knowledge base for company data and past analyses
 - generate_report: compile your strategic analysis into a structured report
+- track_okrs: track OKR progress in persistent memory
+- monitor_competitors: search for recent competitor news and changes
+- generate_board_report: compile a board-level executive summary report
 
 Respond with JSON:
 {
@@ -161,7 +164,9 @@ export class StrategistAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter' },
+              maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+              scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+              scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
             },
             required: ['query'],
           },
@@ -175,11 +180,11 @@ export class StrategistAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },

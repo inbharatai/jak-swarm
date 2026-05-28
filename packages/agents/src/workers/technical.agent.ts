@@ -128,6 +128,8 @@ You have access to these tools:
 - search_knowledge: search the internal knowledge base for existing architecture docs and technical standards
 - generate_report: compile your technical analysis into a structured report
 - web_search: search the web for technology benchmarks, best practices, and documentation
+- check_dependencies: parse package.json and check for vulnerabilities
+- estimate_tech_debt: analyze code files for tech debt indicators
 
 For "review my codebase" requests: use github_list_files to map the tree, then github_read_file on the 5-10 most relevant files. Do NOT stop at analyze_github_repo metadata — the user asked you to review code, not repo stats.
 
@@ -234,7 +236,9 @@ export class TechnicalAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter (e.g., "architecture", "standards", "adrs")' },
+              maxResults: { type: 'number', description: 'Maximum number of results (default: 5)' },
+              scopeType: { type: 'string', description: 'Scope type: TENANT, USER, WORKFLOW, PROJECT, or AGENT (default: TENANT)' },
+              scopeId: { type: 'string', description: 'Scope identifier (defaults to tenantId for TENANT scope)' },
             },
             required: ['query'],
           },
@@ -248,11 +252,11 @@ export class TechnicalAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },

@@ -5562,7 +5562,7 @@ Date: _______________`;
       description: 'Start a development server in the sandbox and return the preview URL.',
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
-      requiresApproval: false,
+      requiresApproval: true,
       maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'read',

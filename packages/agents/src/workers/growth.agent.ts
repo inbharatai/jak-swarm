@@ -135,6 +135,9 @@ You have access to these tools:
 - predict_churn: Predict churn probability from multiple signals
 - monitor_company_signals: Detect buying signals for a company
 - find_decision_makers: Find key people at a company by role
+- auto_engage_reddit: find Reddit threads about keywords and draft helpful replies
+- auto_engage_twitter: find Twitter discussions and draft engagement replies
+- track_lead_pipeline: store and manage leads with stage tracking
 
 Respond with JSON:
 {
@@ -378,8 +381,8 @@ export class GrowthAgent extends BaseAgent {
           },
         },
       },
-      { type: 'function' as const, function: { name: 'auto_engage_reddit', description: 'Find Reddit threads about keywords and draft helpful replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' }, maxThreads: { type: 'number' } }, required: ['keywords'] } } },
-      { type: 'function' as const, function: { name: 'auto_engage_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } }, productName: { type: 'string' } }, required: ['keywords'] } } },
+      { type: 'function' as const, function: { name: 'auto_engage_reddit', description: 'Find Reddit threads about keywords and draft helpful replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for on Reddit' }, productName: { type: 'string', description: 'Product name to subtly reference in replies' }, maxThreads: { type: 'number', description: 'Maximum threads to return (default: 5)' } }, required: ['keywords'] } } },
+      { type: 'function' as const, function: { name: 'auto_engage_twitter', description: 'Find Twitter discussions and draft engagement replies', parameters: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for on Twitter/X' }, productName: { type: 'string', description: 'Product name to reference in replies' } }, required: ['keywords'] } } },
       { type: 'function' as const, function: { name: 'track_lead_pipeline', description: 'Store and manage leads with stage tracking', parameters: { type: 'object', properties: { action: { type: 'string' }, lead: { type: 'object' }, leadId: { type: 'string' } }, required: ['action'] } } },
     ];
 
