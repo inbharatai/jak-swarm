@@ -152,7 +152,11 @@ jobs:
         # `integration/*` suite has drift from earlier API evolution that
         # predates the Phase 1-3 hardening pass (see integration-drift job
         # below). Unblocking new work while that drift is tracked separately.
-        run: pnpm --filter @jak-swarm/tests exec vitest run --coverage unit integration/circuit-breaker.test.ts integration/truth-claims.test.ts
+        # NOTE: unit/agents/role-*-behavioral.test.ts files call the live OpenAI API
+        # and require a real OPENAI_API_KEY. They are excluded here so CI stays green
+        # for structural + service + route tests. Run behavioral tests locally with
+        # OPENAI_API_KEY=sk-... when validating agent behavior changes.
+        run: pnpm --filter @jak-swarm/tests exec vitest run --coverage unit integration/circuit-breaker.test.ts integration/truth-claims.test.ts --exclude "**/role-*-behavioral.test.ts"
         env:
           NODE_ENV: test
           AUTH_SECRET: ci-test-secret-change-me
