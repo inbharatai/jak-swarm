@@ -13,7 +13,7 @@
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-2090_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Tests](https://img.shields.io/badge/Tests-2045_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Free Trial](https://img.shields.io/badge/Free_Trial-30_Days-34d399?style=for-the-badge&logo=sparkfun&logoColor=white)](https://jakswarm.com/trial)
 
 **JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
@@ -108,6 +108,8 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 > **Migration 106 — Team + 30-Day Free Trial (8 May 2026):** humans-on-task-graph wedge + landing-page free-trial CTA with daily caps. Departments + manager hierarchy (`/team`), per-employee Inbox (`/my-tasks`), human task assignment (`POST /task-assignments`), aggregated `/inbox` route (tasks + approvals + notifications in one round-trip), trial signup at `/trial` with email-only intake (no credit card), four daily caps enforced before workflow start (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K tokens / day), trial-cap guard returning structured `429 TRIAL_DAILY_CAP_HIT` + `402 TRIAL_EXPIRED` so the cockpit can render banners instead of silently failing. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts), now expanded by later migrations. Full design + file map + carry-overs in [`docs/team-and-trial.md`](docs/team-and-trial.md).
 
 > **Migration 107 — Closed-loop Company OS foundation (20 May 2026):** evidence artifacts -> company graph entities -> deterministic drift findings -> OpenAI-generated agent specs -> reviewer decision gate. Hardening in this pass fixed recurring drift reopening, completed-work false positives, primary artifact evidence preservation, immutable spec review decisions, and `/company` source/type parity with the API schema. Truth-locked by [`tests/unit/services/company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) (17 tests), [`tests/integration/company-os-foundation.test.ts`](tests/integration/company-os-foundation.test.ts) (30 tests), and [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (59 tests).
+
+> **Migration 108 — A-to-Z Critical Fixes (28 May 2026):** five structural refactors closing the top critical gaps surfaced by the human-level A-to-Z audit (rated 6.0/10 → structural fixes landed). **Planner prompt slimmed** from 157 lines to 42, deterministic keyword overrides removed, verb→worker mapping accuracy preserved (added `check`/`review`/`audit`/`website`/`URL`). **Conversation memory migrated** from a frontend localStorage string-concat hack to real server-side thread persistence: new `Conversation` + `ConversationMessage` Prisma models, Supabase migration applied, history injected into `SwarmState` and prepended by the Commander node so the LLM sees prior turns natively. **Workflows routes split:** 1,054-line `workflows.routes.ts` god-file decomposed into 4 sub-routers (`workflow-control`, `workflow-query`, `workflow-stream`, `conversation`) + 2 services (`workflow-creation`, `workflow-recovery`) with zero business-logic change. **BaseAgent decomposed:** 1,508-line god-class split into `llm-call.service.ts`, `prompt-builder.service.ts`, and `tool-execution.service.ts` — all public signatures preserved for subclasses. **OpenAPI auto-spec:** added `zod-to-json-schema` registry + `generate-spec.ts` chokepoint so `/docs` and `/openapi.json` stay typed from the Zod source of truth. Structural tests updated to read the new file paths; 2,045 unit/structural tests passing. Honest carry-over: 64 behavioral integration tests still fail on the dummy OpenAI key (`401`) — pre-existing, not introduced by this migration.
 
 > **Security + quality audit — 8 P0 hardening + test-coverage push (8 May 2026):** five parallel deep-survey agents (dead code · route safety · test gaps · security re-audit · schema integrity) drove a single-session pass that closed 8 P0 + 2 P1 findings AND wrote 17 previously-missing test files (+420 tests, total 2045 passing at that time). **P0 hardening:** `Workflow.userId` + `TaskAssignment.assignedByUserId` schema declarations now match the live FK behaviour (truth-of-record); `/trial/verify` got `Cache-Control: no-store` + 80 ms response-time floor (kills cache-of-initialPassword + timing side-channel); `JAK_TRIAL_EMAIL_LOG_DIR` validated against an allowlist (tmpdir / cwd/tmp / `/var/log/jak` / `JAK_ALLOWED_DATA_ROOT`); per-IP (5/min signup, 10/min verify) + per-email (3/hr) rate limits added; `X-Forwarded-For` only honoured behind `JAK_TRUST_PROXY=true`; trial cap now enforced on `WorkflowSchedule` cron firing (`SKIPPED_TRIAL_CAP_HIT` / `SKIPPED_TRIAL_EXPIRED`); department parent-chain has full ancestor-cycle detection (depth-cap 64). **5 real bugs surfaced + fixed by writing tests:** `task-assignments` cancel notification mis-categorised as `task_assigned` (now distinct `task_completed`/`task_declined`/`task_cancelled` kinds); `inbox.routes` showed approvals to `OPERATOR` who can't decide them; `auth.service.register` echoed the email back in `ConflictError` (enumeration oracle — generic message + sha256-truncated-hash log); `DELETE /documents/:id` had no role check (now uploader-or-`REVIEWER+`); `update({where:{id}})` tenant-isolation invariant documented as load-bearing on the prior `findFirst`. **17 new test files** covering credential / bundle+bundle-signing / oauth-providers / sandbox / auth services + audit-run / workflow / workflow-timeline / artifact / 3 compliance services + 5 routes (task-assignments / team / inbox / trial / documents). **Honest carry-overs:** 30 service/route files still untested (~15-25 hours more focused work); OAuth refresh-token grant flow doesn't exist; `sandbox.service` is a thin lifecycle wrapper (real isolation lives in the adapter); `audit-run.transition()` has a read-then-write concurrency race. The landing truth-lock has since expanded with the Company OS checks named above.
 
@@ -256,7 +258,7 @@ flowchart LR
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
 | 🧪 | **Tool Maturity Manifest** | All 122 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
 | 🧠 | **OpenAI-only runtime** | Primary and only LLM execution path: OpenAI Responses API with GPT-5.5 for Tier 3 orchestration and GPT-5.4 for Tier 1/2 worker paths. API keys are required: set `OPENAI_API_KEY` for LLM execution. No Anthropic/Gemini/DeepSeek/Ollama/OpenRouter fallback is wired in the runtime. |
-| 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. Learns from every execution |
+| 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. **Conversation threads** are now server-side (`Conversation` + `ConversationMessage` tables) with full history injection into the LangGraph state so multi-turn chat feels continuous instead of a string-concat hack. |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
 | 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
 | 💬 | **Slack Channel Bridge** | Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling |
@@ -1084,6 +1086,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | **External Integrations** | Model Context Protocol (MCP) |
 | **Testing** | Vitest |
 | **Schema Validation** | Zod |
+| **OpenAPI / Docs** | `zod-to-json-schema` — auto-generated from Zod schemas, registered via `schema-registry.ts` + `generate-spec.ts` |
 
 ---
 
@@ -1094,15 +1097,16 @@ jak-swarm/
 ├── apps/
 │   ├── api/                    # Fastify REST API (port 4000)
 │   │   └── src/
-│   │       ├── routes/         # 16 route modules (workflows, approvals, audit, audit-runs, compliance, artifacts, bundles, exports, integrations, schedules, memory, tools, traces, voice, slack, ...)
+│   │       ├── routes/         # 16 route modules (workflows split into 4 sub-routers: control, query, stream, conversation; approvals, audit, audit-runs, compliance, artifacts, bundles, exports, integrations, schedules, memory, tools, traces, voice, slack, ...)
 │   │       ├── services/
 │   │       │   ├── audit/       # AuditRun · ControlTest · Exception · Workpaper · FinalPack
 │   │       │   ├── compliance/  # Mapper · Attestation · ManualEvidence · Scheduler · auto-mapping rules
 │   │       │   ├── exporters/   # JSON · CSV · XLSX · PDF · DOCX
-│   │       │   └── ...          # artifact, bundle, bundle-signing, db-state-store, swarm-execution, workflow, etc.
+│   │       │   └── ...          # artifact, bundle, bundle-signing, db-state-store, swarm-execution, workflow-creation, workflow-recovery, etc.
 │   │       ├── middleware/      # Auth, RBAC, rate limiting
 │   │       ├── boot/           # Config validation + environment diagnostics
-│   │       └── plugins/        # Fastify plugins
+│   │       ├── plugins/        # Fastify plugins
+│   │       └── openapi/        # Zod → JSON Schema → OpenAPI spec registry
 │   └── web/                    # Next.js 16 dashboard (port 3000)
 │       └── src/app/(dashboard)/
 │           ├── home/           # Mission control
@@ -1120,7 +1124,7 @@ jak-swarm/
 ├── packages/
 │   ├── agents/                 # 38 agent implementations
 │   │   └── src/
-│   │       ├── base/           # BaseAgent, LLM providers, anti-hallucination, memory injection
+│   │       ├── base/           # BaseAgent (decomposed) → llm-call.service, prompt-builder.service, tool-execution.service
 │   │       ├── roles/          # 6 orchestrator agents
 │   │       └── workers/        # 32 worker agents
 │   ├── tools/                  # 122 tool implementations
@@ -1199,6 +1203,19 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | GET | `/workflows/:workflowId/approvals` | JWT | Get approval requests for a workflow |
 | GET | `/workflows/:workflowId/stream` | JWT (query) | SSE event stream for real-time updates |
 | GET | `/workflows/:workflowId/output` | JWT | Download final output as markdown |
+
+</details>
+
+<details>
+<summary><b>💬 Conversations</b></summary>
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| GET | `/conversations` | JWT | List conversations for current user |
+| POST | `/conversations` | JWT | Create a new conversation thread |
+| GET | `/conversations/:id` | JWT | Get a conversation with its messages |
+| DELETE | `/conversations/:id` | JWT | Delete a conversation and its messages |
+| POST | `/workflows` | JWT | Create workflow accepts optional `conversationId`; prior thread history is injected into the Commander node's prompt automatically |
 
 </details>
 
@@ -1856,7 +1873,7 @@ Honest deferrals (named, not faked): live SSE on the audit detail page (~1 day; 
 <details>
 <summary><b>How do I add a new agent?</b></summary>
 
-Subclass `BaseAgent` in `packages/agents/src/`, register it in `packages/agents/src/index.ts`. Pattern: every agent has an `agentRole`, a system prompt, a list of tools it's allowed to call, and (optionally) a `needsGrounding` flag for citation enforcement.
+Subclass `BaseAgent` in `packages/agents/src/`, register it in `packages/agents/src/index.ts`. Pattern: every agent has an `agentRole`, a system prompt, a list of tools it's allowed to call, and (optionally) a `needsGrounding` flag for citation enforcement. `BaseAgent` delegates to three composable services (`LLMCallService`, `PromptBuilderService`, `ToolExecutionService`) in `packages/agents/src/base/`; subclass overrides should target the protected hook methods rather than re-implementing the full LLM call loop.
 
 </details>
 
