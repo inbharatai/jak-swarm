@@ -154,71 +154,9 @@ export class AppGeneratorAgent extends BaseAgent {
       'App Generator agent executing task',
     );
 
+    // NOTE: validate_typescript, lint_code, check_imports removed —
+    // not registered in the tool registry. Register in a future sprint if needed.
     const tools: OpenAI.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'validate_typescript',
-          description: 'Type-check a TypeScript/TSX file against strict mode + the generated file tree. Returns { ok, errors[{file, line, code, message}] }. USE on every generated file before including it in the result. Broken types = Vibe Coder build-check will fail later.',
-          parameters: {
-            type: 'object',
-            properties: {
-              filePath: { type: 'string', description: 'Relative path of the file being checked' },
-              content: { type: 'string', description: 'File content' },
-              projectContext: {
-                type: 'object',
-                description: 'Known existing files + their exports (for cross-file type resolution)',
-              },
-            },
-            required: ['filePath', 'content'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'lint_code',
-          description: 'Run ESLint (Next.js strict + react-hooks + a11y rules). Returns findings[{line, rule, severity, message, fix?}]. USE on every .tsx/.ts output before shipping.',
-          parameters: {
-            type: 'object',
-            properties: {
-              filePath: { type: 'string' },
-              content: { type: 'string' },
-              rulesetVariant: { type: 'string', enum: ['nextjs', 'react', 'node'] },
-            },
-            required: ['filePath', 'content'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'check_imports',
-          description: 'Validate that every import in a file resolves to (a) a file in the generated batch, (b) an existing file, or (c) a declared dependency. Returns { ok, unresolvedImports[{importPath, line}], suggestedDeps[] }. USE on every file — broken imports are the #1 cause of build-check failures.',
-          parameters: {
-            type: 'object',
-            properties: {
-              filePath: { type: 'string' },
-              content: { type: 'string' },
-              generatedFiles: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Paths of all files in the current generation batch',
-              },
-              existingFiles: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Paths of files already present in the project',
-              },
-              knownDependencies: {
-                type: 'object',
-                description: 'package.json dependencies map',
-              },
-            },
-            required: ['filePath', 'content'],
-          },
-        },
-      },
       {
         type: 'function',
         function: {

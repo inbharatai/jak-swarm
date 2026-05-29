@@ -1,9 +1,12 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import { WorkflowService } from '../../services/workflow.service.js';
 import { enforceTenantIsolation } from '../../middleware/tenant-isolation.js';
 import { ok, err } from '../../types.js';
 import { AppError } from '../../errors.js';
 import { resumeWorkflowBodySchema } from '../workflows.routes.js';
+
+const controlBodySchema = z.object({}).strict();
 
 const workflowControlRoutes: FastifyPluginAsync = async (fastify) => {
   const workflowService = new WorkflowService(fastify.db, fastify.log);
@@ -104,27 +107,37 @@ const workflowControlRoutes: FastifyPluginAsync = async (fastify) => {
     '/:workflowId/pause',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
+      try {
+        const bodyParsed = controlBodySchema.safeParse(request.body ?? {});
+        if (!bodyParsed.success) {
+          return reply.code(422).send(err('VALIDATION_ERROR', 'Invalid request body', bodyParsed.error.flatten()));
+        }
+        const { workflowId } = request.params as { workflowId: string };
+        const { tenantId } = request.user;
 
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-      if (workflow.status !== 'RUNNING' && workflow.status !== 'EXECUTING') {
-        return reply.code(400).send(err('BAD_REQUEST', `Cannot pause workflow in ${workflow.status} status`));
+        const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
+        if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
+        if (workflow.status !== 'RUNNING' && workflow.status !== 'EXECUTING') {
+          return reply.code(400).send(err('BAD_REQUEST', `Cannot pause workflow in ${workflow.status} status`));
+        }
+
+        fastify.swarm.pauseWorkflow(workflowId);
+        await fastify.coordination.signals.publish({
+          type: 'pause',
+          workflowId,
+          issuedBy: request.user.userId,
+          timestamp: new Date().toISOString(),
+        });
+        await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'PAUSED' } });
+
+        fastify.swarm.emit(`workflow:${workflowId}`, { type: 'paused', workflowId, timestamp: new Date().toISOString() });
+
+        return reply.send(ok({ success: true, message: 'Workflow will pause after current node completes' }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        request.log.error({ err: e }, 'Failed to pause workflow');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      fastify.swarm.pauseWorkflow(workflowId);
-      await fastify.coordination.signals.publish({
-        type: 'pause',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'PAUSED' } });
-
-      fastify.swarm.emit(`workflow:${workflowId}`, { type: 'paused', workflowId, timestamp: new Date().toISOString() });
-
-      return reply.send(ok({ success: true, message: 'Workflow will pause after current node completes' }));
     },
   );
 
@@ -135,37 +148,47 @@ const workflowControlRoutes: FastifyPluginAsync = async (fastify) => {
     '/:workflowId/unpause',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
+      try {
+        const bodyParsed = controlBodySchema.safeParse(request.body ?? {});
+        if (!bodyParsed.success) {
+          return reply.code(422).send(err('VALIDATION_ERROR', 'Invalid request body', bodyParsed.error.flatten()));
+        }
+        const { workflowId } = request.params as { workflowId: string };
+        const { tenantId } = request.user;
 
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
-      if (workflow.status !== 'PAUSED') {
-        return reply.code(400).send(err('BAD_REQUEST', `Cannot unpause workflow in ${workflow.status} status`));
+        const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
+        if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
+        if (workflow.status !== 'PAUSED') {
+          return reply.code(400).send(err('BAD_REQUEST', `Cannot unpause workflow in ${workflow.status} status`));
+        }
+
+        const pendingApproval = await fastify.db.approvalRequest.findFirst({
+          where: { workflowId, tenantId, status: 'PENDING' },
+          select: { id: true },
+        });
+        if (pendingApproval) {
+          return reply.code(409).send(err(
+            'APPROVAL_REQUIRED',
+            'This workflow is paused for a pending approval. Use /approvals/:approvalId/decide or /workflows/:workflowId/resume with a reviewer role.',
+            { approvalId: pendingApproval.id },
+          ));
+        }
+
+        fastify.swarm.unpauseWorkflow(workflowId);
+        await fastify.coordination.signals.publish({
+          type: 'unpause',
+          workflowId,
+          issuedBy: request.user.userId,
+          timestamp: new Date().toISOString(),
+        });
+        await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING' } });
+
+        return reply.send(ok({ success: true, message: 'Workflow resumed' }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        request.log.error({ err: e }, 'Failed to unpause workflow');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      const pendingApproval = await fastify.db.approvalRequest.findFirst({
-        where: { workflowId, tenantId, status: 'PENDING' },
-        select: { id: true },
-      });
-      if (pendingApproval) {
-        return reply.code(409).send(err(
-          'APPROVAL_REQUIRED',
-          'This workflow is paused for a pending approval. Use /approvals/:approvalId/decide or /workflows/:workflowId/resume with a reviewer role.',
-          { approvalId: pendingApproval.id },
-        ));
-      }
-
-      fastify.swarm.unpauseWorkflow(workflowId);
-      await fastify.coordination.signals.publish({
-        type: 'unpause',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING' } });
-
-      return reply.send(ok({ success: true, message: 'Workflow resumed' }));
     },
   );
 
@@ -176,25 +199,35 @@ const workflowControlRoutes: FastifyPluginAsync = async (fastify) => {
     '/:workflowId/stop',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
+      try {
+        const bodyParsed = controlBodySchema.safeParse(request.body ?? {});
+        if (!bodyParsed.success) {
+          return reply.code(422).send(err('VALIDATION_ERROR', 'Invalid request body', bodyParsed.error.flatten()));
+        }
+        const { workflowId } = request.params as { workflowId: string };
+        const { tenantId } = request.user;
 
-      const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
-      if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
+        const workflow = await fastify.db.workflow.findFirst({ where: { id: workflowId, tenantId } });
+        if (!workflow) return reply.code(404).send(err('NOT_FOUND', 'Workflow not found'));
 
-      fastify.swarm.stopWorkflow(workflowId);
-      await fastify.coordination.signals.publish({
-        type: 'stop',
-        workflowId,
-        issuedBy: request.user.userId,
-        timestamp: new Date().toISOString(),
-      });
-      await fastify.db.workflow.update({
-        where: { id: workflowId },
-        data: { status: 'CANCELLED', error: 'Stopped by user', completedAt: new Date() },
-      });
+        fastify.swarm.stopWorkflow(workflowId);
+        await fastify.coordination.signals.publish({
+          type: 'stop',
+          workflowId,
+          issuedBy: request.user.userId,
+          timestamp: new Date().toISOString(),
+        });
+        await fastify.db.workflow.update({
+          where: { id: workflowId },
+          data: { status: 'CANCELLED', error: 'Stopped by user', completedAt: new Date() },
+        });
 
-      return reply.send(ok({ success: true, message: 'Workflow stopped' }));
+        return reply.send(ok({ success: true, message: 'Workflow stopped' }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        request.log.error({ err: e }, 'Failed to stop workflow');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 

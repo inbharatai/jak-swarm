@@ -23,6 +23,10 @@ const createDeptSchema = z.object({
 
 const updateDeptSchema = createDeptSchema.partial();
 
+const deleteDeptParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
 const updateMembershipSchema = z.object({
   departmentId: z.string().nullable().optional(),
   jobTitle: z.string().max(120).nullable().optional(),
@@ -40,33 +44,45 @@ const teamRoutes: FastifyPluginAsync = async (fastify) => {
 
   /** GET /team/departments — list this tenant's departments (with member counts). */
   fastify.get('/departments', { preHandler: auth }, async (request, reply) => {
-    const tenantId = request.user.tenantId;
-    const departments = await fastify.db.department.findMany({
-      where: { tenantId },
-      orderBy: [{ parentId: 'asc' }, { name: 'asc' }],
-      include: {
-        _count: { select: { members: true, children: true } },
-      },
-    });
-    return reply.status(200).send(ok({ items: departments, count: departments.length }));
+    try {
+      const tenantId = request.user.tenantId;
+      const departments = await fastify.db.department.findMany({
+        where: { tenantId },
+        orderBy: [{ parentId: 'asc' }, { name: 'asc' }],
+        include: {
+          _count: { select: { members: true, children: true } },
+        },
+      });
+      return reply.status(200).send(ok({ items: departments, count: departments.length }));
+    } catch (e) {
+      if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+      request.log.error({ err: e }, 'Failed to list departments');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   /** GET /team/departments/:id — detail + members. */
   fastify.get('/departments/:id', { preHandler: auth }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const tenantId = request.user.tenantId;
-    const dept = await fastify.db.department.findFirst({
-      where: { id, tenantId },
-      include: {
-        members: {
-          select: { id: true, name: true, email: true, jobTitle: true, role: true, active: true },
+    try {
+      const { id } = request.params as { id: string };
+      const tenantId = request.user.tenantId;
+      const dept = await fastify.db.department.findFirst({
+        where: { id, tenantId },
+        include: {
+          members: {
+            select: { id: true, name: true, email: true, jobTitle: true, role: true, active: true },
+          },
+          children: { select: { id: true, name: true } },
+          parent: { select: { id: true, name: true } },
         },
-        children: { select: { id: true, name: true } },
-        parent: { select: { id: true, name: true } },
-      },
-    });
-    if (!dept) return reply.status(404).send(err('NOT_FOUND', 'Department not found'));
-    return reply.status(200).send(ok(dept));
+      });
+      if (!dept) return reply.status(404).send(err('NOT_FOUND', 'Department not found'));
+      return reply.status(200).send(ok(dept));
+    } catch (e) {
+      if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+      request.log.error({ err: e }, 'Failed to get department');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   /** POST /team/departments — create department. */
@@ -167,55 +183,73 @@ const teamRoutes: FastifyPluginAsync = async (fastify) => {
 
   /** DELETE /team/departments/:id — soft-delete (sets parentId on children to null + members to null). */
   fastify.delete('/departments/:id', { preHandler: writeAdmin }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const tenantId = request.user.tenantId;
-    const existing = await fastify.db.department.findFirst({
-      where: { id, tenantId },
-      select: { id: true },
-    });
-    if (!existing) return reply.status(404).send(err('NOT_FOUND', 'Department not found'));
+    try {
+      const paramsParsed = deleteDeptParamsSchema.safeParse(request.params);
+      if (!paramsParsed.success) {
+        return reply
+          .status(422)
+          .send(err('VALIDATION_ERROR', 'Invalid params', paramsParsed.error.flatten()));
+      }
+      const { id } = paramsParsed.data;
+      const tenantId = request.user.tenantId;
+      const existing = await fastify.db.department.findFirst({
+        where: { id, tenantId },
+        select: { id: true },
+      });
+      if (!existing) return reply.status(404).send(err('NOT_FOUND', 'Department not found'));
 
-    // FK on departmentId is SET NULL; children too via parentId. Hard-delete is fine.
-    await fastify.db.department.delete({ where: { id } });
-    return reply.status(204).send();
+      // FK on departmentId is SET NULL; children too via parentId. Hard-delete is fine.
+      await fastify.db.department.delete({ where: { id } });
+      return reply.status(204).send();
+    } catch (e) {
+      if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+      request.log.error({ err: e }, 'Failed to delete department');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // ────────────── Members / directory ──────────────
 
   /** GET /team/members — searchable directory of all active users in this tenant. */
   fastify.get('/members', { preHandler: auth }, async (request, reply) => {
-    const tenantId = request.user.tenantId;
-    const q = (request.query as { q?: string; departmentId?: string })?.q?.trim();
-    const departmentId = (request.query as { departmentId?: string })?.departmentId;
+    try {
+      const tenantId = request.user.tenantId;
+      const q = (request.query as { q?: string; departmentId?: string })?.q?.trim();
+      const departmentId = (request.query as { departmentId?: string })?.departmentId;
 
-    const where: Record<string, unknown> = { tenantId, active: true };
-    if (departmentId) where.departmentId = departmentId;
-    if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { jobTitle: { contains: q, mode: 'insensitive' } },
-      ];
+      const where: Record<string, unknown> = { tenantId, active: true };
+      if (departmentId) where.departmentId = departmentId;
+      if (q) {
+        where.OR = [
+          { name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+          { jobTitle: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+
+      const members = await fastify.db.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          jobTitle: true,
+          role: true,
+          departmentId: true,
+          managerId: true,
+          avatarUrl: true,
+          department: { select: { id: true, name: true } },
+          manager: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { name: 'asc' },
+        take: 200,
+      });
+      return reply.status(200).send(ok({ items: members, count: members.length }));
+    } catch (e) {
+      if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+      request.log.error({ err: e }, 'Failed to list team members');
+      return reply.status(500).send({ error: 'Internal server error' });
     }
-
-    const members = await fastify.db.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        jobTitle: true,
-        role: true,
-        departmentId: true,
-        managerId: true,
-        avatarUrl: true,
-        department: { select: { id: true, name: true } },
-        manager: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { name: 'asc' },
-      take: 200,
-    });
-    return reply.status(200).send(ok({ items: members, count: members.length }));
   });
 
   /** PATCH /team/members/:userId — update department / jobTitle / manager. */

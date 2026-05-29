@@ -23,6 +23,10 @@ const updateScheduleSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+const runScheduleBodySchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
 const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
   const preHandlerBase = [fastify.authenticate, enforceTenantIsolation];
 
@@ -34,12 +38,17 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { tenantId } = request.user;
-      const schedules = await fastify.db.workflowSchedule.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-      });
-      return reply.send(ok(schedules));
+      try {
+        const { tenantId } = request.user;
+        const schedules = await fastify.db.workflowSchedule.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+        });
+        return reply.send(ok(schedules));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to list schedules');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -51,11 +60,16 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/:id',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params as { id: string };
-      const { tenantId } = request.user;
-      const schedule = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
-      if (!schedule) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
-      return reply.send(ok(schedule));
+      try {
+        const { id } = request.params as { id: string };
+        const { tenantId } = request.user;
+        const schedule = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
+        if (!schedule) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
+        return reply.send(ok(schedule));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to get schedule');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -67,46 +81,51 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { tenantId, userId } = request.user;
-      const parsed = createScheduleSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
-      }
-      const body = parsed.data;
-
-      if (!body.name || !body.goal || !body.cronExpression) {
-        return reply.code(400).send(err('VALIDATION_ERROR', 'name, goal, and cronExpression are required'));
-      }
-
-      // Validate cron expression
       try {
-        CronExpressionParser.parse(body.cronExpression);
-      } catch {
-        return reply.code(400).send(
-          err('VALIDATION_ERROR', 'Invalid cron expression. Use standard 5-field format: "minute hour dayOfMonth month dayOfWeek"'),
-        );
+        const { tenantId, userId } = request.user;
+        const parsed = createScheduleSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
+        }
+        const body = parsed.data;
+
+        if (!body.name || !body.goal || !body.cronExpression) {
+          return reply.code(400).send(err('VALIDATION_ERROR', 'name, goal, and cronExpression are required'));
+        }
+
+        // Validate cron expression
+        try {
+          CronExpressionParser.parse(body.cronExpression);
+        } catch {
+          return reply.code(400).send(
+            err('VALIDATION_ERROR', 'Invalid cron expression. Use standard 5-field format: "minute hour dayOfMonth month dayOfWeek"'),
+          );
+        }
+
+        // Calculate first nextRunAt
+        const expr = CronExpressionParser.parse(body.cronExpression);
+        const nextRunAt = expr.next().toDate();
+
+        const schedule = await fastify.db.workflowSchedule.create({
+          data: {
+            tenantId,
+            userId,
+            name: body.name,
+            goal: body.goal,
+            cronExpression: body.cronExpression,
+            description: body.description,
+            industry: body.industry,
+            maxCostUsd: body.maxCostUsd,
+            nextRunAt,
+          },
+        });
+
+        await fastify.auditLog(request, 'CREATE_SCHEDULE', 'Schedule', schedule.id, { name: schedule.name });
+        return reply.code(201).send(ok(schedule));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to create schedule');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      // Calculate first nextRunAt
-      const expr = CronExpressionParser.parse(body.cronExpression);
-      const nextRunAt = expr.next().toDate();
-
-      const schedule = await fastify.db.workflowSchedule.create({
-        data: {
-          tenantId,
-          userId,
-          name: body.name,
-          goal: body.goal,
-          cronExpression: body.cronExpression,
-          description: body.description,
-          industry: body.industry,
-          maxCostUsd: body.maxCostUsd,
-          nextRunAt,
-        },
-      });
-
-      await fastify.auditLog(request, 'CREATE_SCHEDULE', 'Schedule', schedule.id, { name: schedule.name });
-      return reply.code(201).send(ok(schedule));
     },
   );
 
@@ -118,41 +137,46 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/:id',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params as { id: string };
-      const { tenantId } = request.user;
-      const parsed = updateScheduleSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
-      }
-      const updates: Record<string, unknown> = { ...parsed.data };
-
-      const existing = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
-      if (!existing) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
-
-      // If cron expression changed, recalculate nextRunAt
-      if (updates.cronExpression && typeof updates.cronExpression === 'string') {
-        try {
-          const expr = CronExpressionParser.parse(updates.cronExpression);
-          updates.nextRunAt = expr.next().toDate();
-        } catch {
-          return reply.code(400).send(err('VALIDATION_ERROR', 'Invalid cron expression'));
+      try {
+        const { id } = request.params as { id: string };
+        const { tenantId } = request.user;
+        const parsed = updateScheduleSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
         }
+        const updates: Record<string, unknown> = { ...parsed.data };
+
+        const existing = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
+        if (!existing) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
+
+        // If cron expression changed, recalculate nextRunAt
+        if (updates.cronExpression && typeof updates.cronExpression === 'string') {
+          try {
+            const expr = CronExpressionParser.parse(updates.cronExpression);
+            updates.nextRunAt = expr.next().toDate();
+          } catch {
+            return reply.code(400).send(err('VALIDATION_ERROR', 'Invalid cron expression'));
+          }
+        }
+
+        // If re-enabled, recalculate nextRunAt
+        if (updates.enabled === true && !existing.enabled) {
+          const cron = (updates.cronExpression as string) ?? existing.cronExpression;
+          const expr = CronExpressionParser.parse(cron);
+          updates.nextRunAt = expr.next().toDate();
+        }
+
+        const schedule = await fastify.db.workflowSchedule.update({
+          where: { id },
+          data: updates as any,
+        });
+
+        await fastify.auditLog(request, 'UPDATE_SCHEDULE', 'Schedule', schedule.id);
+        return reply.send(ok(schedule));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to update schedule');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      // If re-enabled, recalculate nextRunAt
-      if (updates.enabled === true && !existing.enabled) {
-        const cron = (updates.cronExpression as string) ?? existing.cronExpression;
-        const expr = CronExpressionParser.parse(cron);
-        updates.nextRunAt = expr.next().toDate();
-      }
-
-      const schedule = await fastify.db.workflowSchedule.update({
-        where: { id },
-        data: updates as any,
-      });
-
-      await fastify.auditLog(request, 'UPDATE_SCHEDULE', 'Schedule', schedule.id);
-      return reply.send(ok(schedule));
     },
   );
 
@@ -164,12 +188,17 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/:id',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params as { id: string };
-      const { tenantId } = request.user;
+      try {
+        const { id } = request.params as { id: string };
+        const { tenantId } = request.user;
 
-      await fastify.db.workflowSchedule.deleteMany({ where: { id, tenantId } });
-      await fastify.auditLog(request, 'DELETE_SCHEDULE', 'Schedule', id);
-      return reply.code(204).send();
+        await fastify.db.workflowSchedule.deleteMany({ where: { id, tenantId } });
+        await fastify.auditLog(request, 'DELETE_SCHEDULE', 'Schedule', id);
+        return reply.code(204).send();
+      } catch (err) {
+        request.log.error({ err }, 'Failed to delete schedule');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -181,45 +210,55 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
     '/:id/run',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params as { id: string };
-      const { tenantId } = request.user;
+      try {
+        const { id } = request.params as { id: string };
+        const { tenantId } = request.user;
 
-      const schedule = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
-      if (!schedule) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
+        const parsed = runScheduleBodySchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send(err('VALIDATION_ERROR', parsed.error.message));
+        }
 
-      // Create a workflow record and kick off execution
-      const workflow = await fastify.db.workflow.create({
-        data: {
-          tenantId: schedule.tenantId,
-          userId: schedule.userId,
-          goal: schedule.goal,
-          industry: schedule.industry,
-          status: 'PENDING',
-        },
-      });
+        const schedule = await fastify.db.workflowSchedule.findFirst({ where: { id, tenantId } });
+        if (!schedule) return reply.code(404).send(err('NOT_FOUND', 'Schedule not found'));
 
-      setImmediate(() => {
-        void fastify.swarm.executeAsync({
-          workflowId: workflow.id,
-          tenantId: schedule.tenantId,
-          userId: schedule.userId,
-          goal: schedule.goal,
-          industry: schedule.industry ?? undefined,
+        // Create a workflow record and kick off execution
+        const workflow = await fastify.db.workflow.create({
+          data: {
+            tenantId: schedule.tenantId,
+            userId: schedule.userId,
+            goal: schedule.goal,
+            industry: schedule.industry,
+            status: 'PENDING',
+          },
         });
-      });
 
-      // Update last run info
-      await fastify.db.workflowSchedule.update({
-        where: { id },
-        data: {
-          lastRunAt: new Date(),
-          lastRunStatus: 'RUNNING',
-          lastRunId: workflow.id,
-          runCount: { increment: 1 },
-        },
-      });
+        setImmediate(() => {
+          void fastify.swarm.executeAsync({
+            workflowId: workflow.id,
+            tenantId: schedule.tenantId,
+            userId: schedule.userId,
+            goal: schedule.goal,
+            industry: schedule.industry ?? undefined,
+          });
+        });
 
-      return reply.send(ok({ workflowId: workflow.id, message: 'Workflow triggered' }));
+        // Update last run info
+        await fastify.db.workflowSchedule.update({
+          where: { id },
+          data: {
+            lastRunAt: new Date(),
+            lastRunStatus: 'RUNNING',
+            lastRunId: workflow.id,
+            runCount: { increment: 1 },
+          },
+        });
+
+        return reply.send(ok({ workflowId: workflow.id, message: 'Workflow triggered' }));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to trigger schedule run');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 };

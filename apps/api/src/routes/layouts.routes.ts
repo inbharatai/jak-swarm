@@ -28,17 +28,22 @@ const layoutRoutes: FastifyPluginAsync = async (fastify) => {
     '/current',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = request.user.userId;
+      try {
+        const userId = request.user.userId;
 
-      const record = await fastify.db.userLayout.findUnique({
-        where: { userId },
-      });
+        const record = await fastify.db.userLayout.findUnique({
+          where: { userId },
+        });
 
-      if (!record) {
-        return reply.send(ok({ layout: null }));
+        if (!record) {
+          return reply.send(ok({ layout: null }));
+        }
+
+        return reply.send(ok({ layout: record.layout }));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to get current layout');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      return reply.send(ok({ layout: record.layout }));
     },
   );
 
@@ -50,25 +55,30 @@ const layoutRoutes: FastifyPluginAsync = async (fastify) => {
     '/current',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = request.user.userId;
+      try {
+        const userId = request.user.userId;
 
-      const parsed = layoutSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send(err('INVALID_LAYOUT', 'Invalid layout data'));
+        const parsed = layoutSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.status(400).send(err('INVALID_LAYOUT', 'Invalid layout data'));
+        }
+
+        const record = await fastify.db.userLayout.upsert({
+          where: { userId },
+          create: {
+            userId,
+            layout: parsed.data.layout as any,
+          },
+          update: {
+            layout: parsed.data.layout as any,
+          },
+        });
+
+        return reply.send(ok({ layout: record.layout }));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to save current layout');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      const record = await fastify.db.userLayout.upsert({
-        where: { userId },
-        create: {
-          userId,
-          layout: parsed.data.layout as any,
-        },
-        update: {
-          layout: parsed.data.layout as any,
-        },
-      });
-
-      return reply.send(ok({ layout: record.layout }));
     },
   );
 };

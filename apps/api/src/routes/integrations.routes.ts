@@ -15,6 +15,8 @@ import {
 import { normalizeMcpProviderKey } from '../services/company-brain/sync-provider-normalization.js';
 import { ok, err } from '../types.js';
 
+const oauthAuthorizeBodySchema = z.object({}).strict();
+
 type IntegrationMaturity = 'production-ready' | 'beta' | 'partial' | 'placeholder';
 
 const INTEGRATION_MATURITY: Record<string, { maturity: IntegrationMaturity; note: string }> = {
@@ -209,17 +211,22 @@ export async function integrationRoutes(app: FastifyInstance) {
   app.get('/integrations', {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const integrations = await app.db.integration.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return reply.send(ok(
-      integrations.map((integration) => ({
-        ...integration,
-        ...getIntegrationMaturity(integration.provider),
-      })),
-    ));
+    try {
+      const { tenantId } = request.user;
+      const integrations = await app.db.integration.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reply.send(ok(
+        integrations.map((integration) => ({
+          ...integration,
+          ...getIntegrationMaturity(integration.provider),
+        })),
+      ));
+    } catch (err) {
+      request.log.error({ err }, 'Failed to list integrations');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // ─── /integrations/gmail/inbox ───────────────────────────────────────────
@@ -459,42 +466,52 @@ export async function integrationRoutes(app: FastifyInstance) {
   app.post('/integrations/:id/test', {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { tenantId } = request.user;
+    try {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user;
 
-    const integration = await app.db.integration.findFirst({ where: { id, tenantId } });
-    if (!integration) return reply.code(404).send(err('NOT_FOUND', 'Integration not found'));
+      const integration = await app.db.integration.findFirst({ where: { id, tenantId } });
+      if (!integration) return reply.code(404).send(err('NOT_FOUND', 'Integration not found'));
 
-    const isConnected = mcpClientManager.isConnected(integration.provider);
-    const tools = mcpClientManager.getRegisteredTools(integration.provider);
+      const isConnected = mcpClientManager.isConnected(integration.provider);
+      const tools = mcpClientManager.getRegisteredTools(integration.provider);
 
-    return reply.send(ok({
-        connected: isConnected,
-        provider: integration.provider,
-        toolCount: tools.length,
-        tools,
-      }));
+      return reply.send(ok({
+          connected: isConnected,
+          provider: integration.provider,
+          toolCount: tools.length,
+          tools,
+        }));
+    } catch (err) {
+      request.log.error({ err }, 'Failed to test integration');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // Disconnect an integration
   app.delete('/integrations/:id', {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const { id } = request.params as { id: string };
+    try {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
 
-    const integration = await app.db.integration.findFirst({ where: { id, tenantId } });
-    if (integration) {
-      await mcpClientManager.disconnect(integration.provider);
-    }
+      const integration = await app.db.integration.findFirst({ where: { id, tenantId } });
+      if (integration) {
+        await mcpClientManager.disconnect(integration.provider);
+      }
 
-    await app.db.integration.deleteMany({
-      where: { id, tenantId },
-    });
-    if (integration) {
-      await app.auditLog(request, 'DISCONNECT_INTEGRATION', 'Integration', id, { provider: integration.provider });
+      await app.db.integration.deleteMany({
+        where: { id, tenantId },
+      });
+      if (integration) {
+        await app.auditLog(request, 'DISCONNECT_INTEGRATION', 'Integration', id, { provider: integration.provider });
+      }
+      return reply.code(204).send();
+    } catch (err) {
+      request.log.error({ err }, 'Failed to disconnect integration');
+      return reply.status(500).send({ error: 'Internal server error' });
     }
-    return reply.code(204).send();
   });
 
   // ─── OAuth discovery: which providers are configured on this deployment ──
@@ -515,6 +532,10 @@ export async function integrationRoutes(app: FastifyInstance) {
   app.post('/integrations/oauth/:provider/authorize', {
     preHandler: [app.authenticate],
   }, async (request, reply) => {
+    const bodyParsed = oauthAuthorizeBodySchema.safeParse(request.body ?? {});
+    if (!bodyParsed.success) {
+      return reply.code(422).send(err('VALIDATION_ERROR', 'Invalid request body', bodyParsed.error.flatten()));
+    }
     const { provider } = request.params as { provider: string };
     const providerUpper = provider.toUpperCase();
     const { tenantId, userId } = request.user;

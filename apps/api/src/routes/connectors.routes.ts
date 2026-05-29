@@ -49,47 +49,52 @@ const connectorsRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const query = request.query as { category?: string; status?: string };
+      try {
+        const query = request.query as { category?: string; status?: string };
 
-      if (query.category && !VALID_CATEGORIES.includes(query.category as (typeof VALID_CATEGORIES)[number])) {
-        return reply.status(422).send(err('VALIDATION_ERROR', `Invalid category '${query.category}'`));
-      }
-      if (query.status && !VALID_STATUSES.includes(query.status as ConnectorStatus)) {
-        return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${query.status}'`));
-      }
+        if (query.category && !VALID_CATEGORIES.includes(query.category as (typeof VALID_CATEGORIES)[number])) {
+          return reply.status(422).send(err('VALIDATION_ERROR', `Invalid category '${query.category}'`));
+        }
+        if (query.status && !VALID_STATUSES.includes(query.status as ConnectorStatus)) {
+          return reply.status(422).send(err('VALIDATION_ERROR', `Invalid status '${query.status}'`));
+        }
 
-      let views = connectorRegistry.list();
-      if (query.category) {
-        views = views.filter((v) => v.manifest.category === query.category);
-      }
-      if (query.status) {
-        views = views.filter((v) => v.status === query.status);
-      }
+        let views = connectorRegistry.list();
+        if (query.category) {
+          views = views.filter((v) => v.manifest.category === query.category);
+        }
+        if (query.status) {
+          views = views.filter((v) => v.status === query.status);
+        }
 
-      // Aggregate counts by status so the dashboard can show a header
-      // ribbon ("4 installed · 2 needs setup · 17 available") without
-      // a second round-trip.
-      const all = connectorRegistry.list();
-      const counts: Record<ConnectorStatus, number> = {
-        available: 0,
-        installed: 0,
-        configured: 0,
-        needs_user_setup: 0,
-        failed_validation: 0,
-        unavailable: 0,
-        disabled: 0,
-        blocked_by_policy: 0,
-      };
-      for (const v of all) {
-        counts[v.status] = (counts[v.status] ?? 0) + 1;
-      }
+        // Aggregate counts by status so the dashboard can show a header
+        // ribbon ("4 installed · 2 needs setup · 17 available") without
+        // a second round-trip.
+        const all = connectorRegistry.list();
+        const counts: Record<ConnectorStatus, number> = {
+          available: 0,
+          installed: 0,
+          configured: 0,
+          needs_user_setup: 0,
+          failed_validation: 0,
+          unavailable: 0,
+          disabled: 0,
+          blocked_by_policy: 0,
+        };
+        for (const v of all) {
+          counts[v.status] = (counts[v.status] ?? 0) + 1;
+        }
 
-      return reply.send(ok({
-        connectors: views,
-        total: views.length,
-        registered: all.length,
-        counts,
-      }));
+        return reply.send(ok({
+          connectors: views,
+          total: views.length,
+          registered: all.length,
+          counts,
+        }));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to list connectors');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -101,12 +106,17 @@ const connectorsRoutes: FastifyPluginAsync = async (fastify) => {
     '/:id',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params as { id: string };
-      const view = connectorRegistry.get(id);
-      if (!view) {
-        return reply.status(404).send(err('NOT_FOUND', `Connector '${id}' not registered`));
+      try {
+        const { id } = request.params as { id: string };
+        const view = connectorRegistry.get(id);
+        if (!view) {
+          return reply.status(404).send(err('NOT_FOUND', `Connector '${id}' not registered`));
+        }
+        return reply.send(ok(view));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to get connector');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-      return reply.send(ok(view));
     },
   );
 
@@ -123,15 +133,20 @@ const connectorsRoutes: FastifyPluginAsync = async (fastify) => {
     '/resolve',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const parsed = resolveBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(422).send(err('VALIDATION_ERROR', parsed.error.message));
+      try {
+        const parsed = resolveBodySchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.status(422).send(err('VALIDATION_ERROR', parsed.error.message));
+        }
+        const opts: { hintedRoles?: string[]; maxAlternatives?: number } = {};
+        if (parsed.data.hintedRoles !== undefined) opts.hintedRoles = parsed.data.hintedRoles;
+        if (parsed.data.maxAlternatives !== undefined) opts.maxAlternatives = parsed.data.maxAlternatives;
+        const result = resolveConnectorsForTask(parsed.data.task, opts);
+        return reply.send(ok(result));
+      } catch (err) {
+        request.log.error({ err }, 'Failed to resolve connectors for task');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-      const opts: { hintedRoles?: string[]; maxAlternatives?: number } = {};
-      if (parsed.data.hintedRoles !== undefined) opts.hintedRoles = parsed.data.hintedRoles;
-      if (parsed.data.maxAlternatives !== undefined) opts.maxAlternatives = parsed.data.maxAlternatives;
-      const result = resolveConnectorsForTask(parsed.data.task, opts);
-      return reply.send(ok(result));
     },
   );
 };

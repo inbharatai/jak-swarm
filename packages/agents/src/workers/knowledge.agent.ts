@@ -88,9 +88,8 @@ EXTRACT:
 
 Tools you have:
 - search_knowledge — tenant-scoped internal retrieval with semantic + keyword + date filters.
-- dedupe_sources(results) — collapses near-duplicate hits. USE after search_knowledge on SEARCH / SUMMARIZE.
-- check_freshness(docIds) — returns per-doc freshness classification (fresh / aging / stale / likely_superseded) based on lastUpdated + domain half-life.
 - classify_text — supporting classification / extraction.
+- NOTE: dedupe_sources, check_freshness are not yet available (not registered in the tool registry). Manually deduplicate near-duplicate results and flag stale documents based on lastUpdated dates until they are registered.
 
 Respond with JSON:
 {
@@ -163,47 +162,8 @@ export class KnowledgeAgent extends BaseAgent {
           },
         },
       },
-      {
-        type: 'function',
-        function: {
-          name: 'dedupe_sources',
-          description: 'Collapse near-duplicate search results (same policy republished, wiki page mirrored across spaces, different versions of same doc). Returns canonical list with {id, title, duplicates[]}. USE after search_knowledge to avoid returning 5 copies of the same policy.',
-          parameters: {
-            type: 'object',
-            properties: {
-              results: {
-                type: 'array',
-                items: { type: 'object' },
-                description: 'Array of search results to deduplicate',
-              },
-              similarityThreshold: { type: 'number', description: 'Similarity threshold 0-1 (default 0.85)' },
-            },
-            required: ['results'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'check_freshness',
-          description: 'Classify each document\'s freshness based on lastUpdated + domain half-life. Returns {docId: {freshness: "fresh" | "aging" | "stale" | "likely_superseded", ageDays, warning?}}. USE on final result set before returning — stale policies in answers are a leading cause of RAG system distrust.',
-          parameters: {
-            type: 'object',
-            properties: {
-              docIds: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Document IDs to classify',
-              },
-              domainHalfLifeDays: {
-                type: 'number',
-                description: 'How long documents in this domain typically stay accurate (policies: 180d; technical: 90d; product-pricing: 30d)',
-              },
-            },
-            required: ['docIds'],
-          },
-        },
-      },
+      // NOTE: dedupe_sources, check_freshness removed —
+      // not registered in the tool registry. Register in a future sprint if needed.
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

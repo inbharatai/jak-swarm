@@ -148,57 +148,9 @@ export class AppDebuggerAgent extends BaseAgent {
       },
     ];
 
+    // NOTE: run_typecheck, read_stacktrace, apply_patch removed —
+    // not registered in the tool registry. Register in a future sprint if needed.
     const tools: OpenAI.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'run_typecheck',
-          description: 'Re-run the TypeScript compiler against the current set of files (including any proposed fix) and return { ok, errors[{file, line, code, message}] }. USE to verify a proposed fix actually resolves the compile error before returning it.',
-          parameters: {
-            type: 'object',
-            properties: {
-              files: {
-                type: 'array',
-                items: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } } },
-                description: 'Full file tree to check (including proposed fixes substituted in)',
-              },
-              strict: { type: 'boolean', description: 'Use strict mode (default true)' },
-            },
-            required: ['files'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'read_stacktrace',
-          description: 'Parse a stack trace (Next.js build, Vite, Node runtime), identify the root frame, and surface the minimal relevant source context for debugging. Returns { rootFrame: {file, line, function}, precedingContext, hypothesis, confidence }. USE on every DIAGNOSE_BUILD_ERROR / FIX_RUNTIME_ERROR as first step.',
-          parameters: {
-            type: 'object',
-            properties: {
-              trace: { type: 'string', description: 'Raw stack trace / error log text' },
-              errorType: { type: 'string', enum: ['build', 'runtime', 'type', 'lint', 'hydration'] },
-            },
-            required: ['trace'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'apply_patch',
-          description: 'Validate that a proposed minimal patch (not a full file) applies cleanly to the original content. Prevents the "regenerate the whole file and introduce new bugs" failure mode. Returns { applied: bool, resultContent?, conflictLines? }. USE when the fix is small and surgical (1-5 lines).',
-          parameters: {
-            type: 'object',
-            properties: {
-              originalContent: { type: 'string' },
-              patch: { type: 'string', description: 'Unified diff or described minimal change' },
-              mode: { type: 'string', enum: ['diff', 'described-minimal'] },
-            },
-            required: ['originalContent', 'patch'],
-          },
-        },
-      },
       {
         type: 'function',
         function: {

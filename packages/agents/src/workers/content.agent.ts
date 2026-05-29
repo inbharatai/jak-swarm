@@ -206,36 +206,8 @@ export class ContentAgent extends BaseAgent {
           },
         },
       },
-      {
-        type: 'function',
-        function: {
-          name: 'brand_voice_check',
-          description: 'Score content against the tenant\'s known brand voice profile. Returns { alignmentScore (0-1), driftedAttributes[], recommendations[] }. USE on final content before publish to catch off-brand drift.',
-          parameters: {
-            type: 'object',
-            properties: {
-              content: { type: 'string', description: 'Content to score' },
-              format: { type: 'string', description: 'blog | social | newsletter | email | press-release' },
-            },
-            required: ['content'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'check_readability',
-          description: 'Compute Flesch-Kincaid grade level, Hemingway-style complex-sentence flags, and average sentence length. Returns { gradeLevel, avgSentenceLen, longSentences[], passiveCount, suggestions[] }. USE on WRITE_BLOG, WRITE_NEWSLETTER. Target: grade 8-10 for B2B, 6-8 for B2C.',
-          parameters: {
-            type: 'object',
-            properties: {
-              content: { type: 'string', description: 'Content to analyze' },
-              targetGradeLevel: { type: 'number', description: 'Target reading grade level (default 8)' },
-            },
-            required: ['content'],
-          },
-        },
-      },
+      // NOTE: brand_voice_check, check_readability removed —
+      // not registered in the tool registry. Register in a future sprint if needed.
     ];
 
     const userAsk = JSON.stringify({

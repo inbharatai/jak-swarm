@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#09090b"/>
+  <!-- Background grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(52,211,153,0.06)" stroke-width="1"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <!-- Decorative circles -->
+  <circle cx="100" cy="80" r="60" fill="none" stroke="rgba(52,211,153,0.12)" stroke-width="2"/>
+  <circle cx="1100" cy="550" r="80" fill="none" stroke="rgba(251,191,36,0.1)" stroke-width="2"/>
+  <circle cx="200" cy="500" r="40" fill="none" stroke="rgba(244,114,182,0.08)" stroke-width="1.5"/>
+  <circle cx="950" cy="120" r="50" fill="none" stroke="rgba(52,211,153,0.08)" stroke-width="1.5"/>
+  <!-- Connection lines -->
+  <line x1="100" y1="80" x2="350" y2="200" stroke="rgba(52,211,153,0.15)" stroke-width="1.5"/>
+  <line x1="1100" y1="550" x2="850" y2="430" stroke="rgba(251,191,36,0.12)" stroke-width="1.5"/>
+  <line x1="200" y1="500" x2="400" y2="380" stroke="rgba(244,114,182,0.1)" stroke-width="1"/>
+  <!-- Small dots -->
+  <circle cx="350" cy="200" r="4" fill="#34d399" opacity="0.5"/>
+  <circle cx="850" cy="430" r="4" fill="#fbbf24" opacity="0.4"/>
+  <circle cx="400" cy="380" r="3" fill="#f472b6" opacity="0.4"/>
+  <circle cx="600" cy="150" r="3" fill="#34d399" opacity="0.3"/>
+  <circle cx="700" cy="480" r="3" fill="#fbbf24" opacity="0.3"/>
+  <!-- Main content -->
+  <defs>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <text x="600" y="260" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="900" font-size="96" letter-spacing="-3" fill="url(#titleGrad)">JAK Swarm</text>
+  <text x="600" y="340" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="32" fill="#a1a1aa">The Trusted Control Plane for Autonomous Work</text>
+  <!-- Stats row -->
+  <text x="420" y="440" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="28" fill="#34d399">38 Agents</text>
+  <text x="600" y="440" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="28" fill="#fbbf24">122 Tools</text>
+  <text x="780" y="440" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="28" fill="#f472b6">22 Integrations</text>
+  <!-- Tagline -->
+  <text x="600" y="520" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="20" fill="#71717a">Plan · Execute · Verify · Recover — with Human Approvals</text>
+  <!-- Bottom bar -->
+  <rect x="0" y="610" width="1200" height="20" fill="url(#titleGrad)" opacity="0.3"/>
+</svg>

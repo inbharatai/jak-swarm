@@ -175,53 +175,8 @@ export class ProductAgent extends BaseAgent {
           },
         },
       },
-      {
-        type: 'function',
-        function: {
-          name: 'compute_rice',
-          description: 'Compute RICE score (Reach × Impact × Confidence / Effort) with calibrated impact scale. Returns { riceScore, breakdown, band (high|medium|low) }. USE for every priority claim — no fabricated scores.',
-          parameters: {
-            type: 'object',
-            properties: {
-              reach: { type: 'number', description: 'Users affected per quarter (actual number)' },
-              impact: { type: 'number', enum: [0.25, 0.5, 1, 2, 3], description: 'Impact: 3=massive, 2=high, 1=medium, 0.5=low, 0.25=minimal' },
-              confidence: { type: 'number', description: 'Confidence 0-1 (0.5=low/rough, 0.8=medium, 1.0=high)' },
-              effortPersonWeeks: { type: 'number', description: 'Total engineering effort in person-weeks' },
-            },
-            required: ['reach', 'impact', 'confidence', 'effortPersonWeeks'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'score_prd',
-          description: 'Score a PRD document against the 7-section rubric (problem, goals/non-goals, user stories with AC, success metrics, technical, timeline, risks). Returns { completenessScore, missingSections[], weakSections[], recommendations[] }. USE before handing off a PRD to engineering.',
-          parameters: {
-            type: 'object',
-            properties: {
-              prdContent: { type: 'string', description: 'Full PRD content in markdown' },
-            },
-            required: ['prdContent'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'competitor_feature_matrix',
-          description: 'Build a feature × competitor matrix with evidence-backed entries (pricing page URLs, docs links, screenshots). Returns { features[], competitors[], matrix (2D string grid), gaps[], positioning_notes[] }. USE on COMPETITIVE_ANALYSIS / any market-positioning output.',
-          parameters: {
-            type: 'object',
-            properties: {
-              competitors: { type: 'array', items: { type: 'string' }, description: 'Competitor names' },
-              featuresOfInterest: { type: 'array', items: { type: 'string' }, description: 'Features to compare' },
-              depth: { type: 'string', enum: ['surface', 'standard', 'deep'], description: 'How thorough to make the analysis' },
-            },
-            required: ['competitors', 'featuresOfInterest'],
-          },
-        },
-      },
+      // NOTE: compute_rice, score_prd, competitor_feature_matrix removed —
+      // not registered in the tool registry. Register in a future sprint if needed.
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

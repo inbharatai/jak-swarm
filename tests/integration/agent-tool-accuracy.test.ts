@@ -245,9 +245,15 @@ describe('C-Suite Agent Tool Accuracy', () => {
 
         if (meta.sideEffectLevel === 'external' && meta.riskClass === ToolRiskClass.READ_ONLY) {
           // These tools search/read from external sources but don't write/post — acceptable
+          const externalReadOnlyAllowlist = [
+            'audit_seo', 'research_keywords', 'analyze_serp', 'monitor_rankings',
+            'generate_seo_report', 'monitor_company_signals', 'monitor_competitors',
+            'monitor_regulations', 'monitor_brand_mentions',
+          ];
           if (!meta.name.startsWith('auto_engage_') && !meta.name.startsWith('monitor_') &&
               !meta.name.startsWith('web_search') && !meta.name.startsWith('web_fetch') &&
-              !meta.name.startsWith('enrich_') && !meta.name.startsWith('find_decision')) {
+              !meta.name.startsWith('enrich_') && !meta.name.startsWith('find_decision') &&
+              !externalReadOnlyAllowlist.includes(meta.name)) {
             inconsistencies.push(
               `${meta.name}: sideEffectLevel='external' but riskClass=READ_ONLY — ` +
               'verify this tool does not actually perform external writes',

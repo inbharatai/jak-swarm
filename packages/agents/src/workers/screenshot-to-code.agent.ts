@@ -165,69 +165,9 @@ export class ScreenshotToCodeAgent extends BaseAgent {
       },
     ];
 
+    // NOTE: vision_extract, ocr_text, color_palette_detect, check_color_contrast removed —
+    // not registered in the tool registry. Register in a future sprint if needed.
     const tools: OpenAI.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'vision_extract',
-          description: 'Extract structured visual data from the screenshot: bounding boxes of components, text regions, visual hierarchy. Returns { boxes[{x,y,w,h,role}], textRegions[{bbox, text}], hierarchy[{parent,children[]}] }. USE FIRST on every ANALYZE_SCREENSHOT / REPLICATE_UI — this gives you concrete measurements instead of prose descriptions.',
-          parameters: {
-            type: 'object',
-            properties: {
-              imageRef: { type: 'string', description: 'Image reference (URL or base64)' },
-              extractionDepth: { type: 'string', enum: ['components', 'text', 'all'], description: 'What to extract' },
-            },
-            required: ['imageRef'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'ocr_text',
-          description: 'Run OCR to read the EXACT text visible in the screenshot. Returns { text, perRegion[{bbox, text, confidence}] }. USE whenever the screenshot contains labels, headings, button copy, or form fields — never guess at visible text.',
-          parameters: {
-            type: 'object',
-            properties: {
-              imageRef: { type: 'string', description: 'Image reference' },
-              language: { type: 'string', description: 'Expected language (e.g. "en")' },
-            },
-            required: ['imageRef'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'color_palette_detect',
-          description: 'Extract the dominant color palette from the screenshot with exact hex values + coverage percentages. Returns { palette[{hex, hsl, coveragePct, likelyRole (primary | secondary | accent | surface | text | border)}] }. USE BEFORE populating colorPalette or designTokens — no more "looks like a shade of blue".',
-          parameters: {
-            type: 'object',
-            properties: {
-              imageRef: { type: 'string', description: 'Image reference' },
-              maxColors: { type: 'number', description: 'Max colors to return (default 12)' },
-              clusteringMethod: { type: 'string', enum: ['kmeans', 'median-cut', 'octree'], description: 'Clustering algorithm' },
-            },
-            required: ['imageRef'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'check_color_contrast',
-          description: 'Compute WCAG contrast ratio between two detected colors. Returns { ratio, passesAA, passesAAA }. USE to verify text-over-background pairs observed in the screenshot meet accessibility — if the source design fails WCAG, flag it (don\'t silently ship inaccessible code).',
-          parameters: {
-            type: 'object',
-            properties: {
-              foreground: { type: 'string', description: 'Foreground hex' },
-              background: { type: 'string', description: 'Background hex' },
-              largeText: { type: 'boolean', description: 'True if ≥18pt or ≥14pt bold' },
-            },
-            required: ['foreground', 'background'],
-          },
-        },
-      },
       {
         type: 'function',
         function: {

@@ -95,11 +95,9 @@ CREATE_MOCKUP:
 - Responsive variants specified. Animations specified with duration + easing + reduced-motion fallback.
 
 Tools you have:
-- check_color_contrast(foreground, background, largeText?) → returns WCAG ratio, pass/fail. USE BEFORE proposing any text/background pair.
-- search_figma_library(component, variant?) → checks if an existing design system component matches. USE BEFORE inventing a new component.
-- validate_wcag(componentSpec, level) → runs multi-criterion accessibility check against AA or AAA. USE ON FINAL OUTPUT of DESIGN_UI / CREATE_MOCKUP.
 - search_knowledge → brand guidelines, existing patterns.
 - generate_report → structured deliverable.
+- NOTE: check_color_contrast, search_figma_library, validate_wcag are not yet available (not registered in the tool registry). Manual verification of contrast ratios, component reuse, and WCAG compliance is required until they are registered.
 
 Respond with STRICT JSON matching DesignerResult. accessibilityNotes MUST include measured contrast ratios and the WCAG criterion each satisfies (e.g. "Body text #1e293b on #ffffff: 16.6:1 — WCAG AA 1.4.3"). No markdown fences.`;
 
@@ -117,53 +115,9 @@ export class DesignerAgent extends BaseAgent {
       'Designer agent executing task',
     );
 
+    // NOTE: check_color_contrast, search_figma_library, validate_wcag removed —
+    // not registered in the tool registry. Register in a future sprint if needed.
     const tools: OpenAI.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'check_color_contrast',
-          description: 'Compute WCAG contrast ratio between two colors. Returns ratio (e.g. 4.6), and pass flags for AA normal, AA large, AAA normal, AAA large. Use BEFORE proposing any text/background color pair.',
-          parameters: {
-            type: 'object',
-            properties: {
-              foreground: { type: 'string', description: 'Foreground color — hex (#RRGGBB) or rgb()' },
-              background: { type: 'string', description: 'Background color — hex (#RRGGBB) or rgb()' },
-              largeText: { type: 'boolean', description: 'True if text is ≥18pt or ≥14pt bold (applies 3:1 threshold instead of 4.5:1)' },
-            },
-            required: ['foreground', 'background'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'search_figma_library',
-          description: 'Search an existing Figma/design-system library for components matching the described intent. Returns matches with usage notes and variants. Use BEFORE inventing a new component.',
-          parameters: {
-            type: 'object',
-            properties: {
-              component: { type: 'string', description: 'Component role / intent (e.g. "primary cta", "multi-select filter", "empty state card")' },
-              variant: { type: 'string', description: 'Optional variant hint (e.g. "destructive", "compact")' },
-            },
-            required: ['component'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'validate_wcag',
-          description: 'Run multi-criterion WCAG 2.1 check against a component spec. Returns per-criterion pass/fail (e.g. 1.4.3 Contrast, 2.1.1 Keyboard, 2.4.7 Focus Visible, 1.3.1 Info and Relationships). Use on final DESIGN_UI / CREATE_MOCKUP output.',
-          parameters: {
-            type: 'object',
-            properties: {
-              componentSpec: { type: 'string', description: 'Component spec in markdown or JSON' },
-              level: { type: 'string', enum: ['AA', 'AAA'], description: 'WCAG conformance level to validate against' },
-            },
-            required: ['componentSpec', 'level'],
-          },
-        },
-      },
       {
         type: 'function',
         function: {

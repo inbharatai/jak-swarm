@@ -102,12 +102,8 @@ GENERATE_TESTS:
 - Use run_tests to validate the test file runs.
 
 Tools you have:
-- run_linter(code, language) — run linter over code; returns findings. USE BEFORE shipping WRITE_CODE / REFACTOR output.
-- run_typecheck(code, language) — for TS/Go/Rust/Java etc., verify types resolve. USE for every typed-language output.
-- run_tests(testCode, sourceCode, framework?) — run the test sketch and report pass/fail.
-- static_analysis(code, language) — surface security + quality findings. USE first on REVIEW_CODE.
-- read_stacktrace(trace) — parse a stack trace, locate root frame, surface relevant source context. USE on DEBUG.
 - search_knowledge, generate_report.
+- NOTE: run_linter, run_typecheck, run_tests, static_analysis, read_stacktrace are not yet available (not registered in the tool registry). Manual lint/typecheck/test verification is required until they are registered.
 
 Respond with STRICT JSON matching CoderResult. No markdown fences.`;
 
@@ -125,90 +121,9 @@ export class CoderAgent extends BaseAgent {
       'Coder agent executing task',
     );
 
+    // NOTE: run_linter, run_typecheck, run_tests, static_analysis, read_stacktrace removed —
+    // not registered in the tool registry. Register in a future sprint if needed.
     const tools: OpenAI.ChatCompletionTool[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'run_linter',
-          description: 'Run a language-appropriate linter (eslint, ruff, clippy, golangci-lint) over the provided source and return findings as { file, line, rule, severity, message }. USE BEFORE shipping WRITE_CODE or REFACTOR output — lint surfaces the obvious correctness + style issues the LLM might miss.',
-          parameters: {
-            type: 'object',
-            properties: {
-              code: { type: 'string', description: 'Source code to lint' },
-              language: { type: 'string', description: 'Language: typescript | javascript | python | rust | go | java | ruby | csharp' },
-              rulesetOverride: { type: 'string', description: 'Optional ruleset name (e.g. "strict", "recommended")' },
-            },
-            required: ['code', 'language'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'run_typecheck',
-          description: 'Type-check source code for statically-typed languages (TypeScript, Go, Rust, Java, C#, Kotlin, Swift). Returns { ok, errors[{file, line, code, message}] }. USE on every WRITE_CODE output for typed languages.',
-          parameters: {
-            type: 'object',
-            properties: {
-              code: { type: 'string', description: 'Source code to type-check' },
-              language: { type: 'string', description: 'Target language' },
-              strict: { type: 'boolean', description: 'Run in strict mode (no implicit any for TS, clippy pedantic for Rust)' },
-            },
-            required: ['code', 'language'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'run_tests',
-          description: 'Execute a test file against provided source and report pass/fail + coverage summary. Returns { passed, failed, coverage, failures[{test, message, stack}] }. USE on GENERATE_TESTS and after REFACTOR.',
-          parameters: {
-            type: 'object',
-            properties: {
-              testCode: { type: 'string', description: 'Test file content' },
-              sourceCode: { type: 'string', description: 'Source code under test' },
-              framework: { type: 'string', description: 'Test framework: vitest | jest | pytest | cargo-test | go-test | junit' },
-            },
-            required: ['testCode', 'sourceCode'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'static_analysis',
-          description: 'Run security + quality static analysis (Semgrep, CodeQL-style rules). Surfaces: injection sinks, hardcoded secrets, unsafe regex, race windows, taint flows. Returns findings[{rule, severity, location, message}]. USE FIRST on REVIEW_CODE.',
-          parameters: {
-            type: 'object',
-            properties: {
-              code: { type: 'string', description: 'Code to analyze' },
-              language: { type: 'string', description: 'Source language' },
-              rulesets: {
-                type: 'array',
-                items: { type: 'string', enum: ['security', 'quality', 'performance', 'all'] },
-                description: 'Which ruleset to apply',
-              },
-            },
-            required: ['code', 'language'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'read_stacktrace',
-          description: 'Parse a stack trace (JS, Python, Java, Go, Rust), locate the root frame, and surface the relevant source context. Returns { rootFrame: {file, line, function}, relevantSource, hypothesis }. USE on DEBUG.',
-          parameters: {
-            type: 'object',
-            properties: {
-              trace: { type: 'string', description: 'Raw stack trace text' },
-              language: { type: 'string', description: 'Source language inferred from trace format' },
-            },
-            required: ['trace'],
-          },
-        },
-      },
       {
         type: 'function',
         function: {

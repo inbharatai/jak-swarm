@@ -34,6 +34,10 @@ const signupBodySchema = z.object({
   source: z.string().max(60).optional(),
 });
 
+const verifyTokenParamsSchema = z.object({
+  token: z.string().min(16),
+});
+
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -271,12 +275,12 @@ const trialRoutes: FastifyPluginAsync = async (fastify) => {
       if (remain > 0) await new Promise((r) => setTimeout(r, remain));
     };
 
-    const { token } = request.params as { token: string };
-    if (!token || token.length < 16) {
+    const paramsParsed = verifyTokenParamsSchema.safeParse(request.params);
+    if (!paramsParsed.success) {
       await padToFloor();
       return reply.status(400).send(err('INVALID_TOKEN', 'Token format invalid'));
     }
-    const hash = hashToken(token);
+    const hash = hashToken(paramsParsed.data.token);
 
     const signup = await fastify.db.trialSignup.findFirst({
       where: { verifyTokenHash: hash },

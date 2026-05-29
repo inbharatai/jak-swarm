@@ -206,52 +206,8 @@ export class PRAgent extends BaseAgent {
           },
         },
       },
-      {
-        type: 'function',
-        function: {
-          name: 'find_journalist',
-          description: 'Verify a journalist exists + returns their beat, outlet, recent coverage, and contact details. Returns { verified: bool, journalist?: {name, outlet, beat, recentArticles[], contactEmail?} }. USE BEFORE listing any journalist in mediaTargets — fabricated names end careers.',
-          parameters: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Journalist name to verify' },
-              outlet: { type: 'string', description: 'Known or suspected outlet' },
-              beatHint: { type: 'string', description: 'Topic area (e.g. "AI infrastructure", "enterprise SaaS")' },
-            },
-            required: ['name'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'ap_style_lint',
-          description: 'Lint press-release / pitch content against current AP Style guide. Checks: title-case headlines, date format ("month day, year" not ISO), AP numerals (one through nine spelled, 10+ numeric), "percent" vs "%", state abbreviations, title formatting. Returns findings[{line, rule, violation, correction}]. USE before marking a release ready.',
-          parameters: {
-            type: 'object',
-            properties: {
-              content: { type: 'string', description: 'PR content to lint' },
-              documentType: { type: 'string', enum: ['press-release', 'media-pitch', 'statement', 'crisis'], description: 'Content type (different rules apply)' },
-            },
-            required: ['content'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'check_embargo',
-          description: 'Check whether an embargo has passed before exposing embargoed details in a pitch. Returns { active: bool, releaseAt?: ISOString, blockedIfActive: string[] (list of fields/phrases that must NOT appear until embargo lifts) }. USE on any pitch/release with an embargo marker in the brief — pre-embargo leaks are a career-ending violation.',
-          parameters: {
-            type: 'object',
-            properties: {
-              embargoLabel: { type: 'string', description: 'Embargo identifier / event / launch name' },
-              proposedPublishTime: { type: 'string', description: 'ISO timestamp the content would be sent/published' },
-            },
-            required: ['embargoLabel'],
-          },
-        },
-      },
+      // NOTE: find_journalist, ap_style_lint, check_embargo removed —
+      // not registered in the tool registry. Register in a future sprint if needed.
     ];
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [

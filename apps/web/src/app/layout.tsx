@@ -45,10 +45,11 @@ export const metadata: Metadata = {
     siteName: 'JAK Swarm',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-image.svg',
         width: 1200,
         height: 630,
         alt: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
+        type: 'image/svg+xml',
       },
     ],
   },
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
     description: 'One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
-    images: ['/og-image.png'],
+    images: ['/og-image.svg'],
   },
   other: {
     'theme-color': '#09090b',

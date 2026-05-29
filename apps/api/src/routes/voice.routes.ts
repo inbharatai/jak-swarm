@@ -10,6 +10,12 @@ const createSessionBodySchema = z.object({
   workflowId: z.string().optional(),
 });
 
+const triggerWorkflowBodySchema = z.object({
+  goal: z.string().max(10000).optional(),
+  industry: z.string().max(100).optional(),
+  maxCostUsd: z.number().positive().optional(),
+});
+
 const VOICE_SESSION_TTL_SECONDS = 3600; // 1 hour
 
 const voiceRoutes: FastifyPluginAsync = async (fastify) => {
@@ -300,11 +306,13 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { sessionId } = request.params as { sessionId: string };
-      const body = (request.body ?? {}) as {
-        goal?: string;
-        industry?: string;
-        maxCostUsd?: number;
-      };
+      const parsed = triggerWorkflowBodySchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply
+          .status(422)
+          .send(err('VALIDATION_ERROR', 'Invalid request body', parsed.error.flatten()));
+      }
+      const body = parsed.data;
       const { userId, tenantId } = request.user;
 
       try {

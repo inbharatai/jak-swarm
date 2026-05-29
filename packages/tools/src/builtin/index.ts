@@ -458,6 +458,7 @@ export function registerBuiltinTools(): void {
       },
       maturity: 'config_dependent',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { content, title, sourceType, sourceKey } = input as {
@@ -724,6 +725,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { summary: { type: 'string' }, keyPoints: { type: 'array' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { content, focusArea } = input as { content: string; focusArea?: string };
@@ -758,6 +760,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { extractedFields: { type: 'array' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { content, fields } = input as { content: string; fields: string[] };
@@ -996,6 +999,7 @@ export function registerBuiltinTools(): void {
       },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { data, delimiter = ',', hasHeaders = true } = input as {
@@ -1066,6 +1070,7 @@ export function registerBuiltinTools(): void {
       },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { values, label } = input as { values: unknown[]; label?: string };
@@ -1140,6 +1145,7 @@ export function registerBuiltinTools(): void {
       },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { reportType, data, title } = input as {
@@ -1568,6 +1574,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'config_dependent',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { prompt, fullPage = false } = input as { prompt?: string; fullPage?: boolean };
@@ -2155,6 +2162,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'experimental',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       const { maxEmails = 20 } = (input as { maxEmails?: number }) ?? {};
@@ -3155,6 +3163,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3246,6 +3255,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3302,6 +3312,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -3357,6 +3368,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -3421,6 +3433,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -3455,6 +3468,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3504,6 +3518,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -3545,6 +3560,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -3589,6 +3605,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3645,6 +3662,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3690,6 +3708,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -3743,6 +3762,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4288,6 +4308,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { audit: { type: 'object' }, keywords: { type: 'object' }, serp: { type: 'object' }, recommendations: { type: 'array' }, score: { type: 'number' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4335,6 +4356,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { tracked: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4377,6 +4399,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { okrs: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4427,6 +4450,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { competitors: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4467,6 +4491,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { report: { type: 'string' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4554,6 +4579,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { dependencies: { type: 'array' }, totalDeps: { type: 'number' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4597,6 +4623,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { score: { type: 'number' }, indicators: { type: 'array' }, recommendations: { type: 'array' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4664,6 +4691,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { rows: { type: 'array' }, totals: { type: 'object' }, summary: { type: 'string' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4722,6 +4750,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { budget: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4769,6 +4798,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { forecast: { type: 'array' }, trend: { type: 'string' }, confidence: { type: 'string' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4829,6 +4859,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { score: { type: 'number' }, matchedSkills: { type: 'array' }, missingSkills: { type: 'array' }, recommendation: { type: 'string' }, flags: { type: 'array' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4879,6 +4910,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { listings: { type: 'object' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4919,6 +4951,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { letter: { type: 'string' }, filename: { type: 'string' } } },
       maturity: 'heuristic',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -4980,6 +5013,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { differences: { type: 'array' }, summary: { type: 'string' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -5035,6 +5069,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { obligations: { type: 'array' }, renewalDate: { type: 'string' }, terminationClause: { type: 'string' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -5091,6 +5126,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { updates: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'external',
     },
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
@@ -5288,6 +5324,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { pipeline: { type: 'array' }, stageBreakdown: { type: 'object' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -5344,6 +5381,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { current: { type: 'object' }, history: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -5400,6 +5438,7 @@ Date: _______________`;
       outputSchema: { type: 'object', properties: { qbr: { type: 'string' } } },
       maturity: 'llm_passthrough',
       version: '1.0.0',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -6325,6 +6364,7 @@ Date: _______________`;
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
+      sideEffectLevel: 'read',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { timeRangeDays = 7 } = input as { timeRangeDays?: number };

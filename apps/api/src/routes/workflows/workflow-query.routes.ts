@@ -66,8 +66,13 @@ const workflowQueryRoutes: FastifyPluginAsync = async (fastify) => {
       ],
     },
     async (_request: FastifyRequest, reply: FastifyReply) => {
-      const stats = await fastify.swarm.getQueueStats();
-      return reply.status(200).send(ok(stats));
+      try {
+        const stats = await fastify.swarm.getQueueStats();
+        return reply.status(200).send(ok(stats));
+      } catch (err) {
+        _request.log.error({ err }, 'Failed to get queue stats');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -84,11 +89,16 @@ const workflowQueryRoutes: FastifyPluginAsync = async (fastify) => {
       ],
     },
     async (_request: FastifyRequest, reply: FastifyReply) => {
-      const health = fastify.swarm.getWorkerHealth();
-      return reply.status(200).send(ok({
-        ...health,
-        mode: config.workflowWorkerMode,
-      }));
+      try {
+        const health = fastify.swarm.getWorkerHealth();
+        return reply.status(200).send(ok({
+          ...health,
+          mode: config.workflowWorkerMode,
+        }));
+      } catch (err) {
+        _request.log.error({ err }, 'Failed to get queue health');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     },
   );
 
@@ -166,24 +176,29 @@ const workflowQueryRoutes: FastifyPluginAsync = async (fastify) => {
     '/:workflowId/output',
     { preHandler: preHandlerBase },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { workflowId } = request.params as { workflowId: string };
-      const { tenantId } = request.user;
+      try {
+        const { workflowId } = request.params as { workflowId: string };
+        const { tenantId } = request.user;
 
-      const workflow = await (fastify.db.workflow.findFirst as any)({
-        where: { id: workflowId, tenantId },
-        select: { finalOutput: true, goal: true, status: true },
-      });
+        const workflow = await (fastify.db.workflow.findFirst as any)({
+          where: { id: workflowId, tenantId },
+          select: { finalOutput: true, goal: true, status: true },
+        });
 
-      if (!workflow) {
-        return reply.code(404).send({ error: 'Workflow not found' });
+        if (!workflow) {
+          return reply.code(404).send({ error: 'Workflow not found' });
+        }
+
+        if (!workflow.finalOutput) {
+          return reply.code(404).send({ error: 'No output available yet. Workflow may still be running.' });
+        }
+
+        reply.header('Content-Type', 'text/markdown; charset=utf-8');
+        return reply.send(`# ${workflow.goal ?? 'Workflow Output'}\n\n${workflow.finalOutput}`);
+      } catch (err) {
+        request.log.error({ err }, 'Failed to get workflow output');
+        return reply.status(500).send({ error: 'Internal server error' });
       }
-
-      if (!workflow.finalOutput) {
-        return reply.code(404).send({ error: 'No output available yet. Workflow may still be running.' });
-      }
-
-      reply.header('Content-Type', 'text/markdown; charset=utf-8');
-      return reply.send(`# ${workflow.goal ?? 'Workflow Output'}\n\n${workflow.finalOutput}`);
     },
   );
 };
