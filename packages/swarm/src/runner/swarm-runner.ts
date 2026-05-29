@@ -195,7 +195,7 @@ export class SwarmRunner {
   private readonly runtime: LangGraphRuntime;
 
   constructor(options: SwarmRunnerOptions = {}) {
-    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 5 * 60 * 1000;
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 10 * 60 * 1000;
     this.maxConcurrent = options.maxConcurrentWorkflows ?? 20;
     this.stateStore = options.stateStore ?? new InMemoryStateStore();
     this.runtime = new LangGraphRuntime(this, options.db ?? makeInMemoryCheckpointDb());
