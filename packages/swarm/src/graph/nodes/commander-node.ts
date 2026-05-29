@@ -15,6 +15,7 @@ import type { SwarmState } from '../../state/swarm-state.js';
 const UX_ROLE_TO_AGENT_ROLE: Record<string, string> = {
   cto: 'WORKER_TECHNICAL',
   cmo: 'WORKER_MARKETING',
+  cfo: 'WORKER_FINANCE',
   ceo: 'WORKER_STRATEGIST',
   coding: 'WORKER_CODER',
   code: 'WORKER_CODER',
@@ -23,12 +24,18 @@ const UX_ROLE_TO_AGENT_ROLE: Record<string, string> = {
   automation: 'WORKER_OPS',
   auto: 'WORKER_OPS',
   legal: 'WORKER_LEGAL',
+  hr: 'WORKER_HR',
+  success: 'WORKER_SUCCESS',
+  growth: 'WORKER_GROWTH',
+  pr: 'WORKER_PR',
+  content: 'WORKER_CONTENT',
 };
 
 /** Human-readable label for each UX role (used in the focus-text block). */
 const UX_ROLE_LABEL: Record<string, string> = {
   cto: 'CTO',
   cmo: 'CMO',
+  cfo: 'CFO',
   ceo: 'CEO',
   coding: 'Code',
   code: 'Code',
@@ -37,6 +44,11 @@ const UX_ROLE_LABEL: Record<string, string> = {
   automation: 'Auto',
   auto: 'Auto',
   legal: 'Legal',
+  hr: 'HR',
+  success: 'Customer Success',
+  growth: 'Growth',
+  pr: 'PR',
+  content: 'Content',
 };
 
 function normalizeRoleMode(role: string): string {

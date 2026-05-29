@@ -326,7 +326,30 @@ async function seed() {
       });
     }
 
-    // ── 5. Audit log entries ────────────────────────────────────────────────
+    // ── 5. Subscription ──────────────────────────────────────────────────
+    // Demo tenants need a subscription so they can actually create workflows.
+    await prisma.subscription.upsert({
+      where: { tenantId: tenant.id },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        planId: 'team',
+        status: 'active',
+        creditsTotal: 1_000_000,
+        creditsUsed: 0,
+        premiumTotal: 100_000,
+        premiumUsed: 0,
+        dailyUsed: 0,
+        dailyCap: 500,
+        perTaskCap: 50,
+        concurrentCap: 10,
+        maxModelTier: 3,
+        periodStart: new Date(),
+        periodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      },
+    });
+
+    // ── 6. Audit log entries ────────────────────────────────────────────────
     await prisma.auditLog.create({
       data: {
         tenantId: tenant.id,
