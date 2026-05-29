@@ -110,6 +110,9 @@ Tech stack conventions:
 - Forms: React Hook Form + Zod validation
 - API: Next.js Route Handlers (app/api/*)
 
+You have access to these tools:
+- search_knowledge: Search the tenant knowledge base for relevant information, policies, and procedures.
+
 Respond with JSON:
 {
   "architecture": "high-level architecture description",

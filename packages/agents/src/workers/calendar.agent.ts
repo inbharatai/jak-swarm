@@ -130,6 +130,11 @@ Recommended slot scoring (0-100 quality):
 - +10 if it's the EARLIEST viable slot across attendees.
 - Subtract 40 for any attendee outside 8-8 local. Subtract 30 for hard conflicts (should never be in candidates).
 
+You have access to these tools:
+- list_calendar_events: List calendar events within a date range with optional filters.
+- create_calendar_event: Create a new calendar event and optionally invite attendees.
+- find_availability: Find available time slots across calendars.
+
 Return STRICT JSON matching CalendarResult. Populate recommendedSlot.reasons with 2-4 specific, factual statements. No pleasantries.`;
 
 /** Actions that mutate calendar state and must be reviewed by a human. */
@@ -186,11 +191,12 @@ export class CalendarAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              from: { type: 'string', description: 'Start date in ISO 8601 format' },
-              to: { type: 'string', description: 'End date in ISO 8601 format' },
-              timezone: { type: 'string', description: 'IANA timezone name' },
+              after: { type: 'string', description: 'Start date in ISO 8601 format' },
+              before: { type: 'string', description: 'End date in ISO 8601 format' },
+              query: { type: 'string', description: 'Optional search query' },
+              maxResults: { type: 'number', description: 'Maximum number of results' },
             },
-            required: ['from', 'to'],
+            required: ['after', 'before'],
           },
         },
       },
@@ -203,14 +209,13 @@ export class CalendarAgent extends BaseAgent {
             type: 'object',
             properties: {
               title: { type: 'string' },
-              start: { type: 'string' },
-              end: { type: 'string' },
+              startTime: { type: 'string' },
+              endTime: { type: 'string' },
               attendees: { type: 'array', items: { type: 'string' } },
               location: { type: 'string' },
               description: { type: 'string' },
-              timezone: { type: 'string' },
             },
-            required: ['title', 'start', 'end'],
+            required: ['title', 'startTime', 'endTime'],
           },
         },
       },

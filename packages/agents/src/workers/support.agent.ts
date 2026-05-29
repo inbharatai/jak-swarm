@@ -81,6 +81,11 @@ Non-negotiables:
 3. Never promise a refund, credit, or feature without checking permissions.
 4. Never close a ticket on someone whose sentiment is still frustrated.
 
+You have access to these tools:
+- classify_ticket: Classify a support ticket by category, priority, and sentiment.
+- search_knowledge_base: Search the support knowledge base for solutions and articles.
+- lookup_customer: Look up customer information by email or ID.
+
 Respond with STRICT JSON matching SupportResult. No markdown fences.`;
 
 export class SupportAgent extends BaseAgent {
@@ -106,10 +111,9 @@ export class SupportAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              text: { type: 'string', description: 'Ticket content to classify' },
-              categories: { type: 'array', items: { type: 'string' }, description: 'Available categories' },
+              content: { type: 'string', description: 'Ticket content to classify' },
             },
-            required: ['text'],
+            required: ['content'],
           },
         },
       },
@@ -122,7 +126,6 @@ export class SupportAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Filter by support category' },
             },
             required: ['query'],
           },
@@ -136,8 +139,8 @@ export class SupportAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              customerName: { type: 'string', description: 'Customer name to look up' },
-              ticketId: { type: 'string', description: 'Related ticket ID' },
+              email: { type: 'string', description: 'Customer email address' },
+              customerId: { type: 'string', description: 'Customer ID' },
             },
           },
         },

@@ -180,7 +180,9 @@ export class HRAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              category: { type: 'string', description: 'Category filter (e.g., "policies", "compensation", "culture")' },
+              maxResults: { type: 'number', description: 'Maximum number of results to return' },
+              scopeType: { type: 'string', description: 'Scope type filter (e.g., "tenant", "global")' },
+              scopeId: { type: 'string', description: 'Scope identifier (e.g., tenant ID)' },
             },
             required: ['query'],
           },
@@ -194,11 +196,11 @@ export class HRAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },

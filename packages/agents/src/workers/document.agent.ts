@@ -88,6 +88,11 @@ Non-negotiables:
 3. Dates in ISO 8601. Currency with ISO code when possible.
 4. If the document is unreadable (low-quality scan, corrupted PDF) say so — don't synthesize plausible content.
 
+You have access to these tools:
+- find_document: Find a document the user previously uploaded via the dashboard Files tab. Matches by file name, tags, or semantic content similarity.
+- extract_document_data: Extract structured data fields from a document using a provided schema. Returns fields with confidence scores.
+- summarize_document: Generate a structured summary of a document with key points and action items.
+
 Respond with STRICT JSON matching DocumentResult. No markdown fences.`;
 
 export class DocumentAgent extends BaseAgent {

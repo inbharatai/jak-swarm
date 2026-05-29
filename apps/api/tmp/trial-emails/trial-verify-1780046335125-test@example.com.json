@@ -1,0 +1,7 @@
+{
+  "to": "test@example.com",
+  "subject": "Confirm your JAK Swarm trial",
+  "verifyUrl": "http://localhost:3000/trial/verify/c3e99aeb73b6aea20668b6d4c6e034db61fffdf5480c02555a5ec69a2fc4dd43",
+  "text": "Hi,\n\nClick the link below to confirm your email and activate your 30-day JAK Swarm trial:\n\nhttp://localhost:3000/trial/verify/c3e99aeb73b6aea20668b6d4c6e034db61fffdf5480c02555a5ec69a2fc4dd43\n\nWhat happens next:\n  - We create a workspace bound to your email\n  - You get an initial password (shown once — save it)\n  - 30 days of access with daily caps to protect your budget:\n      20 agent runs / day\n      5 external-action approvals / day\n      120 minutes of tool execution / day\n      200,000 LLM tokens / day\n  - No credit card required\n\nLink expires in 24 hours.\n\nIf you didn't request this, you can ignore this email — no account is created until you click the link.\n\n— JAK Swarm",
+  "sentAt": "2026-05-29T09:18:55.126Z"
+}

@@ -168,17 +168,10 @@ export class ProjectAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              operation: {
-                type: 'string',
-                enum: ['pert', 'descriptive', 'percentile'],
-                description: 'Statistical operation to perform',
-              },
-              optimistic: { type: 'number', description: 'Optimistic estimate' },
-              mostLikely: { type: 'number', description: 'Most likely estimate' },
-              pessimistic: { type: 'number', description: 'Pessimistic estimate' },
-              data: { type: 'array', items: { type: 'number' }, description: 'Data array' },
+              values: { type: 'array', items: { type: 'number' }, description: 'Data array' },
+              label: { type: 'string', description: 'Label for the dataset' },
             },
-            required: ['operation'],
+            required: ['values'],
           },
         },
       },
@@ -190,11 +183,11 @@ export class ProjectAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              fileUrl: { type: 'string', description: 'URL or path to spreadsheet' },
-              sheet: { type: 'string', description: 'Sheet name' },
-              range: { type: 'string', description: 'Cell range (e.g., A1:D100)' },
+              data: { type: 'string', description: 'Raw spreadsheet data' },
+              delimiter: { type: 'string', description: 'Column delimiter' },
+              hasHeaders: { type: 'boolean', description: 'Whether the data has header rows' },
             },
-            required: ['fileUrl'],
+            required: ['data'],
           },
         },
       },

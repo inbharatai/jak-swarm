@@ -184,7 +184,7 @@ export class ContentAgent extends BaseAgent {
             type: 'object',
             properties: {
               key: { type: 'string', description: 'Memory key' },
-              value: { type: 'string', description: 'Content to store' },
+              value: { type: 'object', description: 'Content to store' },
               type: { type: 'string', description: 'Memory type: KNOWLEDGE, POLICY, or WORKFLOW' },
             },
             required: ['key', 'value'],

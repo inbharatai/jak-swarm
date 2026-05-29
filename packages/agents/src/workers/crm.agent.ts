@@ -131,6 +131,11 @@ Data hygiene & compliance:
 Write-op approval:
 - Every UPDATE and CREATE_NOTE returns requiresApproval=true with proposedChanges. Never pretend to execute.
 
+You have access to these tools:
+- lookup_crm_contact: Look up a CRM contact by email, name, or company. Returns contact details and recent activity.
+- update_crm_record: Update a CRM contact record. REQUIRES approval for significant field changes. Returns updated contact.
+- search_deals: Search CRM deals and pipeline opportunities.
+
 Respond with STRICT JSON matching CRMResult. No markdown fences.`;
 
 /** Write operations that must be approved before execution. */
@@ -186,8 +191,7 @@ export class CRMAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              contactId: { type: 'string', description: 'Contact ID' },
-              email: { type: 'string', description: 'Contact email address' },
+              query: { type: 'string', description: 'Search query for contact lookup' },
             },
           },
         },
@@ -200,11 +204,10 @@ export class CRMAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              recordId: { type: 'string' },
-              recordType: { type: 'string', enum: ['contact', 'deal', 'company'] },
+              contactId: { type: 'string' },
               updates: { type: 'object' },
             },
-            required: ['recordId', 'recordType', 'updates'],
+            required: ['contactId', 'updates'],
           },
         },
       },
@@ -216,11 +219,7 @@ export class CRMAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              query: { type: 'string' },
-              stage: { type: 'string' },
-              minValue: { type: 'number' },
-              maxValue: { type: 'number' },
-              limit: { type: 'number' },
+              status: { type: 'string' },
             },
           },
         },

@@ -157,8 +157,7 @@ export class SuccessAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              accountId: { type: 'string', description: 'Account ID to look up' },
-              customerName: { type: 'string', description: 'Customer name to search' },
+              query: { type: 'string', description: 'Search query for customer account' },
             },
           },
         },

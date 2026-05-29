@@ -208,11 +208,11 @@ export class SpreadsheetAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              data: { type: 'object', description: 'Historical cashflow data' },
+              historicalData: { type: 'array', items: { type: 'number' }, description: 'Historical cashflow data as numeric values' },
               method: { type: 'string', description: 'Forecasting method: linear, moving_average, exponential' },
               periods: { type: 'number', description: 'Number of periods to forecast' },
             },
-            required: ['data'],
+            required: ['historicalData'],
           },
         },
       },

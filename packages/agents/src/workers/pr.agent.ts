@@ -168,7 +168,7 @@ export class PRAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              to: { type: 'string', description: 'Recipient email' },
+              to: { type: 'array', items: { type: 'string' }, description: 'Recipient email addresses' },
               subject: { type: 'string', description: 'Email subject line' },
               body: { type: 'string', description: 'Email body' },
             },

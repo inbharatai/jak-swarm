@@ -124,19 +124,9 @@ export class KnowledgeAgent extends BaseAgent {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query (semantic + keyword)' },
-              documentType: {
-                type: 'string',
-                description: 'Filter by document type (e.g. policy, procedure, wiki, faq)',
-              },
-              limit: { type: 'number', description: 'Max results to return' },
-              dateRange: {
-                type: 'object',
-                properties: {
-                  from: { type: 'string' },
-                  to: { type: 'string' },
-                },
-                description: 'Filter by last-updated date range',
-              },
+              maxResults: { type: 'number', description: 'Maximum number of results to return' },
+              scopeType: { type: 'string', description: 'Scope type filter (e.g., "tenant", "global")' },
+              scopeId: { type: 'string', description: 'Scope identifier (e.g., tenant ID)' },
             },
             required: ['query'],
           },
@@ -151,12 +141,6 @@ export class KnowledgeAgent extends BaseAgent {
             type: 'object',
             properties: {
               text: { type: 'string' },
-              categories: { type: 'array', items: { type: 'string' } },
-              extractFields: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Specific fields to extract from the text',
-              },
             },
             required: ['text'],
           },

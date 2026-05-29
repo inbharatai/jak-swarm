@@ -142,16 +142,10 @@ export class AnalyticsAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              operation: {
-                type: 'string',
-                enum: ['descriptive', 'ttest', 'zscore', 'correlation', 'regression', 'percentile'],
-                description: 'Statistical operation to perform',
-              },
-              data: { type: 'array', items: { type: 'number' }, description: 'Data array' },
-              dataB: { type: 'array', items: { type: 'number' }, description: 'Second data array for comparisons' },
-              alpha: { type: 'number', description: 'Significance level (default 0.05)' },
+              values: { type: 'array', items: { type: 'number' }, description: 'Data array' },
+              label: { type: 'string', description: 'Label for the dataset' },
             },
-            required: ['operation', 'data'],
+            required: ['values'],
           },
         },
       },
@@ -163,11 +157,11 @@ export class AnalyticsAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              fileUrl: { type: 'string', description: 'URL or path to spreadsheet' },
-              sheet: { type: 'string', description: 'Sheet name' },
-              range: { type: 'string', description: 'Cell range (e.g., A1:D100)' },
+              data: { type: 'string', description: 'Raw spreadsheet data' },
+              delimiter: { type: 'string', description: 'Column delimiter' },
+              hasHeaders: { type: 'boolean', description: 'Whether the data has header rows' },
             },
-            required: ['fileUrl'],
+            required: ['data'],
           },
         },
       },

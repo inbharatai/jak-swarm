@@ -1563,6 +1563,7 @@ export function registerBuiltinTools(): void {
       category: ToolCategory.BROWSER,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
+      requiredEnvVars: ['OPENAI_API_KEY'],
       inputSchema: {
         type: 'object',
         properties: {
@@ -2229,12 +2230,12 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'gmail_send_email',
-      description: 'Send an email via Gmail browser automation. Navigates to Gmail compose, fills to/subject/body, and clicks send. REQUIRES approval. User must be logged in.',
+      description: 'Send an email via Gmail browser automation. Navigates to Gmail compose, fills to/subject/body, and clicks send. REQUIRES approval. User must be logged in to Gmail in the browser profile.',
       category: ToolCategory.EMAIL,
       riskClass: ToolRiskClass.EXTERNAL_SIDE_EFFECT,
       requiresApproval: true,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GMAIL_EMAIL', 'GMAIL_APP_PASSWORD'],
+      requiredEnvVars: [],
       liveTested: false,
       sideEffectLevel: 'external',
       inputSchema: {
@@ -3560,7 +3561,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object' },
       maturity: 'real_external',
       version: '1.0.0',
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4214,7 +4215,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
-      sideEffectLevel: 'external',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4257,7 +4258,7 @@ export function registerBuiltinTools(): void {
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
-      sideEffectLevel: 'external',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -4316,9 +4317,9 @@ export function registerBuiltinTools(): void {
         const auditResult = await toolRegistry.execute('audit_seo', { url }, context);
         let keywordsResult = null;
         if (keywords.length > 0) {
-          keywordsResult = await toolRegistry.execute('research_keywords', { seed: keywords[0] }, context);
+          keywordsResult = await toolRegistry.execute('research_keywords', { seedKeyword: keywords[0] }, context);
         }
-        const serpResult = await toolRegistry.execute('analyze_serp', { query: keywords[0] ?? new URL(url).hostname }, context);
+        const serpResult = await toolRegistry.execute('analyze_serp', { keyword: keywords[0] ?? new URL(url).hostname }, context);
         const recommendations: string[] = [];
         if (auditResult && typeof auditResult === 'object') {
           const audit = auditResult as unknown as Record<string, unknown>;
@@ -4356,7 +4357,7 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { tracked: { type: 'array' } } },
       maturity: 'real_external',
       version: '1.0.0',
-      sideEffectLevel: 'read',
+      sideEffectLevel: 'write',
     },
     async (input: unknown, context: ToolExecutionContext) => {
       try {
@@ -4514,12 +4515,12 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'analyze_github_repo',
-      description: 'Analyze a public GitHub repository using the GitHub API. Returns stars, forks, issues, language, and more.',
+      description: 'Analyze a GitHub repository using the GitHub API. Returns stars, forks, issues, language, and more. Public repos work without auth; private repos require GITHUB_PAT.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GITHUB_PAT'],
+      requiredEnvVars: [],
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -4536,8 +4537,11 @@ export function registerBuiltinTools(): void {
     async (input: unknown, _context: ToolExecutionContext) => {
       try {
         const { owner, repo } = input as { owner: string; repo: string };
+        const headers: Record<string, string> = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JAK-Swarm/1.0' };
+        const token = process.env['GITHUB_PAT'];
+        if (token) headers['Authorization'] = `token ${token}`;
         const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
-          headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JAK-Swarm/1.0' },
+          headers,
         });
         if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
         const data = await response.json() as Record<string, unknown>;
@@ -5167,7 +5171,7 @@ Date: _______________`;
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
-      sideEffectLevel: 'external',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5219,7 +5223,7 @@ Date: _______________`;
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
-      sideEffectLevel: 'external',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -5263,7 +5267,7 @@ Date: _______________`;
       requiresApproval: false,
       maturity: 'config_dependent',
       liveTested: false,
-      sideEffectLevel: 'external',
+      sideEffectLevel: 'read',
       inputSchema: {
         type: 'object',
         properties: {
@@ -6109,12 +6113,12 @@ Date: _______________`;
   toolRegistry.register(
     {
       name: 'github_list_files',
-      description: 'List files in a GitHub repository directory (recursive). Returns up to 300 file paths so a code-reviewing agent can pick which files to read next via github_read_file. Requires GITHUB_PAT for private repos; public repos work without it.',
+      description: 'List files in a GitHub repository directory (recursive). Returns up to 300 file paths so a code-reviewing agent can pick which files to read next via github_read_file. GITHUB_PAT is optional — public repos work without it; private repos require it.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GITHUB_PAT'],
+      requiredEnvVars: [],
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -6216,12 +6220,12 @@ Date: _______________`;
   toolRegistry.register(
     {
       name: 'github_read_file',
-      description: 'Read the contents of a single file from a GitHub repository. Use this AFTER github_list_files to pick a file. Truncates at 100KB to keep the LLM context manageable — large files return with `truncated: true` and the first 100KB of content.',
+      description: 'Read the contents of a single file from a GitHub repository. Use this AFTER github_list_files to pick a file. Truncates at 100KB to keep the LLM context manageable — large files return with `truncated: true` and the first 100KB of content. GITHUB_PAT is optional — public repos work without it.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GITHUB_PAT'],
+      requiredEnvVars: [],
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {
@@ -6288,12 +6292,12 @@ Date: _______________`;
   toolRegistry.register(
     {
       name: 'github_review_pr',
-      description: 'Fetch a GitHub pull request with diff for code review. Requires GITHUB_PAT.',
+      description: 'Fetch a GitHub pull request with diff for code review. GITHUB_PAT is optional — public repos work without it; private repos require it.',
       category: ToolCategory.RESEARCH,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       maturity: 'config_dependent',
-      requiredEnvVars: ['GITHUB_PAT'],
+      requiredEnvVars: [],
       liveTested: false,
       sideEffectLevel: 'read',
       inputSchema: {

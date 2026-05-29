@@ -149,10 +149,10 @@ export class SEOAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              seed_keyword: { type: 'string', description: 'Seed keyword' },
-              market: { type: 'string', description: 'Target market' },
+              seedKeyword: { type: 'string', description: 'Seed keyword' },
+              locale: { type: 'string', description: 'Target market' },
             },
-            required: ['seed_keyword'],
+            required: ['seedKeyword'],
           },
         },
       },

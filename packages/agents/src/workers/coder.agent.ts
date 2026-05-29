@@ -147,11 +147,11 @@ export class CoderAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
+              reportType: { type: 'string', description: 'Type of report: daily_ops, summary, kpi, custom' },
+              data: { type: 'object', description: 'Data to include in the report' },
               title: { type: 'string', description: 'Report title' },
-              content: { type: 'string', description: 'Report content in markdown' },
-              format: { type: 'string', enum: ['markdown', 'json', 'html'], description: 'Output format' },
             },
-            required: ['title', 'content'],
+            required: ['reportType'],
           },
         },
       },
