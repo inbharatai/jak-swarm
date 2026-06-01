@@ -3,7 +3,7 @@ export { AgentContext } from './base/agent-context.js';
 export type { AgentActivityEvent, AgentActivityEmitter } from './base/agent-context.js';
 export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent, extractFirstJsonBlob } from './base/base-agent.js';
-export type { ToolLoopResult, MemoryProvider, CompanyContextProvider } from './base/base-agent.js';
+export type { ToolLoopResult, MemoryProvider, CompanyContextProvider, ReflectionMode, ReflectAndCorrectOptions } from './base/base-agent.js';
 
 // Multi-agent coordination (Sprint 3 — full-fledged JAK)
 export {
@@ -159,6 +159,7 @@ export {
   getRoleManifestEntry,
   listRoleManifest,
   getRoleManifestSummary,
+  getReflectionMode,
 } from './role-manifest.js';
 export type { RoleMaturity, RoleManifestEntry } from './role-manifest.js';
 

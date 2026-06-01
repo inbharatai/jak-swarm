@@ -1,5 +1,5 @@
 import { WorkflowStatus, TaskStatus } from '@jak-swarm/shared';
-import { AgentContext } from '@jak-swarm/agents';
+import { AgentContext, getReflectionMode } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
@@ -217,7 +217,11 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
           const { corrected, wasChanged } = await agent.reflectAndCorrect(
             outputStr,
             task.description,
-            { maxTokens: 2048 },
+            {
+              maxTokens: 2048,
+              mode: getReflectionMode(task.agentRole),
+              maxReflectionPasses: 2,
+            },
           );
           if (wasChanged) {
             try {

@@ -13,6 +13,7 @@ import {
   getTierForAgent,
 } from './provider-router.js';
 import { getRuntime, type LLMRuntime } from '../runtime/index.js';
+import { getReflectionMode } from '../role-manifest.js';
 
 import { LLMCallService, type OnLLMCallComplete } from './llm-call.service.js';
 import { ToolExecutionService } from './tool-execution.service.js';
@@ -117,6 +118,21 @@ export interface ToolLoopResult {
   totalCostUsd: number;
 }
 
+/** Strictness mode for self-reflection.
+ *  - 'strict': corrects both objective errors and subjective quality gaps (for factual/grounded roles)
+ *  - 'lenient': corrects only objective errors like hallucinations and format violations (for creative/subjective roles)
+ */
+export type ReflectionMode = 'strict' | 'lenient';
+
+/** Options for the reflectAndCorrect method. */
+export interface ReflectAndCorrectOptions {
+  maxTokens?: number;
+  /** Maximum reflect-then-correct passes. Default: 2. Acts as a hard convergence safety net. */
+  maxReflectionPasses?: number;
+  /** Reflection strictness. Default: determined by agent role (strict for factual roles, lenient for creative roles). */
+  mode?: ReflectionMode;
+}
+
 export abstract class BaseAgent {
   protected readonly role: AgentRole;
   protected readonly logger: Logger;
@@ -193,10 +209,15 @@ export abstract class BaseAgent {
       callLLMPublic: (m, t, o) => this.callLLM(m, t, o),
       executeWithToolsPublic: (m, t, c, o) => this.executeWithTools(m, t, c, o),
     });
+
+    this.defaultReflectionMode = getReflectionMode(role);
   }
 
   /** Phase 2 — JAK-owned LLM runtime (LegacyRuntime by default). */
   protected readonly runtime!: LLMRuntime;
+
+  /** Default reflection mode based on this agent's role. */
+  protected readonly defaultReflectionMode: ReflectionMode;
 
   /**
    * Global hook called after every LLM call with cost information.
@@ -280,82 +301,158 @@ export abstract class BaseAgent {
 
   // ─── AUTONOMOUS COWORK CAPABILITIES ────────────────────────────────────────
 
+  /** Strict-mode reflection prompt — checks objective errors + completeness. */
+  private static readonly STRICT_REFLECTION_PROMPT = `You are a critical reviewer. Analyze the following output for errors, hallucinations, or format violations. Think step by step.
+
+Respond with JSON:
+{
+  "hasIssues": <boolean>,
+  "issues": ["specific issue 1", "specific issue 2"],
+  "severity": "none" | "minor" | "major" | "critical",
+  "suggestion": "brief description of what needs fixing"
+}
+
+Check for:
+- Factual accuracy and logical consistency
+- Completeness relative to the task description
+- Format compliance (proper JSON, required fields present)
+- Hallucinated data (made-up statistics, names, dates)
+
+Only flag issues where the output is objectively incorrect or violates explicit requirements. Do not flag stylistic preferences or subjective quality concerns.`;
+
+  /** Lenient-mode reflection prompt — checks objective errors ONLY. */
+  private static readonly LENIENT_REFLECTION_PROMPT = `You are a critical reviewer. Analyze the following output for objective errors ONLY. Think step by step.
+
+Respond with JSON:
+{
+  "hasIssues": <boolean>,
+  "issues": ["specific issue 1", "specific issue 2"],
+  "severity": "none" | "minor" | "major" | "critical",
+  "suggestion": "brief description of what needs fixing"
+}
+
+IMPORTANT: Set hasIssues to true ONLY for objective, verifiable errors. Subjective quality concerns must NOT set hasIssues to true.
+
+Check ONLY for:
+- Factual inaccuracies and logical contradictions
+- Format violations (invalid JSON, missing required fields that the task explicitly requires)
+- Hallucinated data (made-up statistics, names, dates, fabricated sources)
+
+Do NOT flag as issues:
+- Vague or non-actionable recommendations (inherent to strategic/creative content)
+- "Could be more detailed" or "could be more specific" (preferences, not errors)
+- Style, tone, or wording preferences
+- Completeness beyond what the task explicitly required
+
+If you find only subjective concerns, set hasIssues to false and severity to "none".`;
+
   /**
-   * Self-reflection and correction loop (Claude-level autonomy).
+   * Self-reflection and correction loop with convergence guarantee.
    *
    * After the agent produces an initial result, this method:
    * 1. Asks the LLM to critique its own output (chain-of-thought reflection)
-   * 2. If the critique finds issues, asks the LLM to produce a corrected version
-   * 3. Returns the corrected output (or original if no issues found)
+   * 2. If the critique finds issues that warrant correction, asks the LLM to produce a corrected version
+   * 3. Re-reflects on the corrected output (up to maxReflectionPasses)
+   * 4. Returns the corrected output (or original if no issues found or passes exhausted)
    *
-   * This gives every agent the ability to self-correct without human intervention.
+   * Mode-aware: 'lenient' mode (for creative/subjective roles) only corrects objective
+   * errors and accepts minor severity. 'strict' mode corrects both objective and
+   * quality issues including minor severity.
+   *
+   * This gives every agent the ability to self-correct without human intervention,
+   * while guaranteeing convergence via the maxReflectionPasses cap.
    */
   async reflectAndCorrect(
     originalOutput: string,
     taskDescription: string,
-    options?: { maxTokens?: number },
+    options?: ReflectAndCorrectOptions,
   ): Promise<{ corrected: string; wasChanged: boolean; reflection: string }> {
-    const reflectionMessages: OpenAI.ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: `You are a critical reviewer. Analyze the following output for errors, gaps, hallucinations, or quality issues. Think step by step.\n\nRespond with JSON:\n{\n  "hasIssues": <boolean>,\n  "issues": ["specific issue 1", "specific issue 2"],\n  "severity": "none" | "minor" | "major" | "critical",\n  "suggestion": "brief description of what needs fixing"\n}\n\nBe strict. Check for:\n- Factual accuracy and logical consistency\n- Completeness relative to the task description\n- Format compliance (proper JSON, required fields present)\n- Hallucinated data (made-up statistics, names, dates)\n- Vague or non-actionable recommendations`,
-      },
-      {
-        role: 'user',
-        content: `TASK: ${taskDescription}\n\nOUTPUT TO REVIEW:\n${originalOutput}`,
-      },
-    ];
+    const mode = options?.mode ?? this.defaultReflectionMode;
+    const maxPasses = options?.maxReflectionPasses ?? 2;
+    let currentOutput = originalOutput;
+    let wasChanged = false;
+    let lastReflection = '';
 
-    try {
-      const reflectionCompletion = await this.callLLM(reflectionMessages, undefined, {
-        maxTokens: options?.maxTokens ?? 512,
-        temperature: 0.1,
-      });
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const systemPrompt = mode === 'lenient'
+        ? BaseAgent.LENIENT_REFLECTION_PROMPT
+        : BaseAgent.STRICT_REFLECTION_PROMPT;
 
-      const reflectionContent = reflectionCompletion.choices[0]?.message?.content ?? '';
-      let reflection: { hasIssues?: boolean; issues?: string[]; severity?: string; suggestion?: string };
-
-      try {
-        reflection = this.parseJsonResponse(reflectionContent);
-      } catch {
-        // If we can't parse reflection, trust the original
-        return { corrected: originalOutput, wasChanged: false, reflection: reflectionContent };
-      }
-
-      if (!reflection.hasIssues || reflection.severity === 'none') {
-        this.logger.debug({ role: this.role }, 'Self-reflection: output passed quality check');
-        return { corrected: originalOutput, wasChanged: false, reflection: reflectionContent };
-      }
-
-      // Issues found — ask for a corrected version
-      this.logger.info(
-        { role: this.role, severity: reflection.severity, issueCount: reflection.issues?.length },
-        'Self-reflection: issues found, requesting correction',
-      );
-
-      const correctionMessages: OpenAI.ChatCompletionMessageParam[] = [
-        {
-          role: 'system',
-          content: `You are the ${this.role} agent. Your previous output had issues. Fix them and produce a corrected version.\nMaintain the same JSON format. Only fix the identified issues — don't change things that were correct.`,
-        },
-        {
-          role: 'user',
-          content: `ORIGINAL TASK: ${taskDescription}\n\nYOUR PREVIOUS OUTPUT:\n${originalOutput}\n\nISSUES FOUND:\n${(reflection.issues ?? []).map((i, idx) => `${idx + 1}. ${i}`).join('\n')}\n\nSUGGESTION: ${reflection.suggestion ?? 'Fix the issues above'}\n\nProduce a corrected output in the same format.`,
-        },
+      const reflectionMessages: OpenAI.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `TASK: ${taskDescription}\n\nOUTPUT TO REVIEW:\n${currentOutput}` },
       ];
 
-      const correctionCompletion = await this.callLLM(correctionMessages, undefined, {
-        maxTokens: options?.maxTokens ?? 4096,
-        temperature: 0.15,
-      });
+      try {
+        const reflectionCompletion = await this.callLLM(reflectionMessages, undefined, {
+          maxTokens: options?.maxTokens ?? 512,
+          temperature: 0.1,
+        });
 
-      const corrected = correctionCompletion.choices[0]?.message?.content ?? originalOutput;
-      return { corrected, wasChanged: true, reflection: reflectionContent };
-    } catch (err) {
-      // Reflection failed — return original (don't break the pipeline)
-      this.logger.warn({ err }, 'Self-reflection failed, using original output');
-      return { corrected: originalOutput, wasChanged: false, reflection: 'Reflection failed' };
+        const reflectionContent = reflectionCompletion.choices[0]?.message?.content ?? '';
+        lastReflection = reflectionContent;
+
+        let reflection: { hasIssues?: boolean; issues?: string[]; severity?: string; suggestion?: string };
+        try {
+          reflection = this.parseJsonResponse(reflectionContent);
+        } catch {
+          // If we can't parse reflection, trust the current output
+          return { corrected: currentOutput, wasChanged, reflection: lastReflection };
+        }
+
+        // Gate 1: No issues at all
+        if (!reflection.hasIssues || reflection.severity === 'none') {
+          this.logger.debug({ role: this.role, pass }, 'Self-reflection: output passed quality check');
+          return { corrected: currentOutput, wasChanged, reflection: lastReflection };
+        }
+
+        // Gate 2: Lenient mode accepts "minor" severity without correction
+        if (mode === 'lenient' && reflection.severity === 'minor') {
+          this.logger.debug(
+            { role: this.role, pass, severity: 'minor' },
+            'Self-reflection: minor issues accepted (lenient mode)',
+          );
+          return { corrected: currentOutput, wasChanged, reflection: lastReflection };
+        }
+
+        // Issues found that warrant correction
+        this.logger.info(
+          { role: this.role, severity: reflection.severity, issueCount: reflection.issues?.length, pass },
+          'Self-reflection: issues found, requesting correction',
+        );
+
+        const correctionMessages: OpenAI.ChatCompletionMessageParam[] = [
+          {
+            role: 'system',
+            content: `You are the ${this.role} agent. Your previous output had issues. Fix them and produce a corrected version.\nMaintain the same JSON format. Only fix the identified issues — don't change things that were correct.`,
+          },
+          {
+            role: 'user',
+            content: `ORIGINAL TASK: ${taskDescription}\n\nYOUR PREVIOUS OUTPUT:\n${currentOutput}\n\nISSUES FOUND:\n${(reflection.issues ?? []).map((i: string, idx: number) => `${idx + 1}. ${i}`).join('\n')}\n\nSUGGESTION: ${reflection.suggestion ?? 'Fix the issues above'}\n\nProduce a corrected output in the same format.`,
+          },
+        ];
+
+        const correctionCompletion = await this.callLLM(correctionMessages, undefined, {
+          maxTokens: options?.maxTokens ?? 4096,
+          temperature: 0.15,
+        });
+
+        currentOutput = correctionCompletion.choices[0]?.message?.content ?? currentOutput;
+        wasChanged = true;
+
+        // Continue to next pass for re-reflection on the corrected output
+      } catch (err) {
+        this.logger.warn({ err, pass }, 'Self-reflection failed, using current output');
+        return { corrected: currentOutput, wasChanged, reflection: lastReflection || 'Reflection failed' };
+      }
     }
+
+    // maxReflectionPasses exhausted — accept whatever we have
+    this.logger.info(
+      { role: this.role, maxPasses },
+      'Self-reflection: max passes reached, accepting current output',
+    );
+    return { corrected: currentOutput, wasChanged, reflection: lastReflection };
   }
 
   /**
