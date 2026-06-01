@@ -538,7 +538,7 @@ export class SwarmExecutionService extends EventEmitter {
     // facade over LangGraphRuntime; it requires the Prisma client to
     // construct the PostgresCheckpointSaver internally.
     this.runner = new SwarmRunner({
-      defaultTimeoutMs: 5 * 60 * 1000,
+      defaultTimeoutMs: 20 * 60 * 1000,
       stateStore,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       db: db as any,
