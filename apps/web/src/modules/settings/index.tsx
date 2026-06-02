@@ -107,7 +107,7 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
             >
               {meta.icon}
               {meta.label}
-              {switchingProvider && preferredProvider !== name && <Spinner size="xs" />}
+              {switchingProvider && preferredProvider !== name && <Spinner size="sm" />}
             </button>
           ))}
         </div>

@@ -28,10 +28,10 @@ import type {
   StructuredRespondOptions,
 } from './llm-runtime.js';
 import type { ProviderTier } from '../base/provider-router.js';
-import { chatMessagesToGeminiContents } from './gemini-message-adapter.js';
+import { chatMessagesToGeminiContents, type OpenAIMessage } from './gemini-message-adapter.js';
 import { chatToolsToFunctionDeclarations } from './gemini-tool-adapter.js';
 import { geminiResponseToChatCompletion, geminiResponseIsBlocked } from './gemini-response-parser.js';
-import { modelForGeminiTier, getDefaultGeminiModel } from './gemini-model-resolver.js';
+import { modelForGeminiTier } from './gemini-model-resolver.js';
 
 const MAX_TOOL_LOOP_ITERATIONS_DEFAULT = 10;
 const DEFAULT_TIER: ProviderTier = 2;
@@ -43,14 +43,12 @@ const GEMINI_RETRY_BASE_MS = 1000;
 
 type GoogleGenerativeAI = import('@google/generative-ai').GoogleGenerativeAI;
 type GenerativeModel = import('@google/generative-ai').GenerativeModel;
-type GenerateContentResult = import('@google/generative-ai').GenerateContentResult;
 
 export class GeminiRuntime implements LLMRuntime {
   readonly name = 'gemini';
   private readonly client: GoogleGenerativeAI;
   private readonly explicitModel: string | undefined;
   private readonly defaultTier: ProviderTier;
-  private readonly requestTimeoutMs: number;
 
   constructor(opts: { apiKey?: string; model?: string; tier?: ProviderTier } = {}) {
     const apiKey = opts.apiKey ?? process.env['GEMINI_API_KEY'];
@@ -67,7 +65,6 @@ export class GeminiRuntime implements LLMRuntime {
     this.client = new GenAI(apiKey);
     this.explicitModel = opts.model ?? (process.env['GEMINI_MODEL']?.trim() || undefined);
     this.defaultTier = opts.tier ?? DEFAULT_TIER;
-    this.requestTimeoutMs = parseInt(process.env['GEMINI_REQUEST_TIMEOUT_MS'] ?? '60000', 10);
   }
 
   // ─── resolveModel ─────────────────────────────────────────────────────────
@@ -78,7 +75,7 @@ export class GeminiRuntime implements LLMRuntime {
 
   // ─── getModel ─────────────────────────────────────────────────────────────
 
-  private getModel(model: string, systemInstruction?: { parts: [{ text: string }] }): GenerativeModel {
+  private getModel(model: string, systemInstruction?: string): GenerativeModel {
     return this.client.getGenerativeModel({
       model,
       ...(systemInstruction ? { systemInstruction } : {}),
@@ -94,17 +91,21 @@ export class GeminiRuntime implements LLMRuntime {
   ): Promise<OpenAI.ChatCompletion> {
     const model = this.resolveModel();
     const { contents, systemInstruction } = chatMessagesToGeminiContents(
-      messages as Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string | unknown[] | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }>,
+      messages as OpenAIMessage[],
     );
 
-    const geminiModel = this.getModel(model, systemInstruction);
+    // systemInstruction is { parts: [{ text }] } — extract the text string
+    // because the Gemini SDK's ModelParams.systemInstruction expects
+    // string | Part | Content (Content needs role, so plain string is safest).
+    const systemText = systemInstruction?.parts?.[0]?.text;
+    const geminiModel = this.getModel(model, systemText);
     const generationConfig: Record<string, unknown> = {};
     if (options.maxTokens) generationConfig.maxOutputTokens = options.maxTokens;
     if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
     if (options.jsonMode) generationConfig.responseMimeType = 'application/json';
 
     const response = await this.callWithRetry(() =>
-      geminiModel.generateContent({ contents, generationConfig }),
+      geminiModel.generateContent({ contents, generationConfig } as any),
     );
 
     const chatCompletion = geminiResponseToChatCompletion(
@@ -143,12 +144,16 @@ export class GeminiRuntime implements LLMRuntime {
     // Lazy import to avoid circular dep
     const { getTenantToolRegistry } = await import('@jak-swarm/tools');
 
+    // Track last response for usage recording after loop
+    let lastGeminiResp: Record<string, unknown> | undefined;
+
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       const { contents, systemInstruction } = chatMessagesToGeminiContents(
-        workingMessages as Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string | unknown[] | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }>,
+        workingMessages as OpenAIMessage[],
       );
 
-      const geminiModel = this.getModel(model, systemInstruction);
+      const systemText = systemInstruction?.parts?.[0]?.text;
+      const geminiModel = this.getModel(model, systemText);
       const generationConfig: Record<string, unknown> = {};
       if (options.maxTokens) generationConfig.maxOutputTokens = options.maxTokens;
       if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
@@ -162,10 +167,11 @@ export class GeminiRuntime implements LLMRuntime {
           contents,
           generationConfig,
           ...(toolsConfig ?? {}),
-        }),
+        } as any),
       );
 
       const geminiResp = response.response as unknown as Record<string, unknown>;
+      lastGeminiResp = geminiResp;
 
       // Track usage
       const usage = (geminiResp as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata;
@@ -209,7 +215,15 @@ export class GeminiRuntime implements LLMRuntime {
         const toolArgs = fc.functionCall.args;
 
         try {
-          const tenantRegistry = getTenantToolRegistry(context.tenantId);
+          const tenantRegistry = getTenantToolRegistry(
+            context.tenantId,
+            context.connectedProviders,
+            {
+              browserAutomationEnabled: context.browserAutomationEnabled,
+              restrictedCategories: context.restrictedCategories,
+              disabledToolNames: context.disabledToolNames,
+            },
+          );
           const toolResult = await tenantRegistry.execute(toolName, toolArgs, {
             tenantId: context.tenantId,
             userId: context.userId,
@@ -237,11 +251,9 @@ export class GeminiRuntime implements LLMRuntime {
     }
 
     // Max iterations reached — return whatever we have
-    this.recordUsage(
-      (response.response as unknown as Record<string, unknown>),
-      model,
-      context,
-    );
+    if (lastGeminiResp) {
+      this.recordUsage(lastGeminiResp, model, context);
+    }
 
     return {
       content: '',
@@ -261,19 +273,21 @@ export class GeminiRuntime implements LLMRuntime {
   ): Promise<T> {
     const model = this.resolveModel();
     const { contents, systemInstruction } = chatMessagesToGeminiContents(
-      messages as Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string | unknown[] | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }>,
+      messages as OpenAIMessage[],
     );
 
-    const geminiModel = this.getModel(model, systemInstruction);
+    const systemText = systemInstruction?.parts?.[0]?.text;
+    const geminiModel = this.getModel(model, systemText);
 
     // Convert zod schema to JSON Schema for Gemini's responseSchema
     // Use the same zod-to-json-schema package that OpenAIRuntime uses
     let jsonSchema: Record<string, unknown>;
     try {
-      const zodToJsonSchema = await import('zod-to-json-schema');
-      jsonSchema = zodToJsonSchema.default(schema, {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { zodToJsonSchema } = require('zod-to-json-schema') as typeof import('zod-to-json-schema');
+      jsonSchema = zodToJsonSchema(schema, {
         name: options.schemaName ?? 'response',
-        description: options.schemaDescription,
+        target: 'jsonSchema7',
       }) as Record<string, unknown>;
       // Remove $schema — Gemini doesn't need it
       delete jsonSchema.$schema;
@@ -289,7 +303,7 @@ export class GeminiRuntime implements LLMRuntime {
     if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
 
     const response = await this.callWithRetry(() =>
-      geminiModel.generateContent({ contents, generationConfig }),
+      geminiModel.generateContent({ contents, generationConfig } as any),
     );
 
     const geminiResp = response.response as unknown as Record<string, unknown>;
@@ -361,6 +375,7 @@ export class GeminiRuntime implements LLMRuntime {
 
     context.emitActivity({
       type: 'cost_updated',
+      agentRole: context.agentRole ?? 'UNKNOWN',
       runtime: this.name,
       model,
       promptTokens,
@@ -368,6 +383,7 @@ export class GeminiRuntime implements LLMRuntime {
       totalTokens: promptTokens + completionTokens,
       costUsd,
       runId: context.runId,
+      timestamp: new Date().toISOString(),
     });
   }
 

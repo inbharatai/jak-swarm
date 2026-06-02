@@ -1,5 +1,6 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
 import { PlannerAgent, AgentContext } from '@jak-swarm/agents';
+import type { PlannerOutput } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 
 /**
@@ -52,7 +53,7 @@ export async function replannerNode(state: SwarmState): Promise<Partial<SwarmSta
       missionBrief: state.missionBrief,
     };
 
-    const result = await agent.execute(replanInput, context);
+    const result = await agent.execute(replanInput, context) as PlannerOutput;
     const traces = context.getTraces();
 
     return {

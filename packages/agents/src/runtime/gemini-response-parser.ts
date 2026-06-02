@@ -93,7 +93,7 @@ export function geminiResponseToChatCompletion(
   }> = [];
 
   for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
+    const part = parts[i]!;
     if ('text' in part && part.text) {
       textContent = (textContent ?? '') + part.text;
     } else if ('functionCall' in part && part.functionCall) {

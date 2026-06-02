@@ -307,7 +307,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
         existingFiles: params.existingFiles,
       },
       agentContext,
-    );
+    ) as AppArchitectResult;
   } catch (err) {
     emit('architect:failed', params, { error: err instanceof Error ? err.message : String(err) });
     emit('failed', params, { stage: 'architect', error: err instanceof Error ? err.message : String(err) });
@@ -353,7 +353,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
             existingFiles: params.existingFiles,
           },
           agentContext,
-        );
+        ) as AppGeneratorResult;
       } catch (err) {
         emit('generator:failed', params, { error: err instanceof Error ? err.message : String(err) });
         emit('failed', params, { stage: 'generator', error: err instanceof Error ? err.message : String(err) });
@@ -426,7 +426,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
           previousFixes,
         },
         agentContext,
-      );
+      ) as AppDebuggerResult;
     } catch (err) {
       emit('debugger:failed', params, { error: err instanceof Error ? err.message : String(err) });
       return {
@@ -474,7 +474,7 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
   if (deployAfterBuild) {
     emit('deployer:start', params);
     try {
-      deployment = await deployer.execute(
+      deployment = (await deployer.execute(
         {
           action: 'DEPLOY_VERCEL',
           projectName: params.projectName ?? `jak-${params.workflowId.slice(-8)}`,
@@ -483,13 +483,13 @@ export async function runVibeCoderWorkflow(params: VibeCoderParams): Promise<Vib
           envVars: params.envVars,
         },
         agentContext,
-      );
-      if (deployment.status === 'success') {
+      )) as AppDeployerResult | undefined;
+      if (deployment && deployment.status === 'success') {
         emit('deployer:ok', params, {
           deploymentUrl: deployment.deploymentUrl,
           deploymentId: deployment.deploymentId,
         });
-      } else {
+      } else if (deployment) {
         emit('deployer:failed', params, {
           status: deployment.status,
           error: deployment.error,

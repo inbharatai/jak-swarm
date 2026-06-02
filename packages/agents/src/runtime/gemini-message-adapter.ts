@@ -25,7 +25,7 @@ export interface GeminiSystemInstruction {
 
 // ─── OpenAI message shape (subset needed for conversion) ─────────────────────
 
-interface OpenAIMessage {
+export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | unknown[] | null;
   tool_calls?: Array<{

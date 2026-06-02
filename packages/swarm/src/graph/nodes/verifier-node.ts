@@ -1,6 +1,6 @@
 import { WorkflowStatus, TaskStatus } from '@jak-swarm/shared';
 import { VerifierAgent, AgentContext } from '@jak-swarm/agents';
-import type { VerifierInput } from '@jak-swarm/agents';
+import type { VerifierInput, VerificationResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
@@ -131,7 +131,7 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     agentOutput: taskOutput,
   };
 
-  const result = await agent.execute(verifierInput, context);
+  const result = await agent.execute(verifierInput, context) as VerificationResult;
   const traces = context.getTraces();
 
   // Count how many times this task has been retried
