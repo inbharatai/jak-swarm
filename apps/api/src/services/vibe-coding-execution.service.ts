@@ -98,7 +98,7 @@ export class VibeCodingExecutionService extends EventEmitter {
         const ssResult = await screenshotAgent.execute(
           { action: 'ANALYZE_SCREENSHOT', imageBase64, targetFramework: framework ?? 'nextjs' },
           context,
-        );
+        ) as import('@jak-swarm/agents').ScreenshotToCodeResult;
         imageAnalysis = ssResult.layoutAnalysis + '\n' + ssResult.overallDescription;
         this.emitProjectEvent(projectId, 'screenshot_analysis_completed', {
           componentCount: ssResult.components.length,
@@ -116,7 +116,7 @@ export class VibeCodingExecutionService extends EventEmitter {
           imageAnalysis,
         },
         context,
-      );
+      ) as import('@jak-swarm/agents').AppArchitectResult;
       this.emitProjectEvent(projectId, 'architect_completed', {
         fileCount: architecture.fileTree.length,
         modelCount: architecture.dataModels.length,
@@ -172,7 +172,7 @@ export class VibeCodingExecutionService extends EventEmitter {
             existingFiles: allFiles.map(f => ({ path: f.path, content: f.content })),
           },
           context,
-        );
+        ) as import('@jak-swarm/agents').AppGeneratorResult;
 
         for (const file of genResult.files) {
           const existing = allFiles.findIndex(f => f.path === file.path);
@@ -279,7 +279,7 @@ export class VibeCodingExecutionService extends EventEmitter {
           conversationHistory: conversations.slice(-10).map((c: { role: string; content: string }) => ({ role: c.role, content: c.content })),
         },
         context,
-      );
+      ) as import('@jak-swarm/agents').AppArchitectResult;
       this.emitProjectEvent(projectId, 'architect_completed', {
         filesToModify: changePlan.filesToModify,
       });
@@ -306,7 +306,7 @@ export class VibeCodingExecutionService extends EventEmitter {
           framework: (await this.db.project.findUnique({ where: { id: projectId }, select: { framework: true } }))?.framework ?? 'nextjs',
         },
         context,
-      );
+      ) as import('@jak-swarm/agents').AppGeneratorResult;
 
       this.emitProjectEvent(projectId, 'files_modified', {
         modifiedCount: genResult.files.length,
@@ -428,7 +428,7 @@ export class VibeCodingExecutionService extends EventEmitter {
           previousFixes,
         },
         context,
-      );
+      ) as import('@jak-swarm/agents').AppDebuggerResult;
 
       if (debugResult.requiresUserInput) {
         await this.projectService.addConversation(projectId, 'assistant',
