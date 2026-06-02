@@ -7,9 +7,9 @@
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
+[![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-2216_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-development)
 
 > 🏆 **Google for Startups AI Agents Challenge** — JAK Swarm integrates Google's **Gemini 2.5 Pro, 2.5 Flash, and 2.5 Flash-Lite** as first-class LLM runtimes alongside OpenAI. Every one of JAK's 38 specialist agents runs end-to-end on Gemini with tool calling, structured output, and controllable thinking. Per-tenant provider switching in the Settings UI means each organization independently selects OpenAI or Gemini — no code changes, no env-var swaps. [See LLM Providers →](#-llm-providers--routing)
 
@@ -42,7 +42,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 ### Honest boundary
 
-This is **beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is **beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
 
 ---
 
@@ -151,33 +151,56 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Sec
 ```mermaid
 graph LR
     subgraph ORCH["🧠 Orchestrators"]
-        O1["🎯 Commander"]  O2["📋 Planner"]
-        O3["🔀 Router"]    O4["✅ Verifier"]
-        O5["🛡️ Guardrail"] O6["⚠️ Approval"]
+        O1["🎯 Commander"]
+        O2["📋 Planner"]
+        O3["🔀 Router"]
+        O4["✅ Verifier"]
+        O5["🛡️ Guardrail"]
+        O6["⚠️ Approval"]
     end
 
     subgraph EXEC["💼 Executive"]
-        E1["🎯 Strategist (CEO)"]  E2["🏗️ Technical (CTO)"]
-        E3["💰 Finance (CFO)"]     E4["📣 Marketing (CMO)"]
-        E5["👔 HR"]  E6["💻 Coder"]  E7["🎨 Designer"]  E8["🚀 Growth"]
+        E1["🎯 Strategist (CEO)"]
+        E2["🏗️ Technical (CTO)"]
+        E3["💰 Finance (CFO)"]
+        E4["📣 Marketing (CMO)"]
+        E5["👔 HR"]
+        E6["💻 Coder"]
+        E7["🎨 Designer"]
+        E8["🚀 Growth"]
     end
 
     subgraph VIBE["⚡ Vibe Coding"]
-        V1["🏛️ Architect"]  V2["⚡ Generator"]
-        V3["🔧 Debugger"]   V4["🚀 Deployer"]  V5["📸 Screenshot→Code"]
+        V1["🏛️ Architect"]
+        V2["⚡ Generator"]
+        V3["🔧 Debugger"]
+        V4["🚀 Deployer"]
+        V5["📸 Screenshot→Code"]
     end
 
     subgraph OPS["🏢 Operations"]
-        P1["✏️ Content"]  P2["📈 SEO"]   P3["📰 PR"]
-        P4["⚖️ Legal"]   P5["🤝 Success"] P6["📉 Analytics"]
-        P7["🗺️ Product"] P8["📌 Project"]
+        P1["✏️ Content"]
+        P2["📈 SEO"]
+        P3["📰 PR"]
+        P4["⚖️ Legal"]
+        P5["🤝 Success"]
+        P6["📉 Analytics"]
+        P7["🗺️ Product"]
+        P8["📌 Project"]
     end
 
     subgraph CORE["⚙️ Core Workers"]
-        W1["📧 Email"]  W2["📅 Calendar"] W3["👤 CRM"]
-        W4["📄 Doc"]    W5["📊 Sheet"]    W6["🌐 Browser"]
-        W7["🔍 Research"] W8["🧠 Knowledge"] W9["🎧 Support"]
-        W10["⚙️ Ops"]   W11["🎤 Voice"]
+        W1["📧 Email"]
+        W2["📅 Calendar"]
+        W3["👤 CRM"]
+        W4["📄 Doc"]
+        W5["📊 Sheet"]
+        W6["🌐 Browser"]
+        W7["🔍 Research"]
+        W8["🧠 Knowledge"]
+        W9["🎧 Support"]
+        W10["⚙️ Ops"]
+        W11["🎤 Voice"]
     end
 ```
 
