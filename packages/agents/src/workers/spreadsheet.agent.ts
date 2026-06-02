@@ -143,7 +143,7 @@ export class SpreadsheetAgent extends BaseAgent {
     super(AgentRole.WORKER_SPREADSHEET, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<SpreadsheetResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<SpreadsheetResult> {
     const startedAt = new Date();
     const task = input as SpreadsheetTask;
 

@@ -153,7 +153,7 @@ export class GrowthAgent extends BaseAgent {
     super(AgentRole.WORKER_GROWTH, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<GrowthResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<GrowthResult> {
     const startedAt = new Date();
     const task = input as GrowthTask;
 

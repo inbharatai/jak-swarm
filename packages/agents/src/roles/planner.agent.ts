@@ -81,7 +81,7 @@ export class PlannerAgent extends BaseAgent {
     super(AgentRole.PLANNER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<PlannerOutput> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<PlannerOutput> {
     const startedAt = new Date();
 
     // Check if this is a replan request

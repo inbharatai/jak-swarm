@@ -92,7 +92,7 @@ export class ResearchAgent extends BaseAgent {
     super(AgentRole.WORKER_RESEARCH, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ResearchResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ResearchResult> {
     const startedAt = new Date();
     const task = input as ResearchTask;
 

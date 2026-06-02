@@ -15,7 +15,9 @@ export type { Subgoal, SubgoalCoordinatorResult } from './coordination/subgoal-c
 // LLM Providers
 export type { LLMProvider, LLMResponse, TextContent, ImageContent, MessageContent } from './base/llm-provider.js';
 export { OpenAIProvider } from './base/providers/openai-provider.js';
-export { ProviderRouter, getDefaultProvider } from './base/provider-router.js';
+export { GeminiProvider } from './base/providers/gemini-provider.js';
+export { ProviderRouter, getDefaultProvider, getProviderForTier } from './base/provider-router.js';
+export type { ProviderHints as ProviderRouterHints } from './base/provider-router.js';
 
 // Anti-hallucination & optimization utilities
 export {
@@ -245,11 +247,16 @@ export {
   getRuntime,
   LegacyRuntime,
   OpenAIRuntime,
+  GeminiRuntime,
   ensureModelMap,
   getModelMapSync,
   modelForTier,
+  modelForGeminiTier,
+  getDefaultGeminiModel,
+  isGeminiModel,
   smokeResponsesApi,
 } from './runtime/index.js';
+export type { ProviderHints } from './runtime/index.js';
 
 // Phase 4 schemas — strict zod schemas for Planner / Commander / Research
 // outputs. Both runtimes validate; OpenAIRuntime enforces at the model layer.

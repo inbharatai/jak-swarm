@@ -5,6 +5,7 @@ import { getCurrentTask } from '../../state/swarm-state.js';
 import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
 import { getBreakerFactory } from '../../supervisor/breaker-registry.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
+import { getLLMApiKey } from '../../supervisor/llm-key-registry.js';
 import { createWorkerAgent } from './worker/agent-factory.js';
 import { buildTaskInput } from './worker/task-input-builders.js';
 import {
@@ -71,6 +72,12 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     connectedProviders: state.connectedProviders,
     subscriptionTier: state.subscriptionTier,
     ...(onActivity ? { onActivity } : {}),
+    // Per-tenant LLM provider preference from TenantMemory
+    ...(state.llmProvider ? { llmProvider: state.llmProvider } : {}),
+    // API key from side-channel registry (never persisted to SwarmState)
+    ...(state.llmProvider && getLLMApiKey(state.workflowId)
+      ? { llmApiKey: getLLMApiKey(state.workflowId) }
+      : {}),
   });
 
   let output: unknown;

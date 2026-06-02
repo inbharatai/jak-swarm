@@ -136,7 +136,7 @@ export class ContentAgent extends BaseAgent {
     super(AgentRole.WORKER_CONTENT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ContentResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ContentResult> {
     const startedAt = new Date();
     const task = input as ContentTask;
 

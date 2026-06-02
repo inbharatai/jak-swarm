@@ -93,7 +93,7 @@ export class SupportAgent extends BaseAgent {
     super(AgentRole.WORKER_SUPPORT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<SupportResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<SupportResult> {
     const startedAt = new Date();
     const task = input as SupportTask;
 

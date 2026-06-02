@@ -155,7 +155,7 @@ export class AppDeployerAgent extends BaseAgent {
     super(AgentRole.WORKER_APP_DEPLOYER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<AppDeployerResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<AppDeployerResult> {
     const startedAt = new Date();
     const task = input as AppDeployerTask;
 

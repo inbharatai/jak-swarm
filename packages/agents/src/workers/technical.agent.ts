@@ -151,7 +151,7 @@ export class TechnicalAgent extends BaseAgent {
     super(AgentRole.WORKER_TECHNICAL, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<TechnicalResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<TechnicalResult> {
     const startedAt = new Date();
     const task = input as TechnicalTask;
 

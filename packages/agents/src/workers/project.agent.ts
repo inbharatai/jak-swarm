@@ -150,7 +150,7 @@ export class ProjectAgent extends BaseAgent {
     super(AgentRole.WORKER_PROJECT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ProjectResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ProjectResult> {
     const startedAt = new Date();
     const task = input as ProjectTask;
 

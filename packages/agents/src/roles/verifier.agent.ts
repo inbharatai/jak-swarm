@@ -181,7 +181,7 @@ export class VerifierAgent extends BaseAgent {
     super(AgentRole.VERIFIER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<VerificationResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<VerificationResult> {
     const startedAt = new Date();
     const { task, agentOutput, expectedOutputSchema, toolCallsTrace } = input as VerifierInput;
 

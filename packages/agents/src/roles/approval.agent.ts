@@ -69,7 +69,7 @@ export class ApprovalAgent extends BaseAgent {
     super(AgentRole.APPROVAL, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ApprovalRequest> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ApprovalRequest> {
     const startedAt = new Date();
     const {
       task,

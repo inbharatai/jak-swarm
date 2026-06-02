@@ -145,7 +145,7 @@ export class AppGeneratorAgent extends BaseAgent {
     super(AgentRole.WORKER_APP_GENERATOR, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<AppGeneratorResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<AppGeneratorResult> {
     const startedAt = new Date();
     const task = input as AppGeneratorTask;
 

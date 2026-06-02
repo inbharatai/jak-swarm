@@ -139,7 +139,7 @@ export class SuccessAgent extends BaseAgent {
     super(AgentRole.WORKER_SUCCESS, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<SuccessResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<SuccessResult> {
     const startedAt = new Date();
     const task = input as SuccessTask;
 

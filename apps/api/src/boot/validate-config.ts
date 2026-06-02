@@ -137,6 +137,25 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   }
 
   // -----------------------------------------------------------------------
+  // 2b. Gemini model execution (only when LLM_PROVIDER=gemini)
+  // -----------------------------------------------------------------------
+  if (config.llmProvider === 'gemini') {
+    if (!config.geminiApiKey) {
+      results.push({
+        name: 'GEMINI_API_KEY',
+        status: isProd ? 'error' : 'warn',
+        message: 'GEMINI_API_KEY is not set - LLM_PROVIDER=gemini requires a Gemini API key.',
+      });
+    } else {
+      results.push({
+        name: 'GEMINI_API_KEY',
+        status: 'ok',
+        message: 'Gemini API key configured',
+      });
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // 3. Database connectivity
   // -----------------------------------------------------------------------
   try {

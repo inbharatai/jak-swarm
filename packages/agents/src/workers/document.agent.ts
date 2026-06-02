@@ -100,7 +100,7 @@ export class DocumentAgent extends BaseAgent {
     super(AgentRole.WORKER_DOCUMENT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<DocumentResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<DocumentResult> {
     const startedAt = new Date();
     const task = input as DocumentTask;
 

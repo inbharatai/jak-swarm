@@ -146,7 +146,7 @@ export class CRMAgent extends BaseAgent {
     super(AgentRole.WORKER_CRM, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<CRMResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<CRMResult> {
     const startedAt = new Date();
     const task = input as CRMTask;
 

@@ -1,5 +1,6 @@
 import type { LLMProvider, LLMResponse, MessageContent } from './llm-provider.js';
 import { OpenAIProvider } from './providers/openai-provider.js';
+import { GeminiProvider } from './providers/gemini-provider.js';
 
 export type ProviderTier = 1 | 2 | 3;
 export type RoutingStrategy = 'openai_only';
@@ -148,11 +149,48 @@ export function getModelOverride(role: string): string | undefined {
   return AGENT_MODEL_MAP[role];
 }
 
-export function getProviderForTier(tier: ProviderTier): LLMProvider {
+/**
+ * Per-tenant provider hints that override the process.env default.
+ * Mirrors ProviderHints from runtime/index.ts.
+ */
+export interface ProviderHints {
+  provider?: 'openai' | 'gemini';
+  apiKey?: string;
+}
+
+export function getProviderForTier(tier: ProviderTier, hints?: ProviderHints): LLMProvider {
+  // Per-tenant hints take precedence
+  if (hints?.provider === 'gemini') {
+    const apiKey = hints.apiKey ?? process.env['GEMINI_API_KEY'];
+    if (apiKey) return new GeminiProvider(apiKey, undefined, { tier });
+  }
+  if (hints?.provider === 'openai') {
+    const apiKey = hints.apiKey ?? process.env['OPENAI_API_KEY'];
+    if (apiKey) return new OpenAIProvider(apiKey, undefined, { tier });
+  }
+
+  const llmProvider = (process.env['LLM_PROVIDER'] ?? 'existing').trim().toLowerCase();
+  if (llmProvider === 'gemini' && process.env['GEMINI_API_KEY']) {
+    return new GeminiProvider(undefined, undefined, { tier });
+  }
   return new OpenAIProvider(undefined, undefined, { tier });
 }
 
-export function getDefaultProvider(): LLMProvider {
+export function getDefaultProvider(hints?: ProviderHints): LLMProvider {
+  // Per-tenant hints take precedence
+  if (hints?.provider === 'gemini') {
+    const apiKey = hints.apiKey ?? process.env['GEMINI_API_KEY'];
+    if (apiKey) return new GeminiProvider(apiKey);
+  }
+  if (hints?.provider === 'openai') {
+    const apiKey = hints.apiKey ?? process.env['OPENAI_API_KEY'];
+    if (apiKey) return new OpenAIProvider(apiKey);
+  }
+
+  const llmProvider = (process.env['LLM_PROVIDER'] ?? 'existing').trim().toLowerCase();
+  if (llmProvider === 'gemini' && process.env['GEMINI_API_KEY']) {
+    return new GeminiProvider();
+  }
   return new OpenAIProvider();
 }
 

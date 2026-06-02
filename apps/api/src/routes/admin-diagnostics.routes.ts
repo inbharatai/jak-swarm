@@ -69,6 +69,13 @@ export async function adminDiagnosticsRoutes(app: FastifyInstance) {
               OPENAI_MODEL_TIER_3: process.env['OPENAI_MODEL_TIER_3']?.trim() || null,
               JAK_EXECUTION_ENGINE: process.env['JAK_EXECUTION_ENGINE']?.trim() || '(default - openai-first)',
               JAK_OPENAI_RUNTIME_AGENTS: process.env['JAK_OPENAI_RUNTIME_AGENTS']?.trim() || null,
+              LLM_PROVIDER: process.env['LLM_PROVIDER']?.trim() || '(default - existing)',
+              GEMINI_API_KEY_set: Boolean(process.env['GEMINI_API_KEY']),
+              GEMINI_MODEL: process.env['GEMINI_MODEL']?.trim() || null,
+              GEMINI_MODEL_TIER_1: process.env['GEMINI_MODEL_TIER_1']?.trim() || null,
+              GEMINI_MODEL_TIER_2: process.env['GEMINI_MODEL_TIER_2']?.trim() || null,
+              GEMINI_MODEL_TIER_3: process.env['GEMINI_MODEL_TIER_3']?.trim() || null,
+              GEMINI_REQUEST_TIMEOUT_MS: process.env['GEMINI_REQUEST_TIMEOUT_MS']?.trim() || null,
             },
           }),
         );

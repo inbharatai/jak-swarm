@@ -130,7 +130,7 @@ export class StrategistAgent extends BaseAgent {
     super(AgentRole.WORKER_STRATEGIST, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<StrategistResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<StrategistResult> {
     const startedAt = new Date();
     const task = input as StrategistTask;
 

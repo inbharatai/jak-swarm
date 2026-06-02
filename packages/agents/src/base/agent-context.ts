@@ -207,6 +207,18 @@ export interface AgentContextParams {
    * don't set it get identical behavior to before.
    */
   onActivity?: AgentActivityEmitter;
+  /**
+   * Per-tenant LLM provider preference. When set, the agent should
+   * use this provider instead of the process.env default. Values:
+   * 'openai' | 'gemini'. Undefined = use env-var default.
+   */
+  llmProvider?: 'openai' | 'gemini';
+  /**
+   * Per-tenant decrypted API key for the selected provider.
+   * When set, overrides the process.env key. Resolved from
+   * TenantMemory at workflow-start time by swarm-execution.service.ts.
+   */
+  llmApiKey?: string;
 }
 
 export class AgentContext {
@@ -227,6 +239,8 @@ export class AgentContext {
   readonly allowedToolNames: string[];
   readonly subscriptionTier: SubscriptionTier | undefined;
   readonly onActivity: AgentActivityEmitter | undefined;
+  readonly llmProvider: 'openai' | 'gemini' | undefined;
+  readonly llmApiKey: string | undefined;
   private steps: AgentTrace[] = [];
   private llmUsages: AgentLLMUsage[] = [];
 
@@ -248,6 +262,8 @@ export class AgentContext {
     this.allowedToolNames = params.allowedToolNames ?? [];
     this.subscriptionTier = params.subscriptionTier;
     this.onActivity = params.onActivity;
+    this.llmProvider = params.llmProvider;
+    this.llmApiKey = params.llmApiKey;
   }
 
   /** Safe activity-emit helper — swallows errors so emission never breaks agent execution. */
@@ -306,6 +322,8 @@ export class AgentContext {
       allowedToolNames: this.allowedToolNames,
       subscriptionTier: this.subscriptionTier,
       ...(this.onActivity ? { onActivity: this.onActivity } : {}),
+      ...(this.llmProvider ? { llmProvider: this.llmProvider } : {}),
+      ...(this.llmApiKey ? { llmApiKey: this.llmApiKey } : {}),
       ...overrides,
     });
   }
