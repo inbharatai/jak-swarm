@@ -48,6 +48,13 @@ export interface RoleManifestEntry {
    * Set lower (e.g. 0.5) for roles where some claims are interpretive.
    */
   groundingDensityThreshold?: number;
+  /**
+   * Self-reflection mode. 'lenient' for creative/subjective roles where
+   * only objective errors (hallucinations, format violations) should trigger
+   * correction. 'strict' for factual/grounded roles where completeness and
+   * quality also matter. Default: undefined → 'strict'.
+   */
+  reflectionMode?: 'strict' | 'lenient';
 }
 
 /**
@@ -63,6 +70,15 @@ export function getGroundingRequirement(role: AgentRole): {
   const enforce = entry?.needsGrounding === true;
   const threshold = entry?.groundingDensityThreshold ?? 0.7;
   return { enforce, threshold };
+}
+
+/**
+ * Helper: lookup a role's reflection mode. Returns 'strict' when the
+ * role doesn't specify a mode so callers have a single uniform shape.
+ */
+export function getReflectionMode(role: AgentRole): 'strict' | 'lenient' {
+  const entry = ROLE_MANIFEST[role];
+  return entry?.reflectionMode ?? 'strict';
 }
 
 /**
@@ -122,6 +138,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'world_class',
     strengths: ['Fortune 500 CEO persona', 'Strategic frameworks', 'Second-order thinking'],
     implementation: 'packages/agents/src/workers/strategist.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_MARKETING]: {
     role: AgentRole.WORKER_MARKETING,
@@ -129,6 +146,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'world_class',
     strengths: ['CMO-grade prompt', 'Revenue attribution', 'Campaign design', '9 dedicated tools'],
     implementation: 'packages/agents/src/workers/marketing.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_TECHNICAL]: {
     role: AgentRole.WORKER_TECHNICAL,
@@ -150,6 +168,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['VP People Ops persona', 'Culture + policy balance'],
     implementation: 'packages/agents/src/workers/hr.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_GROWTH]: {
     role: AgentRole.WORKER_GROWTH,
@@ -157,6 +176,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'world_class',
     strengths: ['466-line specialized prompt', 'Lead-gen + SEO + outreach'],
     implementation: 'packages/agents/src/workers/growth.agent.ts',
+    reflectionMode: 'lenient',
   },
 
   // ─── Upgraded (Session 8 + follow-ons) ────────────────────────────────
@@ -320,6 +340,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['Long-form generation', 'Format adaptation (blog / social / script)'],
     implementation: 'packages/agents/src/workers/content.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_SEO]: {
     role: AgentRole.WORKER_SEO,
@@ -327,6 +348,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['Technical SEO discipline', 'Structured data awareness'],
     implementation: 'packages/agents/src/workers/seo.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_PR]: {
     role: AgentRole.WORKER_PR,
@@ -334,6 +356,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['AP Style', 'Crisis comms framework', 'Journalistic conventions'],
     implementation: 'packages/agents/src/workers/pr.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_LEGAL]: {
     role: AgentRole.WORKER_LEGAL,
@@ -348,6 +371,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'world_class',
     strengths: ['VP CS persona', 'Health scoring', 'Renewal strategy'],
     implementation: 'packages/agents/src/workers/success.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_ANALYTICS]: {
     role: AgentRole.WORKER_ANALYTICS,
@@ -367,6 +391,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
       'Problem-first, solution-second discipline',
     ],
     implementation: 'packages/agents/src/workers/product.agent.ts',
+    reflectionMode: 'lenient',
   },
   [AgentRole.WORKER_PROJECT]: {
     role: AgentRole.WORKER_PROJECT,
@@ -374,6 +399,7 @@ export const ROLE_MANIFEST: Record<AgentRole, RoleManifestEntry> = {
     maturity: 'strong',
     strengths: ['Timeline / resource / milestone structure'],
     implementation: 'packages/agents/src/workers/project.agent.ts',
+    reflectionMode: 'lenient',
   },
 
   // ─── Vibe Coding (hero roles) ──────────────────────────────────────────

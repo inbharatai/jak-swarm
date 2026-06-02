@@ -319,11 +319,11 @@ describe('Landing — top-line counts', () => {
     const page = read('apps/web/src/app/page.tsx');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
     expect(readme).toContain('Beta `0.1.0-beta.0`');
-    expect(readme).toMatch(/Tests-2045_passing/);
+    expect(readme).toMatch(/Tests-2232_passing/);
     expect(page).toContain('Beta 0.1.0-beta.0');
     expect(page).toContain('Controlled beta');
     expect(beta).toContain('Status: beta release candidate');
-    expect(beta).toContain('2045 passed, 101 skipped, 54 todo');
+    expect(beta).toContain('2232 passed, 101 skipped, 54 todo');
     expect(beta).toMatch(/not an enterprise-SLA release/i);
   });
 });

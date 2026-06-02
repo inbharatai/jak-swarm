@@ -42,7 +42,7 @@ That rating means the core architecture is now credible enough for controlled be
 - `pnpm --filter @jak-swarm/shared typecheck`
 - `pnpm --filter @jak-swarm/db typecheck`
 - `pnpm --filter @jak-swarm/swarm exec tsc --noEmit`
-- `pnpm --filter @jak-swarm/tests test`: 2045 passed, 101 skipped, 54 todo.
+- `pnpm --filter @jak-swarm/tests test`: 2232 passed, 101 skipped, 54 todo.
 - `PWHEADLESS=1 E2E_START_API=1 pnpm --filter @jak-swarm/tests run test:e2e -- standing-orders.spec.ts --project=chromium-desktop`: 3 passed.
 - `PWHEADLESS=1 pnpm --filter @jak-swarm/tests run test:e2e -- human-qa-landing.spec.ts --project=chromium-desktop`: passed.
 - `PWHEADLESS=1 pnpm --filter @jak-swarm/tests run test:e2e -- human-qa-dashboard.spec.ts --project=chromium-desktop`: 10 dashboard pages passed in the earlier local sweep.

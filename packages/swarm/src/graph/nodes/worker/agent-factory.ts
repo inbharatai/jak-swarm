@@ -33,6 +33,7 @@ import {
   AppDeployerAgent,
   ScreenshotToCodeAgent,
 } from '@jak-swarm/agents';
+import type { ReflectAndCorrectOptions } from '@jak-swarm/agents';
 
 /** Minimal surface worker-node depends on from any agent instance. */
 export interface WorkerAgent {
@@ -40,7 +41,7 @@ export interface WorkerAgent {
   reflectAndCorrect(
     outputStr: string,
     taskDescription: string,
-    options?: { maxTokens?: number },
+    options?: ReflectAndCorrectOptions,
   ): Promise<{ corrected: string; wasChanged: boolean }>;
 }
 
