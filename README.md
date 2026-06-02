@@ -16,6 +16,8 @@
 [![Tests](https://img.shields.io/badge/Tests-2232_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![Free Trial](https://img.shields.io/badge/Free_Trial-30_Days-34d399?style=for-the-badge&logo=sparkfun&logoColor=white)](https://jakswarm.com/trial)
 
+> 🏆 **Google for Startups AI Agents Challenge** — JAK Swarm integrates Google's **Gemini 2.5 Pro, 2.5 Flash, and 2.5 Flash-Lite** as first-class LLM runtimes alongside OpenAI. Every one of JAK's 38 specialist agents runs end-to-end on Gemini with tool calling, structured output, and controllable thinking. Per-tenant provider switching in the Settings UI means each organization independently selects OpenAI or Gemini — no code changes, no env-var swaps. The `GeminiRuntime` adapter bridges Google's Generative AI SDK to JAK's agent-first architecture, with `geminiResponseToChatCompletion()` translating responses into a unified shape. [See the architecture →](#-llm-providers--routing)
+
 **JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
 JAK Swarm captures evidence from company artifacts, maps decisions/tasks/risks/owners/customer signals/code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
@@ -219,22 +221,36 @@ flowchart TD
 
 ```mermaid
 flowchart LR
+    subgraph PROVIDER["🔌 Provider Layer"]
+        direction TB
+        OPENAI["OpenAI<br/>GPT-5.5 · GPT-5.4"]
+        GEMINI["Google Gemini<br/>2.5 Pro · 2.5 Flash · 2.5 Flash-Lite"]
+    end
+
     subgraph TIER3["💎 Tier 3 — Premium"]
         T3A["GPT-5.5"]
+        T3B["Gemini 2.5 Pro"]
     end
 
     subgraph TIER2["⚡ Tier 2 — Balanced"]
         T2A["GPT-5.4"]
+        T2B["Gemini 2.5 Flash"]
     end
 
-    subgraph TIER1["💰 Tier 1 — Cost Optimized"]
-        T1A["GPT-5.4 mini-tier routing"]
+    subgraph TIER1["💰 Tier 1 — Economy"]
+        T1A["GPT-5.4 mini-tier"]
+        T1B["Gemini 2.5 Flash-Lite"]
     end
 
     CMD["Commander\nPlanner\nVerifier"] --> TIER3
     GEN["Code Generator\nDesigner\nArchitect"] --> TIER2
-    WRK["Email • Calendar\nCRM • Debug\nResearch"] --> TIER1
+    WRK["Email · Calendar\nCRM · Debug\nResearch"] --> TIER1
 
+    TIER3 --> PROVIDER
+    TIER2 --> PROVIDER
+    TIER1 --> PROVIDER
+
+    style PROVIDER fill:#0d1117,stroke:#fbbf24,color:#e6edf3
     style TIER3 fill:#1a0a2e,stroke:#c084fc,color:#e6edf3
     style TIER2 fill:#0a1a15,stroke:#34d399,color:#e6edf3
     style TIER1 fill:#1a150a,stroke:#fbbf24,color:#e6edf3
@@ -259,7 +275,7 @@ flowchart LR
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
 | 🧪 | **Tool Maturity Manifest** | All 122 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
-| 🧠 | **Agent-first runtime** | All work routes through specialist agents with tier-based model execution. API keys are required: set `OPENAI_API_KEY` for LLM execution. |
+| 🧠 | **Agent-first runtime** | All work routes through specialist agents with tier-based model execution. Supports both **OpenAI** (GPT-5.5/5.4) and **Google Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant provider switching from the Settings UI. |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. **Conversation threads** are now server-side (`Conversation` + `ConversationMessage` tables) with full history injection into the LangGraph state so multi-turn chat feels continuous instead of a string-concat hack. |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
 | 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
@@ -489,15 +505,77 @@ graph LR
 
 <div align="center">
 
-| Provider | Tier | Use Case |
-|:--------:|:----:|----------|
-| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_GPT--5.4-412991?style=flat-square&logo=robot&logoColor=white) | **Tier 1-3** | LLM execution provider; Responses API, strict structured output, prompt-cache-aware telemetry |
+| Provider | Tier | Models | Use Case |
+|:--------:|:----:|:------:|----------|
+| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_GPT--5.4-412991?style=flat-square&logo=openai&logoColor=white) | **Tier 1-3** | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry |
+| ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5_Pro_%2F_Flash-4285f4?style=flat-square&logo=google&logoColor=white) | **Tier 1-3** | Gemini 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output |
 
 </div>
 
-**Routing strategy:** Agent-first. Tier 3 orchestration defaults to GPT-5.5; Tier 1/2 worker and balanced paths default to GPT-5.4. The legacy multi-provider failover strategies were removed to keep execution predictable and auditable.
+**Per-tenant provider switching** — Each tenant chooses between OpenAI and Gemini from the Settings UI. The preference is stored in `TenantMemory` (key: `llm:preferred_provider`) and flows through the entire execution pipeline: `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → every graph node → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()` → provider-specific runtime. Tenant API keys are AES-256-GCM encrypted at rest.
 
-> Tier 1 handles parallel worker tasks on the lower-cost tier. Tier 3 handles Commander, Planner, and Verifier on GPT-5.5.
+**Routing strategy:** Agent-first with tier-based model selection. When Gemini is selected:
+- **Tier 3 (premium):** Gemini 2.5 Pro — Commander, Planner, Verifier, CEO/CMO/CFO agents
+- **Tier 2 (balanced):** Gemini 2.5 Flash — Code Generator, Architect, Research agents
+- **Tier 1 (economy):** Gemini 2.5 Flash-Lite — Router, Guardrail, simple workers
+
+All three models support parallel function calling, structured output (`responseSchema`), and controllable thinking budgets — no capability downgrade when switching providers.
+
+**Runtime architecture:** `GeminiRuntime` converts OpenAI message shapes to Gemini `Content[]` format, maps tool definitions via `zod-to-json-schema`, and translates responses back through `geminiResponseToChatCompletion()`. This means every existing agent (all 38) works with Gemini with zero code changes — the `BaseAgent.execute()` wrapper calls `setContextOverride(context)` which transparently swaps the LLM call service when `context.llmProvider === 'gemini'`.
+
+> **Google AI Agents Challenge:** JAK Swarm integrates Google's Gemini models as a first-class runtime alongside OpenAI. Every agent — from the Commander orchestrator to the Vibe Coding pipeline — runs end-to-end on Gemini 2.5 Pro/Flash/Flash-Lite with tool calling, structured output, and per-tenant switching. The `GeminiRuntime` adapter in [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) bridges the Gemini SDK to JAK's agent-first architecture.
+
+<details>
+<summary><b>🔧 Provider Switching Architecture</b></summary>
+
+```mermaid
+flowchart LR
+    subgraph UI["⚙️ Settings UI"]
+        A["Preferred Provider Toggle"]
+    end
+
+    subgraph API["🚀 API Layer"]
+        B["PUT /settings/llm/preferred-provider"]
+        C["TenantMemory<br/>llm:preferred_provider"]
+        D["Encrypted API Key<br/>llm:gemini:api_key"]
+    end
+
+    subgraph EXEC["🐝 Execution Pipeline"]
+        E["SwarmExecutionService<br/>reads preference + decrypts key"]
+        F["SwarmRunner<br/>passes llmProvider + llmApiKey"]
+        G["SwarmState<br/>propagates to graph nodes"]
+        H["AgentContext.llmProvider"]
+    end
+
+    subgraph AGENT["🤖 Agent Layer"]
+        I["BaseAgent.execute()<br/>calls setContextOverride()"]
+        J{llmProvider?}
+        K["OpenAI Runtime<br/>GPT-5.5 / GPT-5.4"]
+        L["Gemini Runtime<br/>2.5 Pro / Flash / Flash-Lite"]
+    end
+
+    A --> B --> C
+    B --> D
+    C --> E
+    D --> E
+    E --> F --> G --> H --> I --> J
+    J -->|"openai"| K
+    J -->|"gemini"| L
+
+    style UI fill:#0d1117,stroke:#34d399,color:#e6edf3
+    style API fill:#0d1117,stroke:#38bdf8,color:#e6edf3
+    style EXEC fill:#0d1117,stroke:#fbbf24,color:#e6edf3
+    style AGENT fill:#0d1117,stroke:#c084fc,color:#e6edf3
+```
+
+Key files:
+- [`apps/api/src/routes/llm-settings.routes.ts`](apps/api/src/routes/llm-settings.routes.ts) — Provider toggle + key management APIs
+- [`apps/api/src/services/swarm-execution.service.ts`](apps/api/src/services/swarm-execution.service.ts) — Reads tenant preference, injects into runner
+- [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) — Gemini SDK adapter (tool calling, structured output, thinking)
+- [`packages/agents/src/runtime/gemini-response-parser.ts`](packages/agents/src/runtime/gemini-response-parser.ts) — Converts Gemini responses to OpenAI shape
+- [`packages/agents/src/base/base-agent.ts`](packages/agents/src/base/base-agent.ts) — `setContextOverride()` transparently swaps provider
+
+</details>
 
 ---
 
@@ -670,15 +748,15 @@ flowchart TD
 
 <div align="center">
 
-| Stage | LLM Tier | Model | Est. Cost |
-|:------|:--------:|:------|:---------:|
-| 📸 Screenshot analysis | Tier 3 | GPT-5.5 vision-capable agent runtime | $0.10-0.20 |
-| 🏛️ Architecture | Tier 3 | GPT-5.5 | $0.20-0.50 |
-| ⚡ Code generation | Tier 2 | GPT-5.4 | $0.15-0.40 |
-| 🔧 Debug iterations | Tier 1 | GPT-5.4 lower-cost routing | $0.02-0.05/iter |
-| 🚀 Deploy | Tier 1 | Tool calls only | $0.01-0.02 |
-| | | **Total (new app)** | **$0.50-2.00** |
-| | | **Per iteration** | **$0.05-0.30** |
+| Stage | OpenAI Tier | OpenAI Model | Gemini Tier | Gemini Model | Est. Cost |
+|:------|:----------:|:------------:|:-----------:|:------------:|:---------:|
+| 📸 Screenshot analysis | Tier 3 | GPT-5.5 | Tier 3 | Gemini 2.5 Pro | $0.10-0.20 |
+| 🏛️ Architecture | Tier 3 | GPT-5.5 | Tier 3 | Gemini 2.5 Pro | $0.20-0.50 |
+| ⚡ Code generation | Tier 2 | GPT-5.4 | Tier 2 | Gemini 2.5 Flash | $0.15-0.40 |
+| 🔧 Debug iterations | Tier 1 | GPT-5.4 mini | Tier 1 | Gemini 2.5 Flash-Lite | $0.02-0.05/iter |
+| 🚀 Deploy | Tier 1 | Tool calls only | Tier 1 | Tool calls only | $0.01-0.02 |
+| | | **Total (new app)** | | | **$0.50-2.00** |
+| | | **Per iteration** | | | **$0.05-0.30** |
 
 *Estimated costs based on model pricing. Actual costs vary by app complexity, model selection, and debug iterations.*
 
@@ -830,7 +908,10 @@ cp .env.example .env
 Edit `.env` -- at minimum set:
 
 ```bash
-OPENAI_API_KEY=sk-your-key-here
+# LLM provider (set one or both — per-tenant switching available in the dashboard)
+OPENAI_API_KEY=sk-your-openai-key-here
+GEMINI_API_KEY=your-gemini-key-here          # Optional: enables Gemini 2.5 Pro/Flash
+
 DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
 AUTH_SECRET=your-random-32-char-string-here
 
@@ -990,6 +1071,7 @@ Create recurring workflows from the dashboard at `/schedules`:
 | Tools | **122** | 50+ | Custom | ~10 |
 | Built-in UI | **13 pages** | — | LangSmith | IDE |
 | Multi-tenant | ✅ | Enterprise | — | — |
+| **Gemini + OpenAI** | ✅ Per-tenant switching | ❌ | ❌ | ❌ |
 | Scheduling | ✅ | ✅ | ✅ | — |
 | Browser control | **30 tools** | Via plugin | Via plugin | — |
 | Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
@@ -1046,13 +1128,14 @@ Create recurring workflows from the dashboard at `/schedules`:
 
 ## 📈 Performance
 
-| Operation | Time | Cost (OpenAI GPT-5.4/5.5 tier) |
-|:----------|:----:|:-------------:|
-| Simple research task | 10-30s | $0.01-0.05 |
-| Multi-agent workflow (5 tasks) | 30-90s | $0.05-0.20 |
-| Complex pipeline (10+ tasks) | 2-10min | $0.20-1.00 |
-| Strategy-tier workflow (CEO/CFO/CMO) | 5-20min | $0.30-2.00 |
-| Voice session (per minute) | Real-time | ~$0.06 |
+| Operation | Time | Cost (OpenAI) | Cost (Gemini) |
+|:----------|:----:|:-------------:|:-------------:|
+| Simple research task | 10-30s | $0.01-0.05 | $0.01-0.03 |
+| Multi-agent workflow (5 tasks) | 30-90s | $0.05-0.20 | $0.03-0.15 |
+| Complex pipeline (10+ tasks) | 2-10min | $0.20-1.00 | $0.10-0.80 |
+| Strategy-tier workflow (CEO/CFO/CMO) | 5-20min | $0.30-2.00 | $0.20-1.50 |
+| Vibe Coding (full app) | 3-8min | $0.50-2.00 | $0.30-1.50 |
+| Voice session (per minute) | Real-time | ~$0.06 | ~$0.04 |
 
 ### Resource Limits
 
@@ -1083,6 +1166,8 @@ Create recurring workflows from the dashboard at `/schedules`:
 | **DAG Visualization** | React Flow |
 | **Database** | PostgreSQL + Prisma ORM |
 | **Durable Workflows** | PostgreSQL state persistence (Temporal package included, API wiring in progress) |
+| **LLM Runtime — OpenAI** | OpenAI SDK (GPT-5.5, GPT-5.4) — Responses API, json_schema strict mode |
+| **LLM Runtime — Gemini** | Google Generative AI SDK (Gemini 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite) — parallel function calling, responseSchema, controllable thinking |
 | **Browser Automation** | Playwright |
 | **Email** | imapflow (IMAP) + nodemailer (SMTP) |
 | **Calendar** | tsdav (CalDAV) |
@@ -1312,10 +1397,14 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 
 | Method | Endpoint | Auth | Description |
 |:------:|:---------|:----:|:------------|
-| GET | `/settings/llm` | JWT | List configured LLM providers (masked key previews) |
-| GET | `/settings/llm/status` | JWT | Health check all providers |
-| PUT | `/settings/llm/:provider` | JWT + Operator | Set or update API key for a provider (AES-256-GCM encrypted) |
+| GET | `/settings/llm` | JWT | List configured LLM providers (OpenAI + Gemini) with masked key previews |
+| GET | `/settings/llm/status` | JWT | Health check all providers — tests API key availability |
+| GET | `/settings/llm/preferred-provider` | JWT | Get tenant's current preferred LLM provider (default: `openai`) |
+| PUT | `/settings/llm/preferred-provider` | JWT + Operator | Switch preferred provider (`openai` or `gemini`) — stored in `TenantMemory` |
+| PUT | `/settings/llm/:provider` | JWT + Operator | Set or update API key for a provider (AES-256-GCM encrypted at rest) |
 | DELETE | `/settings/llm/:provider` | JWT + Admin | Remove a stored API key |
+
+**Per-tenant provider switching:** Each tenant independently selects OpenAI or Gemini. The preference propagates to every agent in every workflow — Commander, Planner, Router, Workers, Vibe Coding — with zero code changes. Provider identity is privacy-masked for non-owner users (`canRevealProviderIdentity`).
 
 </details>
 
@@ -1470,7 +1559,9 @@ Errors include `409 ILLEGAL_TRANSITION` (state machine refused), `409 FINAL_PACK
 | `EVIDENCE_SIGNING_SECRET` | Yes (for audit pack) | -- | 32+ byte random secret for HMAC-SHA256 signing of audit evidence bundles. Generate with `openssl rand -base64 48`. Without it the final audit pack route returns `503 BUNDLE_SIGNING_UNAVAILABLE`. Intentionally separate from `AUTH_SECRET` so the two can be rotated independently. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes (for storage) | -- | Supabase project URL — required by `ArtifactService` for storing workpaper PDF / final-pack bytes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (for storage) | -- | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
-| `OPENAI_API_KEY` | Yes | -- | OpenAI API key (only LLM execution provider) |
+| `OPENAI_API_KEY` | Yes (one of OpenAI or Gemini) | -- | OpenAI API key for GPT-5.5/5.4 execution |
+| `GEMINI_API_KEY` | Yes (one of OpenAI or Gemini) | -- | Google Gemini API key for 2.5 Pro/Flash/Flash-Lite execution |
+| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. |
 | `OPENAI_ORG_ID` | No | -- | OpenAI organization ID |
 | `GMAIL_EMAIL` | No | -- | Gmail address for real email adapter |
 | `GMAIL_APP_PASSWORD` | No | -- | Gmail app password (not your account password) |
@@ -1788,14 +1879,18 @@ When self-hosting, you pay only for **LLM API calls** (~$0.01–$1.00 per workfl
 <details>
 <summary><b>Can I use local LLMs or other providers?</b></summary>
 
-The current runtime uses a single LLM provider for execution. Ollama, OpenRouter, Anthropic, Gemini, and DeepSeek adapters were removed from the execution path to keep model behavior, audit evidence, and cost telemetry predictable. If local LLM support returns later, it should land as a new reviewed runtime with its own tests and documentation, not as a silent fallback.
+JAK Swarm supports two first-class LLM providers: **OpenAI** (GPT-5.5 / GPT-5.4) and **Google Gemini** (2.5 Pro / 2.5 Flash / 2.5 Flash-Lite). Each tenant switches between them from the Settings UI — the preference is stored in `TenantMemory` and flows through the entire execution pipeline with zero code changes.
+
+The `GeminiRuntime` adapter ([`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts)) bridges the Gemini SDK to JAK's agent-first architecture: it converts OpenAI message shapes to Gemini `Content[]` format, maps tool definitions, and translates responses back via `geminiResponseToChatCompletion()`. All 38 agents, tool calling, structured output, and the Vibe Coding pipeline work identically on both providers.
+
+Additional providers (Anthropic, DeepSeek, Ollama, OpenRouter) would follow the same adapter pattern. If local LLM support is added later, it should land as a new reviewed runtime with its own tests and documentation, not as a silent fallback.
 
 </details>
 
 <details>
 <summary><b>What does "Agent-first" mean in the architecture?</b></summary>
 
-JAK routes all work through specialist agents with the Responses API + `json_schema` strict mode for structured output, plus prompt-cache-aware cost telemetry. The LLM provider is the execution engine — agents are the architecture. Switches for alternate providers are not supported in the current codebase.
+JAK routes all work through specialist agents with structured output via the Responses API (`json_schema` strict mode for OpenAI, `responseSchema` for Gemini). Prompt-cache-aware cost telemetry tracks tokens across both providers. The agent layer is the architecture — `BaseAgent.execute()` transparently swaps the LLM call service based on the tenant's preferred provider via `setContextOverride()`.
 
 </details>
 
