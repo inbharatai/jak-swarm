@@ -79,8 +79,9 @@ The core execution engine. Contains:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
-  - `OpenAIRuntime`: The only active LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry. Anthropic, Gemini, DeepSeek, Ollama, and OpenRouter adapters were removed to keep execution predictable and auditable.
-  - `ModelRouter`: Tier-based routing within the OpenAI runtime. Tier 3 orchestration defaults to GPT-5.5; Tier 1/2 worker and balanced paths default to GPT-5.4.
+  - `OpenAIRuntime`: Primary LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry.
+  - `GeminiRuntime`: First-class alternative runtime. Bridges Google's Generative AI SDK (Gemini 2.5 Pro/Flash/Flash-Lite) to JAK's agent-first architecture via `geminiResponseToChatCompletion()`. Supports parallel function calling, `responseSchema` structured output, and controllable thinking. Per-tenant provider switching from Settings UI stored in `TenantMemory` → `BaseAgent.setContextOverride()`.
+  - `ModelRouter`: Tier-based routing. When OpenAI is selected: Tier 3 → GPT-5.5, Tier 1/2 → GPT-5.4. When Gemini is selected: Tier 3 → Gemini 2.5 Pro, Tier 2 → Gemini 2.5 Flash, Tier 1 → Gemini 2.5 Flash-Lite.
   - `AntiHallucination`: Four detection layers run on every agent output before it's accepted.
   - `TokenOptimizer`: Estimates token counts, compresses context when approaching limits, selects optimal model based on input size.
 
@@ -156,6 +157,10 @@ Pre-configured agent behaviors and tool permissions for specific industries (e.g
 
 ## LLM Provider Routing
 
+JAK Swarm supports two first-class LLM providers with per-tenant switching:
+
+### OpenAI Path
+
 ```
                         ModelRouter
                              |
@@ -170,11 +175,37 @@ Pre-configured agent behaviors and tool permissions for specific industries (e.g
        routing        worker          vision
 ```
 
-The runtime is intentionally OpenAI-only. No Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter fallbacks are wired in the execution path. Tier assignments are:
+### Gemini Path
 
-- **Tier 1** (parallel workers, email, calendar, CRM): GPT-5.4 with lower-cost routing
-- **Tier 2** (code generator, designer, architect): GPT-5.4 standard
-- **Tier 3** (Commander, Planner, Verifier, vision tasks): GPT-5.5
+```
+                        ModelRouter
+                             |
+              ┌──────────────┼──────────────┐
+              v              v              v
+          Tier 1         Tier 2         Tier 3
+       (cost opt)      (balanced)     (premium)
+              |              |              |
+              v              v              v
+      Flash-Lite         Flash           Pro
+       simple         code/arch      commander/
+       workers         itect         planner/verifier
+```
+
+Per-tenant provider preference is stored in `TenantMemory` (key: `llm:preferred_provider`) and flows through the entire execution pipeline: `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
+
+### Tier Assignments
+
+| Tier | OpenAI Model | Gemini Model | Assigned to |
+|:----:|:------------:|:------------:|:-----------|
+| Tier 1 | GPT-5.4 (lower-cost) | Gemini 2.5 Flash-Lite | Parallel workers, email, calendar, CRM |
+| Tier 2 | GPT-5.4 (standard) | Gemini 2.5 Flash | Code generator, designer, architect |
+| Tier 3 | GPT-5.5 | Gemini 2.5 Pro | Commander, Planner, Verifier, vision tasks |
+
+Key files:
+- [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) — Gemini SDK adapter
+- [`packages/agents/src/runtime/gemini-response-parser.ts`](packages/agents/src/runtime/gemini-response-parser.ts) — Response conversion
+- [`packages/agents/src/runtime/gemini-message-adapter.ts`](packages/agents/src/runtime/gemini-message-adapter.ts) — Message shape conversion
+- [`apps/api/src/routes/llm-settings.routes.ts`](apps/api/src/routes/llm-settings.routes.ts) — Provider toggle + key management API
 
 ---
 
@@ -263,7 +294,7 @@ Tenant
 
 ## API Layer
 
-Fastify server with 14 route modules. Key patterns:
+Fastify server with route modules for workflows, approvals, audit, compliance, integrations, schedules, memory, tools, traces, voice, slack, and more. Key patterns:
 
 - **Multi-tenant**: Every request is scoped to a tenant via auth middleware.
 - **Streaming**: Workflow execution events are streamed to the frontend via SSE for real-time DAG updates.
@@ -273,7 +304,7 @@ Fastify server with 14 route modules. Key patterns:
 
 ## Frontend Architecture
 
-Next.js 15 with App Router. The dashboard uses a shared layout with sidebar navigation across 11 pages.
+Next.js 16 with App Router. The dashboard uses a shared layout with sidebar navigation across 13 pages.
 
 Key UI components:
 - **DAG Viewer** (React Flow): Renders the workflow plan as an interactive node graph. Nodes change color based on task status (pending/running/completed/failed).

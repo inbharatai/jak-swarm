@@ -4,161 +4,53 @@
 
 ### The Closed-Loop Company Operating Layer for Agent Work
 
-[![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
-[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](https://jakswarm.com)
-[![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
-[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](https://jakswarm.com)
-[![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_HIPAA_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](https://jakswarm.com)
-[![Runtime](https://img.shields.io/badge/Runtime-Agent--first-412991?style=for-the-badge&logo=robot&logoColor=white)](https://jakswarm.com)
-[![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster)
+[![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory)
+[![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-2232_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/inbharatai/jak-swarm)
-[![Free Trial](https://img.shields.io/badge/Free_Trial-30_Days-34d399?style=for-the-badge&logo=sparkfun&logoColor=white)](https://jakswarm.com/trial)
+[![Tests](https://img.shields.io/badge/Tests-2216_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-development)
 
-> 🏆 **Google for Startups AI Agents Challenge** — JAK Swarm integrates Google's **Gemini 2.5 Pro, 2.5 Flash, and 2.5 Flash-Lite** as first-class LLM runtimes alongside OpenAI. Every one of JAK's 38 specialist agents runs end-to-end on Gemini with tool calling, structured output, and controllable thinking. Per-tenant provider switching in the Settings UI means each organization independently selects OpenAI or Gemini — no code changes, no env-var swaps. The `GeminiRuntime` adapter bridges Google's Generative AI SDK to JAK's agent-first architecture, with `geminiResponseToChatCompletion()` translating responses into a unified shape. [See the architecture →](#-llm-providers--routing)
+> 🏆 **Google for Startups AI Agents Challenge** — JAK Swarm integrates Google's **Gemini 2.5 Pro, 2.5 Flash, and 2.5 Flash-Lite** as first-class LLM runtimes alongside OpenAI. Every one of JAK's 38 specialist agents runs end-to-end on Gemini with tool calling, structured output, and controllable thinking. Per-tenant provider switching in the Settings UI means each organization independently selects OpenAI or Gemini — no code changes, no env-var swaps. [See LLM Providers →](#-llm-providers--routing)
 
 **JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
-JAK Swarm captures evidence from company artifacts, maps decisions/tasks/risks/owners/customer signals/code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
-
-**Current release:** Beta `0.1.0-beta.0` for self-hosted and design-partner validation. This is not an enterprise-SLA release. On 20 May 2026 the Company OS and landing-page hardening pass was locally verified with the landing truth-lock, Company Operating Layer unit/integration tests, web/API type-checks, production web build, and truth-check. See [`docs/beta-release.md`](docs/beta-release.md).
-
-**JAK Shield** — the security/trust layer wrapped around every agent action — risk-scores every task, checks permissions, blocks unsafe cyber requests, pauses risky work for human approval, sandboxes browser + subprocess execution, and signs every step into a tamper-evident evidence bundle.
-
-> "Turn company evidence into drift findings, executable specs, approved agent work, and tamper-evident audit trails."
-
-## 🔁 Closed-loop Company OS — beta foundation
-
-JAK is not claiming finished company-wide auto-sync yet. The shipped beta foundation is an evidence-first operating layer that connectors, uploads, and manual notes can feed.
-
-| Layer | What is shipped today | Code evidence |
-|---|---|---|
-| Evidence artifacts | Tenant-scoped `CompanyArtifact` records with source/type labels, body hash, source URL, author, occurrence time, and audit event on ingest | [`company-operating-layer.routes.ts`](apps/api/src/routes/company-operating-layer.routes.ts), [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
-| Company graph | `CompanyGraphEntity` records for decisions, tasks, specs, customer signals, risks, owners, deadlines, code changes, customers, metrics, and requirements; entities must cite source artifacts | [`schema.prisma`](packages/db/prisma/schema.prisma), `apps/web/src/app/(dashboard)/company/page.tsx` |
-| Drift detection | Deterministic comparator flags unaddressed customer signals, decisions not operationalized, ungrounded execution, and stale high-priority tasks | `buildDriftCandidates()` in [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
-| Agent-executable specs | Agent-backed spec generation with objective, context, approach, acceptance criteria, test plan, agent task plan, approval gates, and evidence IDs. No template fallback. | `generateSpec()` + `/company/specs/generate` |
-| Review gate | Specs are reviewer-approved or rejected through `/company/specs/:id/decide`; review decisions are immutable after the first decision | `decideSpec()` + [`company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) |
-
-**Honest boundary:** full connector auto-sync is still a product build item. The API and `/company` UI can label evidence as GitHub, Linear, Jira, Slack, Notion, Google Drive, Gmail, meetings, customer calls, support, documents, manual notes, or other sources, but not every source has a first-party background sync job yet. Until those jobs are implemented and smoke-tested, the accurate claim is **Company OS beta foundation**, not “finished company AI OS.”
-
-## 🛡️ JAK Shield — the trust layer
-
-Before any agent touches your code, browser, files, email, GitHub, or business tools, JAK Shield runs every action through six defenses. **Every claim below maps to a real file path** and is locked by a CI test that fails if the file disappears (see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) and [`tests/unit/landing/jak-shield-truth.test.ts`](tests/unit/landing/jak-shield-truth.test.ts)).
-
-| # | Defense | What it does | Code |
-|---|---|---|---|
-| 1 | **Agent Firewall** | Blocks prompt-injection attacks (`detectInjection`) AND offensive-cyber requests — malware, exploit generation, credential theft, unauthorized scanning, phishing — BEFORE the LLM sees them. Defensive markers (audit, review, harden, OWASP, SAST, dependency audit) down-weight confidence so legitimate security work passes. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) + [`injection-detector.ts`](packages/security/src/guardrails/injection-detector.ts) |
-| 2 | **Risk-Based Approvals** | Every tool call classified across the 6-tier `ToolRiskLevel` lattice (`READ_ONLY` → `DRAFT_ONLY` → `SANDBOX_EDIT` → `LOCAL_EXEC_ALLOWLIST` → `EXTERNAL_ACTION_APPROVAL` → `CRITICAL_MANUAL_ONLY`). Risky calls pause the workflow. Approval is bound to the exact payload via SHA-256 hash; replays with modified payloads → HTTP 409 `APPROVAL_PAYLOAD_MISMATCH`. | [`approval-policy.ts`](packages/tools/src/registry/approval-policy.ts) + `proposedDataHash` in [`schema.prisma`](packages/db/prisma/schema.prisma) |
-| 3 | **Secure Tool Permissions** | Per-tenant tool registry + industry-pack restrictions + Standing Orders (allowed-tools whitelist + blocked-actions list + budget cap + expiry). `requireRole('REVIEWER','TENANT_ADMIN','SYSTEM_ADMIN')` on every destructive route. | [`tenant-tool-registry.ts`](packages/tools/src/registry/tenant-tool-registry.ts) + `StandingOrder` model |
-| 4 | **Sandboxed Execution** | Browser sessions in per-tenant data dirs with **500 MB disk quota** + URL allowlist (no localhost, RFC1918, IPv6 link-local, cloud-metadata) + **DNS-rebind defense** on every navigation + downloads disabled. Installer subprocess uses literal argv (never `shell:true`), 60s timeout, stripped env. | [`playwright-browser-operator.ts`](packages/tools/src/browser-operator/playwright-browser-operator.ts) + [`sandboxed-installer.ts`](packages/tools/src/installer/sandboxed-installer.ts) |
-| 5 | **Defensive Vulnerability Triage** | JAK Shield supports defensive security work — repo audits, dependency scans, secret-leak detection, patch recommendations. Offensive work (writing exploits, malware, phishing kits, unauthorized scanning) is blocked at the boundary. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) — see DEFENSIVE_MARKERS list |
-| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace JSON columns are PII-redacted at write time. `workflows.{goal,error,finalOutput,planJson,stateJson}` are AES-256-GCM encrypted at rest. Final evidence bundles are HMAC-SHA256 signed and verify byte-for-byte. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) + [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) + [`persistence-redactor.ts`](packages/security/src/guardrails/persistence-redactor.ts) |
-
-### Safety boundary
-
-JAK Shield is built for **defensive security, safe automation, permissioned workflows, and audit-ready agent execution**. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation. Defensive requests pass; offensive ones are refused at the boundary with a structured error.
-
-### Honest gaps (roadmap, not shipped today)
-
-- A first-party **defensive-review agent** (audit my repo end-to-end) — the boundary exists, the agent is on the roadmap.
-- A dedicated **`/shield` dashboard tab** — Shield state is currently surfaced at `/audit` + `/inbox`; a unified panel is roadmap.
-- **Chain-hashed AuditLog rows** — bundles are HMAC-signed, but rows aren't yet hash-chained (a SYSTEM_ADMIN with DB access could rewrite a row).
-
----
-
-## 📖 About JAK Swarm
-
-**JAK Swarm is a beta closed-loop operating layer for product and engineering execution.** It makes company context legible to AI, converts evidence into specs, routes work to agents or humans, and keeps risky actions behind the same approval flow, audit trail, and security boundary.
-
-**What's actually unique:**
-
-- **Evidence graph before agent action** — artifacts become graph entities; graph entities become drift findings; drift findings become agent-executable specs. This is the closed-loop Company OS foundation and it is intentionally citation-first, not chatbot memory. (See [`apps/api/src/services/company-brain/company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts))
-- **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator. Both emit lifecycle events. Both feed the signed audit pack. No tool-switching, no context loss between the AI work and the human work. (See [`docs/team-and-trial.md`](docs/team-and-trial.md))
-- **JAK Shield as the trust layer** — every agent action runs through six defenses (Agent Firewall · Risk-Based Approvals · Secure Tool Permissions · Sandboxed Execution · Defensive Vulnerability Triage · Audit Evidence Layer) before it touches your code, browser, files, or business tools. Defensive security work passes; offensive requests are refused at the boundary. (See [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
-- **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K LLM tokens) protect both your data AND your budget — when a cap hits, your workflow pauses with a clear "resets at UTC midnight" message, never silently fails. (See [`apps/api/src/services/trial/usage-counter.service.ts`](apps/api/src/services/trial/usage-counter.service.ts))
-- **Integrate, don't rebuild** — JAK is the cockpit for your existing stack, but connector maturity is explicit. Gmail, Google Calendar, Slack, WhatsApp, LinkedIn manual handoff, browser automation, and MCP-provider surfaces exist in code; deeper Company OS auto-sync jobs for every source remain a roadmap item until implemented and smoke-tested.
-
-**Who it's for:**
-
-- Product and engineering teams that need to compare customer/founder intent with what is actually being built
-- Solo founders and small ops teams who want AI to do real work, not just "give answers"
-- Compliance-aware teams that need a tamper-evident trail of every agent action (SOC 2 / HIPAA / ISO 27001 control mappings shipped, third-party audit certification not — see FAQ below)
-- Teams already using Slack/GitHub/Notion/Linear/Gmail-style tools who want one place to turn evidence into approved execution
-
-**Built on the assumption** that AI agents on their own are not ready to be trusted with destructive actions, and humans on their own can't keep up with the volume — so the answer is to put them on the same graph with explicit, payload-bound human approval at the risky steps.
-
-> 📋 **For the bluntly-honest "is this ready to sell publicly?" answer**, see the [FAQ](#-faq) below — specifically *"Is JAK Swarm production-ready?"*. We tell you exactly what's shipped, what's deferred, and what's blocking go-live.
-
----
-
-## 🚀 What's inside JAK Swarm
-
-- **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real_external` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
-- **Closed-loop Company OS foundation** — source-labeled artifacts, graph entities, deterministic drift findings, agent-generated specs, reviewer decisions, and audit events. Current beta supports manual/API-fed evidence plus connector-labeled artifacts; full connector auto-sync is still in progress.
-- **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
-- **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **182 seeded controls** (63 SOC 2 + 37 HIPAA + 82 ISO 27001) of which **108 are operationally backed** (auto-mapping rules pull evidence from system activity) and **74 require reviewer attestation** (policy / paperwork / physical), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
-- **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
-- **Trust layer** — source-grounded outputs with citation-density verification, runtime PII redaction at the LLM boundary, structured output via Responses API + `json_schema` strict mode, prompt-cache-aware cost telemetry
-- **Cross-task auto-repair** with error-class decision tree (destructive actions never auto-retried), **CEO super-orchestrator** that loads Company Brain and emits an executive summary at workflow end, **retention sweep** service (dry-run by default, never touches user-owned evidence)
-- Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed `@jak-swarm/client` SDK
-
-> **Sprint 2.x + final hardening (Apr 2026):** native LangGraph cutover · URL crawler · DOCX/XLSX/image ingest · runtime PII redaction · prompt-cache cost telemetry · source-grounded output verification · external auditor portal · CEO super-orchestrator · cross-task auto-repair · retention sweep. See [`qa/a-to-z-human-level-product-audit.md`](qa/a-to-z-human-level-product-audit.md) for the truthful per-module rating and [`qa/post-sprint-2-final-gap-audit.md`](qa/post-sprint-2-final-gap-audit.md) for the per-feature classification.
-
-> **Connector Runtime Phase 1 (29 Apr 2026):** unified ConnectorRegistry on top of the existing tool/MCP/integration layers · 21 MCP providers auto-mapped + Remotion + Blender first-class · ConnectorResolver that picks connectors from natural-language tasks · `/connectors` dashboard with honest status badges (`available` / `installed` / `configured` / `needs_user_setup` / `failed_validation` / `unavailable` / `disabled` / `blocked_by_policy`) · 43 unit tests pinning the registry + resolver + manifest contract. **Honest about what's not shipped yet:** the installer service + auto-publish + cloud-render adapters land in Phase 2/3. See [`docs/connector-runtime.md`](docs/connector-runtime.md) for the full design + [`qa/connector-runtime-phase1-status.md`](qa/connector-runtime-phase1-status.md) for the bluntly-rated closing report.
-
-> **Migration 106 — Team + 30-Day Free Trial (8 May 2026):** humans-on-task-graph wedge + landing-page free-trial CTA with daily caps. Departments + manager hierarchy (`/team`), per-employee Inbox (`/my-tasks`), human task assignment (`POST /task-assignments`), aggregated `/inbox` route (tasks + approvals + notifications in one round-trip), trial signup at `/trial` with email-only intake (no credit card), four daily caps enforced before workflow start (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K tokens / day), trial-cap guard returning structured `429 TRIAL_DAILY_CAP_HIT` + `402 TRIAL_EXPIRED` so the cockpit can render banners instead of silently failing. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts), now expanded by later migrations. Full design + file map + carry-overs in [`docs/team-and-trial.md`](docs/team-and-trial.md).
-
-> **Migration 107 — Closed-loop Company OS foundation (20 May 2026):** evidence artifacts -> company graph entities -> deterministic drift findings -> agent-generated specs -> reviewer decision gate. Hardening in this pass fixed recurring drift reopening, completed-work false positives, primary artifact evidence preservation, immutable spec review decisions, and `/company` source/type parity with the API schema. Truth-locked by [`tests/unit/services/company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) (17 tests), [`tests/integration/company-os-foundation.test.ts`](tests/integration/company-os-foundation.test.ts) (30 tests), and [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (59 tests).
-
-> **Migration 108 — A-to-Z Critical Fixes (28 May 2026):** five structural refactors closing the top critical gaps surfaced by the human-level A-to-Z audit (rated 6.0/10 → structural fixes landed). **Planner prompt slimmed** from 157 lines to 42, deterministic keyword overrides removed, verb→worker mapping accuracy preserved (added `check`/`review`/`audit`/`website`/`URL`). **Conversation memory migrated** from a frontend localStorage string-concat hack to real server-side thread persistence: new `Conversation` + `ConversationMessage` Prisma models, Supabase migration applied, history injected into `SwarmState` and prepended by the Commander node so the LLM sees prior turns natively. **Workflows routes split:** 1,054-line `workflows.routes.ts` god-file decomposed into 4 sub-routers (`workflow-control`, `workflow-query`, `workflow-stream`, `conversation`) + 2 services (`workflow-creation`, `workflow-recovery`) with zero business-logic change. **BaseAgent decomposed:** 1,508-line god-class split into `llm-call.service.ts`, `prompt-builder.service.ts`, and `tool-execution.service.ts` — all public signatures preserved for subclasses. **OpenAPI auto-spec:** added `zod-to-json-schema` registry + `generate-spec.ts` chokepoint so `/docs` and `/openapi.json` stay typed from the Zod source of truth. Structural tests updated to read the new file paths; 2,045 unit/structural tests passing. Honest carry-over: 64 behavioral integration tests still fail on the dummy API key (`401`) — pre-existing, not introduced by this migration.
-
-> **Migration 109 — Tool Accuracy Audit + Live E2E Validation (29 May 2026):** deep audit of all 122 tools and 38 agents against live API execution. **17 tool fixes:** cross-tool parameter name mismatches in `generate_seo_report` (seed→seedKeyword, query→keyword), removed false `requiredEnvVars` from `gmail_send_email` and `analyze_github_repo`, added `GITHUB_PAT` token usage in `analyze_github_repo` execute, corrected `sideEffectLevel` on 7 tools (5 auto-reply tools: external→read; `track_email_engagement`: read→write; `track_content_performance`: read→write), added `requiredEnvVars: ['OPENAI_API_KEY']` to `browser_analyze_page`, removed false `requiredEnvVars: ['GITHUB_PAT']` from 3 GitHub tools. **28 agent schema alignments across 15 agent files:** parameter names aligned with ToolRegistry `inputSchema` (research_keywords, lookup_crm_contact, update_crm_record, search_deals, list_calendar_events, create_calendar_event, lookup_customer, classify_ticket, search_knowledge_base, compute_statistics, parse_spreadsheet, generate_report, search_knowledge, draft_email, forecast_cashflow, memory_store). **5 prompt tool-list additions:** support, CRM, calendar, app-architect, and document agents now list all their declared tools in system prompts. **6 UX_ROLE_TO_AGENT_ROLE mappings added** (cfo, ceo, coding, research, design, legal, hr, etc.) — previously the CFO/CEO roles were dropped on the floor. **pgvector Docker image** switched from postgres:16-alpine to pgvector/pgvector:pg16 for vector similarity search. **Workflow timeout increased** from 5min → 20min (both SwarmRunner default and SwarmExecutionService — the latter was overriding with a hardcoded 5min value, causing strategy-tier CEO workflows to timeout mid-execution). **Subscription seed** added so demo tenants can create workflows (was returning 429 NO_SUBSCRIPTION). **Live E2E results:** CMO ✅ (10 traces, 3 self-reflection loops, 2000+ word healthcare marketing analysis), CTO ✅ (HIPAA/HITRUST/SOC2 compliance identified), CFO ✅ (healthcare financial contextualization), CEO/Strategist ✅ (29 traces, full 12-month rural healthcare strategic roadmap — completed on 3rd retry after timeout fix). 2,216 unit/structural tests passing.
-
-> **Security + quality audit — 8 P0 hardening + test-coverage push (8 May 2026):** five parallel deep-survey agents (dead code · route safety · test gaps · security re-audit · schema integrity) drove a single-session pass that closed 8 P0 + 2 P1 findings AND wrote 17 previously-missing test files (+420 tests, total 2045 passing at that time). **P0 hardening:** `Workflow.userId` + `TaskAssignment.assignedByUserId` schema declarations now match the live FK behaviour (truth-of-record); `/trial/verify` got `Cache-Control: no-store` + 80 ms response-time floor (kills cache-of-initialPassword + timing side-channel); `JAK_TRIAL_EMAIL_LOG_DIR` validated against an allowlist (tmpdir / cwd/tmp / `/var/log/jak` / `JAK_ALLOWED_DATA_ROOT`); per-IP (5/min signup, 10/min verify) + per-email (3/hr) rate limits added; `X-Forwarded-For` only honoured behind `JAK_TRUST_PROXY=true`; trial cap now enforced on `WorkflowSchedule` cron firing (`SKIPPED_TRIAL_CAP_HIT` / `SKIPPED_TRIAL_EXPIRED`); department parent-chain has full ancestor-cycle detection (depth-cap 64). **5 real bugs surfaced + fixed by writing tests:** `task-assignments` cancel notification mis-categorised as `task_assigned` (now distinct `task_completed`/`task_declined`/`task_cancelled` kinds); `inbox.routes` showed approvals to `OPERATOR` who can't decide them; `auth.service.register` echoed the email back in `ConflictError` (enumeration oracle — generic message + sha256-truncated-hash log); `DELETE /documents/:id` had no role check (now uploader-or-`REVIEWER+`); `update({where:{id}})` tenant-isolation invariant documented as load-bearing on the prior `findFirst`. **17 new test files** covering credential / bundle+bundle-signing / oauth-providers / sandbox / auth services + audit-run / workflow / workflow-timeline / artifact / 3 compliance services + 5 routes (task-assignments / team / inbox / trial / documents). **Honest carry-overs:** 30 service/route files still untested (~15-25 hours more focused work); OAuth refresh-token grant flow doesn't exist; `sandbox.service` is a thin lifecycle wrapper (real isolation lives in the adapter); `audit-run.transition()` has a read-then-write concurrency race. The landing truth-lock has since expanded with the Company OS checks named above.
-
-[Website](https://jakswarm.com) • [Quick Start](#-quick-start) • [Features](#-features) • [Audit & Compliance](#%EF%B8%8F-audit--compliance-agent-pack) • [Agent Roster](#-agent-roster) • [Documentation](ARCHITECTURE.md)
-
----
-
-*Give it a goal in plain English. JAK decomposes, routes, executes, and verifies — in real time.*
-
-![JAK Swarm — Hero](docs/screenshot-hero.png)
-
-<details>
-<summary><strong>More screenshots</strong></summary>
-
-#### Orchestration Engine
-![Orchestration Engine](docs/screenshot-orchestration.png)
-
-#### Agent Network
-![Agent Grid](docs/screenshot-agents.png)
-
-#### Capability Architecture
-![Capability Map](docs/screenshot-capability-map.png)
-
-#### Live Execution Trace
-![Live Demo](docs/screenshot-live-demo.png)
-
-#### Pricing
-![Pricing](docs/screenshot-pricing.png)
-
-#### Mobile
-![Mobile](docs/screenshot-mobile-hero.png)
-
-</details>
+Give it a goal in plain English. JAK decomposes, routes, executes, and verifies — in real time.
 
 </div>
 
 ---
 
+## What JAK Swarm Does
+
+JAK Swarm is a beta closed-loop operating layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
+
+### What's unique
+
+- **Evidence graph before agent action** — artifacts become graph entities; graph entities become drift findings; drift findings become agent-executable specs. This is the closed-loop Company OS foundation — intentionally citation-first, not chatbot memory. ([`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts))
+- **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator, emit lifecycle events, and feed the signed audit pack. ([`docs/team-and-trial.md`](docs/team-and-trial.md))
+- **JAK Shield as the trust layer** — every agent action runs through six defenses before it touches your code, browser, files, or business tools. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
+- **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K LLM tokens) protect both your data AND your budget. ([`usage-counter.service.ts`](apps/api/src/services/trial/usage-counter.service.ts))
+- **Integrate, don't rebuild** — JAK is the cockpit for your existing stack. Gmail, Google Calendar, Slack, GitHub, Notion, browser automation, and MCP surfaces exist in code; deeper Company OS auto-sync jobs for every source remain a roadmap item until implemented and smoke-tested.
+
+### Who it's for
+
+- Product and engineering teams comparing customer/founder intent with what is actually being built
+- Solo founders and small ops teams who want AI to do real work, not just "give answers"
+- Compliance-aware teams needing tamper-evident agent action trails (SOC 2 / HIPAA / ISO 27001 control mappings shipped — third-party certification not yet; see [FAQ](docs/faq.md))
+- Teams already on Slack / GitHub / Notion / Gmail wanting one place to turn evidence into approved execution
+
+### Honest boundary
+
+This is **beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+
+---
+
 ## 🏗️ How It Works
 
-JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. In the Company OS path, source-labeled evidence becomes graph entities, graph entities become drift findings, and drift findings become reviewer-gated execution specs. In the workflow path, you give it a high-level goal in natural language; a Commander interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers where supported, and a Verifier checks outputs before delivery.
+JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. In the Company OS path, source-labeled evidence becomes graph entities, graph entities become drift findings, and drift findings become reviewer-gated execution specs. In the workflow path, you give it a high-level goal in natural language; a Commander interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers, and a Verifier checks outputs before delivery.
 
-The orchestrator is a real native [`@langchain/langgraph`](https://langchain-ai.github.io/langgraphjs/) `StateGraph` — checkpoints persist to a `workflow_checkpoints` Postgres table via the `PostgresCheckpointSaver`; approval pauses use LangGraph's native `interrupt()` + `Command(resume=…)` cycle. The previous custom SwarmGraph state machine was deleted in Sprint 2.5/A.6 (commit `34491f2`); LangGraph is the only orchestration engine and the `JAK_WORKFLOW_RUNTIME` env-flag fallback no longer exists.
-
-It can connect to real infrastructure when configured — Gmail via IMAP/SMTP, Google Calendar via CalDAV, Slack/GitHub/Notion via MCP, and the open web via Playwright. Connector capability is explicit and config-dependent; the Company OS can label artifacts from many sources today, but first-party background sync for every source is not yet complete.
+The orchestrator is a native [`@langchain/langgraph`](https://langchain-ai.github.io/langgraphjs/) `StateGraph` — checkpoints persist to Postgres via `PostgresCheckpointSaver`; approval pauses use LangGraph's native `interrupt()` + `Command(resume=…)`. No custom state machine, no env-flag fallback.
 
 ```mermaid
 flowchart TD
@@ -168,198 +60,89 @@ flowchart TD
     end
 
     subgraph ORCHESTRATION["🧠 Orchestration Layer"]
-        C["🎯 Commander Agent\nParse intent • Extract entities • Set mission context"]
-        D["📋 Planner Agent\nDecompose goal • Build dependency DAG • Estimate cost"]
-        E["🛡️ Guardrail Agent\nRisk assessment • PII detection • Policy enforcement"]
-        F["🔀 Router Agent\nAssign agents • Select LLM tier • Enable parallelism"]
+        C["🎯 Commander Agent"]
+        D["📋 Planner Agent"]
+        E["🛡️ Guardrail Agent"]
+        F["🔀 Router Agent"]
     end
 
-    subgraph WORKERS["⚡ Worker Layer — 32 Specialists (incl. 5 Vibe Coding)"]
+    subgraph WORKERS["⚡ Worker Layer — 32 Specialists"]
         direction LR
-        G["📧 Email\n📅 Calendar\n👤 CRM"]
-        H["📄 Document\n📊 Spreadsheet\n🌐 Browser"]
-        I["🔍 Research\n🧠 Knowledge\n🎧 Support"]
-        J["💻 Coder\n🎨 Designer\n🚀 Growth"]
-        K["⚖️ Legal\n💰 Finance\n👔 HR"]
-        L["🏛️ App Architect\n⚡ Code Generator\n🔧 Auto-Debugger"]
+        G["📧 Email  📅 Calendar  👤 CRM"]
+        H["📄 Document  📊 Spreadsheet  🌐 Browser"]
+        I["🔍 Research  🧠 Knowledge  🎧 Support"]
+        J["💻 Coder  🎨 Designer  🚀 Growth"]
+        K["⚖️ Legal  💰 Finance  👔 HR"]
     end
 
     subgraph VERIFY["✅ Quality Layer"]
-        M["✅ Verifier Agent\nValidate outputs • Check completeness • Score quality"]
-        N["⚠️ Approval Gate\nHuman review for high-risk actions"]
+        M["✅ Verifier Agent"]
+        N["⚠️ Approval Gate"]
     end
 
-    subgraph OUTPUT["📊 Output Layer"]
-        O["📊 Compiled Result\nMarkdown report • Generated app • Executed actions"]
+    subgraph OUTPUT["📊 Output"]
+        O["Compiled Result"]
     end
 
     A --> C
     B --> C
-    C --> D
-    D --> E
+    C --> D --> E
     E -->|"✅ Pass"| F
     E -->|"🚫 Block"| C
-    F --> G & H & I & J & K & L
-    G & H & I & J & K & L --> M
+    F --> G & H & I & J & K
+    G & H & I & J & K --> M
     M -->|"✅ Pass"| O
     M -->|"❌ Fail"| D
     M -->|"⚠️ Risk"| N
     N -->|"👍 Approved"| O
     N -->|"👎 Rejected"| C
-
-    style INPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
-    style ORCHESTRATION fill:#0d1117,stroke:#fbbf24,color:#e6edf3
-    style WORKERS fill:#0d1117,stroke:#38bdf8,color:#e6edf3
-    style VERIFY fill:#0d1117,stroke:#c084fc,color:#e6edf3
-    style OUTPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
 ```
 
-> **Auto-Repair**: If the Verifier rejects output, the system re-plans and re-routes failed tasks — no human intervention needed (configurable).
+> **Auto-Repair**: If the Verifier rejects output, the system re-plans and re-routes failed tasks — no human intervention needed (configurable). Destructive actions are never auto-retried.
 
-<details>
-<summary><b>🔄 LLM Routing Strategy</b></summary>
-
-```mermaid
-flowchart LR
-    subgraph PROVIDER["🔌 Provider Layer"]
-        direction TB
-        OPENAI["OpenAI<br/>GPT-5.5 · GPT-5.4"]
-        GEMINI["Google Gemini<br/>2.5 Pro · 2.5 Flash · 2.5 Flash-Lite"]
-    end
-
-    subgraph TIER3["💎 Tier 3 — Premium"]
-        T3A["GPT-5.5"]
-        T3B["Gemini 2.5 Pro"]
-    end
-
-    subgraph TIER2["⚡ Tier 2 — Balanced"]
-        T2A["GPT-5.4"]
-        T2B["Gemini 2.5 Flash"]
-    end
-
-    subgraph TIER1["💰 Tier 1 — Economy"]
-        T1A["GPT-5.4 mini-tier"]
-        T1B["Gemini 2.5 Flash-Lite"]
-    end
-
-    CMD["Commander\nPlanner\nVerifier"] --> TIER3
-    GEN["Code Generator\nDesigner\nArchitect"] --> TIER2
-    WRK["Email · Calendar\nCRM · Debug\nResearch"] --> TIER1
-
-    TIER3 --> PROVIDER
-    TIER2 --> PROVIDER
-    TIER1 --> PROVIDER
-
-    style PROVIDER fill:#0d1117,stroke:#fbbf24,color:#e6edf3
-    style TIER3 fill:#1a0a2e,stroke:#c084fc,color:#e6edf3
-    style TIER2 fill:#0a1a15,stroke:#34d399,color:#e6edf3
-    style TIER1 fill:#1a150a,stroke:#fbbf24,color:#e6edf3
-```
-
-</details>
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data model, error handling strategy, and scaling considerations.
 
 ---
 
-## ✨ Features
+## 🛡️ JAK Shield — The Trust Layer
+
+Before any agent touches your code, browser, files, email, GitHub, or business tools, JAK Shield runs every action through six defenses. Every claim below maps to a real file path and is locked by a CI test.
+
+| # | Defense | What it does | Code |
+|---|---------|-------------|------|
+| 1 | **Agent Firewall** | Blocks prompt-injection attacks AND offensive-cyber requests before the LLM sees them. Defensive markers (audit, OWASP, SAST) down-weight confidence so legitimate security work passes. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) + [`injection-detector.ts`](packages/security/src/guardrails/injection-detector.ts) |
+| 2 | **Risk-Based Approvals** | Every tool call classified across the 6-tier `ToolRiskLevel` lattice. Risky calls pause the workflow. Approval bound to exact payload via SHA-256 hash. | [`approval-policy.ts`](packages/tools/src/registry/approval-policy.ts) |
+| 3 | **Secure Tool Permissions** | Per-tenant tool registry + industry-pack restrictions + Standing Orders (allowed-tools whitelist + blocked-actions list + budget cap + expiry). | [`tenant-tool-registry.ts`](packages/tools/src/registry/tenant-tool-registry.ts) |
+| 4 | **Sandboxed Execution** | Browser sessions: per-tenant data dirs, 500 MB disk quota, URL allowlist, DNS-rebind defense. Subprocess: literal argv, 60s timeout, stripped env. | [`playwright-browser-operator.ts`](packages/tools/src/browser-operator/playwright-browser-operator.ts) |
+| 5 | **Defensive Vulnerability Triage** | Supports defensive security work — repo audits, dependency scans, secret-leak detection. Offensive work is blocked at the boundary. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) |
+| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace PII-redacted at write time. Workflow fields AES-256-GCM encrypted at rest. Evidence bundles HMAC-SHA256 signed. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) + [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) |
+
+**Safety boundary:** JAK Shield is built for defensive security, safe automation, permissioned workflows, and audit-ready agent execution. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation.
+
+Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Security policy: [`SECURITY.md`](SECURITY.md).
+
+---
+
+## ✨ Key Features
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **38 AI Agents** | 6 orchestrators (Commander, Planner, Router, Verifier, Guardrail, Approval) + 32 specialist workers |
-| 🧠 | **Company Brain** | Per-tenant `CompanyProfile` (name, industry, brand voice, target customers, competitors, pricing, products, goals, constraints, preferred channels). LLM-extracts from uploaded documents → user approves → `BaseAgent.injectCompanyContext` grounds every agent's prompt in the approved profile. Refuses to load extracted-but-unapproved profiles into agent prompts (no silent overwrite). Memory items now have an `approval_status` field (`extracted` / `suggested` / `user_approved` / `rejected`); agent-suggested memories require reviewer approval before agents see them. UI at `/company`. See [qa/company-brain-verification.md](qa/company-brain-verification.md). |
-| 🎯 | **Intent vocabulary + WorkflowTemplate library** | 18 named CompanyOSIntents (`company_strategy_review`, `marketing_campaign_generation`, `audit_compliance_workflow`, …) constrained at the LLM layer via strict zod `CompanyOSIntentSchema`. `IntentRecord` Prisma model persists every classification. 6 system-seeded `WorkflowTemplate`s (strategy review, marketing campaign, website review, code review, competitor research, sales outreach drafts) provide pre-tuned decompositions; tenants can override per-intent. Cockpit emits `intent_detected`, `workflow_selected`, `clarification_required`, `company_context_missing` lifecycle events. |
-| 💬 | **Follow-up command NL parser** | Rule-based parser maps short chat inputs to actions on the active workflow: `approve`, `reject`, `continue`, `pause`, `resume`, `cancel`, `show graph`, `show failed`, `show cost`, `download report`, `finalize workpaper`, `why is this waiting`, `what is the CMO/CTO/VibeCoder doing` (resolves role keyword → `agentRole`). Approval-pending bias: short positive responses (`yes`, `go ahead`) auto-route to approve. |
-| 🛡️ | **Audit & Compliance Agent Pack** | Full audit engagement workflow: `AuditRun` lifecycle (PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED), 182 controls seeded across SOC 2 Type 2 (63), HIPAA Security Rule (37), and ISO/IEC 27001:2022 (82). LLM-driven control test evaluation (deterministic fallback when no key), auto-created `AuditException` rows on test failure, per-control workpaper PDFs gated by reviewer approval, HMAC-SHA256 signed final evidence pack. End-to-end e2e test passes. Live SSE on `/audit/runs/[id]` (was 15s SWR poll). See [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md). |
-| 🔒 | **Document content sanitization** | Every document chunk returned by `find_document` is wrapped in `<UNTRUSTED_DOCUMENT_CONTENT>` tags + scrubbed of ANSI/zero-width chars + scanned for 8 prompt-injection patterns (ignore-previous-instructions, role-override, fake-system-message, chat-template-injection, prompt-extraction, data-exfiltration). `BaseAgent` system prompt instructs every agent to treat tagged content as DATA, never instructions. |
-| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (real / heuristic / llm_passthrough / config_dependent / experimental). Email (IMAP/SMTP), calendar (CalDAV), browser tools (Playwright), code sandbox, GitHub, Vercel, CRM, PDF, verification. Breakdown live at `GET /tools/manifest`. |
-| 🔍 | **31 Research Tools** | Web search (Serper primary → Tavily → DDG fallback), SEO audit, competitor monitoring, lead enrichment, keyword research, SERP analysis, platform discovery. Count matches `toolRegistry.getManifest()` RESEARCH category |
-| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
-| 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
-| 🧪 | **Tool Maturity Manifest** | All 122 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
-| 🧠 | **Agent-first runtime** | All work routes through specialist agents with tier-based model execution. Supports both **OpenAI** (GPT-5.5/5.4) and **Google Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant provider switching from the Settings UI. |
-| 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. **Conversation threads** are now server-side (`Conversation` + `ConversationMessage` tables) with full history injection into the LangGraph state so multi-turn chat feels continuous instead of a string-concat hack. |
-| 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
-| 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
-| 💬 | **Slack Channel Bridge** | Slack messages trigger authenticated workflows with thread-reply results. HMAC-SHA256 signature verification, idempotent event handling |
-| 💬 | **WhatsApp Control (QR)** | Register a number in the dashboard, verify via challenge code, then send workflow commands over WhatsApp |
-| 🎤 | **Voice Sessions + Realtime Tokens** | Voice session lifecycle and realtime token exchange are implemented; workflow trigger behavior depends on client-side orchestration |
-| 📦 | **Internal TypeScript Client Package** | Typed API client in-monorepo with SSE streaming, workflow management, memory CRUD, health checks |
-| 🛠️ | **SKILL.md Format** | DeerFlow-compatible skill definitions with YAML frontmatter, recursive discovery, risk levels, tool allowlists |
-| 💰 | **Credit-Based Billing** | 4 plans (Free/Pro/Team/Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard, Paddle payments |
-| 🔐 | **Verification Engine** | Email threat detection, document forgery, transaction risk, identity verification. 4-layer: rules → AI Tier 1 → AI Tier 3 → human review |
-| 🔄 | **DAG Execution** | Directed acyclic graph orchestration with parallel scheduling, dependency tracking, and auto-repair |
-| 🔌 | **MCP Integrations (Implemented + Extendable)** | Slack, GitHub, Notion are wired with provider management; additional providers are extendable via MCP and adapter work |
-| 🌐 | **30 Browser Tools** | ~20 Playwright primitives (navigate, click, type, screenshot, PDF export, cookies, tabs, JS evaluation) + ~10 site-specific automation tools (social posting, Gmail inbox, auto-reply). The site-specific tools are classified `experimental` in the tool manifest — fragile on UI change. Count matches `toolRegistry.getManifest()` BROWSER category |
-| 📊 | **Observability** | 17 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, /healthz + /ready probes |
-| 📈 | **Boot Diagnostics** | Config validation on startup: checks DB, Redis, LLM providers, secrets, CORS — actionable errors in production, friendly warnings in dev |
-| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. P1b worker-lease reclaim: dead workers' jobs are auto-recovered in lease_ttl/2 (default 30s). |
-| 🔭 | **Operator-grade Observability** | API + each worker expose `/metrics` (35+ Prometheus types: queue depth, worker liveness, reclaim rate, heartbeat failures, Vibe Coder runs, LLM cost, provider errors, signals). Scrape/alert/dashboard/runbook artifacts in `ops/`. |
-| 🎛️ | **Two-service Production Topology** | API (HTTP + SSE + enqueue) runs separately from the queue worker (claim + run + reclaim). Reference: `docker-compose.prod.yml` at repo root. |
-| 🏢 | **Multi-Tenant SaaS** | RBAC, approval gates, audit logging, tenant isolation, encrypted secrets (AES-256-GCM) |
-| 📧 | **Real Email/Calendar** | Gmail via IMAP/SMTP, Google Calendar via CalDAV. Real send, real events — not mocks |
-| 🧩 | **Skills Marketplace** | Create, sandbox-test, and deploy custom agent skills with approval workflow |
-| ⏰ | **Workflow Scheduling** | Cron-based recurring workflows with leader-elected scheduler (no duplicate execution) |
-| 📸 | **Screenshot-to-Code** | Upload a UI design → AI generates matching React + Tailwind components |
-| 🛡️ | **Supervisor Module** | Event bus, circuit breakers (exponential backoff), workflow telemetry, budget enforcement |
-| 🏖️ | **Virtual Sandbox FS** | Tenant-scoped `/workspace/` virtual paths translated to E2B or Docker sandbox physical paths. Path traversal protection |
-
----
-
-## 🧠 Supervisor Module — System Intelligence
-
-The Supervisor is JAK's observability and resilience layer. It ensures workflows are **observable**, **resilient**, and **controllable** — even when individual agents fail.
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                      SupervisorBus                           │
-│              (Typed Event Pub-Sub — Singleton)                │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Publishers:                    Subscribers:                 │
-│  ├─ SwarmRunner                 ├─ SSE → Frontend            │
-│  ├─ WorkerNode                  ├─ Database persistence       │
-│  ├─ CircuitBreaker              ├─ Audit logging             │
-│  └─ ApprovalGate                └─ Cost tracking             │
-│                                                              │
-├───── Event Types ────────────────────────────────────────────┤
-│  workflow:requested  │  workflow:started  │  workflow:completed│
-│  node:entered        │  node:completed    │  approval:required │
-│  budget:exceeded     │  circuit:open      │                    │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Circuit Breaker
-
-Every agent execution is wrapped in a per-role circuit breaker:
-
-```
-CLOSED ──(5 failures)──→ OPEN ──(30s timeout)──→ HALF-OPEN ──(probe succeeds)──→ CLOSED
-                           │                        │
-                           └── calls fail instantly  └── one test call allowed
-```
-
-- **`worker:email`**, **`worker:crm`**, **`worker:browser`** — each agent role gets its own breaker
-- When a circuit opens, the Supervisor publishes `circuit:open` to the event bus
-- Prevents one broken integration (e.g. Gmail API outage) from cascading to the entire workflow
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `packages/swarm/src/supervisor/supervisor-bus.ts` | Event pub-sub with multi-tenant workflow tracking |
-| `packages/swarm/src/supervisor/circuit-breaker.ts` | State machine protecting agent execution |
-| `packages/swarm/src/runner/swarm-runner.ts` | Publishes workflow lifecycle events |
-| `packages/swarm/src/graph/nodes/worker-node.ts` | Wraps agent calls in circuit breakers |
-
-### Why This Matters
-
-Most AI agent platforms have **zero resilience**. If an LLM call fails, the whole workflow crashes. JAK's Supervisor module means:
-
-- **One broken agent can't take down everything** — circuit breakers isolate failures
-- **You can watch execution in real time** — every node entry/exit streams to the frontend
-- **High-risk actions require approval** — budget limits and human gates prevent runaway costs
-- **Full audit trail** — every event is timestamped, tenant-scoped, and persisted
+| 🤖 | **38 AI Agents** | 6 orchestrators + 32 specialist workers across Executive, Operations, Core, and Vibe Coding layers. [Full roster →](#-agent-roster) |
+| 🧠 | **Company Brain** | Per-tenant profile (industry, brand voice, competitors, goals) LLM-extracted from documents → user approves → grounds every agent prompt. Refuses unapproved profiles. UI at `/company`. |
+| 🎯 | **Intent Vocabulary + Templates** | 18 named CompanyOSIntents constrained at the LLM layer via strict Zod schema. 6 system-seeded WorkflowTemplates provide pre-tuned decompositions. |
+| 💬 | **Follow-up NL Parser** | Rule-based parser maps short chat inputs to workflow actions: approve, reject, continue, pause, resume, cancel, show graph/cost/failed, "what is the CMO doing?" |
+| 🛡️ | **Audit & Compliance Pack** | SOC 2 Type 2 (63) + HIPAA (37) + ISO 27001 (82) = 182 controls seeded. 108 operationally backed, 74 require reviewer attestation. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed evidence packs, External Auditor Portal. [Full details →](docs/audit-compliance-agent-pack.md) |
+| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). Email, calendar, browser, CRM, research, document, spreadsheet, knowledge, webhook. [Inventory →](#-tool-inventory) |
+| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. Durable workflow, auto-snapshots with diff, checkpoint-revert. [Details →](docs/vibe-coding.md) |
+| 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-5.5/5.4) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
+| 🧬 | **Memory System** | LLM-powered fact extraction, token-budgeted retrieval injected via `<memory>` tags. Server-side conversation threads with full history injection into LangGraph state. |
+| 🔌 | **MCP Integrations** | Slack, GitHub, Notion wired with provider management. 21 MCP providers auto-mapped. Connector Runtime with honest status badges. [Connector docs →](docs/connector-runtime.md) |
+| 💬 | **Slack + WhatsApp Bridges** | Slack messages trigger authenticated workflows with HMAC-verified webhooks. WhatsApp control via QR verification. |
+| 🎤 | **Voice Sessions** | OpenAI Realtime API via WebRTC. Optional Deepgram STT / ElevenLabs TTS adapters. |
+| 🏢 | **Multi-Tenant SaaS** | RBAC (5 roles + External Auditor), approval gates, audit logging, tenant isolation, AES-256-GCM encrypted secrets. |
+| 💰 | **Credit-Based Billing** | 4 plans (Free / Pro / Team / Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard. |
+| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/healthz` + `/ready` probes. |
+| 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. Worker-lease reclaim: dead workers' jobs auto-recovered in 30s. |
 
 ---
 
@@ -368,515 +151,70 @@ Most AI agent platforms have **zero resilience**. If an LLM call fails, the whol
 ```mermaid
 graph LR
     subgraph ORCH["🧠 Orchestrators"]
-        O1["🎯 Commander"]
-        O2["📋 Planner"]
-        O3["🔀 Router"]
-        O4["✅ Verifier"]
-        O5["🛡️ Guardrail"]
-        O6["⚠️ Approval"]
+        O1["🎯 Commander"]  O2["📋 Planner"]
+        O3["🔀 Router"]    O4["✅ Verifier"]
+        O5["🛡️ Guardrail"] O6["⚠️ Approval"]
     end
 
-    subgraph EXEC["💼 Executive Suite"]
-        E1["🎯 Strategist\n(CEO)"]
-        E2["🏗️ Technical\n(CTO)"]
-        E3["💰 Finance\n(CFO)"]
-        E4["📣 Marketing\n(CMO)"]
-        E5["👔 HR"]
-        E6["💻 Coder"]
-        E7["🎨 Designer"]
-        E8["🚀 Growth"]
+    subgraph EXEC["💼 Executive"]
+        E1["🎯 Strategist (CEO)"]  E2["🏗️ Technical (CTO)"]
+        E3["💰 Finance (CFO)"]     E4["📣 Marketing (CMO)"]
+        E5["👔 HR"]  E6["💻 Coder"]  E7["🎨 Designer"]  E8["🚀 Growth"]
     end
 
-    subgraph VIBE["⚡ Vibe Coding — NEW"]
-        V1["🏛️ App\nArchitect"]
-        V2["⚡ Code\nGenerator"]
-        V3["🔧 Auto-\nDebugger"]
-        V4["🚀 Deployer"]
-        V5["📸 Screenshot\nto Code"]
+    subgraph VIBE["⚡ Vibe Coding"]
+        V1["🏛️ Architect"]  V2["⚡ Generator"]
+        V3["🔧 Debugger"]   V4["🚀 Deployer"]  V5["📸 Screenshot→Code"]
     end
 
     subgraph OPS["🏢 Operations"]
-        P1["✏️ Content"]
-        P2["📈 SEO"]
-        P3["📰 PR"]
-        P4["⚖️ Legal"]
-        P5["🤝 Success"]
-        P6["📉 Analytics"]
-        P7["🗺️ Product"]
-        P8["📌 Project"]
+        P1["✏️ Content"]  P2["📈 SEO"]   P3["📰 PR"]
+        P4["⚖️ Legal"]   P5["🤝 Success"] P6["📉 Analytics"]
+        P7["🗺️ Product"] P8["📌 Project"]
     end
 
     subgraph CORE["⚙️ Core Workers"]
-        W1["📧 Email"]
-        W2["📅 Calendar"]
-        W3["👤 CRM"]
-        W4["📄 Document"]
-        W5["📊 Spreadsheet"]
-        W6["🌐 Browser"]
-        W7["🔍 Research"]
-        W8["🧠 Knowledge"]
-        W9["🎧 Support"]
-        W10["⚙️ Ops"]
-        W11["🎤 Voice"]
+        W1["📧 Email"]  W2["📅 Calendar"] W3["👤 CRM"]
+        W4["📄 Doc"]    W5["📊 Sheet"]    W6["🌐 Browser"]
+        W7["🔍 Research"] W8["🧠 Knowledge"] W9["🎧 Support"]
+        W10["⚙️ Ops"]   W11["🎤 Voice"]
     end
-
-    style ORCH fill:#1a0a2e,stroke:#c084fc,color:#e6edf3
-    style EXEC fill:#0a1a15,stroke:#34d399,color:#e6edf3
-    style VIBE fill:#1a150a,stroke:#fbbf24,color:#e6edf3
-    style OPS fill:#0d1117,stroke:#38bdf8,color:#e6edf3
-    style CORE fill:#0d1117,stroke:#fb923c,color:#e6edf3
 ```
 
-<div align="center">
-
-| Layer | Agents | Purpose |
-|:------|:------:|:--------|
+| Layer | Count | Purpose |
+|:------|:-----:|:--------|
 | **🧠 Orchestrators** | 6 | Parse goals, build DAGs, route tasks, verify quality, enforce guardrails |
-| **💼 Executive Suite** | 8 | CEO/CTO/CFO/CMO-level strategic decisions and specialized expertise |
+| **💼 Executive** | 8 | CEO/CTO/CFO/CMO-level strategic decisions and specialized expertise |
 | **⚡ Vibe Coding** | 5 | Full-stack app generation — architecture, code, debug, deploy, vision |
 | **🏢 Operations** | 8 | Content, SEO, PR, Legal, Analytics, Product, Project management |
-| **⚙️ Core Workers** | 11 | Email, Calendar, CRM, Browser, Research, Voice, and infrastructure tools |
+| **⚙️ Core Workers** | 11 | Email, Calendar, CRM, Browser, Research, Voice, infrastructure tools |
 
-</div>
-
----
-
-<details>
-<summary><b>📋 Full Agent Details (click to expand)</b></summary>
-
-#### Orchestrator Agents
-
-| Role | Agent | Description |
-|------|-------|-------------|
-| `COMMANDER` | CommanderAgent | Interprets user goals, extracts intent, sets mission context |
-| `PLANNER` | PlannerAgent | Decomposes goals into dependency-aware task graphs |
-| `ROUTER` | RouterAgent | Assigns agents and tools to each task, enables parallelism |
-| `VERIFIER` | VerifierAgent | Validates outputs, triggers re-planning on failure |
-| `GUARDRAIL` | GuardrailAgent | Pre-flight risk assessment, blocks dangerous operations |
-| `APPROVAL` | ApprovalAgent | Human-in-the-loop gate for high-risk actions |
-
-#### Worker Agents
-
-| Role | Agent | Primary Tools |
-|------|-------|---------------|
-| `WORKER_EMAIL` | EmailAgent | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email |
-| `WORKER_CALENDAR` | CalendarAgent | list_calendar_events, create_calendar_event, find_availability |
-| `WORKER_CRM` | CRMAgent | lookup_crm_contact, update_crm_record, search_deals, enrich_contact |
-| `WORKER_DOCUMENT` | DocumentAgent | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze |
-| `WORKER_SPREADSHEET` | SpreadsheetAgent | parse_spreadsheet, compute_statistics, generate_report |
-| `WORKER_BROWSER` | BrowserAgent | browser_navigate, browser_extract, browser_fill_form, browser_screenshot + 23 more |
-| `WORKER_RESEARCH` | ResearchAgent | web_search, web_fetch, search_knowledge |
-| `WORKER_KNOWLEDGE` | KnowledgeAgent | search_knowledge, memory_store, memory_retrieve |
-| `WORKER_SUPPORT` | SupportAgent | classify_ticket, lookup_customer, search_knowledge_base |
-| `WORKER_OPS` | OpsAgent | send_webhook, file_read, file_write, list_directory, code_execute |
-| `WORKER_VOICE` | VoiceAgent | OpenAI Realtime API via WebRTC |
-| `WORKER_CODER` | CoderAgent | code_execute, file_read, file_write |
-| `WORKER_DESIGNER` | DesignerAgent | browser_screenshot, browser_analyze_page |
-| `WORKER_STRATEGIST` | StrategistAgent | web_search, research tools, analytics |
-| `WORKER_MARKETING` | MarketingAgent | create_email_sequence, personalize_email, track_email_engagement |
-| `WORKER_TECHNICAL` | TechnicalAgent | code_execute, web_search, architecture analysis |
-| `WORKER_FINANCE` | FinanceAgent | compute_statistics, generate_report, spreadsheet tools |
-| `WORKER_HR` | HRAgent | classify_text, draft_email, document tools |
-| `WORKER_GROWTH` | GrowthAgent | score_lead, enrich_contact, predict_churn, generate_winback, monitor_company_signals |
-| `WORKER_CONTENT` | ContentAgent | web_search, classify_text, draft tools |
-| `WORKER_SEO` | SEOAgent | audit_seo, research_keywords, analyze_serp, monitor_rankings |
-| `WORKER_PR` | PRAgent | web_search, draft_email, classify_text |
-| `WORKER_LEGAL` | LegalAgent | extract_document_data, summarize_document, classify_text |
-| `WORKER_SUCCESS` | SuccessAgent | lookup_customer, classify_ticket, draft_email |
-| `WORKER_ANALYTICS` | AnalyticsAgent | compute_statistics, generate_report, analyze_engagement |
-| `WORKER_PRODUCT` | ProductAgent | web_search, classify_text, generate_report |
-| `WORKER_PROJECT` | ProjectAgent | list_calendar_events, send_webhook, generate_report |
-
-#### Vibe Coding Agents
-
-| Role | Agent | Primary Tools |
-|------|-------|---------------|
-| `WORKER_APP_ARCHITECT` | AppArchitectAgent | Architecture blueprints, file tree planning, data model design |
-| `WORKER_APP_GENERATOR` | AppGeneratorAgent | Full file code generation (React, Next.js, Tailwind, Prisma) |
-| `WORKER_APP_DEBUGGER` | AppDebuggerAgent | Self-debugging loop: diagnose build errors, auto-fix, rebuild |
-| `WORKER_APP_DEPLOYER` | AppDeployerAgent | Vercel deployment via LLM tool calls (experimental — requires Vercel API token) |
-| `WORKER_SCREENSHOT_TO_CODE` | ScreenshotToCodeAgent | Vision analysis, UI replication from screenshots |
-
-</details>
+Full agent details with input/output contracts, handoff logic, and error contracts: [`AGENTS.md`](AGENTS.md)
 
 ---
 
 ## 🧠 LLM Providers & Routing
 
-<div align="center">
+| Provider | Models | Use Case |
+|:--------:|:------:|:---------|
+| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_5.4-412991?style=flat-square&logo=openai) | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry |
+| ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5-4285f4?style=flat-square&logo=google) | 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output |
 
-| Provider | Tier | Models | Use Case |
-|:--------:|:----:|:------:|----------|
-| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_GPT--5.4-412991?style=flat-square&logo=openai&logoColor=white) | **Tier 1-3** | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry |
-| ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5_Pro_%2F_Flash-4285f4?style=flat-square&logo=google&logoColor=white) | **Tier 1-3** | Gemini 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output |
+**Per-tenant provider switching** — each tenant chooses OpenAI or Gemini from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
 
-</div>
+**Tier-based model selection:**
 
-**Per-tenant provider switching** — Each tenant chooses between OpenAI and Gemini from the Settings UI. The preference is stored in `TenantMemory` (key: `llm:preferred_provider`) and flows through the entire execution pipeline: `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → every graph node → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()` → provider-specific runtime. Tenant API keys are AES-256-GCM encrypted at rest.
+| Tier | OpenAI | Gemini | Assigned to |
+|:----:|:------:|:------:|:-----------|
+| 💎 Premium | GPT-5.5 | Gemini 2.5 Pro | Commander, Planner, Verifier, CEO/CMO/CFO |
+| ⚡ Balanced | GPT-5.4 | Gemini 2.5 Flash | Code Generator, Architect, Research |
+| 💰 Economy | GPT-5.4 mini-tier | Gemini 2.5 Flash-Lite | Router, Guardrail, simple workers |
 
-**Routing strategy:** Agent-first with tier-based model selection. When Gemini is selected:
-- **Tier 3 (premium):** Gemini 2.5 Pro — Commander, Planner, Verifier, CEO/CMO/CFO agents
-- **Tier 2 (balanced):** Gemini 2.5 Flash — Code Generator, Architect, Research agents
-- **Tier 1 (economy):** Gemini 2.5 Flash-Lite — Router, Guardrail, simple workers
+All three Gemini models support parallel function calling, structured output, and controllable thinking — no capability downgrade when switching providers.
 
-All three models support parallel function calling, structured output (`responseSchema`), and controllable thinking budgets — no capability downgrade when switching providers.
+Key files: [`gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) · [`gemini-response-parser.ts`](packages/agents/src/runtime/gemini-response-parser.ts) · [`llm-settings.routes.ts`](apps/api/src/routes/llm-settings.routes.ts) · [`base-agent.ts`](packages/agents/src/base/base-agent.ts)
 
-**Runtime architecture:** `GeminiRuntime` converts OpenAI message shapes to Gemini `Content[]` format, maps tool definitions via `zod-to-json-schema`, and translates responses back through `geminiResponseToChatCompletion()`. This means every existing agent (all 38) works with Gemini with zero code changes — the `BaseAgent.execute()` wrapper calls `setContextOverride(context)` which transparently swaps the LLM call service when `context.llmProvider === 'gemini'`.
-
-> **Google AI Agents Challenge:** JAK Swarm integrates Google's Gemini models as a first-class runtime alongside OpenAI. Every agent — from the Commander orchestrator to the Vibe Coding pipeline — runs end-to-end on Gemini 2.5 Pro/Flash/Flash-Lite with tool calling, structured output, and per-tenant switching. The `GeminiRuntime` adapter in [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) bridges the Gemini SDK to JAK's agent-first architecture.
-
-<details>
-<summary><b>🔧 Provider Switching Architecture</b></summary>
-
-```mermaid
-flowchart LR
-    subgraph UI["⚙️ Settings UI"]
-        A["Preferred Provider Toggle"]
-    end
-
-    subgraph API["🚀 API Layer"]
-        B["PUT /settings/llm/preferred-provider"]
-        C["TenantMemory<br/>llm:preferred_provider"]
-        D["Encrypted API Key<br/>llm:gemini:api_key"]
-    end
-
-    subgraph EXEC["🐝 Execution Pipeline"]
-        E["SwarmExecutionService<br/>reads preference + decrypts key"]
-        F["SwarmRunner<br/>passes llmProvider + llmApiKey"]
-        G["SwarmState<br/>propagates to graph nodes"]
-        H["AgentContext.llmProvider"]
-    end
-
-    subgraph AGENT["🤖 Agent Layer"]
-        I["BaseAgent.execute()<br/>calls setContextOverride()"]
-        J{llmProvider?}
-        K["OpenAI Runtime<br/>GPT-5.5 / GPT-5.4"]
-        L["Gemini Runtime<br/>2.5 Pro / Flash / Flash-Lite"]
-    end
-
-    A --> B --> C
-    B --> D
-    C --> E
-    D --> E
-    E --> F --> G --> H --> I --> J
-    J -->|"openai"| K
-    J -->|"gemini"| L
-
-    style UI fill:#0d1117,stroke:#34d399,color:#e6edf3
-    style API fill:#0d1117,stroke:#38bdf8,color:#e6edf3
-    style EXEC fill:#0d1117,stroke:#fbbf24,color:#e6edf3
-    style AGENT fill:#0d1117,stroke:#c084fc,color:#e6edf3
-```
-
-Key files:
-- [`apps/api/src/routes/llm-settings.routes.ts`](apps/api/src/routes/llm-settings.routes.ts) — Provider toggle + key management APIs
-- [`apps/api/src/services/swarm-execution.service.ts`](apps/api/src/services/swarm-execution.service.ts) — Reads tenant preference, injects into runner
-- [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) — Gemini SDK adapter (tool calling, structured output, thinking)
-- [`packages/agents/src/runtime/gemini-response-parser.ts`](packages/agents/src/runtime/gemini-response-parser.ts) — Converts Gemini responses to OpenAI shape
-- [`packages/agents/src/base/base-agent.ts`](packages/agents/src/base/base-agent.ts) — `setContextOverride()` transparently swaps provider
-
-</details>
-
----
-
-## 📸 Screenshots
-
-### Landing Page — Hero
-![JAK Swarm Hero](docs/screenshots/01-hero.png)
-
-### Agent Network — 38 Agents in 5 Layers
-![Agent Network](docs/screenshots/02-agents.png)
-
-### Workflow — From Command to Result in Seconds
-![Workflow](docs/screenshots/03-workflow.png)
-
-### Pricing — Free / Builder ($29) / Pro ($99) / Team ($249)
-![Pricing](docs/screenshots/04-pricing.png)
-
-### Vibe Coding — Build Apps with AI
-> 5-step pipeline: Describe → Architect → Generate → Debug → Preview
-> Builder IDE with Monaco editor, file tree, chat panel, and live preview
-
-### Verification Engine — Verify Before You Act
-> Email threat detection, document verification, transaction risk analysis,
-> identity verification, cross-evidence correlation with 4-layer escalation
-
-### Onboarding Wizard — 4-Step Setup
-![Onboarding](docs/screenshots/07-onboarding.png)
-
-### Login & Registration
-| Login | Registration |
-|:-----:|:------------:|
-| ![Login](docs/screenshots/05-login.png) | ![Register](docs/screenshots/06-register.png) |
-
----
-
-## ⚡ Vibe Coding — AI App Builder
-
-<div align="center">
-
-**Describe an app in plain English. Watch 5 AI agents architect, generate, debug, and deploy it — as a single durable workflow with auto-repair and diff-aware checkpoints.**
-
-*Think Emergent.sh / Lovable / Bolt.new, but with operator-grade durability — cross-instance reclaim, risk-stratified approvals, structural diff on every stage, diff-aware revert (click + confirm) to any checkpoint.*
-
-</div>
-
-### What makes this different
-
-- **Durable workflow**, not chat: the Vibe Coder chain runs through the queue with `workflowKind: 'vibe-coder'`. A worker can die mid-run and another instance reclaims the job.
-- **3-layer build verification**: heuristic checker catches truncation + placeholder leaks in ~1ms → TypeScript compiler API catches real syntax/type errors in-memory in sub-second → optional Docker-backed `next build` provides the real production pre-flight. Each layer fails fast and passes the earliest actionable error to the debugger.
-- **Auto-repair loop**: up to 3 debug retries per workflow, with fingerprint-based loop detection to stop the same fix from being tried repeatedly.
-- **Checkpoint-revert**: every stage (generator, debugger-retry N, deployer) auto-snapshots the project with a structural diff (+added ~modified -deleted) persisted to `project_versions.diffJson`. Restore creates a new rollback version — restores are themselves reversible.
-- **Subscription-tier gating**: free-tier runs route through the lower-cost GPT-5.4 tier; paid routes unlock Tier 3 GPT-5.5 for the Architect / Technical / Strategist stages.
-
-### Pipeline Architecture
-
-```mermaid
-flowchart TD
-    subgraph INPUT["💬 User Input"]
-        A["📝 Text Description"]
-        B["📸 Screenshot Upload"]
-    end
-
-    subgraph VISION["👁️ Vision Layer — Optional"]
-        C["📸 Screenshot-to-Code Agent\n• Analyze layout, colors, typography\n• Extract component boundaries\n• Generate design tokens"]
-    end
-
-    subgraph ARCHITECT["🏛️ Architecture Layer — Tier 3"]
-        D["🏛️ App Architect Agent\n• File tree & component hierarchy\n• Prisma data models & relations\n• API endpoint contracts\n• Auth strategy & env vars\n• Dependency resolution"]
-    end
-
-    subgraph GENERATE["⚡ Generation Layer — Tier 2"]
-        direction LR
-        E["📄 Pages\nNext.js App Router\nServer Components"]
-        F["🧩 Components\nReact + Tailwind\nshadcn/ui patterns"]
-        G["🔌 API Routes\nRoute Handlers\nZod validation"]
-        H["🗃️ Database\nPrisma schema\nMigrations"]
-    end
-
-    subgraph SANDBOX["🏗️ Build Layer"]
-        I["📦 npm install\nDependency resolution"]
-        J["🔨 next build\nTypeScript compilation"]
-        K{"✅ Build\nPassed?"}
-    end
-
-    subgraph DEBUG["🔧 Debug Loop — Tier 1"]
-        L["🔧 Auto-Debugger Agent\n• Parse error logs\n• Identify root cause\n• Apply surgical fix\n• Max 3 retries"]
-    end
-
-    subgraph DELIVER["🚀 Delivery Layer"]
-        M["👁️ Live Preview\nIframe + Hot Reload"]
-        N["💬 Iterate via Chat\nModify only affected files"]
-        O["🚀 Deploy to Vercel\n(Planned — experimental)"]
-        P["🔀 GitHub Sync\nPush/pull • CI/CD"]
-    end
-
-    A --> D
-    B --> C --> D
-    D --> E & F & G & H
-    E & F & G & H --> I --> J --> K
-    K -->|"✅ Yes"| M
-    K -->|"❌ No"| L --> J
-    M --> N --> D
-    M --> O
-    M --> P
-
-    style INPUT fill:#0d1117,stroke:#34d399,color:#e6edf3
-    style VISION fill:#0d1117,stroke:#f472b6,color:#e6edf3
-    style ARCHITECT fill:#0d1117,stroke:#fbbf24,color:#e6edf3
-    style GENERATE fill:#0d1117,stroke:#38bdf8,color:#e6edf3
-    style SANDBOX fill:#0d1117,stroke:#c084fc,color:#e6edf3
-    style DEBUG fill:#0d1117,stroke:#fb923c,color:#e6edf3
-    style DELIVER fill:#0d1117,stroke:#34d399,color:#e6edf3
-```
-
-### Builder IDE
-
-<div align="center">
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ← Back   My Task Manager    v3          [GitHub]  [Deploy]     Ready   │
-├────────────┬─────────────────────────────────────┬───────────────────────┤
-│            │                                     │                       │
-│  📁 Files  │  [Code]  [Preview]                  │  💬 Chat              │
-│            │                                     │                       │
-│  ▸ src/    │  ┌─────────────────────────────┐    │  You: "Add dark mode  │
-│    ▸ app/  │  │  // Monaco Editor           │    │   and a sidebar"      │
-│      page  │  │  export default function    │    │                       │
-│      layou │  │    Home() {                 │    │  JAK: Modified 3 files│
-│    ▸ compo │  │    return (                 │    │   ✓ layout.tsx        │
-│    ▸ lib/  │  │      <main>                 │    │   ✓ Sidebar.tsx       │
-│  package.j │  │        <h1>Task Manager</h1>│    │   ✓ globals.css       │
-│  tsconfig  │  │      </main>                │    │                       │
-│  tailwind  │  │    );                       │    │  [📸 Screenshot]      │
-│            │  │  }                          │    │  [Type a message...]  │
-│  📋 v3     │  └─────────────────────────────┘    │  [Send ▶]             │
-│  📋 v2     │                                     │                       │
-│  📋 v1     │                                     │                       │
-├────────────┴─────────────────────────────────────┴───────────────────────┤
-│  ⏳ Analyzing ✅ → Generating ✅ → Building ⏳ → Preview ○     [72%]    │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-</div>
-
-### Feature Comparison
-
-<div align="center">
-
-| Feature | JAK Swarm | Emergent.sh | Lovable | Bolt.new |
-|:--------|:---------:|:-----------:|:-------:|:--------:|
-| **Full-stack generation** | ✅ | ✅ | ✅ | ✅ |
-| **Multi-agent pipeline** | ✅ 5 agents | ✅ | ❌ | ❌ |
-| **Screenshot-to-code** | ✅ | ✅ | ❌ | ❌ |
-| **Self-debugging loop** | ✅ 3 retries | ✅ | ❌ | ❌ |
-| **3-tier cost routing** | ✅ | ❌ | ❌ | ❌ |
-| **Version rollback** | ✅ | ✅ | ✅ | ❌ |
-| **Monaco editor** | ✅ | ❌ | ✅ | ✅ |
-| **Vercel deploy** | 🚧 Planned | ❌ Custom | ✅ | ✅ |
-| **GitHub sync** | ✅ | ✅ | ✅ | ✅ |
-| **Open source** | ✅ MIT | ❌ | ❌ | ❌ |
-| **122 classified tools** (CI-enforced maturity) | ✅ | ❌ | ❌ | ❌ |
-| **Voice input** | ✅ | ❌ | ❌ | ❌ |
-| **Multi-tenant SaaS** | ✅ | ❌ | ❌ | ❌ |
-| **Industry compliance** | ✅ 13 packs | ❌ | ❌ | ❌ |
-
-</div>
-
-### Cost Per App
-
-<div align="center">
-
-| Stage | OpenAI Tier | OpenAI Model | Gemini Tier | Gemini Model | Est. Cost |
-|:------|:----------:|:------------:|:-----------:|:------------:|:---------:|
-| 📸 Screenshot analysis | Tier 3 | GPT-5.5 | Tier 3 | Gemini 2.5 Pro | $0.10-0.20 |
-| 🏛️ Architecture | Tier 3 | GPT-5.5 | Tier 3 | Gemini 2.5 Pro | $0.20-0.50 |
-| ⚡ Code generation | Tier 2 | GPT-5.4 | Tier 2 | Gemini 2.5 Flash | $0.15-0.40 |
-| 🔧 Debug iterations | Tier 1 | GPT-5.4 mini | Tier 1 | Gemini 2.5 Flash-Lite | $0.02-0.05/iter |
-| 🚀 Deploy | Tier 1 | Tool calls only | Tier 1 | Tool calls only | $0.01-0.02 |
-| | | **Total (new app)** | | | **$0.50-2.00** |
-| | | **Per iteration** | | | **$0.05-0.30** |
-
-*Estimated costs based on model pricing. Actual costs vary by app complexity, model selection, and debug iterations.*
-
-</div>
-
-### Templates
-
-| Template | Stack | Includes |
-|:---------|:------|:---------|
-| `nextjs-app` | Next.js 14 + Tailwind | App Router, TypeScript strict, responsive layout |
-| `nextjs-saas` | Next.js 14 + Prisma + Stripe | Auth, database, payments, dashboard scaffold |
-| `react-spa` | React + Vite + Router | Single-page app, client-side routing, Tailwind |
-
----
-
-## 🛡️ Audit & Compliance Agent Pack
-
-<div align="center">
-
-**Run a real SOC 2 / HIPAA / ISO 27001 audit engagement end-to-end. Plan controls, auto-map evidence, run LLM-driven control tests, generate per-control workpaper PDFs gated by reviewer approval, produce a binding HMAC-signed final evidence pack, and invite a third-party auditor through a secure portal — verifiable byte-for-byte.**
-
-*Built on the same durable workflow + lifecycle event + RBAC + signed-bundle foundation that powers everything else in JAK.*
-
-</div>
-
-### External Auditor Portal (Sprint 2.6)
-
-Third-party auditors get a dedicated portal scoped to the engagements they're invited to. They never see other tenant data and never see audit runs they aren't on.
-
-| Surface | Real-and-tested |
-|---|---|
-| Invite flow | Admin (`REVIEWER+`) creates an invite via `POST /audit/runs/:id/auditors/invite`. Cleartext token is returned **once**; only the SHA-256 hash is persisted (`crypto.randomBytes(32)` → 64-char hex → `SHA-256` → hex). |
-| Acceptance | Auditor visits `/auditor/accept/[token]`. Token is hashed + verified with `crypto.timingSafeEqual`. On accept: an `EXTERNAL_AUDITOR` user row is created (no password — invite-token is the auth) and an `ExternalAuditorEngagement` row grants per-audit-run scope. |
-| Engagement isolation | Every auditor route runs through `requireAuditorEngagement` middleware: verifies role + active engagement (not expired, not revoked) for the `:auditRunId` path param. Cross-engagement access returns 403. |
-| Audit trail | Every auditor action (view, comment, approve/reject/request-changes) writes an `ExternalAuditorAction` row. The decide endpoint logs INTENT before mutating so failed mutations leave a forensic trace. |
-| Revocation | `POST /audit/runs/:id/auditors/:inviteId/revoke` flips the invite to `REVOKED` AND sets `accessRevokedAt` on the engagement in a single transaction; subsequent JWTs cannot pass the engagement check. |
-| Tests | 11 unit tests (`tests/unit/services/external-auditor.test.ts`) cover token format, cleartext-never-persisted, expired/revoked rejection, cross-tenant isolation. |
-| Security audit | [`qa/external-auditor-portal-security-audit.md`](qa/external-auditor-portal-security-audit.md) records the threat model + per-requirement implementation status. |
-
-### Frameworks shipped (182 controls total · 108 operationally backed · 74 require reviewer attestation)
-
-| Framework | Slug | Issuer | Version | Seeded | Auto-mapped | Reviewer attest |
-|---|---|---|---|---|---|---|
-| SOC 2 Type 2 | `soc2-type2` | AICPA | 2017 | 63 | 37 | 26 |
-| HIPAA Security Rule | `hipaa-security` | HHS | 2013 | 37 | 25 | 12 |
-| ISO/IEC 27001:2022 | `iso27001-2022` | ISO/IEC | 2022 | 82 | 46 | 36 |
-| **Total** | | | | **182** | **108** | **74** |
-
-Each control is real-seeded from the published standard. 10 implemented `autoRuleKey` rules pull evidence (audit log rows, approvals, workflow artifacts, signed bundles, PII detections, guardrail events, tool blocks, …) onto controls that have automation. Controls without an `autoRuleKey` carry `requiresHumanAttestation: true` (set automatically by `withAttestationFlags()` in the seed file) so reviewers know exactly which entries need their signature versus which the system can satisfy from activity. Counts are derived at module load via `FRAMEWORK_COUNTS` and cross-verified by the `pnpm check:truth` CI gate.
-
-### Engagement flow
-
-```
-User → POST /audit/runs                                  AuditRunService.create()
-                                                         status = PLANNING
-                                                         emit audit_run_started
-       POST /audit/runs/:id/plan                         seed ControlTest rows
-                                                         status = PLANNED
-                                                         emit audit_plan_created
-       POST /audit/runs/:id/auto-map                     ComplianceMapperService.runForTenant()
-                                                         emit evidence_mapped
-       POST /audit/runs/:id/test-controls                ControlTestService.runAll()
-                                                         per control: emit control_test_started/_completed
-                                                         on fail/exception: emit exception_found + auto-create AuditException
-                                                         status = TESTING → REVIEWING
-       POST /audit/runs/:id/workpapers/generate          WorkpaperService.generateAll()
-                                                         per control: render real PDF (pdfkit)
-                                                         persist as WorkflowArtifact, approvalState=REQUIRES_APPROVAL
-                                                         emit workpaper_generated + reviewer_action_required
-       POST /audit/runs/:id/workpapers/:wpId/decide      WorkpaperService.setReviewDecision()
-                                                         propagates to ArtifactService.setApprovalState
-                                                         all approved → status = READY_TO_PACK
-       POST /audit/runs/:id/final-pack                   FinalAuditPackService.generate()
-                                                         GATE: refuses if any workpaper unapproved
-                                                         bundles workpapers + control matrix CSV +
-                                                         exceptions JSON + executive summary PDF
-                                                         signs via bundle-signing.service (HMAC-SHA256)
-                                                         status = FINAL_PACK → COMPLETED
-                                                         emit final_pack_generated + audit_run_completed
-```
-
-### What's shipped (real, working, typechecked, e2e-tested)
-
-| Capability | File |
-|---|---|
-| 4 Prisma models (`AuditRun`, `ControlTest`, `AuditException`, `AuditWorkpaper`) + migration 15 | [packages/db/prisma/migrations/15_audit_runs/migration.sql](packages/db/prisma/migrations/15_audit_runs/migration.sql) |
-| State machine with `assertAuditTransition()` refusing illegal jumps | [apps/api/src/services/audit/audit-run.service.ts](apps/api/src/services/audit/audit-run.service.ts) |
-| LLM-driven control test evaluation (deterministic fallback when no key) | [apps/api/src/services/audit/control-test.service.ts](apps/api/src/services/audit/control-test.service.ts) |
-| Auto-create exceptions on test failure + reviewer lifecycle | [apps/api/src/services/audit/audit-exception.service.ts](apps/api/src/services/audit/audit-exception.service.ts) |
-| Real PDF workpapers via existing `exportPdf` (pdfkit) | [apps/api/src/services/audit/workpaper.service.ts](apps/api/src/services/audit/workpaper.service.ts) |
-| HMAC-SHA256 signed final pack with workpaper-approval gate | [apps/api/src/services/audit/final-audit-pack.service.ts](apps/api/src/services/audit/final-audit-pack.service.ts) |
-| 14 REST endpoints under `/audit/runs/*`, REVIEWER+ RBAC on writes | [apps/api/src/routes/audit-runs.routes.ts](apps/api/src/routes/audit-runs.routes.ts) |
-| 13 audit-specific lifecycle events on the `audit_run:{id}` SSE channel | (see [docs/agent-run-cockpit.md](docs/agent-run-cockpit.md)) |
-| `/audit/runs` workspace + `/audit/runs/:id` detail UI (control matrix + workpaper + exception panels) | [apps/web/src/app/(dashboard)/audit/runs/page.tsx](apps/web/src/app/(dashboard)/audit/runs/page.tsx) |
-| 11-assertion end-to-end test: create → plan → test → workpaper → approve → signed pack → signature verify | [tests/integration/audit-run-e2e.test.ts](tests/integration/audit-run-e2e.test.ts) |
-
-### Reviewer gates (enforced at every layer)
-
-1. **Test confidence < 0.7** → status `reviewer_required` (won't auto-pass)
-2. **Every workpaper PDF** persists with `approvalState='REQUIRES_APPROVAL'` — download blocked, run can't advance until approved
-3. **Final-pack signing** refuses if ANY workpaper is unapproved (`FinalPackGateError`)
-4. **Exception lifecycle** runs through its own state machine — `IllegalAuditExceptionTransitionError` blocks bad transitions
-
-### Honesty notes
-
-- LLM evaluation is real (`AgentRuntime.respondStructured` with strict json_schema). When `OPENAI_API_KEY` is absent, the service uses a deterministic coverage rule and writes `"deterministic coverage rule (no LLM key configured)"` as the rationale so reviewers see the difference. Never silent-faked.
-- Lifecycle events carry an `agentRole` field (`AUDIT_COMMANDER`, `CONTROL_TEST_AGENT`, `EXCEPTION_FINDER`, `WORKPAPER_WRITER`, `FINAL_AUDIT_PACK_AGENT`, `COMPLIANCE_MAPPER`). The work itself is performed by the named service. We did NOT create 9 fake `BaseAgent` placeholder classes — that's a documented Phase 2 optimization in [qa/audit-compliance-readiness-audit.md](qa/audit-compliance-readiness-audit.md).
-- Things explicitly deferred (and named, not faked) — external auditor portal (~2 weeks), real LangGraph nodes (~2 weeks), DOCX/XLSX/image content parsing for evidence (~3 days), live SSE on the audit detail page (~1 day; currently 15s SWR polling). Full deferral table in [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md).
-
-### Reference docs
-
-| Doc | Purpose |
-|---|---|
-| [docs/audit-compliance-agent-pack.md](docs/audit-compliance-agent-pack.md) | Product overview |
-| [docs/audit-framework-library.md](docs/audit-framework-library.md) | Per-framework + per-control reference |
-| [docs/audit-workpapers.md](docs/audit-workpapers.md) | Workpaper generation + approval flow |
-| [docs/audit-human-review.md](docs/audit-human-review.md) | 4 human-in-loop surfaces + RBAC matrix |
-| [docs/audit-api.md](docs/audit-api.md) | Endpoint reference + error codes + SSE channel |
-| [docs/agent-run-cockpit.md](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
-| [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md) | 26-point shipped + deferred report |
+Provider switching architecture diagram in [`ARCHITECTURE.md`](ARCHITECTURE.md#llm-provider-routing).
 
 ---
 
@@ -888,7 +226,7 @@ User → POST /audit/runs                                  AuditRunService.creat
 |:-----------:|:-------:|
 | Node.js | 20+ |
 | pnpm | 9+ |
-| PostgreSQL | 15+ |
+| PostgreSQL | 15+ (pgvector recommended) |
 | Redis | Optional (for scheduling) |
 
 ### 1. Clone & Install
@@ -905,7 +243,7 @@ pnpm install
 cp .env.example .env
 ```
 
-Edit `.env` -- at minimum set:
+Edit `.env` — API keys are required for external LLM providers (OpenAI, Gemini, or both). At minimum set:
 
 ```bash
 # LLM provider (set one or both — per-tenant switching available in the dashboard)
@@ -915,28 +253,26 @@ GEMINI_API_KEY=your-gemini-key-here          # Optional: enables Gemini 2.5 Pro/
 DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
 AUTH_SECRET=your-random-32-char-string-here
 
-# Required for the Audit & Compliance final-pack signing
+# Required for Audit & Compliance final-pack signing
 EVIDENCE_SIGNING_SECRET=$(openssl rand -base64 48)
 ```
+
+Full environment variable reference: [`docs/environment-setup.md`](docs/environment-setup.md)
 
 ### 3. Setup Database
 
 ```bash
 pnpm --filter @jak-swarm/db db:migrate
-pnpm --filter @jak-swarm/db db:seed         # optional: seed sample data
-pnpm seed:compliance                        # seeds 182 SOC 2 / HIPAA / ISO 27001 controls (108 auto-mapped + 74 reviewer attest)
-pnpm seed:audit-demo                        # optional: seeds a demo audit run for end-to-end exercise
+pnpm --filter @jak-swarm/db db:seed              # optional: seed sample data
+pnpm seed:compliance                             # seeds 182 SOC 2 / HIPAA / ISO 27001 controls
+pnpm seed:audit-demo                            # optional: seeds a demo audit run
 ```
 
-### 4. Build
+### 4. Build & Run
 
 ```bash
 pnpm turbo build
-```
 
-### 5. Run
-
-```bash
 # Terminal 1 — API server (Fastify, port 4000)
 pnpm --filter @jak-swarm/api dev
 
@@ -944,13 +280,59 @@ pnpm --filter @jak-swarm/api dev
 pnpm --filter @jak-swarm/web dev
 ```
 
-### 6. Open Dashboard
+Open **http://localhost:3000** — give it a goal and watch the swarm execute.
 
-```
-http://localhost:3000
-```
+Docker setup: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production topology: [`docker-compose.prod.yml`](docker-compose.prod.yml)
 
-> That's it. Give it a goal and watch the swarm execute.
+### Integration Setup
+
+<details>
+<summary><b>📧 Gmail (IMAP/SMTP)</b></summary>
+
+1. Enable 2-Factor Authentication → generate an App Password at [Google App Passwords](https://myaccount.google.com/apppasswords)
+2. Add to `.env`: `GMAIL_EMAIL="you@gmail.com"` + `GMAIL_APP_PASSWORD="abcd efgh ijkl mnop"`
+3. System auto-detects these and switches from mock to real adapters
+
+</details>
+
+<details>
+<summary><b>💬 Slack (MCP)</b></summary>
+
+1. Create Slack app at [api.slack.com/apps](https://api.slack.com/apps) → add Bot Token Scopes: `channels:read`, `chat:write`, `search:read`, `users:read`
+2. Install to workspace → copy Bot User OAuth Token
+3. Dashboard: **Settings > Integrations > Slack** → paste token + Team ID
+
+</details>
+
+<details>
+<summary><b>🐙 GitHub (MCP) · 📝 Notion (MCP)</b></summary>
+
+- **GitHub**: Generate PAT at [github.com/settings/tokens](https://github.com/settings/tokens) (scopes: `repo`, `read:org`, `read:user`) → paste in **Settings > Integrations > GitHub**
+- **Notion**: Create integration at [notion.so/my-integrations](https://www.notion.so/my-integrations) → copy Internal Integration Secret → share pages with integration → paste in **Settings > Integrations > Notion**
+
+</details>
+
+Full integration setup guide: [`docs/environment-setup.md`](docs/environment-setup.md)
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Landing Page | Agent Network |
+|:---:|:---:|
+| ![Hero](docs/screenshots/01-hero.png) | ![Agents](docs/screenshots/02-agents.png) |
+
+| Workflow Execution | Pricing |
+|:---:|:---:|
+| ![Workflow](docs/screenshots/03-workflow.png) | ![Pricing](docs/screenshots/04-pricing.png) |
+
+| Login | Onboarding |
+|:---:|:---:|
+| ![Login](docs/screenshots/05-login.png) | ![Onboarding](docs/screenshots/07-onboarding.png) |
+
+</div>
 
 ---
 
@@ -958,18 +340,17 @@ http://localhost:3000
 
 | Page | Description |
 |:-----|:------------|
-| 🏠 **Home** | Mission control with activity feed, approvals, quick actions |
+| 🏠 **Home** | Mission control — activity feed, approvals, quick actions |
 | 🏢 **Workspace** | Command center — text/voice input, DAG view, agent tracker |
 | ⚡ **Builder** | Vibe Coding IDE — Monaco editor, chat, preview, deploy |
 | 🐝 **Swarm** | Workflow inspector with agent timeline visualization |
-| 🛡️ **Audit** | Audit & Compliance home — dashboard, audit log, reviewer queue, workflow trail, compliance frameworks (SOC 2 / HIPAA / ISO 27001), and **Audit Runs** workspace |
-| 🛡️ **Audit Runs** | `/audit/runs` index + `/audit/runs/:id` engagement detail (control matrix · workpapers · exceptions · final pack) |
+| 🛡️ **Audit** | Audit & Compliance home — dashboard, log, reviewer queue, compliance frameworks |
+| 🛡️ **Audit Runs** | Engagement detail — control matrix, workpapers, exceptions, final pack |
 | 🔎 **Traces** | Full agent trace explorer with token/cost breakdown |
 | 📊 **Analytics** | Usage metrics, cost tracking, agent performance charts |
 | ⏰ **Schedules** | Cron-based recurring workflow management |
-| 🔌 **Integrations** | MCP providers — HubSpot, Salesforce, Slack, GitHub + more |
-| 🧩 **Skills** | Skill marketplace — browse, install, create custom skills |
-| 🧠 **Knowledge** | Memory store — facts, preferences, policies, learnings |
+| 🔌 **Integrations** | MCP provider connections |
+| 🧠 **Knowledge** | Memory store — facts, preferences, policies |
 | ⚙️ **Settings** | LLM provider config, approval thresholds |
 | 👑 **Admin** | Tenant management, users, API keys, tool toggles |
 
@@ -977,181 +358,34 @@ http://localhost:3000
 
 ## 🔧 Tool Inventory (122 Registered)
 
-| Category | Count | Tools | Status |
-|:---------|:-----:|:------|:------:|
-| **Email** | 10 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email, personalize_email, schedule_email, track_email_engagement, analyze_engagement, create_email_sequence | ✅ Real (Gmail IMAP/SMTP) |
+| Category | Count | Key Tools | Status |
+|:---------|:-----:|:----------|:------:|
+| **Email** | 10 | read_email, draft_email, send_email, gmail_read_inbox, gmail_send_email, track_email_engagement | ✅ Real (Gmail IMAP/SMTP) |
 | **Calendar** | 3 | list_calendar_events, create_calendar_event, find_availability | ✅ Real (CalDAV) |
-| **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, enrich_company, verify_email_deliverability, score_lead, deduplicate_contacts, find_decision_makers, monitor_company_signals, predict_churn, generate_winback + more | 🔌 Pluggable adapter |
-| **Browser** | 30 | navigate, extract, fill_form, click, screenshot, get_text, type_text, press_key, mouse_click, scroll, analyze_page, manage_cookies, manage_tabs, hover, select, upload, evaluate_js, wait_for, pdf_export, post_to_twitter, post_to_linkedin, post_to_reddit + more | ✅ Real (Playwright) |
-| **Document** | 16 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write, list_directory, generate_image + more | ✅ Real (pdf-parse + DALL-E) |
-| **Research** | 31 | web_search, web_fetch, classify_text, audit_seo, research_keywords, analyze_serp, monitor_rankings, code_execute, discover_posting_platforms + more | ✅ Real (web) |
+| **CRM** | 14 | lookup_crm_contact, update_crm_record, search_deals, enrich_contact, score_lead, predict_churn | 🔌 Pluggable adapter |
+| **Browser** | 30 | navigate, extract, fill_form, click, screenshot, analyze_page, manage_cookies, evaluate_js, pdf_export | ✅ Real (Playwright) |
+| **Document** | 16 | summarize_document, extract_document_data, pdf_extract_text, pdf_analyze, generate_report, file_read, file_write | ✅ Real (pdf-parse + DALL-E) |
+| **Research** | 31 | web_search, web_fetch, classify_text, audit_seo, research_keywords, analyze_serp, code_execute | ✅ Real (web) |
 | **Spreadsheet** | 4 | parse_spreadsheet, compute_statistics, generate_report, export_csv | ✅ Built-in |
-| **Knowledge** | 9 | search_knowledge, memory_store, memory_retrieve, ingest_document, compile_executive_summary + more | ✅ Real (DB-backed) |
+| **Knowledge** | 9 | search_knowledge, memory_store, memory_retrieve, ingest_document | ✅ Real (DB-backed) |
 | **Webhook** | 2 | send_webhook, deploy_to_vercel | ✅ Built-in |
-| **MCP (external)** | Dynamic | Slack, GitHub, Notion + 18 more loaded at runtime | ✅ Real (MCP servers) |
+| **MCP** | Dynamic | Slack, GitHub, Notion + 18 more loaded at runtime | ✅ Real (MCP servers) |
 
-**Total: 122 registered built-in tools across Email, Calendar, Browser, Document, Spreadsheet, CRM, Research, Knowledge, and Webhook categories. Additional provider tools can be loaded dynamically via MCP integrations.**
-
----
-
-## 🔗 Integration Setup
-
-<details>
-<summary><b>📧 Gmail (IMAP/SMTP)</b></summary>
-
-1. Enable 2-Factor Authentication on your Google account
-2. Go to [Google App Passwords](https://myaccount.google.com/apppasswords)
-3. Generate an app password for "Mail"
-4. Add to `.env`:
-
-```bash
-GMAIL_EMAIL="you@gmail.com"
-GMAIL_APP_PASSWORD="abcd efgh ijkl mnop"
-```
-
-The system auto-detects these variables and switches from mock to real adapters.
-
-</details>
-
-<details>
-<summary><b>💬 Slack (MCP)</b></summary>
-
-1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
-2. Add Bot Token Scopes: `channels:read`, `chat:write`, `search:read`, `users:read`
-3. Install to workspace and copy the Bot User OAuth Token
-4. In the dashboard: **Settings > Integrations > Slack** -- paste token and Team ID
-
-</details>
-
-<details>
-<summary><b>🐙 GitHub (MCP)</b></summary>
-
-1. Generate a Personal Access Token at [github.com/settings/tokens](https://github.com/settings/tokens)
-2. Select scopes: `repo`, `read:org`, `read:user`
-3. In the dashboard: **Settings > Integrations > GitHub** -- paste token
-
-</details>
-
-<details>
-<summary><b>📝 Notion (MCP)</b></summary>
-
-1. Create an integration at [notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Copy the Internal Integration Secret
-3. Share your Notion pages/databases with the integration
-4. In the dashboard: **Settings > Integrations > Notion** -- paste secret
-
-</details>
-
----
-
-## ⏰ Scheduling
-
-Create recurring workflows from the dashboard at `/schedules`:
-
-```json
-{
-  "name": "Weekly SEO Audit",
-  "goal": "Run a full SEO audit on our marketing site and email the report to the team",
-  "cron": "0 9 * * 1",
-  "enabled": true
-}
-```
-
-> Cron expressions use standard 5-field format: `minute hour day-of-month month day-of-week`. The scheduler stores execution history and traces for every run.
+Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships unclassified.
 
 ---
 
 ## ⚖️ How JAK Swarm Compares
-
-<div align="center">
 
 | Feature | JAK Swarm | CrewAI | LangGraph | Devin |
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **122** | 50+ | Custom | ~10 |
 | Built-in UI | **13 pages** | — | LangSmith | IDE |
-| Multi-tenant | ✅ | Enterprise | — | — |
-| **Gemini + OpenAI** | ✅ Per-tenant switching | ❌ | ❌ | ❌ |
-| Scheduling | ✅ | ✅ | ✅ | — |
-| Browser control | **30 tools** | Via plugin | Via plugin | — |
-| Vision/PDF | ✅ | v1.13+ | Via model | Screenshots |
-| Self-correction | **4 layers** (heuristic) | Limited | Manual | Limited |
-| **SOC 2 / HIPAA / ISO 27001 audit pack** (182 controls · 108 auto-mapped · signed evidence bundles) | ✅ | ❌ | ❌ | ❌ |
+| **Gemini + OpenAI** (per-tenant) | ✅ | ❌ | ❌ | ❌ |
+| SOC 2 / HIPAA / ISO 27001 audit pack | ✅ | ❌ | ❌ | ❌ |
+| Self-debugging loop | ✅ 3 retries | Limited | Manual | Limited |
 | Open source | ✅ MIT | ✅ MIT | ✅ MIT | — $20/mo |
-| Price | **Free** | Free | Free+$39 | $20/mo |
-
-</div>
-
----
-
-## 🔐 Security
-
-### Tool Risk Classification
-
-| Risk Level | Examples | Approval Required |
-|:-----------|:--------|:-----------------:|
-| 🟢 `READ_ONLY` | web_search, file_read, list_calendar | Never |
-| 🟡 `WRITE` | file_write, create_event, update_crm | Configurable |
-| 🔴 `DESTRUCTIVE` | delete records, clear data | Always |
-| 🟠 `EXTERNAL_SIDE_EFFECT` | send_email, send_webhook, post_slack | Always |
-
-### Approval Gates
-
-- Tasks above the tenant's `approvalThreshold` require human review
-- Set `DEFAULT_APPROVAL_REQUIRED=false` for maximum autonomy (low-risk only)
-- Set `DEFAULT_APPROVAL_REQUIRED=true` to require approval for all write+ operations
-- Reviewers, Tenant Admins, and System Admins can approve/reject/defer
-
-### Data Protection
-
-- OAuth tokens and LLM API keys encrypted with **AES-256-GCM** at rest (derived via scrypt from `AUTH_SECRET`)
-- JWT tokens signed with `AUTH_SECRET` and verified on every request
-- Per-tenant data isolation enforced at middleware level (`enforceTenantIsolation`)
-- Passwords hashed with **bcrypt** (12 rounds)
-- Auth endpoints rate-limited to 10 requests/minute per IP
-- RBAC roles: `SYSTEM_ADMIN` > `TENANT_ADMIN` > `OPERATOR` > `REVIEWER` > `VIEWER`
-
----
-
-## 🛡️ 4-Layer Hallucination Detection
-
-| Layer | Detection | Action |
-|:-----:|:----------|:-------|
-| 1 | **Invented statistics** | Regex patterns catch fabricated percentages, dollar amounts, specific counts |
-| 2 | **Fabricated sources** | Pattern matching identifies fake citations and academic references |
-| 3 | **Overconfidence** | Flags absolute claims ("always", "never", "guaranteed") without evidence |
-| 4 | **Impossible claims** | Rule-based detection of logically inconsistent statements |
-
-> Each layer returns a grounding score (0.0-1.0) and lists specific ungrounded claims. Detection is heuristic/regex-based, not AI-powered.
-
----
-
-## 📈 Performance
-
-| Operation | Time | Cost (OpenAI) | Cost (Gemini) |
-|:----------|:----:|:-------------:|:-------------:|
-| Simple research task | 10-30s | $0.01-0.05 | $0.01-0.03 |
-| Multi-agent workflow (5 tasks) | 30-90s | $0.05-0.20 | $0.03-0.15 |
-| Complex pipeline (10+ tasks) | 2-10min | $0.20-1.00 | $0.10-0.80 |
-| Strategy-tier workflow (CEO/CFO/CMO) | 5-20min | $0.30-2.00 | $0.20-1.50 |
-| Vibe Coding (full app) | 3-8min | $0.50-2.00 | $0.30-1.50 |
-| Voice session (per minute) | Real-time | ~$0.06 | ~$0.04 |
-
-### Resource Limits
-
-| Resource | Default | Configurable |
-|:---------|:-------:|:------------:|
-| Max concurrent workflows | 20 | Yes |
-| Max concurrent tasks per workflow | 5 | `MAX_CONCURRENT_TASKS` |
-| Max tool iterations per agent | 10 | `maxIterations` |
-| Per-node timeout | 122s | `NODE_TIMEOUT_MS` |
-| Max replan attempts | 1 | `MAX_REPLAN_ATTEMPTS` |
-| State store TTL | 5 min | Hardcoded |
-| Workflow timeout (default) | 20 min | `defaultTimeoutMs` |
-| SSE heartbeat interval | 15s | Hardcoded |
-| Voice session TTL | 1 hour | `VOICE_SESSION_TTL_SECONDS` |
-| Auth rate limit | 10 req/min/IP | `AUTH_RATE_LIMIT` |
-| Pagination max per page | 100 | Query param `limit` |
 
 ---
 
@@ -1164,18 +398,18 @@ Create recurring workflows from the dashboard at `/schedules`:
 | **API** | Fastify |
 | **Frontend** | Next.js 16, React 19, Tailwind CSS |
 | **DAG Visualization** | React Flow |
-| **Database** | PostgreSQL + Prisma ORM |
-| **Durable Workflows** | PostgreSQL state persistence (Temporal package included, API wiring in progress) |
-| **LLM Runtime — OpenAI** | OpenAI SDK (GPT-5.5, GPT-5.4) — Responses API, json_schema strict mode |
-| **LLM Runtime — Gemini** | Google Generative AI SDK (Gemini 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite) — parallel function calling, responseSchema, controllable thinking |
+| **Database** | PostgreSQL + Prisma ORM + pgvector |
+| **Durable Workflows** | LangGraph StateGraph + PostgresCheckpointSaver |
+| **LLM — OpenAI** | GPT-5.5, GPT-5.4 — Responses API, json_schema strict mode |
+| **LLM — Gemini** | Gemini 2.5 Pro / Flash / Flash-Lite — parallel function calling, responseSchema |
 | **Browser Automation** | Playwright |
 | **Email** | imapflow (IMAP) + nodemailer (SMTP) |
 | **Calendar** | tsdav (CalDAV) |
-| **PDF** | pdf-parse |
+| **PDF** | pdfkit, pdf-parse |
 | **External Integrations** | Model Context Protocol (MCP) |
 | **Testing** | Vitest |
 | **Schema Validation** | Zod |
-| **OpenAPI / Docs** | `zod-to-json-schema` — auto-generated from Zod schemas, registered via `schema-registry.ts` + `generate-spec.ts` |
+| **OpenAPI** | `zod-to-json-schema` — auto-generated from Zod schemas |
 
 ---
 
@@ -1184,422 +418,77 @@ Create recurring workflows from the dashboard at `/schedules`:
 ```
 jak-swarm/
 ├── apps/
-│   ├── api/                    # Fastify REST API (port 4000)
+│   ├── api/                     # Fastify REST API (port 4000)
 │   │   └── src/
-│   │       ├── routes/         # 16 route modules (workflows split into 4 sub-routers: control, query, stream, conversation; approvals, audit, audit-runs, compliance, artifacts, bundles, exports, integrations, schedules, memory, tools, traces, voice, slack, ...)
-│   │       ├── services/
-│   │       │   ├── audit/       # AuditRun · ControlTest · Exception · Workpaper · FinalPack
-│   │       │   ├── compliance/  # Mapper · Attestation · ManualEvidence · Scheduler · auto-mapping rules
-│   │       │   ├── exporters/   # JSON · CSV · XLSX · PDF · DOCX
-│   │       │   └── ...          # artifact, bundle, bundle-signing, db-state-store, swarm-execution, workflow-creation, workflow-recovery, etc.
-│   │       ├── middleware/      # Auth, RBAC, rate limiting
-│   │       ├── boot/           # Config validation + environment diagnostics
-│   │       ├── plugins/        # Fastify plugins
-│   │       └── openapi/        # Zod → JSON Schema → OpenAPI spec registry
-│   └── web/                    # Next.js 16 dashboard (port 3000)
-│       └── src/app/(dashboard)/
-│           ├── home/           # Mission control
-│           ├── audit/          # Audit & Compliance home (5 tabs: dashboard, log, queue, trail, compliance)
-│           │   └── runs/       # /audit/runs index + /audit/runs/[id] detail (control matrix · workpapers · exceptions · final pack)
-│           ├── swarm/          # Real-time DAG execution view
-│           ├── traces/         # Agent trace explorer
-│           ├── analytics/      # Usage & cost metrics
-│           ├── schedules/      # Cron workflow manager
-│           ├── integrations/   # MCP provider connections
-│           ├── knowledge/      # Knowledge base
-│           ├── workspace/      # Team settings
-│           ├── settings/       # LLM & approval config
-│           └── admin/          # Tenant management + /admin/platform (SYSTEM_ADMIN)
+│   │       ├── routes/           # Route modules (workflows, approvals, audit, compliance, ...)
+│   │       ├── services/         # Business logic (audit, compliance, swarm-execution, ...)
+│   │       ├── middleware/       # Auth, RBAC, rate limiting
+│   │       └── openapi/         # Zod → JSON Schema → OpenAPI spec
+│   └── web/                     # Next.js 16 dashboard (port 3000)
+│       └── src/app/(dashboard)/ # 13 dashboard pages
 ├── packages/
-│   ├── agents/                 # 38 agent implementations
-│   │   └── src/
-│   │       ├── base/           # BaseAgent (decomposed) → llm-call.service, prompt-builder.service, tool-execution.service
-│   │       ├── roles/          # 6 orchestrator agents
-│   │       └── workers/        # 32 worker agents
-│   ├── tools/                  # 122 tool implementations
-│   │   └── src/
-│   │       ├── registry/       # Singleton ToolRegistry
-│   │       ├── builtin/        # Built-in + sandbox tools
-│   │       ├── adapters/       # Email, Calendar, CRM, Browser, Memory, Sandbox
-│   │       └── mcp/            # MCP client, bridge, provider configs
-│   ├── swarm/                  # Orchestration engine
-│   │   └── src/
-│   │       ├── graph/          # DAG builder, node handlers, task scheduler
-│   │       ├── runner/         # SwarmRunner execution loop
-│   │       ├── state/          # Immutable state machine
-│   │       ├── memory/         # Memory extractor + query services
-│   │       └── context/        # Context summarization engine
-│   ├── client/                 # @jak-swarm/client TypeScript SDK
-│   │   └── src/
-│   │       └── index.ts        # HttpClient, SSE streaming, typed API methods
-│   ├── shared/                 # Shared types & enums
-│   │   └── src/
-│   │       └── skills/         # SKILL.md parser + loader
-│   ├── db/                     # Prisma schema, migrations, seed
-│   ├── workflows/              # Temporal workflow definitions
-│   ├── security/               # Audit logging, RBAC, guardrails, tool risk
-│   ├── voice/                  # Voice pipeline (WebRTC, STT, TTS)
-│   ├── verification/           # Email, document, transaction, identity verification
-│   └── industry-packs/         # 13 industry-specific agent configurations
+│   ├── agents/                  # 38 agent implementations
+│   │   ├── base/                # BaseAgent (decomposed: llm-call, prompt-builder, tool-execution)
+│   │   ├── roles/              # 6 orchestrator agents
+│   │   ├── workers/            # 32 worker agents
+│   │   └── runtime/            # OpenAI + Gemini runtime adapters
+│   ├── tools/                   # 122 tool implementations
+│   │   ├── registry/           # Singleton ToolRegistry + approval policy
+│   │   ├── builtin/            # Built-in + sandbox tools
+│   │   ├── adapters/           # Email, Calendar, CRM, Browser, Memory
+│   │   └── mcp/                # MCP client + bridge + provider configs
+│   ├── swarm/                   # Orchestration engine
+│   │   ├── graph/              # LangGraph nodes + task scheduler
+│   │   ├── runner/             # SwarmRunner execution loop
+│   │   ├── state/              # Immutable SwarmState
+│   │   └── supervisor/         # Event bus, circuit breakers, telemetry
+│   ├── db/                      # Prisma schema, migrations, seed
+│   ├── security/                # Audit logging, RBAC, guardrails, encryption
+│   ├── client/                  # @jak-swarm/client TypeScript SDK
+│   ├── shared/                  # Shared types, enums, skills parser
+│   ├── voice/                   # Voice pipeline (WebRTC, STT, TTS)
+│   ├── verification/            # Email/document/transaction verification
+│   ├── industry-packs/          # 13 industry-specific agent configurations
+│   └── workflows/               # Temporal workflow definitions (optional)
 ├── tests/
-│   ├── unit/                   # Unit tests
-│   ├── integration/            # Integration tests
-│   └── e2e/                    # End-to-end tests
-├── docker/                     # Docker Compose for Postgres, Redis, Temporal
-├── scripts/                    # Dev scripts + doctor.ps1, setup.ps1
-└── docs/                       # Documentation
+│   ├── unit/                    # Unit tests
+│   ├── integration/             # Integration tests
+│   └── e2e/                     # End-to-end tests
+├── docker/                      # Docker Compose for Postgres, Redis
+├── scripts/                     # Dev scripts, doctor, setup
+└── docs/                        # Documentation
 ```
 
 ---
 
-## 📡 API Reference
-
-All endpoints are prefixed with `/api`. Responses follow the envelope format:
-
-```json
-{ "success": true, "data": { ... } }
-{ "success": false, "error": { "code": "...", "message": "..." } }
-```
-
-<details>
-<summary><b>🔑 Authentication</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| POST | `/auth/register` | None | Create tenant + admin user, returns JWT |
-| POST | `/auth/login` | None | Authenticate with email + password, returns JWT |
-| POST | `/auth/logout` | JWT | Invalidate session (client discards token) |
-| GET | `/auth/me` | JWT | Get current user profile |
-
-Auth endpoints are rate-limited to 10 requests per minute per IP.
-
-</details>
-
-<details>
-<summary><b>🐝 Workflows</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| POST | `/workflows` | JWT | Create workflow and start async execution (returns 202) |
-| GET | `/workflows` | JWT | List workflows (paginated, filterable by status) |
-| GET | `/workflows/:workflowId` | JWT | Get workflow details with traces and approvals |
-| POST | `/workflows/:workflowId/pause` | JWT | Pause a running workflow between nodes |
-| POST | `/workflows/:workflowId/unpause` | JWT | Resume a paused workflow |
-| POST | `/workflows/:workflowId/stop` | JWT | Stop workflow immediately (marks CANCELLED) |
-| POST | `/workflows/:workflowId/resume` | JWT + Reviewer | Resume after human-in-the-loop approval decision |
-| DELETE | `/workflows/:workflowId` | JWT | Cancel a running or pending workflow |
-| GET | `/workflows/:workflowId/traces` | JWT | Get agent traces for a workflow |
-| GET | `/workflows/:workflowId/approvals` | JWT | Get approval requests for a workflow |
-| GET | `/workflows/:workflowId/stream` | JWT (query) | SSE event stream for real-time updates |
-| GET | `/workflows/:workflowId/output` | JWT | Download final output as markdown |
-
-</details>
-
-<details>
-<summary><b>💬 Conversations</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/conversations` | JWT | List conversations for current user |
-| POST | `/conversations` | JWT | Create a new conversation thread |
-| GET | `/conversations/:id` | JWT | Get a conversation with its messages |
-| DELETE | `/conversations/:id` | JWT | Delete a conversation and its messages |
-| POST | `/workflows` | JWT | Create workflow accepts optional `conversationId`; prior thread history is injected into the Commander node's prompt automatically |
-
-</details>
-
-<details>
-<summary><b>✅ Approvals</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/approvals` | JWT + Reviewer | List approval requests (filterable by status) |
-| GET | `/approvals/:approvalId` | JWT + Reviewer | Get a single approval request |
-| POST | `/approvals/:approvalId/decide` | JWT + Reviewer | Submit decision (APPROVED/REJECTED/DEFERRED) |
-| POST | `/approvals/:approvalId/defer` | JWT + Reviewer | Convenience shortcut to defer an approval |
-
-</details>
-
-<details>
-<summary><b>🔌 Integrations</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/integrations` | JWT | List connected MCP integrations for tenant |
-| GET | `/integrations/providers/:provider` | JWT | Get provider setup info (credential fields, instructions) |
-| POST | `/integrations/connect` | JWT | Connect an MCP integration with credentials |
-| POST | `/integrations/:id/test` | JWT | Test an integration connection |
-| DELETE | `/integrations/:id` | JWT | Disconnect and remove an integration |
-
-</details>
-
-<details>
-<summary><b>⏰ Schedules</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/schedules` | JWT | List all schedules for tenant |
-| GET | `/schedules/:id` | JWT | Get a single schedule |
-| POST | `/schedules` | JWT | Create a new cron schedule |
-| PATCH | `/schedules/:id` | JWT | Update schedule (cron, name, enabled, etc.) |
-| DELETE | `/schedules/:id` | JWT | Delete a schedule |
-| POST | `/schedules/:id/run` | JWT | Trigger an immediate run of a schedule |
-
-</details>
-
-<details>
-<summary><b>🧠 Memory</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/memory` | JWT | List memory entries (filterable by type, searchable) |
-| GET | `/memory/:key` | JWT | Get a specific memory entry by key |
-| PUT | `/memory/:key` | JWT + Operator | Upsert a memory entry (FACT/PREFERENCE/CONTEXT/SKILL_RESULT) |
-| DELETE | `/memory/:key` | JWT + Admin | Delete a memory entry |
-
-</details>
-
-<details>
-<summary><b>🔧 Tools</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/tools` | JWT | List all registered tools with metadata |
-| GET | `/tools/:toolName` | JWT | Get full tool detail (risk class, schemas) |
-
-</details>
-
-<details>
-<summary><b>🔎 Traces</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/traces` | JWT | List agent traces (filterable by workflowId, agentRole) |
-| GET | `/traces/:traceId` | JWT | Get full trace by ID |
-| GET | `/traces/:traceId/replay` | JWT | Get replay-friendly trace data with timing |
-| GET | `/traces/workflow/:workflowId/timeline` | JWT | Workflow timeline with per-node start/end/cost breakdown |
-
-</details>
-
-<details>
-<summary><b>📊 Analytics</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/analytics/usage` | JWT | Tenant usage summary (tokens, cost, time series) |
-| GET | `/analytics/usage/workflow/:workflowId` | JWT | Per-workflow usage report (cost by provider/model/agent) |
-| GET | `/analytics/cost` | JWT | Cost breakdown for current billing period (last 30 days) |
-
-</details>
-
-<details>
-<summary><b>⚙️ LLM Settings</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/settings/llm` | JWT | List configured LLM providers (OpenAI + Gemini) with masked key previews |
-| GET | `/settings/llm/status` | JWT | Health check all providers — tests API key availability |
-| GET | `/settings/llm/preferred-provider` | JWT | Get tenant's current preferred LLM provider (default: `openai`) |
-| PUT | `/settings/llm/preferred-provider` | JWT + Operator | Switch preferred provider (`openai` or `gemini`) — stored in `TenantMemory` |
-| PUT | `/settings/llm/:provider` | JWT + Operator | Set or update API key for a provider (AES-256-GCM encrypted at rest) |
-| DELETE | `/settings/llm/:provider` | JWT + Admin | Remove a stored API key |
-
-**Per-tenant provider switching:** Each tenant independently selects OpenAI or Gemini. The preference propagates to every agent in every workflow — Commander, Planner, Router, Workers, Vibe Coding — with zero code changes. Provider identity is privacy-masked for non-owner users (`canRevealProviderIdentity`).
-
-</details>
-
-<details>
-<summary><b>🎤 Voice</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| POST | `/voice/sessions` | JWT | Create voice session (returns WebRTC config) |
-| GET | `/voice/sessions/:sessionId/token` | JWT | Get ephemeral WebRTC token from OpenAI Realtime API |
-| DELETE | `/voice/sessions/:sessionId` | JWT | End a voice session |
-| GET | `/voice/sessions/:sessionId/transcript` | JWT | Retrieve transcript for a voice session |
-| POST | `/voice/sessions/:sessionId/trigger-workflow` | JWT | Convert voice transcript into a workflow execution |
-
-</details>
-
-<details>
-<summary><b>💬 Slack</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| POST | `/slack/events` | HMAC-SHA256 | Slack Events API webhook (url_verification + event_callback) |
-| POST | `/slack/interactivity` | HMAC-SHA256 | Slack interactive component payloads |
-
-Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. Events trigger authenticated workflows with thread-reply results. Idempotent event handling prevents duplicate workflow creation on Slack retries.
-
-</details>
-
-<details>
-<summary><b>🏢 Tenants</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/tenants/:tenantId` | JWT | Get tenant info |
-| PATCH | `/tenants/:tenantId` | JWT + Admin | Update tenant settings |
-| GET | `/tenants/:tenantId/users` | JWT + Admin | List users in tenant |
-| POST | `/tenants/:tenantId/users` | JWT + Admin | Invite a new user to the tenant |
-| PATCH | `/tenants/:tenantId/users/:userId` | JWT + Admin | Update user role or active status |
-| PATCH | `/tenants/current/users/:userId` | JWT | Update own profile (name, jobFunction, avatarUrl) |
-
-</details>
-
-<details>
-<summary><b>🎯 Skills</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/skills` | JWT | List skills (filterable by tier and status) |
-| GET | `/skills/:skillId` | JWT | Get skill by ID |
-| POST | `/skills/propose` | JWT | Propose a new tenant skill |
-| POST | `/skills/:skillId/approve` | JWT + Admin | Approve a proposed skill |
-| POST | `/skills/:skillId/reject` | JWT + Admin | Reject a proposed skill |
-| POST | `/skills/:skillId/sandbox` | JWT + Admin | Trigger sandbox test run for a proposed skill |
-
-</details>
-
-<details>
-<summary><b>🚀 Onboarding</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/onboarding/state` | JWT | Get current onboarding state |
-| POST | `/onboarding/state` | JWT | Update onboarding progress (completedSteps, dismissed) |
-
-</details>
-
-<details>
-<summary><b>🛡️ Audit & Compliance — v0 (audit log + reviewer surfaces)</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/audit/log` | JWT | Paginated AuditLog with filters (action / resource / dates / search) |
-| GET | `/audit/workflows/:id/trail` | JWT | Chronological event stream for one workflow |
-| GET | `/audit/reviewer-queue` | JWT + Reviewer | Pending workflow approvals + pending artifact downloads |
-| GET | `/audit/dashboard` | JWT + Reviewer | High-level audit metrics |
-
-</details>
-
-<details>
-<summary><b>🛡️ Compliance — v1 (control framework mapping)</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/compliance/frameworks` | JWT | List all available frameworks (soc2-type2, hipaa-security, iso27001-2022) |
-| GET | `/compliance/frameworks/:slug` | JWT | Framework detail + per-control evidence count |
-| GET | `/compliance/frameworks/:slug/controls/:controlId/evidence` | JWT | Drill into one control's evidence rows |
-| POST | `/compliance/frameworks/:slug/auto-map` | JWT + Reviewer | Re-run the auto-mapping rule engine |
-| POST | `/compliance/frameworks/:slug/attestations` | JWT + Reviewer | Generate a period attestation PDF (optionally signed) |
-| GET | `/compliance/attestations` | JWT | List previously generated attestations |
-| POST | `/compliance/manual-evidence` | JWT + Reviewer | Add a curated manual evidence row (BAA, training record, etc.) |
-| GET | `/compliance/controls/:controlId/manual-evidence` | JWT | List manual evidence for a control |
-| DELETE | `/compliance/manual-evidence/:id` | JWT + Reviewer | Soft-delete manual evidence |
-| GET | `/compliance/schedules` | JWT | List recurring attestation schedules |
-| POST | `/compliance/schedules` | JWT + Reviewer | Create a recurring attestation cron schedule |
-| PATCH | `/compliance/schedules/:id` | JWT + Reviewer | Update a schedule |
-| DELETE | `/compliance/schedules/:id` | JWT + Reviewer | Delete a schedule |
-
-</details>
-
-<details>
-<summary><b>🛡️ Audit Runs — v2 (full engagement workflow)</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| POST | `/audit/runs` | JWT + Reviewer | Create a new audit run for a framework + period (status='PLANNING') |
-| GET | `/audit/runs` | JWT | List audit runs (paginated, filterable by status) |
-| GET | `/audit/runs/:id` | JWT | Detail with embedded controls, exceptions, workpapers |
-| POST | `/audit/runs/:id/plan` | JWT + Reviewer | Seed `ControlTest` rows from framework. PLANNING → PLANNED |
-| POST | `/audit/runs/:id/auto-map` | JWT + Reviewer | Run `ComplianceMapperService` for the run's framework + period |
-| POST | `/audit/runs/:id/test-controls` | JWT + Reviewer | Run all not-yet-passed tests. PLANNED → TESTING → REVIEWING |
-| POST | `/audit/runs/:id/controls/:controlTestId/test` | JWT + Reviewer | Re-run one test |
-| POST | `/audit/runs/:id/workpapers/generate` | JWT + Reviewer | Render PDFs for every terminal control test |
-| POST | `/audit/runs/:id/workpapers/:wpId/decide` | JWT + Reviewer | Approve / reject one workpaper |
-| POST | `/audit/runs/:id/exceptions` | JWT + Reviewer | Manually create an exception |
-| PATCH | `/audit/runs/:id/exceptions/:exId/remediation` | JWT + Reviewer | Update remediation plan / owner / due date |
-| POST | `/audit/runs/:id/exceptions/:exId/decide` | JWT + Reviewer | Apply state transition (accepted / rejected / closed / …) |
-| POST | `/audit/runs/:id/final-pack` | JWT + Reviewer | Generate signed final evidence pack (gated on workpaper approval) |
-| DELETE | `/audit/runs/:id` | JWT + TenantAdmin | Soft-delete an audit run |
-
-Errors include `409 ILLEGAL_TRANSITION` (state machine refused), `409 FINAL_PACK_GATE` (workpapers unapproved), `503 AUDIT_SCHEMA_UNAVAILABLE` (apply migration 15 with `pnpm db:migrate:deploy`), `503 BUNDLE_SIGNING_UNAVAILABLE` (set `EVIDENCE_SIGNING_SECRET`).
-
-</details>
-
-<details>
-<summary><b>📦 Artifacts + Bundles + Exports</b></summary>
-
-| Method | Endpoint | Auth | Description |
-|:------:|:---------|:----:|:------------|
-| GET | `/artifacts/:id` | JWT | Get artifact metadata (tenant-scoped) |
-| GET | `/artifacts/:id/download` | JWT | Signed download URL (gated by `approvalState`) |
-| POST | `/artifacts/:id/approve` | JWT + Reviewer | Approve an artifact for download |
-| POST | `/artifacts/:id/reject` | JWT + Reviewer | Reject artifact (download permanently blocked) |
-| POST | `/exports` | JWT | Create an export (json/csv/xlsx/pdf/docx) |
-| POST | `/bundles` | JWT + Reviewer | Generate HMAC-signed evidence bundle for a workflow |
-| GET | `/bundles/:id/verify` | JWT | Verify bundle signature + re-hash referenced artifacts |
-
-</details>
-
----
-
-## 🌍 Environment Variables
-
-<details>
-<summary><b>Click to expand full environment variable reference</b></summary>
-
-| Variable | Required | Default | Description |
-|:---------|:--------:|:-------:|:------------|
-| `DATABASE_URL` | Yes | -- | PostgreSQL connection string |
-| `REDIS_URL` | No | `redis://localhost:6379` | Redis for scheduling/queues |
-| `AUTH_SECRET` | Yes | -- | Random secret for session signing (32+ chars) |
-| `AUTH_URL` | No | `http://localhost:3000` | Base URL for auth callbacks |
-| `EVIDENCE_SIGNING_SECRET` | Yes (for audit pack) | -- | 32+ byte random secret for HMAC-SHA256 signing of audit evidence bundles. Generate with `openssl rand -base64 48`. Without it the final audit pack route returns `503 BUNDLE_SIGNING_UNAVAILABLE`. Intentionally separate from `AUTH_SECRET` so the two can be rotated independently. |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes (for storage) | -- | Supabase project URL — required by `ArtifactService` for storing workpaper PDF / final-pack bytes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes (for storage) | -- | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
-| `OPENAI_API_KEY` | Yes (one of OpenAI or Gemini) | -- | OpenAI API key for GPT-5.5/5.4 execution |
-| `GEMINI_API_KEY` | Yes (one of OpenAI or Gemini) | -- | Google Gemini API key for 2.5 Pro/Flash/Flash-Lite execution |
-| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. |
-| `OPENAI_ORG_ID` | No | -- | OpenAI organization ID |
-| `GMAIL_EMAIL` | No | -- | Gmail address for real email adapter |
-| `GMAIL_APP_PASSWORD` | No | -- | Gmail app password (not your account password) |
-| `CALDAV_URL` | No | -- | CalDAV server URL for calendar |
-| `CALDAV_USERNAME` | No | -- | CalDAV username |
-| `CALDAV_PASSWORD` | No | -- | CalDAV password |
-| `OPENAI_REALTIME_MODEL` | No | `gpt-4o-realtime-preview` | Model for voice agent |
-| `DEEPGRAM_API_KEY` | No | -- | Deepgram STT adapter |
-| `ELEVENLABS_API_KEY` | No | -- | ElevenLabs TTS adapter |
-| `ELEVENLABS_VOICE_ID` | No | -- | ElevenLabs voice ID |
-| `SLACK_SIGNING_SECRET` | No | -- | Slack app signing secret for webhook verification |
-| `SLACK_CLIENT_ID` | No | -- | Slack OAuth client ID |
-| `SLACK_CLIENT_SECRET` | No | -- | Slack OAuth client secret |
-| `TEMPORAL_ADDRESS` | No | `localhost:7233` | Temporal server (infrastructure-ready, API execution path not yet wired) |
-| `TEMPORAL_NAMESPACE` | No | `jak-swarm` | Temporal namespace |
-| `TEMPORAL_TASK_QUEUE` | No | `jak-main` | Temporal task queue |
-| `NODE_ENV` | No | `development` | Environment |
-| `API_PORT` | No | `4000` | API server port |
-| `NEXT_PUBLIC_API_URL` | No | `http://localhost:4000` | API URL for frontend |
-| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | App URL |
-| `LOG_LEVEL` | No | `info` | Logging level |
-| `DEFAULT_APPROVAL_REQUIRED` | No | `true` | Require human approval by default |
-
-</details>
+## 🔐 Security
+
+| Risk Level | Examples | Approval Required |
+|:-----------|:---------|:-----------------:|
+| 🟢 `READ_ONLY` | web_search, file_read, list_calendar | Never |
+| 🟡 `WRITE` | file_write, create_event, update_crm | Configurable |
+| 🔴 `DESTRUCTIVE` | delete records, clear data | Always |
+| 🟠 `EXTERNAL_SIDE_EFFECT` | send_email, send_webhook, post_slack | Always |
+
+- **AES-256-GCM** encryption for OAuth tokens and LLM API keys at rest
+- **JWT** auth with per-tenant isolation enforced at middleware level
+- **bcrypt** password hashing (12 rounds)
+- **PII redaction** at LLM boundary and at write time
+- **4-layer hallucination detection** (heuristic/regex-based) on every agent output
+- **RBAC** roles: `END_USER` < `REVIEWER` < `OPERATOR` < `TENANT_ADMIN` < `SYSTEM_ADMIN` + `EXTERNAL_AUDITOR`
+
+Full security policy and vulnerability reporting: [`SECURITY.md`](SECURITY.md)
 
 ---
 
 ## 🛠️ Development
 
 ```bash
-# Run all tests
-pnpm test
-
-# Type checking
-pnpm typecheck
-
-# Lint
-pnpm lint
+pnpm test                  # Run all tests
+pnpm typecheck             # Type checking
+pnpm lint                  # Lint
+pnpm check:truth           # Verify tool classifications + landing claims match code
+pnpm audit:tools           # Audit all 122 tools against registry
 
 # Run specific package tests
 pnpm --filter @jak-swarm/agents test
@@ -1607,410 +496,88 @@ pnpm --filter @jak-swarm/tools test
 pnpm --filter @jak-swarm/swarm test
 ```
 
----
-
-## 🤝 Contributing
-
 ### Adding a New Agent
 
-1. Create `packages/agents/src/workers/your-agent.ts` following the pattern in `growth.agent.ts`
+1. Create `packages/agents/src/workers/your-agent.ts` (follow `growth.agent.ts` pattern)
 2. Export from `packages/agents/src/index.ts`
 3. Add `AgentRole.WORKER_YOUR_ROLE` to `packages/shared/src/types/agent.ts`
 4. Add case to `createWorkerAgent()` in `packages/swarm/src/graph/nodes/worker/agent-factory.ts`
 5. Add case to `buildTaskInput()` in `packages/swarm/src/graph/nodes/worker/task-input-builders.ts`
-6. Add `infer*Action()` function in `packages/swarm/src/graph/nodes/worker/intent-inference/text.ts`
+6. Add `infer*Action()` in `packages/swarm/src/graph/nodes/worker/intent-inference/text.ts`
 7. Add role description to `packages/agents/src/roles/planner.agent.ts`
 8. Run `pnpm turbo build` to verify
 
 ### Adding a New Tool
 
 1. Add `toolRegistry.register(metadata, executor)` in `packages/tools/src/builtin/index.ts`
-2. Define `inputSchema` and `outputSchema` (JSON Schema format)
-3. Set `riskClass` (`READ_ONLY`, `WRITE`, `DESTRUCTIVE`, `EXTERNAL_SIDE_EFFECT`)
-4. Set `requiresApproval: true` for write/destructive operations
-5. Run `pnpm turbo build` to verify
+2. Define `inputSchema` / `outputSchema` (JSON Schema)
+3. Set `riskClass` (`READ_ONLY` → `CRITICAL_MANUAL_ONLY`) and `maturity` label
+4. Run `pnpm turbo build` to verify
 
-### Running Tests
+### Adding a New LLM Provider
 
-```bash
-pnpm --filter @jak-swarm/tests test                              # Unit tests
-OPENAI_API_KEY=sk-... pnpm --filter @jak-swarm/tests test        # Live tests
-OPENAI_API_KEY=sk-... node tests/human-simulator/run-all.js      # Human simulator
-```
+Follow the `GeminiRuntime` adapter pattern: create a runtime adapter that converts message shapes, map tool definitions, and translate responses back. Wire it through `BaseAgent.setContextOverride()`. See [`gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) as reference.
 
 ---
 
-## 🔥 Troubleshooting
+## 📚 Documentation
 
-| Problem | Cause | Solution |
-|:--------|:------|:---------|
-| `Playwright times out` | Chromium not installed | `cd packages/tools && npx playwright install chromium` |
-| `Email agent says "not connected"` | No Gmail credentials | Set `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` in `.env` |
-| `Workflow stuck in RUNNING` | Server crashed mid-execution | Restart API -- `recoverStaleWorkflows` runs on startup |
-| `Budget exceeded` | `maxCostUsd` too low | Increase budget or remove limit |
-| `MCP connection failed` | Wrong token/API key | Verify credentials in integration settings |
-| `Database connection error` | PostgreSQL not running | Start PostgreSQL: `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres` |
-| `Module not found` | Stale build | Run `pnpm turbo build --force` |
-| `Tool validation error` | Wrong input format | Check tool's `inputSchema` in source code |
-| `SSE stream disconnects` | Proxy buffering | Set `X-Accel-Buffering: no` on your reverse proxy |
-| `JWT expired` | Token older than 7 days | Re-authenticate via `POST /auth/login` |
+| Doc | Description |
+|:----|:-----------|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full system architecture, data model, error handling, scaling |
+| [`AGENTS.md`](AGENTS.md) | Every agent role: purpose, input/output contracts, handoff logic |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting, SLA, scope, cryptographic assumptions |
+| [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) | JAK Shield 6 defenses — full claim-to-code mapping |
+| [`docs/audit-compliance-agent-pack.md`](docs/audit-compliance-agent-pack.md) | Audit & Compliance product overview |
+| [`docs/audit-framework-library.md`](docs/audit-framework-library.md) | Per-framework + per-control reference (SOC 2, HIPAA, ISO 27001) |
+| [`docs/audit-api.md`](docs/audit-api.md) | Audit endpoint reference + error codes + SSE channel |
+| [`docs/audit-workpapers.md`](docs/audit-workpapers.md) | Workpaper generation + approval flow |
+| [`docs/beta-release.md`](docs/beta-release.md) | Beta scope, go/no-go checklist, production readiness |
+| [`docs/team-and-trial.md`](docs/team-and-trial.md) | Team hierarchy, free trial, daily caps |
+| [`docs/connector-runtime.md`](docs/connector-runtime.md) | Connector Runtime design + phase status |
+| [`docs/vibe-coding.md`](docs/vibe-coding.md) | Vibe Coding pipeline, cost tables, feature comparison |
+| [`docs/faq.md`](docs/faq.md) | Full FAQ — product, trial, security, integrations, costs |
+| [`docs/api-reference.md`](docs/api-reference.md) | Complete API endpoint reference |
+| [`docs/environment-setup.md`](docs/environment-setup.md) | Environment variables, integration setup, troubleshooting |
+| [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
+| [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |
 
 ---
 
-## ❓ FAQ
-
-> Every claim in this section maps to a real file path or a CI-locked test. If a feature is on the roadmap and NOT yet shipped, that's said plainly. No marketing fog.
-
-### About the product
-
-<details>
-<summary><b>What is JAK Swarm in one sentence?</b></summary>
-
-A beta closed-loop company operating layer: JAK turns company evidence into drift findings, executable specs, approved agent/human work, and signed audit evidence.
-
-</details>
-
-<details>
-<summary><b>What's the unique thing JAK does that nothing else does?</b></summary>
-
-**A closed loop from company evidence to controlled execution.** JAK has two code-backed loops: the Company OS loop (artifacts -> graph entities -> drift findings -> agent-executable specs -> reviewer decision) and the workflow loop (Commander -> Planner -> Router -> agents/humans -> approval -> verifier -> audit). The point is not "more agents"; the point is keeping execution aligned with cited company context.
-
-The Company OS implementation lives in `CompanyArtifact`, `CompanyGraphEntity`, `ExecutionDriftFinding`, and `AgentExecutableSpec` (`packages/db/prisma/schema.prisma`) plus `apps/api/src/routes/company-operating-layer.routes.ts`. Human task execution lives in `TaskAssignment` + `apps/api/src/routes/task-assignments.routes.ts`; UI is `/company` and `/my-tasks`.
-
-</details>
-
-<details>
-<summary><b>Is the closed-loop Company OS complete?</b></summary>
-
-**No — it is a real beta foundation, not a finished company-wide OS.** Shipped today:
-
-- Tenant-scoped evidence artifacts with source/type labels and body hashes
-- Company graph entities that must cite artifacts
-- Deterministic drift detection for customer signals, decisions, execution work, and stale high-priority tasks
-- Agent-backed executable spec generation with no template fallback
-- Reviewer approval/rejection for specs, now immutable after first review
-- `/company` UI for manual/API-fed evidence ingestion, extraction, drift analysis, and spec review
-
-Still not complete:
-
-- First-party background sync jobs for every connector source
-- Real customer-call/meeting transcript ingestion pipeline into the graph
-- Cross-tool drift monitors that run continuously without manual trigger
-- Production smoke tests against the hosted Vercel + Railway + Supabase + Upstash environment
-
-So the accurate public phrase is **"closed-loop Company OS beta foundation"**, not "finished company AI OS."
-
-</details>
-
-<details>
-<summary><b>Who is JAK Swarm for?</b></summary>
-
-- **Solo founders + small ops teams** that want AI to do real work, not just give answers
-- **Compliance-aware teams** that need a tamper-evident trail of every agent action
-- **Teams already on Slack + HubSpot + Gmail** that want one orchestration layer driving workflows across both AI and human steps
-
-It is NOT yet for: enterprises requiring SOC 2 Type 2 attestation (we have the controls + evidence layer; we don't have third-party certification — see the production-readiness FAQ below).
-
-</details>
-
-### Free trial
-
-<details>
-<summary><b>How does the free trial work?</b></summary>
-
-Sign up at [`/trial`](https://jakswarm.com/trial) with just an email. **No credit card.** You get 30 days with these daily caps (reset at UTC midnight):
-
-| Resource | Daily cap |
-|---|---|
-| Agent runs (one workflow = one count) | **20 / day** |
-| External-action approvals (LinkedIn post, send email, ...) | **5 / day** |
-| Tool execution time (browser, code-interp, ...) | **120 min / day** |
-| LLM tokens (input + output combined) | **200,000 / day** |
-
-When a cap hits, your workflow pauses with a `429 TRIAL_DAILY_CAP_HIT` response carrying `resetsAt` + `daysRemaining`. The cockpit shows a banner — never a silent failure. Caps are independent: hitting the approvals cap doesn't block agent runs.
-
-Source of truth: [`apps/api/src/services/trial/usage-counter.service.ts`](apps/api/src/services/trial/usage-counter.service.ts).
-
-</details>
-
-<details>
-<summary><b>What happens after 30 days?</b></summary>
-
-Your tenant flips to `trial_expired` status. New workflow starts return `402 TRIAL_EXPIRED`. **Read access + data export still work** so you can recover anything you produced. To continue: upgrade to a paid plan (Paddle billing, integrated). Pricing is on the landing page; pricing tiers are not yet through their final review — see the production-readiness FAQ for honest framing.
-
-</details>
-
-<details>
-<summary><b>Can I cycle the trial by re-signing up with a new email?</b></summary>
-
-The TrialSignup table enforces one trial per email AND one trial per IP+UA fingerprint per 90 days. So no — the casual cycle attempt is blocked. A determined attacker can still bypass with VPN + new email; this is the same trade-off every free-trial product makes. The daily caps are the real budget protection.
-
-</details>
-
-<details>
-<summary><b>Why daily caps and not a single 30-day budget?</b></summary>
-
-Because a single bad-actor workflow can drain a 30-day budget in two hours. Per-day caps mean the worst-case loss is bounded to one day, not one trial. They reset cleanly so a heavy day doesn't lock you out for a week.
-
-</details>
-
-### Beta release and production readiness (the bluntly honest answer)
+## ❓ Common Questions
 
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**For solo founders / design partners running it themselves: BETA-YES, with eyes open.** The architecture is solid (LangGraph + Postgres checkpointer + signed evidence bundles + AES-256-GCM workflow encryption + JAK Shield trust boundary). The 20 May 2026 Company OS hardening pass re-verified the full local test suite (`2090 passed, 99 skipped, 54 todo`), landing truth-lock, Company Operating Layer unit/integration tests, web/API type-checks, production web build, and `pnpm check:truth`.
+**For solo founders / design partners running it themselves: BETA-YES, with eyes open.** The architecture is solid (LangGraph + Postgres checkpointer + signed evidence bundles + AES-256-GCM encryption + JAK Shield). 2,216 unit/structural tests passing.
 
-**For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers we name openly:
+**For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers named openly: no live-hosted smoke test, no third-party security audit/certification, no lawyer-reviewed ToS/DPA, no pen test, AuditLog rows not yet chain-hashed, no incident-response runbook.
 
-1. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment, environment variables, migrations, queues, connector credentials, or LLM model entitlements are healthy.
-2. No third-party security audit (no SOC 2 Type 1/2, no ISO 27001 certification). The control infrastructure is shipped (182 controls seeded, 108 operationally backed) but the certification audit itself has not happened.
-3. Lawyer-reviewed Terms of Service / Privacy Policy / DPA are not in place — required for B2B and EU-region sales.
-4. No third-party penetration test against the running system.
-5. AuditLog rows are not yet chain-hashed (bundles ARE HMAC-signed, but a SYSTEM_ADMIN with DB access could rewrite an individual log row — bundle-level tamper-evidence only).
-6. No incident-response runbook + on-call rotation.
-
-**Honest path to "ready to take money from strangers" is ~2-3 months for B2B small business, ~9-12 months for security-conscious enterprise.** Full beta scope and go/no-go checklist: [`docs/beta-release.md`](docs/beta-release.md).
+Honest path to "ready to take money from strangers" is ~2-3 months for B2B small business, ~9-12 months for enterprise. Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
 
 </details>
 
 <details>
-<summary><b>Does JAK Swarm have SOC 2 / HIPAA / ISO 27001 certification?</b></summary>
+<summary><b>Does JAK have SOC 2 / HIPAA / ISO 27001 certification?</b></summary>
 
-**No.** What we have is the *infrastructure* to support those audits: 182 controls seeded across SOC 2 / HIPAA / ISO 27001 (63 + 37 + 82), 108 are operationally backed by auto-mapping rules pulling evidence from system activity, 74 require reviewer attestation. We ship the control matrix, the workpaper PDFs, the HMAC-signed evidence bundles, and the External Auditor Portal — everything an external auditor needs to issue a report.
-
-The actual third-party attestation (an external CPA firm running the audit, observing for 3+ months in the case of Type 2, and issuing the report) is **not done.** That's a customer-driven 4–9 month engagement we have not started.
-
-We deliberately avoid the phrases that would imply third-party attestation we don't have — the landing-truth-lock test in [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) bans those marketing phrases anywhere in the README or landing page.
+**No.** The *infrastructure* is shipped (182 controls seeded, 108 operationally backed, HMAC-signed evidence bundles, External Auditor Portal) — everything an external auditor needs. The actual third-party attestation has not happened. We deliberately avoid phrases that imply certification we don't have.
 
 </details>
 
 <details>
-<summary><b>Can I self-host JAK Swarm?</b></summary>
+<summary><b>Can I self-host?</b></summary>
 
-**Yes.** It's MIT-licensed, the code is here, the README has the full Quick Start. You need: Docker for Postgres + Redis, an API key, Node 20+, pnpm 9+. Run `bash scripts/start-dev.sh` to bootstrap and you're at `http://localhost:3000` in a few minutes. There's no cloud-only feature — the same code that runs at jakswarm.com is what you self-host.
-
-</details>
-
-### Team + assignment
-
-<details>
-<summary><b>Can I assign workflow steps to a human teammate, not just an AI agent?</b></summary>
-
-Yes. `POST /task-assignments` creates a TaskAssignment for a workflow step and routes it to a specific user. The user sees it in `/my-tasks`, can acknowledge / complete / decline. The workflow pauses (via the existing approval-pause mechanism) until the human posts a result, then resumes the next step.
-
-The hierarchy is in `Department` + the `User.{departmentId, jobTitle, managerId}` fields. The org-chart UI is `/team`. Anyone in the tenant can see the directory; only `TENANT_ADMIN+` can create departments or change membership.
+**Yes.** MIT-licensed, the code is here. Docker for Postgres + Redis, an API key, Node 20+, pnpm 9+. No cloud-only feature — the same code that runs at jakswarm.com is what you self-host.
 
 </details>
 
-<details>
-<summary><b>What roles exist for users?</b></summary>
-
-Five roles in ascending privilege:
-
-| Role | What they can do |
-|---|---|
-| `END_USER` | Read-only on workflows + their own profile |
-| `REVIEWER` | + approve/reject pending approvals |
-| `OPERATOR` | + run workflows, manage memory, manage own tenant data |
-| `TENANT_ADMIN` | + manage departments, members, integrations |
-| `SYSTEM_ADMIN` | + cross-tenant (rare; platform operators only) |
-
-Plus `EXTERNAL_AUDITOR` (added in Sprint 2.6) — invite-token only, scoped to one engagement, no password-based login.
-
-</details>
-
-### Integrations
-
-<details>
-<summary><b>What integrations are real today vs roadmap?</b></summary>
-
-**Working in code, but often credential/config dependent:**
-
-- Gmail (send + read via App Password)
-- Google Calendar
-- Slack (bot + channel routes)
-- WhatsApp (link verification + bot)
-- LinkedIn (manual-handoff only — never auto-publishes)
-- Browser automation (Playwright with full SSRF + DNS-rebind + disk-quota defenses)
-- 21 MCP providers via the Connector Runtime
-- Company OS source labels for GitHub, Linear, Jira, Slack, Notion, Google Drive, Gmail, meetings, customer calls, support, documents, manual notes, and other artifacts
-
-**Roadmap / not complete yet:**
-
-- Background auto-sync jobs that continuously ingest every Company OS source into `CompanyArtifact`
-- HubSpot CRM read-through (adapter exists; UI integration is the missing piece)
-- Twilio voice (click-to-call + recorded calls + transcripts → Activity feed)
-- Embeddable customer chat widget
-- Pipedrive (alternative to HubSpot)
-
-The integration philosophy: **integrate, don't rebuild.** JAK is the cockpit; your existing stack stays intact. The unique value lives in the evidence graph, orchestration, approvals, and audit layer, not in re-implementing Slack or HubSpot.
-
-</details>
-
-<details>
-<summary><b>How do I connect Gmail without OAuth?</b></summary>
-
-Enable 2FA on Gmail → generate an App Password at [`myaccount.google.com/apppasswords`](https://myaccount.google.com/apppasswords) → set `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` in `.env`. Verified working in `packages/tools/src/builtin/index.ts`.
-
-</details>
-
-<details>
-<summary><b>How do I connect Slack?</b></summary>
-
-In the dashboard → Integrations → click Connect on Slack → paste your Bot Token + Team ID from [`api.slack.com/apps`](https://api.slack.com/apps).
-
-</details>
-
-### Cost + LLM choices
-
-<details>
-<summary><b>How much does JAK Swarm cost?</b></summary>
-
-The software is **MIT-licensed and free** (run it yourself, no SaaS fees). When using the hosted product:
-
-- **Free trial:** 30 days, no credit card, daily caps as listed above
-- **Paid plans:** Free / Builder / Pro / Team / Enterprise — pricing on the landing page. Pricing details are subject to revision before the first paying customer; do not treat current page numbers as final.
-
-When self-hosting, you pay only for **LLM API calls** (~$0.01–$1.00 per workflow depending on complexity and provider) + your own infra (Postgres + Redis on whatever cloud).
-
-</details>
-
-<details>
-<summary><b>Can I use local LLMs or other providers?</b></summary>
-
-JAK Swarm supports two first-class LLM providers: **OpenAI** (GPT-5.5 / GPT-5.4) and **Google Gemini** (2.5 Pro / 2.5 Flash / 2.5 Flash-Lite). Each tenant switches between them from the Settings UI — the preference is stored in `TenantMemory` and flows through the entire execution pipeline with zero code changes.
-
-The `GeminiRuntime` adapter ([`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts)) bridges the Gemini SDK to JAK's agent-first architecture: it converts OpenAI message shapes to Gemini `Content[]` format, maps tool definitions, and translates responses back via `geminiResponseToChatCompletion()`. All 38 agents, tool calling, structured output, and the Vibe Coding pipeline work identically on both providers.
-
-Additional providers (Anthropic, DeepSeek, Ollama, OpenRouter) would follow the same adapter pattern. If local LLM support is added later, it should land as a new reviewed runtime with its own tests and documentation, not as a silent fallback.
-
-</details>
-
-<details>
-<summary><b>What does "Agent-first" mean in the architecture?</b></summary>
-
-JAK routes all work through specialist agents with structured output via the Responses API (`json_schema` strict mode for OpenAI, `responseSchema` for Gemini). Prompt-cache-aware cost telemetry tracks tokens across both providers. The agent layer is the architecture — `BaseAgent.execute()` transparently swaps the LLM call service based on the tenant's preferred provider via `setContextOverride()`.
-
-</details>
-
-### Security + data
-
-<details>
-<summary><b>How does JAK protect against prompt injection?</b></summary>
-
-`detectInjection()` runs every LLM input through a pattern detector BEFORE it reaches the model. Plus `offensive-cyber-detector.ts` blocks malware-creation, exploit-generation, credential-theft, unauthorized-scanning, and phishing requests at the boundary. Defensive-security work (audits, OWASP scans, SAST/DAST) passes — defensive markers down-weight the offensive-detector confidence so legitimate security teams aren't blocked.
-
-</details>
-
-<details>
-<summary><b>Is my data encrypted?</b></summary>
-
-Yes:
-
-- **At rest:** `workflows.{goal, error, finalOutput, planJson, stateJson}` are AES-256-GCM encrypted via `FieldCipher` + a Prisma `$extends` extension. Set `JAK_FIELD_ENCRYPTION_KEY` (32 hex bytes) — without it, fields are stored cleartext (development default).
-- **In transit:** Standard HTTPS for all API calls.
-- **PII redaction:** AgentTrace JSON columns are PII-redacted at write time via `persistence-redactor.ts`. Runtime PII redaction at the LLM boundary uses `RuntimePIIRedactor`.
-
-</details>
-
-<details>
-<summary><b>What happens to my data if I delete my tenant?</b></summary>
-
-Foreign keys are mostly `onDelete: Cascade` from Tenant → child tables. Deleting a tenant removes its workflows, agent traces, approvals, task assignments, notifications, departments, etc. **Caveats:** AuditLog rows are retained per the `logRetentionDays` policy (default 90 days, tenant-configurable). Signed evidence bundles in storage are not auto-purged on tenant delete (so an external auditor with a valid bundle ID can still verify it). A working "right-to-erasure" flow that purges everything end-to-end is on the roadmap, not yet shipped.
-
-</details>
-
-### Workflow execution
-
-<details>
-<summary><b>What happens if a workflow task fails?</b></summary>
-
-Other independent tasks continue (graceful failure). The Verifier can trigger auto-repair, which replans + retries failed tasks with alternative approaches (configurable max retries, default 2). Destructive actions are NEVER auto-retried — they pause for human review. Cross-task auto-repair has an error-class decision tree (`apps/api/src/services/repair.service.ts`).
-
-</details>
-
-<details>
-<summary><b>How does SSE streaming work?</b></summary>
-
-`GET /workflows/:id/stream` accepts a JWT via `?token=` query param (since EventSource cannot set headers). The server emits events for node transitions, task completions, and errors. A heartbeat every 15s keeps the connection alive. The `/my-tasks` page also polls `/inbox` every 10s as a backup for clients where SSE is blocked.
-
-</details>
-
-<details>
-<summary><b>Can agents see images and PDFs?</b></summary>
-
-Yes. Vision-capable models process images via `analyzeImage()`. PDFs go through `pdf_extract_text` / `pdf_analyze`. DOCX uses `mammoth`, XLSX uses `exceljs`, images use `tesseract.js` for OCR — every parser surfaces a `parseConfidence` value (0.95 DOCX, 0.85 XLSX, 0.6 OCR) so reviewers can filter.
-
-</details>
-
-### Audit & compliance
-
-<details>
-<summary><b>What audit-related lifecycle events does the cockpit show?</b></summary>
-
-13 audit-specific events on the `audit_run:{id}` SSE channel: `audit_run_started`, `audit_plan_created`, `evidence_mapped`, `control_test_started`, `control_test_completed`, `exception_found`, `workpaper_generated`, `reviewer_action_required`, `final_pack_started`, `final_pack_generated`, `audit_run_completed`, `audit_run_failed`, `audit_run_cancelled`. Every event carries `agentRole` so the cockpit attributes each step to the responsible role. Full reference in [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md).
-
-</details>
-
-<details>
-<summary><b>Is the Audit & Compliance pack production-ready?</b></summary>
-
-The pack is functionally complete and end-to-end tested ([`tests/integration/audit-run-e2e.test.ts`](tests/integration/audit-run-e2e.test.ts) — 11 assertions covering create → plan → test → workpaper → approve → signed pack → signature verify, all green). To bring it into production:
-
-1. Apply migration 15 (audit-run schema) against the production DB: `pnpm db:migrate:deploy`
-2. Verify `EVIDENCE_SIGNING_SECRET` is set (required for HMAC final-pack signing — `openssl rand -base64 48`)
-3. Verify `OPENAI_API_KEY` is set — without it, control-test evaluation uses a deterministic coverage rule with the rationale `"deterministic coverage rule (no LLM key configured)"` so reviewers see the difference
-4. Smoke-test by creating an audit run via `POST /audit/runs` for an existing tenant
-
-Honest deferrals (named, not faked): live SSE on the audit detail page (~1 day; currently 15s SWR polling). External Auditor Portal IS shipped (Sprint 2.6 — invite-token-only, SHA-256-hashed tokens, `crypto.timingSafeEqual` verification).
-
-</details>
-
-### Development + extension
-
-<details>
-<summary><b>How do I add a new agent?</b></summary>
-
-Subclass `BaseAgent` in `packages/agents/src/`, register it in `packages/agents/src/index.ts`. Pattern: every agent has an `agentRole`, a system prompt, a list of tools it's allowed to call, and (optionally) a `needsGrounding` flag for citation enforcement. `BaseAgent` delegates to three composable services (`LLMCallService`, `PromptBuilderService`, `ToolExecutionService`) in `packages/agents/src/base/`; subclass overrides should target the protected hook methods rather than re-implementing the full LLM call loop.
-
-</details>
-
-<details>
-<summary><b>How do I add a new tool?</b></summary>
-
-Add a tool definition to `packages/tools/src/builtin/index.ts`, classify it with a `ToolRiskLevel` (READ_ONLY → CRITICAL_MANUAL_ONLY) and a `maturity` label (`real_external` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). The CI `audit:tools` script enforces classification — un-classified tools fail the build.
-
-</details>
-
-<details>
-<summary><b>How do I add a new LLM provider?</b></summary>
-
-For the beta, you don't. JAK Swarm uses a single LLM provider for execution so routing, safety review, tracing, and cost accounting stay predictable. Add new model tiers through the existing runtime and model resolver instead of adding provider fallbacks.
-
-</details>
-
-### Operations + reliability
-
-<details>
-<summary><b>What about durability — what if the API restarts mid-workflow?</b></summary>
-
-In-flight workflows survive API restarts via DB-backed checkpoints (LangGraph's `PostgresCheckpointSaver`). The recovery handler at boot scans for ACTIVE workflows and re-enqueues them. **Caveat:** mid-node crashes (e.g. process killed in the middle of a tool call) lose the in-flight node's progress; the node retries from its last checkpoint. For dedicated workflow-engine durability guarantees (Temporal-style), this is a design decision we made for simplicity over the 0.001% edge case.
-
-</details>
-
-<details>
-<summary><b>What is the active hosted beta deployment target?</b></summary>
-
-Frontend stays on Vercel. API and worker move to Railway. Postgres stays on Supabase for pgvector. Redis stays on Upstash. The old Render setup is legacy rollback reference only; do not run the Render worker and Railway worker against the same production Redis queue at the same time.
-
-</details>
+Full FAQ: [`docs/faq.md`](docs/faq.md)
 
 ---
 
 ## 📄 License
 
-MIT -- free for commercial and personal use.
+MIT — free for commercial and personal use. See [`LICENSE`](LICENSE).
 
 ---
 
@@ -2018,9 +585,9 @@ MIT -- free for commercial and personal use.
 
 **Built with ❤️ by [InBharat AI](https://github.com/inbharatai)**
 
+[Website](https://jakswarm.com) · [Quick Start](#-quick-start) · [Architecture](ARCHITECTURE.md) · [Security](SECURITY.md) · [FAQ](docs/faq.md)
+
 [![GitHub stars](https://img.shields.io/github/stars/inbharatai/jak-swarm?style=social)](https://github.com/inbharatai/jak-swarm)
 [![Twitter Follow](https://img.shields.io/twitter/follow/inbharatai?style=social)](https://twitter.com/inbharatai)
-
-**[⬆ Back to Top](#-jak-swarm)**
 
 </div>
