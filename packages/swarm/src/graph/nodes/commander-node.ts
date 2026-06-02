@@ -127,6 +127,7 @@ export async function commanderNode(
     industry: state.industry,
     idempotencyKey: state.idempotencyKey,
     allowedDomains: state.allowedDomains,
+    ...(state.llmProvider ? { llmProvider: state.llmProvider } : {}),
   });
 
   const prefix = buildConversationPrefix(state.conversationHistory ?? []);

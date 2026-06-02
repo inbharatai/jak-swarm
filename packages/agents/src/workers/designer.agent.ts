@@ -106,7 +106,7 @@ export class DesignerAgent extends BaseAgent {
     super(AgentRole.WORKER_DESIGNER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<DesignerResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<DesignerResult> {
     const startedAt = new Date();
     const task = input as DesignerTask;
 

@@ -36,6 +36,10 @@ import {
   clearActivityEmitter,
 } from '../supervisor/activity-registry.js';
 import {
+  registerLLMApiKey,
+  clearLLMApiKey,
+} from '../supervisor/llm-key-registry.js';
+import {
   registerLifecycleEmitter,
   clearLifecycleEmitter,
 } from '../workflow-runtime/lifecycle-registry.js';
@@ -79,6 +83,10 @@ export interface RunParams {
     name: string,
     opts: { failureThreshold: number; resetTimeoutMs: number },
   ) => { call: <T>(fn: () => Promise<T>) => Promise<T> };
+  /** Per-tenant LLM provider preference (from TenantMemory). */
+  llmProvider?: 'openai' | 'gemini';
+  /** Per-tenant decrypted API key for the selected provider (side-channel only). */
+  llmApiKey?: string;
 }
 
 export interface SwarmResult {
@@ -279,6 +287,13 @@ export class SwarmRunner {
       registerLifecycleEmitter(workflowId, params.onLifecycle);
     }
 
+    // Per-tenant LLM API key side-channel. Decrypted keys cannot go
+    // through SwarmState (persisted to DB), so they travel via this
+    // in-memory registry instead. Cleared in the finally block below.
+    if (params.llmApiKey) {
+      registerLLMApiKey(workflowId, params.llmApiKey);
+    }
+
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
     try {
@@ -304,6 +319,7 @@ export class SwarmRunner {
           ...(params.userRole !== undefined ? { userRole: params.userRole } : {}),
           ...(params.conversationHistory !== undefined ? { conversationHistory: params.conversationHistory } : {}),
           ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
+          ...(params.llmProvider !== undefined ? { llmProvider: params.llmProvider } : {}),
         }),
         timeoutMs,
         workflowId,
@@ -411,6 +427,7 @@ export class SwarmRunner {
       unregisterBreakerFactory(workflowId);
       clearActivityEmitter(workflowId);
       clearLifecycleEmitter(workflowId);
+      clearLLMApiKey(workflowId);
       cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     }
   }

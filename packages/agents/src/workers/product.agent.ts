@@ -120,7 +120,7 @@ export class ProductAgent extends BaseAgent {
     super(AgentRole.WORKER_PRODUCT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ProductResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ProductResult> {
     const startedAt = new Date();
     const task = input as ProductTask;
 

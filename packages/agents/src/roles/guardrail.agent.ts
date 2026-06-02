@@ -56,7 +56,7 @@ export class GuardrailAgent extends BaseAgent {
   }
 
   // Pure heuristic — no LLM calls for speed
-  async execute(input: unknown, context: AgentContext): Promise<GuardrailResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<GuardrailResult> {
     const startedAt = new Date();
     const guardrailInput = input as GuardrailInput;
 

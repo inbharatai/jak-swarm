@@ -113,6 +113,13 @@ export interface SwarmState {
    * never run.
    */
   directAnswer?: string;
+  /**
+   * Per-tenant LLM provider preference. Loaded from TenantMemory
+   * at workflow start by swarm-execution.service.ts. Propagated
+   * to AgentContext for runtime provider selection.
+   * 'openai' | 'gemini'. Undefined = use env-var default.
+   */
+  llmProvider?: 'openai' | 'gemini';
 }
 
 export function createInitialSwarmState(params: {
@@ -135,6 +142,7 @@ export function createInitialSwarmState(params: {
   subscriptionTier?: 'free' | 'paid';
   userRole?: string;
   conversationHistory?: Array<{ role: string; content: string }>;
+  llmProvider?: 'openai' | 'gemini';
 }): SwarmState {
   return {
     goal: params.goal,
@@ -171,6 +179,7 @@ export function createInitialSwarmState(params: {
     connectedProviders: params.connectedProviders ?? [],
     subscriptionTier: params.subscriptionTier,
     userRole: params.userRole,
+    llmProvider: params.llmProvider,
     status: WS.PENDING,
     error: undefined,
     outputs: [],

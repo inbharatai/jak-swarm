@@ -20,6 +20,7 @@ export async function plannerNode(state: SwarmState): Promise<Partial<SwarmState
     industry: state.industry,
     idempotencyKey: state.idempotencyKey,
     allowedDomains: state.allowedDomains,
+    ...(state.llmProvider ? { llmProvider: state.llmProvider } : {}),
   });
 
   const result = await agent.execute(state.missionBrief, context);

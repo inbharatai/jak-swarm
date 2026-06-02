@@ -112,7 +112,7 @@ export class CoderAgent extends BaseAgent {
     super(AgentRole.WORKER_CODER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<CoderResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<CoderResult> {
     const startedAt = new Date();
     const task = input as CoderTask;
 

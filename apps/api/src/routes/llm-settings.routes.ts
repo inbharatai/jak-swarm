@@ -1,63 +1,21 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 import { ok, err } from '../types.js';
 import { AppError } from '../errors.js';
-import { config } from '../config.js';
 import { anonymizeProviderName, canRevealProviderIdentity } from '../security/provider-privacy.js';
-
-// ─── Encryption helpers ──────────────────────────────────────────────────────
-// AES-256-GCM using AUTH_SECRET as key material
-
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12;
-
-let cachedKey: Buffer | null = null;
-
-function deriveKey(): Buffer {
-  if (!cachedKey) {
-    cachedKey = scryptSync(config.jwtSecret, 'jak-swarm-llm-keys', 32);
-  }
-  return cachedKey;
-}
-
-function encrypt(plaintext: string): string {
-  const key = deriveKey();
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  // Store as: iv:tag:ciphertext (all base64)
-  return `${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
-}
-
-function decrypt(encoded: string): string {
-  const parts = encoded.split(':');
-  if (parts.length !== 3) throw new Error('Invalid encrypted format');
-  const iv = Buffer.from(parts[0]!, 'base64');
-  const tag = Buffer.from(parts[1]!, 'base64');
-  const encrypted = Buffer.from(parts[2]!, 'base64');
-  const key = deriveKey();
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(encrypted) + decipher.final('utf8');
-}
+import { encryptLLMKey, decryptLLMKey } from '../utils/llm-key-crypto.js';
 
 // ─── Provider configuration ──────────────────────────────────────────────────
 
-const PROVIDER_NAMES = ['openai'] as const;
+const PROVIDER_NAMES = ['openai', 'gemini'] as const;
 type ProviderName = (typeof PROVIDER_NAMES)[number];
 
 const PROVIDER_ENV_KEYS: Record<ProviderName, { apiKeyEnv: string; modelEnv: string; defaultModel: string }> = {
   openai: { apiKeyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-5.4' },
+  gemini: { apiKeyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', defaultModel: 'gemini-2.5-pro' },
 };
 
 function maskKey(key: string): string {
-  // Defense-in-depth: even if the frontend renders keyPreview, we don't
-  // leak enough of the key for fingerprint matching against leaked-key
-  // databases. Previously returned `${first4}...${last3}` which exposed
-  // 7 chars. Now returns a length indicator only. If operators genuinely
-  // need to disambiguate, they can compare the hash in server logs.
   if (!key) return '***';
   return `••• (${key.length} chars)`;
 }
@@ -66,9 +24,15 @@ function memoryKey(provider: ProviderName): string {
   return `llm:${provider}:api_key`;
 }
 
+const PREFERRED_PROVIDER_KEY = 'llm:preferred_provider';
+
 const setKeySchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
   model: z.string().optional(),
+});
+
+const setPreferredProviderSchema = z.object({
+  provider: z.enum(['openai', 'gemini']),
 });
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -100,6 +64,12 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
           storedMap.set(entry.key, { value: entry.value as Record<string, unknown> });
         }
 
+        // Get preferred provider
+        const preferredEntry = storedMap.get(PREFERRED_PROVIDER_KEY);
+        const preferredProvider = preferredEntry
+          ? (preferredEntry.value['provider'] as string) ?? 'openai'
+          : 'openai';
+
         const providers = PROVIDER_NAMES.map((name, index) => {
           const cfg = PROVIDER_ENV_KEYS[name];
           const dbEntry = storedMap.get(memoryKey(name));
@@ -109,7 +79,7 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
           if (dbEntry) {
             let keyPreview = '***';
             try {
-              const decrypted = decrypt(dbEntry.value['encryptedKey'] as string);
+              const decrypted = decryptLLMKey(dbEntry.value['encryptedKey'] as string);
               keyPreview = maskKey(decrypted);
             } catch {
               keyPreview = '***';
@@ -124,6 +94,7 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
               model: allowIdentity ? model : 'managed',
               source: allowIdentity ? ('database' as const) : ('managed' as const),
               editable: allowIdentity,
+              preferred: name === preferredProvider,
             };
           }
 
@@ -138,6 +109,7 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
               model: allowIdentity ? (process.env[cfg.modelEnv] ?? cfg.defaultModel) : 'managed',
               source: allowIdentity ? ('env' as const) : ('managed' as const),
               editable: allowIdentity,
+              preferred: name === preferredProvider,
             };
           }
 
@@ -147,11 +119,13 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
             providerKey: allowIdentity ? name : undefined,
             configured: false,
             editable: allowIdentity,
+            preferred: name === preferredProvider,
           };
         });
 
         return reply.status(200).send(ok({
           providers,
+          preferredProvider: allowIdentity ? preferredProvider : 'managed',
           canViewProviderIdentity: allowIdentity,
         }));
       } catch (e) {
@@ -189,6 +163,77 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * GET /settings/llm/preferred-provider
+   * Get the tenant's current preferred LLM provider.
+   */
+  fastify.get(
+    '/preferred-provider',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = request.user.tenantId;
+      const entry = await fastify.db.tenantMemory.findFirst({
+        where: { tenantId, key: PREFERRED_PROVIDER_KEY, memoryType: 'POLICY' },
+      });
+
+      const provider = entry
+        ? (entry.value as { provider?: string }).provider ?? 'openai'
+        : 'openai';
+
+      return reply.status(200).send(ok({ provider }));
+    },
+  );
+
+  /**
+   * PUT /settings/llm/preferred-provider
+   * Set the tenant's preferred LLM provider. Stored in TenantMemory
+   * as a POLICY entry with key 'llm:preferred_provider'.
+   */
+  fastify.put(
+    '/preferred-provider',
+    {
+      preHandler: [
+        fastify.authenticate,
+        fastify.requireRole('OPERATOR', 'TENANT_ADMIN', 'SYSTEM_ADMIN'),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parseResult = setPreferredProviderSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
+      }
+
+      const { provider } = parseResult.data;
+      const tenantId = request.user.tenantId;
+
+      const value = { provider, updatedAt: new Date().toISOString() };
+      const existing = await fastify.db.tenantMemory.findFirst({
+        where: { tenantId, key: PREFERRED_PROVIDER_KEY },
+      });
+
+      if (existing) {
+        await fastify.db.tenantMemory.update({
+          where: { id: existing.id },
+          data: { value: value as object },
+        });
+      } else {
+        await fastify.db.tenantMemory.create({
+          data: {
+            tenantId,
+            key: PREFERRED_PROVIDER_KEY,
+            value: value as object,
+            source: request.user.userId,
+            memoryType: 'POLICY',
+          },
+        });
+      }
+
+      await fastify.auditLog(request, 'SET_PREFERRED_LLM_PROVIDER', 'LLMSettings', provider);
+
+      return reply.status(200).send(ok({ provider }));
+    },
+  );
+
+  /**
    * PUT /settings/llm/:provider
    * Set or update an API key for a provider. Stored encrypted in TenantMemory.
    */
@@ -221,7 +266,7 @@ const llmSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       const key = memoryKey(provider as ProviderName);
 
       try {
-        const encryptedKey = encrypt(apiKey);
+        const encryptedKey = encryptLLMKey(apiKey);
         const value = {
           encryptedKey,
           model: model ?? PROVIDER_ENV_KEYS[provider as ProviderName].defaultModel,

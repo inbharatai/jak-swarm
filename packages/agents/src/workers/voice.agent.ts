@@ -120,7 +120,7 @@ export class VoiceAgent extends BaseAgent {
     super(AgentRole.WORKER_VOICE, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<VoiceResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<VoiceResult> {
     const startedAt = new Date();
     const task = input as VoiceTask;
 

@@ -105,7 +105,7 @@ export class KnowledgeAgent extends BaseAgent {
     super(AgentRole.WORKER_KNOWLEDGE, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<KnowledgeResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<KnowledgeResult> {
     const startedAt = new Date();
     const task = input as KnowledgeTask;
 

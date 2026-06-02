@@ -122,7 +122,7 @@ export class ScreenshotToCodeAgent extends BaseAgent {
     super(AgentRole.WORKER_SCREENSHOT_TO_CODE, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<ScreenshotToCodeResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<ScreenshotToCodeResult> {
     const startedAt = new Date();
     const task = input as ScreenshotToCodeTask;
 

@@ -129,7 +129,7 @@ export class OpsAgent extends BaseAgent {
     super(AgentRole.WORKER_OPS, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<OpsResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<OpsResult> {
     const startedAt = new Date();
     const task = input as OpsTask;
 

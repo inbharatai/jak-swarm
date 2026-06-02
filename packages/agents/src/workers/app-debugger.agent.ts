@@ -114,7 +114,7 @@ export class AppDebuggerAgent extends BaseAgent {
     super(AgentRole.WORKER_APP_DEBUGGER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<AppDebuggerResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<AppDebuggerResult> {
     const startedAt = new Date();
     const task = input as AppDebuggerTask;
 

@@ -367,7 +367,7 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(config).toContain("JAK_WORKFLOW_RUNTIME must be unset or 'langgraph'");
     expect(runtimeFactory).toContain('OpenAI-only');
     expect(runtimeFactory).toContain('JAK_EXECUTION_ENGINE=legacy -> ignored');
-    expect(executionDoc).toContain('one production LLM runtime');
+    expect(executionDoc).toContain('two LLM providers');
     expect(truth).toMatch(/label:\s*'Agent Runtime'/);
     expect(truth).toMatch(/suffix:\s*''/);
 

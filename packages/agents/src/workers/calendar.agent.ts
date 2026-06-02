@@ -149,7 +149,7 @@ export class CalendarAgent extends BaseAgent {
     super(AgentRole.WORKER_CALENDAR, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<CalendarResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<CalendarResult> {
     const startedAt = new Date();
     const task = input as CalendarTask;
 

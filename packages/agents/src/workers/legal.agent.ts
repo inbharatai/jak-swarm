@@ -140,7 +140,7 @@ export class LegalAgent extends BaseAgent {
     super(AgentRole.WORKER_LEGAL, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<LegalResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<LegalResult> {
     const startedAt = new Date();
     const task = input as LegalTask;
 

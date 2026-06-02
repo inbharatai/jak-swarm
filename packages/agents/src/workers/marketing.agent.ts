@@ -169,7 +169,7 @@ export class MarketingAgent extends BaseAgent {
     super(AgentRole.WORKER_MARKETING, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<MarketingResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<MarketingResult> {
     const startedAt = new Date();
     const task = input as MarketingTask;
 

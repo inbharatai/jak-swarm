@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { apiFetch, fetcher } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, CardContent, Input, Badge, Spinner } from '@/components/ui';
-import { Key, Check, Eye, EyeOff, Brain } from 'lucide-react';
+import { Key, Check, Eye, EyeOff, Brain, Sparkles } from 'lucide-react';
 import type { ModuleProps } from '@/modules/registry';
 
 interface LLMProvider {
@@ -14,26 +14,53 @@ interface LLMProvider {
   keyPreview?: string;
   model?: string;
   source?: 'database' | 'env' | 'managed';
+  preferred?: boolean;
   url?: string;
 }
 
 const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; description: string; models: string[]; color: string }> = {
-  openai: { icon: <Brain className="h-5 w-5" />, label: 'Agent Runtime', description: 'GPT-5.5 / GPT-5.4 agentic runtime', models: ['gpt-5.5', 'gpt-5.4'], color: '#10a37f' },
+  openai: { icon: <Brain className="h-5 w-5" />, label: 'Agent Runtime', description: 'GPT-5.5 / GPT-5.4 — agentic runtime', models: ['gpt-5.5', 'gpt-5.4'], color: '#10a37f' },
+  gemini: { icon: <Sparkles className="h-5 w-5" />, label: 'Gemini Runtime', description: 'Gemini 2.5 Pro / Flash — tool calling + thinking', models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'], color: '#4285f4' },
 };
 
 export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
   const toast = useToast();
-  const { data, isLoading, mutate } = useSWR<{ success: boolean; data: { providers: LLMProvider[] } }>(
+  const { data, isLoading, mutate } = useSWR<{ success: boolean; data: { providers: LLMProvider[]; preferredProvider?: string } }>(
     '/settings/llm',
     fetcher,
   );
   const providers = data?.data?.providers ?? [];
+  const apiPreferredProvider = data?.data?.preferredProvider ?? 'openai';
 
+  const [preferredProvider, setPreferredProvider] = useState<string>('openai');
+  const [switchingProvider, setSwitchingProvider] = useState(false);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Sync preferred provider from API response
+  useEffect(() => {
+    if (apiPreferredProvider) setPreferredProvider(apiPreferredProvider);
+  }, [apiPreferredProvider]);
+
+  const handleSetPreferredProvider = async (provider: string) => {
+    setSwitchingProvider(true);
+    try {
+      await apiFetch('/settings/llm/preferred-provider', {
+        method: 'PUT',
+        body: { provider },
+      });
+      setPreferredProvider(provider);
+      toast.success(`Preferred provider set to ${PROVIDER_META[provider]?.label ?? provider}`);
+      mutate();
+    } catch {
+      toast.error('Failed to set preferred provider');
+    } finally {
+      setSwitchingProvider(false);
+    }
+  };
 
   const handleSave = async (providerName: string) => {
     setSaving(true);
@@ -60,22 +87,49 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
     <div className="flex flex-col h-full p-4 gap-4 overflow-auto">
       <div className="shrink-0">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Key className="h-5 w-5 text-primary" />Settings</h2>
-        <p className="text-xs text-muted-foreground">Configure the execution key and GPT-5.5/5.4 model tier.</p>
+        <p className="text-xs text-muted-foreground">Configure LLM providers and select your preferred runtime.</p>
+      </div>
+
+      {/* Preferred provider toggle */}
+      <div className="shrink-0 flex items-center gap-3 max-w-3xl">
+        <span className="text-xs text-muted-foreground font-medium">Active provider:</span>
+        <div className="flex items-center gap-1.5">
+          {Object.entries(PROVIDER_META).map(([name, meta]) => (
+            <button
+              key={name}
+              onClick={() => handleSetPreferredProvider(name)}
+              disabled={switchingProvider}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                preferredProvider === name
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              {meta.icon}
+              {meta.label}
+              {switchingProvider && preferredProvider !== name && <Spinner size="xs" />}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 max-w-3xl">
         {Object.entries(PROVIDER_META).map(([name, meta]) => {
           const provider = providers.find(p => p.name === name);
           const isEditing = editingProvider === name;
+          const isActiveProvider = preferredProvider === name;
 
           return (
-            <Card key={name} className={`transition-all ${provider?.configured ? 'ring-1 ring-emerald-500/30' : ''}`}>
+            <Card key={name} className={`transition-all ${provider?.configured ? 'ring-1 ring-emerald-500/30' : ''} ${isActiveProvider ? 'ring-2 ring-primary/50' : ''}`}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded" style={{ color: meta.color }}>{meta.icon}</div>
                     <div>
-                      <p className="font-medium text-sm">{meta.label}</p>
+                      <p className="font-medium text-sm flex items-center gap-1.5">
+                        {meta.label}
+                        {isActiveProvider && <Badge variant="default" className="text-[9px] px-1.5 py-0">Active</Badge>}
+                      </p>
                       <p className="text-[10px] text-muted-foreground">{meta.description}</p>
                     </div>
                   </div>
@@ -88,7 +142,6 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
 
                 {provider?.configured && !isEditing && (
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    {/* Security: never render the sk-p...D4A key fragment. */}
                     {provider.keyPreview && (
                       <p>Key: <span className="font-mono" aria-hidden="true">••••••••</span></p>
                     )}

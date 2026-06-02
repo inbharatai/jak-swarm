@@ -124,7 +124,7 @@ export class AnalyticsAgent extends BaseAgent {
     super(AgentRole.WORKER_ANALYTICS, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<AnalyticsResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<AnalyticsResult> {
     const startedAt = new Date();
     const task = input as AnalyticsTask;
 

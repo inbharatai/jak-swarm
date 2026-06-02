@@ -139,7 +139,7 @@ export class EmailAgent extends BaseAgent {
     super(AgentRole.WORKER_EMAIL, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<EmailResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<EmailResult> {
     const startedAt = new Date();
     const task = input as EmailTask;
 

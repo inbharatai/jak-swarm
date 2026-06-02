@@ -1012,6 +1012,42 @@ export class SwarmExecutionService extends EventEmitter {
 
       const user = await this.db.user.findUnique({ where: { id: userId }, select: { role: true } });
 
+      // ─── Per-tenant LLM provider preference ────────────────────────────────
+      // Read from TenantMemory (key: llm:preferred_provider). If set,
+      // also read and decrypt the API key for that provider from
+      // TenantMemory (key: llm:{provider}:api_key). Both are passed
+      // through to the runner via RunParams and the llm-key-registry
+      // side-channel respectively.
+      let llmProvider: 'openai' | 'gemini' | undefined;
+      let llmApiKey: string | undefined;
+      try {
+        const prefEntry = await this.db.tenantMemory.findFirst({
+          where: { tenantId, key: 'llm:preferred_provider', memoryType: 'POLICY' },
+        });
+        if (prefEntry) {
+          const prefValue = prefEntry.value as { provider?: string };
+          if (prefValue.provider === 'openai' || prefValue.provider === 'gemini') {
+            llmProvider = prefValue.provider;
+          }
+        }
+        if (llmProvider) {
+          const apiKeyEntry = await this.db.tenantMemory.findFirst({
+            where: { tenantId, key: `llm:${llmProvider}:api_key`, memoryType: 'POLICY' },
+          });
+          if (apiKeyEntry) {
+            const { decryptLLMKey } = await import('../utils/llm-key-crypto.js');
+            llmApiKey = decryptLLMKey((apiKeyEntry.value as { encryptedKey: string }).encryptedKey);
+          }
+        }
+      } catch (llmPrefErr) {
+        // TenantMemory read/decrypt failure must not block the workflow.
+        // Fall back to env-var default.
+        this.log.warn(
+          { tenantId, err: llmPrefErr instanceof Error ? llmPrefErr.message : String(llmPrefErr) },
+          '[Swarm] Failed to read tenant LLM preference; using env-var default',
+        );
+      }
+
       // Load conversation thread history when this workflow belongs to a
       // conversation. This replaces the frontend goal-string concatenation
       // hack with real server-side memory across graph replays.
@@ -1040,6 +1076,8 @@ export class SwarmExecutionService extends EventEmitter {
         userRole: user?.role ?? undefined,
         ...(conversationHistory ? { conversationHistory } : {}),
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
+        ...(llmProvider ? { llmProvider } : {}),
+        ...(llmApiKey ? { llmApiKey } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;

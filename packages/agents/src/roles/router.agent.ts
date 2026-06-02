@@ -44,7 +44,7 @@ export class RouterAgent extends BaseAgent {
     super(AgentRole.ROUTER, apiKey);
   }
 
-  async execute(
+  async _executeImpl(
     input: { plan: WorkflowPlan; industryPack: IndustryPack },
     context: AgentContext,
   ): Promise<RouterOutput> {

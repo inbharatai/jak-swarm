@@ -117,7 +117,7 @@ export class SEOAgent extends BaseAgent {
     super(AgentRole.WORKER_SEO, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<SEOResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<SEOResult> {
     const startedAt = new Date();
     const task = input as SEOTask;
 

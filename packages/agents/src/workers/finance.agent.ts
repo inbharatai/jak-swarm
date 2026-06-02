@@ -142,7 +142,7 @@ export class FinanceAgent extends BaseAgent {
     super(AgentRole.WORKER_FINANCE, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<FinanceResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<FinanceResult> {
     const startedAt = new Date();
     const task = input as FinanceTask;
 

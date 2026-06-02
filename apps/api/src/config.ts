@@ -106,10 +106,17 @@ export const config = {
     | 'standalone',
 
   // Runtime selection
-  // Runtime policy: production API execution is OpenAI-only and LangGraph-only.
-  // Old migration flags are accepted only when they name the active runtime;
-  // legacy values fail loud so deploy config cannot silently drift back to
-  // removed provider/router paths.
+  // Runtime policy: production API execution supports OpenAI and Gemini providers.
+  // LLM_PROVIDER selects the active provider; defaults to 'existing' (OpenAI-only,
+  // identical to pre-Gemini behavior). Old JAK_EXECUTION_ENGINE values are accepted
+  // only when they name an active runtime; unknown values fail loud.
+  llmProvider: (function () {
+    const raw = (process.env['LLM_PROVIDER'] ?? 'existing').trim().toLowerCase();
+    if (raw !== '' && raw !== 'existing' && raw !== 'openai' && raw !== 'gemini') {
+      throw new Error(`LLM_PROVIDER must be 'existing', 'openai', or 'gemini' (got '${raw}')`);
+    }
+    return (raw || 'existing') as 'existing' | 'openai' | 'gemini';
+  })(),
   executionEngine: (function () {
     const raw = (process.env['JAK_EXECUTION_ENGINE'] ?? 'openai-first').trim().toLowerCase();
     if (raw !== '' && raw !== 'openai-first') {
@@ -135,6 +142,10 @@ export const config = {
   // OpenAI API key. Required for production LLM execution.
   openaiApiKey: process.env['OPENAI_API_KEY'] ?? '',
   openaiRealtimeModel: process.env['OPENAI_REALTIME_MODEL'] ?? 'gpt-4o-realtime-preview',
+  // Gemini API key. Required when LLM_PROVIDER=gemini.
+  geminiApiKey: process.env['GEMINI_API_KEY'] ?? '',
+  geminiModel: process.env['GEMINI_MODEL'] ?? '',
+  geminiRequestTimeoutMs: parseInt(process.env['GEMINI_REQUEST_TIMEOUT_MS'] ?? '60000', 10),
   // WebRTC ICE servers for voice sessions.
   // Google STUN is a permissive default that works from most residential networks.
   // For corporate networks behind symmetric NAT, operators should provision a

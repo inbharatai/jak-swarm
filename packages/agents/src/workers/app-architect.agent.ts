@@ -134,7 +134,7 @@ export class AppArchitectAgent extends BaseAgent {
     super(AgentRole.WORKER_APP_ARCHITECT, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<AppArchitectResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<AppArchitectResult> {
     const startedAt = new Date();
     const task = input as AppArchitectTask;
 

@@ -220,6 +220,19 @@ export abstract class BaseAgent {
   protected readonly defaultReflectionMode: ReflectionMode;
 
   /**
+   * Per-tenant context override — when set by setContextOverride(),
+   * callLLM() and executeWithTools() route through the override
+   * provider/call-service instead of the constructor-resolved defaults.
+   * This enables per-tenant LLM provider selection (OpenAI vs Gemini)
+   * without changing the constructor or breaking existing call sites.
+   */
+  private contextOverride: {
+    callService: LLMCallService;
+    runtime: LLMRuntime;
+    provider: LLMProvider;
+  } | null = null;
+
+  /**
    * Global hook called after every LLM call with cost information.
    * Set by the API layer to track per-call credit usage.
    * When not set, cost is still logged but not deducted from credits.
@@ -242,7 +255,27 @@ export abstract class BaseAgent {
    */
   static companyContextProvider: CompanyContextProvider | null = null;
 
-  abstract execute(input: unknown, context: AgentContext): Promise<unknown>;
+  /**
+   * Execute the agent's core logic. Subclasses implement this.
+   * The base class wraps each call with setContextOverride/clearContextOverride
+   * so per-tenant LLM provider preferences are automatically applied.
+   */
+  abstract _executeImpl(input: unknown, context: AgentContext): Promise<unknown>;
+
+  /**
+   * Public execute entry point — wraps the subclass implementation with
+   * per-tenant LLM provider override. Every external caller (worker-node,
+   * commander-node, planner-node, etc.) should call `agent.execute()`,
+   * which routes through this wrapper automatically.
+   */
+  async execute(input: unknown, context: AgentContext): Promise<unknown> {
+    this.setContextOverride(context);
+    try {
+      return await this._executeImpl(input, context);
+    } finally {
+      this.clearContextOverride();
+    }
+  }
 
   // ─── DELEGATES TO COMPOSABLE SERVICES ──────────────────────────────────────
 
@@ -251,7 +284,8 @@ export abstract class BaseAgent {
     tools?: OpenAI.ChatCompletionTool[],
     options?: { maxTokens?: number; temperature?: number; jsonMode?: boolean },
   ): Promise<OpenAI.ChatCompletion> {
-    return this.llmCallService.callLLM(messages, tools, options);
+    const service = this.contextOverride?.callService ?? this.llmCallService;
+    return service.callLLM(messages, tools, options);
   }
 
   protected async executeWithTools(
@@ -260,7 +294,76 @@ export abstract class BaseAgent {
     context: AgentContext,
     options?: { maxTokens?: number; temperature?: number; maxIterations?: number },
   ): Promise<ToolLoopResult> {
+    if (this.contextOverride) {
+      const overrideToolService = new ToolExecutionService(
+        this.contextOverride.callService,
+        this.promptBuilder,
+        this.logger,
+        this.role,
+        () => this.contextOverride!.runtime,
+      );
+      return overrideToolService.executeWithTools(messages, tools, context, options);
+    }
     return this.toolExecutionService.executeWithTools(messages, tools, context, options);
+  }
+
+  /**
+   * Set per-tenant LLM provider override from AgentContext.
+   * Call at the start of execute() — if context carries a different
+   * llmProvider than the constructor default, this builds fresh
+   * provider/call-service/runtime for the preferred provider.
+   * No-op when context has no llmProvider or when it matches the default.
+   */
+  protected setContextOverride(context: AgentContext): void {
+    if (!context.llmProvider) return;
+
+    // Determine what provider the constructor resolved
+    const currentProviderName = this.provider?.name ?? '';
+    const wantsOpenAI = context.llmProvider === 'openai';
+    const wantsGemini = context.llmProvider === 'gemini';
+
+    // Check if already on the right provider
+    if (wantsOpenAI && currentProviderName === 'openai') return;
+    if (wantsGemini && currentProviderName === 'google') return;
+
+    // Build override provider + runtime
+    const tier = getTierForAgent(this.role);
+    const hints: { provider: 'openai' | 'gemini'; apiKey?: string } = {
+      provider: context.llmProvider,
+      ...(context.llmApiKey ? { apiKey: context.llmApiKey } : {}),
+    };
+
+    const overrideProvider = getProviderForTier(tier, hints);
+    const overrideRuntime = getRuntime(this.role, {
+      callLLMPublic: (m, t, o) => this.callLLM(m, t, o),
+      executeWithToolsPublic: (m, t, c, o) => this.executeWithTools(m, t, c, o),
+    }, hints);
+
+    const overrideOpenai = wantsOpenAI
+      ? new OpenAI({ apiKey: context.llmApiKey ?? process.env['OPENAI_API_KEY'] })
+      : this.openai;
+
+    const overrideCallService = new LLMCallService(
+      this.role,
+      overrideOpenai,
+      new ProviderRouter(overrideProvider),
+      this.logger,
+      () => BaseAgent.onLLMCallComplete,
+    );
+
+    this.contextOverride = {
+      callService: overrideCallService,
+      runtime: overrideRuntime,
+      provider: overrideProvider,
+    };
+  }
+
+  /**
+   * Clear per-tenant LLM provider override. Call in finally block
+   * after execute() returns so we don't leak override state.
+   */
+  protected clearContextOverride(): void {
+    this.contextOverride = null;
   }
 
   protected async injectCompanyContext(

@@ -135,7 +135,7 @@ export class PRAgent extends BaseAgent {
     super(AgentRole.WORKER_PR, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<PRResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<PRResult> {
     const startedAt = new Date();
     const task = input as PRTask;
 

@@ -70,7 +70,7 @@ export class BrowserAgent extends BaseAgent {
     super(AgentRole.WORKER_BROWSER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<BrowserResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<BrowserResult> {
     const startedAt = new Date();
     const task = input as BrowserTask;
 

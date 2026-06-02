@@ -256,7 +256,7 @@ export class CommanderAgent extends BaseAgent {
     super(AgentRole.COMMANDER, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<CommanderOutput> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<CommanderOutput> {
     const startedAt = new Date();
     const rawInput = typeof input === 'string' ? input : JSON.stringify(input);
 

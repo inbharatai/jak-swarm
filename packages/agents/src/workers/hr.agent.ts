@@ -142,7 +142,7 @@ export class HRAgent extends BaseAgent {
     super(AgentRole.WORKER_HR, apiKey);
   }
 
-  async execute(input: unknown, context: AgentContext): Promise<HRResult> {
+  async _executeImpl(input: unknown, context: AgentContext): Promise<HRResult> {
     const startedAt = new Date();
     const task = input as HRTask;
 
