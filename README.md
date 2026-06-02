@@ -5,11 +5,11 @@
 ### The Closed-Loop Company Operating Layer for Agent Work
 
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
-[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](https://jakswarm.com)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](https://jakswarm.com)
 [![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](https://jakswarm.com)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_HIPAA_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](https://jakswarm.com)
-[![Runtime](https://img.shields.io/badge/Runtime-OpenAI--first-412991?style=for-the-badge&logo=openai&logoColor=white)](https://jakswarm.com)
+[![Runtime](https://img.shields.io/badge/Runtime-Agent--first-412991?style=for-the-badge&logo=robot&logoColor=white)](https://jakswarm.com)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://github.com/inbharatai/jak-swarm)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
@@ -35,7 +35,7 @@ JAK is not claiming finished company-wide auto-sync yet. The shipped beta founda
 | Evidence artifacts | Tenant-scoped `CompanyArtifact` records with source/type labels, body hash, source URL, author, occurrence time, and audit event on ingest | [`company-operating-layer.routes.ts`](apps/api/src/routes/company-operating-layer.routes.ts), [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
 | Company graph | `CompanyGraphEntity` records for decisions, tasks, specs, customer signals, risks, owners, deadlines, code changes, customers, metrics, and requirements; entities must cite source artifacts | [`schema.prisma`](packages/db/prisma/schema.prisma), `apps/web/src/app/(dashboard)/company/page.tsx` |
 | Drift detection | Deterministic comparator flags unaddressed customer signals, decisions not operationalized, ungrounded execution, and stale high-priority tasks | `buildDriftCandidates()` in [`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts) |
-| Agent-executable specs | OpenAI-backed spec generation with objective, context, approach, acceptance criteria, test plan, agent task plan, approval gates, and evidence IDs. No template fallback. | `generateSpec()` + `/company/specs/generate` |
+| Agent-executable specs | Agent-backed spec generation with objective, context, approach, acceptance criteria, test plan, agent task plan, approval gates, and evidence IDs. No template fallback. | `generateSpec()` + `/company/specs/generate` |
 | Review gate | Specs are reviewer-approved or rejected through `/company/specs/:id/decide`; review decisions are immutable after the first decision | `decideSpec()` + [`company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) |
 
 **Honest boundary:** full connector auto-sync is still a product build item. The API and `/company` UI can label evidence as GitHub, Linear, Jira, Slack, Notion, Google Drive, Gmail, meetings, customer calls, support, documents, manual notes, or other sources, but not every source has a first-party background sync job yet. Until those jobs are implemented and smoke-tested, the accurate claim is **Company OS beta foundation**, not “finished company AI OS.”
@@ -93,11 +93,11 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 ## 🚀 What's inside JAK Swarm
 
 - **38 specialist agents** (6 orchestrators + 32 workers) and **122 classified tools** with honest CI-enforced maturity labels (`real_external` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`)
-- **Closed-loop Company OS foundation** — source-labeled artifacts, graph entities, deterministic drift findings, OpenAI-generated specs, reviewer decisions, and audit events. Current beta supports manual/API-fed evidence plus connector-labeled artifacts; full connector auto-sync is still in progress.
+- **Closed-loop Company OS foundation** — source-labeled artifacts, graph entities, deterministic drift findings, agent-generated specs, reviewer decisions, and audit events. Current beta supports manual/API-fed evidence plus connector-labeled artifacts; full connector auto-sync is still in progress.
 - **Native LangGraph orchestrator** with `PostgresCheckpointSaver` and native `interrupt()` / `Command(resume)` for human approvals — no custom state machine, no env-flag fallback
 - **Audit & Compliance Agent Pack** — SOC 2 / HIPAA / ISO 27001 engagements end-to-end with **182 seeded controls** (63 SOC 2 + 37 HIPAA + 82 ISO 27001) of which **108 are operationally backed** (auto-mapping rules pull evidence from system activity) and **74 require reviewer attestation** (policy / paperwork / physical), LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs, and an invite-token-only **External Auditor Portal** with SHA-256-hashed tokens and `crypto.timingSafeEqual` verification
 - **Company Brain** — `CompanyProfile` + `CompanyKnowledgeSource` URL crawler (SSRF defense, robots.txt, per-host rate limit) + DOCX / XLSX / image (OCR) ingestion, all surfaced through pgvector RAG with honest `parseConfidence` values
-- **Trust layer** — source-grounded outputs with citation-density verification, runtime PII redaction at the LLM boundary, structured output via OpenAI Responses API + `json_schema` strict mode, prompt-cache-aware cost telemetry
+- **Trust layer** — source-grounded outputs with citation-density verification, runtime PII redaction at the LLM boundary, structured output via Responses API + `json_schema` strict mode, prompt-cache-aware cost telemetry
 - **Cross-task auto-repair** with error-class decision tree (destructive actions never auto-retried), **CEO super-orchestrator** that loads Company Brain and emits an executive summary at workflow end, **retention sweep** service (dry-run by default, never touches user-owned evidence)
 - Memory-aware agents, Slack + WhatsApp bridges, voice sessions, typed `@jak-swarm/client` SDK
 
@@ -107,11 +107,11 @@ JAK Shield is built for **defensive security, safe automation, permissioned work
 
 > **Migration 106 — Team + 30-Day Free Trial (8 May 2026):** humans-on-task-graph wedge + landing-page free-trial CTA with daily caps. Departments + manager hierarchy (`/team`), per-employee Inbox (`/my-tasks`), human task assignment (`POST /task-assignments`), aggregated `/inbox` route (tasks + approvals + notifications in one round-trip), trial signup at `/trial` with email-only intake (no credit card), four daily caps enforced before workflow start (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K tokens / day), trial-cap guard returning structured `429 TRIAL_DAILY_CAP_HIT` + `402 TRIAL_EXPIRED` so the cockpit can render banners instead of silently failing. Truth-locked at [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts), now expanded by later migrations. Full design + file map + carry-overs in [`docs/team-and-trial.md`](docs/team-and-trial.md).
 
-> **Migration 107 — Closed-loop Company OS foundation (20 May 2026):** evidence artifacts -> company graph entities -> deterministic drift findings -> OpenAI-generated agent specs -> reviewer decision gate. Hardening in this pass fixed recurring drift reopening, completed-work false positives, primary artifact evidence preservation, immutable spec review decisions, and `/company` source/type parity with the API schema. Truth-locked by [`tests/unit/services/company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) (17 tests), [`tests/integration/company-os-foundation.test.ts`](tests/integration/company-os-foundation.test.ts) (30 tests), and [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (59 tests).
+> **Migration 107 — Closed-loop Company OS foundation (20 May 2026):** evidence artifacts -> company graph entities -> deterministic drift findings -> agent-generated specs -> reviewer decision gate. Hardening in this pass fixed recurring drift reopening, completed-work false positives, primary artifact evidence preservation, immutable spec review decisions, and `/company` source/type parity with the API schema. Truth-locked by [`tests/unit/services/company-operating-layer.service.test.ts`](tests/unit/services/company-operating-layer.service.test.ts) (17 tests), [`tests/integration/company-os-foundation.test.ts`](tests/integration/company-os-foundation.test.ts) (30 tests), and [`tests/unit/landing/landing-claim-vs-code.test.ts`](tests/unit/landing/landing-claim-vs-code.test.ts) (59 tests).
 
-> **Migration 108 — A-to-Z Critical Fixes (28 May 2026):** five structural refactors closing the top critical gaps surfaced by the human-level A-to-Z audit (rated 6.0/10 → structural fixes landed). **Planner prompt slimmed** from 157 lines to 42, deterministic keyword overrides removed, verb→worker mapping accuracy preserved (added `check`/`review`/`audit`/`website`/`URL`). **Conversation memory migrated** from a frontend localStorage string-concat hack to real server-side thread persistence: new `Conversation` + `ConversationMessage` Prisma models, Supabase migration applied, history injected into `SwarmState` and prepended by the Commander node so the LLM sees prior turns natively. **Workflows routes split:** 1,054-line `workflows.routes.ts` god-file decomposed into 4 sub-routers (`workflow-control`, `workflow-query`, `workflow-stream`, `conversation`) + 2 services (`workflow-creation`, `workflow-recovery`) with zero business-logic change. **BaseAgent decomposed:** 1,508-line god-class split into `llm-call.service.ts`, `prompt-builder.service.ts`, and `tool-execution.service.ts` — all public signatures preserved for subclasses. **OpenAPI auto-spec:** added `zod-to-json-schema` registry + `generate-spec.ts` chokepoint so `/docs` and `/openapi.json` stay typed from the Zod source of truth. Structural tests updated to read the new file paths; 2,045 unit/structural tests passing. Honest carry-over: 64 behavioral integration tests still fail on the dummy OpenAI key (`401`) — pre-existing, not introduced by this migration.
+> **Migration 108 — A-to-Z Critical Fixes (28 May 2026):** five structural refactors closing the top critical gaps surfaced by the human-level A-to-Z audit (rated 6.0/10 → structural fixes landed). **Planner prompt slimmed** from 157 lines to 42, deterministic keyword overrides removed, verb→worker mapping accuracy preserved (added `check`/`review`/`audit`/`website`/`URL`). **Conversation memory migrated** from a frontend localStorage string-concat hack to real server-side thread persistence: new `Conversation` + `ConversationMessage` Prisma models, Supabase migration applied, history injected into `SwarmState` and prepended by the Commander node so the LLM sees prior turns natively. **Workflows routes split:** 1,054-line `workflows.routes.ts` god-file decomposed into 4 sub-routers (`workflow-control`, `workflow-query`, `workflow-stream`, `conversation`) + 2 services (`workflow-creation`, `workflow-recovery`) with zero business-logic change. **BaseAgent decomposed:** 1,508-line god-class split into `llm-call.service.ts`, `prompt-builder.service.ts`, and `tool-execution.service.ts` — all public signatures preserved for subclasses. **OpenAPI auto-spec:** added `zod-to-json-schema` registry + `generate-spec.ts` chokepoint so `/docs` and `/openapi.json` stay typed from the Zod source of truth. Structural tests updated to read the new file paths; 2,045 unit/structural tests passing. Honest carry-over: 64 behavioral integration tests still fail on the dummy API key (`401`) — pre-existing, not introduced by this migration.
 
-> **Migration 109 — Tool Accuracy Audit + Live E2E Validation (29 May 2026):** deep audit of all 122 tools and 38 agents against real OpenAI API execution. **17 tool fixes:** cross-tool parameter name mismatches in `generate_seo_report` (seed→seedKeyword, query→keyword), removed false `requiredEnvVars` from `gmail_send_email` and `analyze_github_repo`, added `GITHUB_PAT` token usage in `analyze_github_repo` execute, corrected `sideEffectLevel` on 7 tools (5 auto-reply tools: external→read; `track_email_engagement`: read→write; `track_content_performance`: read→write), added `requiredEnvVars: ['OPENAI_API_KEY']` to `browser_analyze_page`, removed false `requiredEnvVars: ['GITHUB_PAT']` from 3 GitHub tools. **28 agent schema alignments across 15 agent files:** parameter names aligned with ToolRegistry `inputSchema` (research_keywords, lookup_crm_contact, update_crm_record, search_deals, list_calendar_events, create_calendar_event, lookup_customer, classify_ticket, search_knowledge_base, compute_statistics, parse_spreadsheet, generate_report, search_knowledge, draft_email, forecast_cashflow, memory_store). **5 prompt tool-list additions:** support, CRM, calendar, app-architect, and document agents now list all their declared tools in system prompts. **6 UX_ROLE_TO_AGENT_ROLE mappings added** (cfo, ceo, coding, research, design, legal, hr, etc.) — previously the CFO/CEO roles were dropped on the floor. **pgvector Docker image** switched from postgres:16-alpine to pgvector/pgvector:pg16 for vector similarity search. **Workflow timeout increased** from 5min → 20min (both SwarmRunner default and SwarmExecutionService — the latter was overriding with a hardcoded 5min value, causing strategy-tier CEO workflows to timeout mid-execution). **Subscription seed** added so demo tenants can create workflows (was returning 429 NO_SUBSCRIPTION). **Live E2E results with real OpenAI API:** CMO ✅ (10 traces, 3 self-reflection loops, 2000+ word healthcare marketing analysis), CTO ✅ (HIPAA/HITRUST/SOC2 compliance identified), CFO ✅ (healthcare financial contextualization), CEO/Strategist ✅ (29 traces, full 12-month rural healthcare strategic roadmap — completed on 3rd retry after timeout fix). 2,216 unit/structural tests passing.
+> **Migration 109 — Tool Accuracy Audit + Live E2E Validation (29 May 2026):** deep audit of all 122 tools and 38 agents against live API execution. **17 tool fixes:** cross-tool parameter name mismatches in `generate_seo_report` (seed→seedKeyword, query→keyword), removed false `requiredEnvVars` from `gmail_send_email` and `analyze_github_repo`, added `GITHUB_PAT` token usage in `analyze_github_repo` execute, corrected `sideEffectLevel` on 7 tools (5 auto-reply tools: external→read; `track_email_engagement`: read→write; `track_content_performance`: read→write), added `requiredEnvVars: ['OPENAI_API_KEY']` to `browser_analyze_page`, removed false `requiredEnvVars: ['GITHUB_PAT']` from 3 GitHub tools. **28 agent schema alignments across 15 agent files:** parameter names aligned with ToolRegistry `inputSchema` (research_keywords, lookup_crm_contact, update_crm_record, search_deals, list_calendar_events, create_calendar_event, lookup_customer, classify_ticket, search_knowledge_base, compute_statistics, parse_spreadsheet, generate_report, search_knowledge, draft_email, forecast_cashflow, memory_store). **5 prompt tool-list additions:** support, CRM, calendar, app-architect, and document agents now list all their declared tools in system prompts. **6 UX_ROLE_TO_AGENT_ROLE mappings added** (cfo, ceo, coding, research, design, legal, hr, etc.) — previously the CFO/CEO roles were dropped on the floor. **pgvector Docker image** switched from postgres:16-alpine to pgvector/pgvector:pg16 for vector similarity search. **Workflow timeout increased** from 5min → 20min (both SwarmRunner default and SwarmExecutionService — the latter was overriding with a hardcoded 5min value, causing strategy-tier CEO workflows to timeout mid-execution). **Subscription seed** added so demo tenants can create workflows (was returning 429 NO_SUBSCRIPTION). **Live E2E results:** CMO ✅ (10 traces, 3 self-reflection loops, 2000+ word healthcare marketing analysis), CTO ✅ (HIPAA/HITRUST/SOC2 compliance identified), CFO ✅ (healthcare financial contextualization), CEO/Strategist ✅ (29 traces, full 12-month rural healthcare strategic roadmap — completed on 3rd retry after timeout fix). 2,216 unit/structural tests passing.
 
 > **Security + quality audit — 8 P0 hardening + test-coverage push (8 May 2026):** five parallel deep-survey agents (dead code · route safety · test gaps · security re-audit · schema integrity) drove a single-session pass that closed 8 P0 + 2 P1 findings AND wrote 17 previously-missing test files (+420 tests, total 2045 passing at that time). **P0 hardening:** `Workflow.userId` + `TaskAssignment.assignedByUserId` schema declarations now match the live FK behaviour (truth-of-record); `/trial/verify` got `Cache-Control: no-store` + 80 ms response-time floor (kills cache-of-initialPassword + timing side-channel); `JAK_TRIAL_EMAIL_LOG_DIR` validated against an allowlist (tmpdir / cwd/tmp / `/var/log/jak` / `JAK_ALLOWED_DATA_ROOT`); per-IP (5/min signup, 10/min verify) + per-email (3/hr) rate limits added; `X-Forwarded-For` only honoured behind `JAK_TRUST_PROXY=true`; trial cap now enforced on `WorkflowSchedule` cron firing (`SKIPPED_TRIAL_CAP_HIT` / `SKIPPED_TRIAL_EXPIRED`); department parent-chain has full ancestor-cycle detection (depth-cap 64). **5 real bugs surfaced + fixed by writing tests:** `task-assignments` cancel notification mis-categorised as `task_assigned` (now distinct `task_completed`/`task_declined`/`task_cancelled` kinds); `inbox.routes` showed approvals to `OPERATOR` who can't decide them; `auth.service.register` echoed the email back in `ConflictError` (enumeration oracle — generic message + sha256-truncated-hash log); `DELETE /documents/:id` had no role check (now uploader-or-`REVIEWER+`); `update({where:{id}})` tenant-isolation invariant documented as load-bearing on the prior `findFirst`. **17 new test files** covering credential / bundle+bundle-signing / oauth-providers / sandbox / auth services + audit-run / workflow / workflow-timeline / artifact / 3 compliance services + 5 routes (task-assignments / team / inbox / trial / documents). **Honest carry-overs:** 30 service/route files still untested (~15-25 hours more focused work); OAuth refresh-token grant flow doesn't exist; `sandbox.service` is a thin lifecycle wrapper (real isolation lives in the adapter); `audit-run.transition()` has a read-then-write concurrency race. The landing truth-lock has since expanded with the Company OS checks named above.
 
@@ -259,7 +259,7 @@ flowchart LR
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check (heuristic + TS compiler + optional Docker) → Debug loop (≤3 retries) → Deploy. Durable end-to-end workflow, auto-snapshots with diff at every stage. Full-stack Next.js/React/Tailwind |
 | 🔖 | **Checkpoint-Revert** | Every Vibe Coder stage auto-snapshots the project with a structural diff (added / modified / deleted per file). One-click restore creates a rollback version so restores themselves are reversible |
 | 🧪 | **Tool Maturity Manifest** | All 122 built-in tools carry an honest `maturity` label (real / heuristic / llm_passthrough / config_dependent / experimental). `pnpm check:truth` fails CI if any tool ships unclassified or any marketing claim drifts from the registry |
-| 🧠 | **OpenAI-only runtime** | Primary and only LLM execution path: OpenAI Responses API with GPT-5.5 for Tier 3 orchestration and GPT-5.4 for Tier 1/2 worker paths. API keys are required: set `OPENAI_API_KEY` for LLM execution. No Anthropic/Gemini/DeepSeek/Ollama/OpenRouter fallback is wired in the runtime. |
+| 🧠 | **Agent-first runtime** | All work routes through specialist agents with tier-based model execution. API keys are required: set `OPENAI_API_KEY` for LLM execution. |
 | 🧬 | **Memory System** | LLM-powered fact extraction from completed workflows, token-budgeted retrieval injected into agent prompts via `<memory>` tags. **Conversation threads** are now server-side (`Conversation` + `ConversationMessage` tables) with full history injection into the LangGraph state so multi-turn chat feels continuous instead of a string-concat hack. |
 | 🎯 | **Context Engineering** | Automatic context summarization prevents window overflow on long DAGs. Protects current task + dependencies, compresses older results |
 | 🔄 | **Tool Error Recovery** | Tool crashes produce recoverable error messages instead of workflow failures. Fingerprint-based loop detection (3x threshold) prevents infinite retries |
@@ -491,13 +491,13 @@ graph LR
 
 | Provider | Tier | Use Case |
 |:--------:|:----:|----------|
-| ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.5_%2F_GPT--5.4-412991?style=flat-square&logo=openai&logoColor=white) | **Tier 1-3** | Only LLM execution provider; Responses API, strict structured output, prompt-cache-aware telemetry |
+| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_GPT--5.4-412991?style=flat-square&logo=robot&logoColor=white) | **Tier 1-3** | LLM execution provider; Responses API, strict structured output, prompt-cache-aware telemetry |
 
 </div>
 
-**Routing strategy:** OpenAI-only. Tier 3 orchestration defaults to GPT-5.5; Tier 1/2 worker and balanced paths default to GPT-5.4. The legacy multi-provider failover strategies were removed to keep execution predictable and auditable.
+**Routing strategy:** Agent-first. Tier 3 orchestration defaults to GPT-5.5; Tier 1/2 worker and balanced paths default to GPT-5.4. The legacy multi-provider failover strategies were removed to keep execution predictable and auditable.
 
-> Tier 1 handles parallel worker tasks on the lower-cost OpenAI tier. Tier 3 handles Commander, Planner, and Verifier on GPT-5.5.
+> Tier 1 handles parallel worker tasks on the lower-cost tier. Tier 3 handles Commander, Planner, and Verifier on GPT-5.5.
 
 ---
 
@@ -672,7 +672,7 @@ flowchart TD
 
 | Stage | LLM Tier | Model | Est. Cost |
 |:------|:--------:|:------|:---------:|
-| 📸 Screenshot analysis | Tier 3 | GPT-5.5 vision-capable OpenAI runtime | $0.10-0.20 |
+| 📸 Screenshot analysis | Tier 3 | GPT-5.5 vision-capable agent runtime | $0.10-0.20 |
 | 🏛️ Architecture | Tier 3 | GPT-5.5 | $0.20-0.50 |
 | ⚡ Code generation | Tier 2 | GPT-5.4 | $0.15-0.40 |
 | 🔧 Debug iterations | Tier 1 | GPT-5.4 lower-cost routing | $0.02-0.05/iter |
@@ -784,7 +784,7 @@ User → POST /audit/runs                                  AuditRunService.creat
 
 ### Honesty notes
 
-- LLM evaluation is real (`OpenAIRuntime.respondStructured` with strict json_schema). When `OPENAI_API_KEY` is absent, the service uses a deterministic coverage rule and writes `"deterministic coverage rule (no LLM key configured)"` as the rationale so reviewers see the difference. Never silent-faked.
+- LLM evaluation is real (`AgentRuntime.respondStructured` with strict json_schema). When `OPENAI_API_KEY` is absent, the service uses a deterministic coverage rule and writes `"deterministic coverage rule (no LLM key configured)"` as the rationale so reviewers see the difference. Never silent-faked.
 - Lifecycle events carry an `agentRole` field (`AUDIT_COMMANDER`, `CONTROL_TEST_AGENT`, `EXCEPTION_FINDER`, `WORKPAPER_WRITER`, `FINAL_AUDIT_PACK_AGENT`, `COMPLIANCE_MAPPER`). The work itself is performed by the named service. We did NOT create 9 fake `BaseAgent` placeholder classes — that's a documented Phase 2 optimization in [qa/audit-compliance-readiness-audit.md](qa/audit-compliance-readiness-audit.md).
 - Things explicitly deferred (and named, not faked) — external auditor portal (~2 weeks), real LangGraph nodes (~2 weeks), DOCX/XLSX/image content parsing for evidence (~3 days), live SSE on the audit detail page (~1 day; currently 15s SWR polling). Full deferral table in [qa/audit-pack-shipped-report.md](qa/audit-pack-shipped-report.md).
 
@@ -1596,7 +1596,7 @@ The Company OS implementation lives in `CompanyArtifact`, `CompanyGraphEntity`, 
 - Tenant-scoped evidence artifacts with source/type labels and body hashes
 - Company graph entities that must cite artifacts
 - Deterministic drift detection for customer signals, decisions, execution work, and stale high-priority tasks
-- OpenAI-backed agent-executable spec generation with no template fallback
+- Agent-backed executable spec generation with no template fallback
 - Reviewer approval/rejection for specs, now immutable after first review
 - `/company` UI for manual/API-fed evidence ingestion, extraction, drift analysis, and spec review
 
@@ -1672,7 +1672,7 @@ Because a single bad-actor workflow can drain a 30-day budget in two hours. Per-
 
 **For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers we name openly:
 
-1. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment, environment variables, migrations, queues, connector credentials, or OpenAI model entitlements are healthy.
+1. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment, environment variables, migrations, queues, connector credentials, or LLM model entitlements are healthy.
 2. No third-party security audit (no SOC 2 Type 1/2, no ISO 27001 certification). The control infrastructure is shipped (182 controls seeded, 108 operationally backed) but the certification audit itself has not happened.
 3. Lawyer-reviewed Terms of Service / Privacy Policy / DPA are not in place — required for B2B and EU-region sales.
 4. No third-party penetration test against the running system.
@@ -1697,7 +1697,7 @@ We deliberately avoid the phrases that would imply third-party attestation we do
 <details>
 <summary><b>Can I self-host JAK Swarm?</b></summary>
 
-**Yes.** It's MIT-licensed, the code is here, the README has the full Quick Start. You need: Docker for Postgres + Redis, an OpenAI API key, Node 20+, pnpm 9+. Run `bash scripts/start-dev.sh` to bootstrap and you're at `http://localhost:3000` in a few minutes. There's no cloud-only feature — the same code that runs at jakswarm.com is what you self-host.
+**Yes.** It's MIT-licensed, the code is here, the README has the full Quick Start. You need: Docker for Postgres + Redis, an API key, Node 20+, pnpm 9+. Run `bash scripts/start-dev.sh` to bootstrap and you're at `http://localhost:3000` in a few minutes. There's no cloud-only feature — the same code that runs at jakswarm.com is what you self-host.
 
 </details>
 
@@ -1786,16 +1786,16 @@ When self-hosting, you pay only for **LLM API calls** (~$0.01–$1.00 per workfl
 </details>
 
 <details>
-<summary><b>Can I use local LLMs or OpenRouter instead of OpenAI?</b></summary>
+<summary><b>Can I use local LLMs or other providers?</b></summary>
 
-No. The active runtime is intentionally OpenAI-only. Ollama, OpenRouter, Anthropic, Gemini, and DeepSeek adapters were removed from the execution path to keep model behavior, audit evidence, and cost telemetry predictable. If local LLM support returns later, it should land as a new reviewed runtime with its own tests and documentation, not as a silent fallback.
+The current runtime uses a single LLM provider for execution. Ollama, OpenRouter, Anthropic, Gemini, and DeepSeek adapters were removed from the execution path to keep model behavior, audit evidence, and cost telemetry predictable. If local LLM support returns later, it should land as a new reviewed runtime with its own tests and documentation, not as a silent fallback.
 
 </details>
 
 <details>
-<summary><b>What does "OpenAI-first" mean in the architecture?</b></summary>
+<summary><b>What does "Agent-first" mean in the architecture?</b></summary>
 
-The agent runtime uses OpenAI's Responses API with `json_schema` strict mode for structured output, plus prompt-cache-aware cost telemetry. OpenAI is not just the preferred path; it is the only LLM execution path in the current codebase. Switches for Anthropic, Gemini, DeepSeek, Ollama, and OpenRouter are not supported.
+JAK routes all work through specialist agents with the Responses API + `json_schema` strict mode for structured output, plus prompt-cache-aware cost telemetry. The LLM provider is the execution engine — agents are the architecture. Switches for alternate providers are not supported in the current codebase.
 
 </details>
 
@@ -1845,7 +1845,7 @@ Other independent tasks continue (graceful failure). The Verifier can trigger au
 <details>
 <summary><b>Can agents see images and PDFs?</b></summary>
 
-Yes. OpenAI vision-capable models process images via `analyzeImage()`. PDFs go through `pdf_extract_text` / `pdf_analyze`. DOCX uses `mammoth`, XLSX uses `exceljs`, images use `tesseract.js` for OCR — every parser surfaces a `parseConfidence` value (0.95 DOCX, 0.85 XLSX, 0.6 OCR) so reviewers can filter.
+Yes. Vision-capable models process images via `analyzeImage()`. PDFs go through `pdf_extract_text` / `pdf_analyze`. DOCX uses `mammoth`, XLSX uses `exceljs`, images use `tesseract.js` for OCR — every parser surfaces a `parseConfidence` value (0.95 DOCX, 0.85 XLSX, 0.6 OCR) so reviewers can filter.
 
 </details>
 
@@ -1891,7 +1891,7 @@ Add a tool definition to `packages/tools/src/builtin/index.ts`, classify it with
 <details>
 <summary><b>How do I add a new LLM provider?</b></summary>
 
-For the beta, you don't. JAK Swarm is intentionally OpenAI-only for LLM execution so routing, safety review, tracing, and cost accounting stay predictable. Add new OpenAI model tiers through the existing OpenAI runtime and model resolver instead of adding provider fallbacks.
+For the beta, you don't. JAK Swarm uses a single LLM provider for execution so routing, safety review, tracing, and cost accounting stay predictable. Add new model tiers through the existing runtime and model resolver instead of adding provider fallbacks.
 
 </details>
 

@@ -18,7 +18,7 @@ interface LLMProvider {
 }
 
 const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; description: string; models: string[]; color: string }> = {
-  openai: { icon: <Brain className="h-5 w-5" />, label: 'OpenAI', description: 'GPT-5.5 / GPT-5.4 agentic runtime', models: ['gpt-5.5', 'gpt-5.4'], color: '#10a37f' },
+  openai: { icon: <Brain className="h-5 w-5" />, label: 'Agent Runtime', description: 'GPT-5.5 / GPT-5.4 agentic runtime', models: ['gpt-5.5', 'gpt-5.4'], color: '#10a37f' },
 };
 
 export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
@@ -60,7 +60,7 @@ export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
     <div className="flex flex-col h-full p-4 gap-4 overflow-auto">
       <div className="shrink-0">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Key className="h-5 w-5 text-primary" />Settings</h2>
-        <p className="text-xs text-muted-foreground">Configure the OpenAI execution key and GPT-5.5/5.4 model tier.</p>
+        <p className="text-xs text-muted-foreground">Configure the execution key and GPT-5.5/5.4 model tier.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 max-w-3xl">

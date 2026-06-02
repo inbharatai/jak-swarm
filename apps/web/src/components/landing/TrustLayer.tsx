@@ -60,9 +60,9 @@ const POINTS: TrustPoint[] = [
     iconPath: 'M12 3l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V7l8-4Z',
   },
   {
-    title: 'OpenAI-first runtime',
-    body: 'JAK is OpenAI-only for model execution, with GPT-5.5/5.4-family tier routing and Responses API support for structured orchestration. No alternate LLM provider fallback is used.',
-    proof: 'openai-runtime.ts · provider-router.ts',
+    title: 'Agent-first runtime',
+    body: 'JAK routes all work through specialist agents with structured orchestration, tier-based model routing, and strict output validation. No template fallbacks — every spec is generated from evidence.',
+    proof: 'agent-runtime.ts · provider-router.ts',
     color: '#f472b6',
     iconPath: 'M12 6V3m0 18v-3m6-9h3M3 12h3m11.66-6.66l2.12-2.12M3.22 20.78l2.12-2.12M17.66 20.78l2.12-2.12M3.22 3.22l2.12 2.12',
   },

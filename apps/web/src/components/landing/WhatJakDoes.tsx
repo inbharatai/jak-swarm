@@ -8,7 +8,7 @@
  *   1. evidence artifacts are real tenant-scoped records
  *   2. graph entities are extracted from evidence, not invented
  *   3. drift detection is deterministic
- *   4. OpenAI-generated specs require approval before execution
+ *   4. Agent-generated specs require approval before execution
  *
  * Connector auto-sync is not claimed as complete here. The page says
  * "connected or manually ingested evidence" because the current /company UI
@@ -63,7 +63,7 @@ const PILLARS: Array<{
     key: 'specs',
     eyebrow: 'Agent-executable specs',
     title: 'Turn drift into approved work.',
-    body: 'When drift is found, JAK can generate an OpenAI-backed execution spec with objective, scope, acceptance criteria, test plan, agent task plan, approval gates, and cited evidence. A reviewer approves or rejects it before the team treats it as executable.',
+    body: 'When drift is found, JAK generates an agent-executable spec with objective, scope, acceptance criteria, test plan, agent task plan, approval gates, and cited evidence. A reviewer approves or rejects it before the team treats it as executable.',
     points: [
       'No template fallback for spec generation',
       'Acceptance criteria and test plans are explicit',
@@ -151,7 +151,7 @@ export default function WhatJakDoes() {
         </div>
 
         <div className="mt-8 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5 text-sm text-amber-100 font-sans leading-relaxed">
-          Blunt beta truth: JAK has the Company OS data model, API routes, dashboard surface, deterministic drift detector, OpenAI spec generator, approval decision route, and audit foundation. It still needs deeper connector auto-sync before the landing page should claim full company-wide OS coverage.
+          Blunt beta truth: JAK has the Company OS data model, API routes, dashboard surface, deterministic drift detector, agent spec generator, approval decision route, and audit foundation. It still needs deeper connector auto-sync before the landing page should claim full company-wide OS coverage.
         </div>
       </div>
     </section>

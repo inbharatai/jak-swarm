@@ -216,7 +216,7 @@ export default function PremiumCTA() {
           </h2>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto mb-12 font-sans leading-relaxed">
-            Start with the honest beta wedge: company evidence, drift detection, executable specs, approval gates, and audit trails. Open-source core. Self-hostable. OpenAI-first runtime.
+            Start with the honest beta wedge: company evidence, drift detection, executable specs, approval gates, and audit trails. Open-source core. Self-hostable. Agent-first runtime.
           </p>
 
           {/* CTA buttons */}

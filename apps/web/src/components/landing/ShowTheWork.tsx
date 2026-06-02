@@ -66,7 +66,7 @@ const OUTCOMES: ProofCard[] = [
         </ul>
       </div>
     ),
-    badges: ['OpenAI required', 'Reviewer decision route'],
+    badges: ['Agent-generated', 'Reviewer decision route'],
     color: '#34d399',
   },
   {

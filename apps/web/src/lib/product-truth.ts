@@ -29,7 +29,7 @@
  *   - agents = AgentRole enum entries in packages/shared/src/types/agent.ts
  *   - tools  = `toolRegistry.register(` call count in packages/tools/src/builtin/index.ts
  *   - connectors = INTEGRATIONS_CORE.length + INTEGRATIONS_INFRA.length
- *   - model runtime = OpenAI-only execution path in packages/agents/src/runtime/
+ *   - model runtime = agent-first execution path in packages/agents/src/runtime/
  */
 
 // ─── Stat counts ────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ export const STATS = [
   // infrastructure/MCP adapters surfaced in the UI. Only a subset are
   // production-ready runtime paths — see docs/integration-maturity-matrix.md.
   { value: 22, label: 'Connectors', suffix: '' },
-  { value: 1, label: 'Model Runtime', suffix: ' OpenAI' },
+  { value: 1, label: 'Agent Runtime', suffix: '' },
 ] as const;
 
 // ─── Compliance framework counts ────────────────────────────────────────────

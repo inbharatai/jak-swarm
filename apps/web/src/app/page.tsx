@@ -90,8 +90,8 @@ function GitHubIcon({ className }: { className?: string }) {
 
 /* ─── Data ────────────────────────────────────────────────────────────────── */
 
-// Pricing copy is OpenAI-only across every tier so public messaging matches
-// the GPT-5.5/5.4 model tier policy.
+// Pricing copy is agent-first across every tier so public messaging matches
+// the specialist agent routing policy.
 const PRICING = [
   {
     name: 'Free',
@@ -103,7 +103,7 @@ const PRICING = [
       '30 credits / day',
       '5 core agents',
       '1 vibe coding project',
-      'Bring-your-own OpenAI key',
+      'Bring-your-own API key',
       'Community support',
     ],
     cta: 'Start Free',
@@ -115,13 +115,13 @@ const PRICING = [
     name: 'Pro',
     price: '$29',
     period: '/mo',
-    description: 'Hosted runtime, OpenAI managed, approvals built in.',
+    description: 'Hosted agent runtime, managed execution, approvals built in.',
     features: [
       '3,000 credits / month',
       '200 credits / day',
       'All 38 specialist agents',
       '5 vibe coding projects',
-      'Managed OpenAI runtime (GPT-5.4 tier)',
+      'Managed agent runtime (all models)',
       '500 premium credits',
       'Email support',
     ],
@@ -141,7 +141,7 @@ const PRICING = [
       'All agents + custom skills',
       'Unlimited projects',
       '3,000 premium credits',
-      'Managed OpenAI runtime',
+      'Managed agent runtime',
       'Priority support',
     ],
     cta: 'Start Team',
@@ -160,7 +160,7 @@ const PRICING = [
       '15,000 premium credits',
       'SSO + RBAC + audit logs',
       'Custom integrations',
-      'Managed OpenAI runtime',
+      'Managed agent runtime',
       'Dedicated support',
     ],
     cta: 'Contact Us',
@@ -449,7 +449,7 @@ export default function HomePage() {
             </h1>
 
             <p className="mb-6 max-w-3xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through OpenAI-first agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
+              JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through specialist agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
             </p>
 
             {/* Capability strip. Every term below maps to real product code:
@@ -667,7 +667,7 @@ export default function HomePage() {
             <div className="text-center mb-16">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Pricing</p>
               <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Transparent pricing. Open-source core.</h2>
-              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted OpenAI ops, higher limits, and SLA.</p>
+              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted agent ops, higher limits, and SLA.</p>
             </div>
 
             <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">

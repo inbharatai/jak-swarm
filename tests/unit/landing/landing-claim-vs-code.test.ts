@@ -220,10 +220,9 @@ describe('Landing — TrustLayer (6 grep-able guarantees)', () => {
     expect(contains('LICENSE', /MIT/i)).toBe(true);
   });
 
-  it('OpenAI-first runtime → openai-runtime.ts exists', () => {
-    expect(contains(TRUST, /OpenAI-first runtime/)).toBe(true);
-    expect(contains(TRUST, /OpenAI-only for model execution/)).toBe(true);
-    expect(contains(TRUST, /Responses API support for structured orchestration/)).toBe(true);
+  it('Agent-first runtime → runtime files exist', () => {
+    expect(contains(TRUST, /Agent-first runtime/)).toBe(true);
+    expect(contains(TRUST, /structured orchestration/)).toBe(true);
     expect(contains(TRUST, /enforced execution path/)).toBe(false);
     expect(exists('packages/agents/src/runtime/openai-runtime.ts')).toBe(true);
   });
@@ -353,7 +352,7 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(shield).toMatch(/(refuse|does not|not support|blocked)/i);
   });
 
-  it('OpenAI-only runtime claims are enforced by config, docs, and deploy templates', () => {
+  it('Agent-first runtime claims are enforced by config, docs, and deploy templates', () => {
     const config = read('apps/api/src/config.ts');
     const runtimeFactory = read('packages/agents/src/runtime/index.ts');
     const executionDoc = read('docs/architecture/execution-engines.md');
@@ -369,13 +368,11 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(runtimeFactory).toContain('OpenAI-only');
     expect(runtimeFactory).toContain('JAK_EXECUTION_ENGINE=legacy -> ignored');
     expect(executionDoc).toContain('one production LLM runtime');
-    expect(executionDoc).toContain('Do not configure Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter runtime keys');
-    expect(envExample).toContain('OpenAI-only for LLM execution');
-    expect(truth).toMatch(/label:\s*'Model Runtime'/);
-    expect(truth).toMatch(/suffix:\s*' OpenAI'/);
+    expect(truth).toMatch(/label:\s*'Agent Runtime'/);
+    expect(truth).toMatch(/suffix:\s*''/);
 
     const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, renderYaml, doctor].join('\n');
-    expect(activeDeploySurfaces).not.toMatch(/ANTHROPIC_API_KEY|GEMINI_API_KEY|DEEPSEEK_API_KEY|OPENROUTER_API_KEY|OLLAMA_(URL|BASE_URL|MODEL)|OPENAI_FALLBACK_MODEL|LLM_ROUTING_STRATEGY/);
+    expect(activeDeploySurfaces).not.toMatch(/ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|OPENROUTER_API_KEY|OLLAMA_(URL|BASE_URL|MODEL)|OPENAI_FALLBACK_MODEL|LLM_ROUTING_STRATEGY/);
   });
 });
 
