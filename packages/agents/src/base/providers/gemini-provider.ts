@@ -9,7 +9,7 @@
 
 import type { LLMProvider, LLMResponse, MessageContent } from '../llm-provider.js';
 import type { ProviderTier } from '../provider-router.js';
-import { chatMessagesToGeminiContents } from '../../runtime/gemini-message-adapter.js';
+import { chatMessagesToGeminiContents, type OpenAIMessage } from '../../runtime/gemini-message-adapter.js';
 import { chatToolsToFunctionDeclarations } from '../../runtime/gemini-tool-adapter.js';
 import { modelForGeminiTier } from '../../runtime/gemini-model-resolver.js';
 
@@ -52,12 +52,16 @@ export class GeminiProvider implements LLMProvider {
 
     // Convert messages
     const { contents, systemInstruction } = chatMessagesToGeminiContents(
-      params.messages as Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string | unknown[] | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }>,
+      params.messages as OpenAIMessage[],
     );
 
+    // systemInstruction is { parts: [{ text }] } — extract the text string
+    // because the Gemini SDK's ModelParams.systemInstruction expects
+    // string | Part | Content (Content needs role, so plain string is safest).
+    const systemText = systemInstruction?.parts?.[0]?.text;
     const geminiModel = this.client.getGenerativeModel({
       model,
-      ...(systemInstruction ? { systemInstruction } : {}),
+      ...(systemText ? { systemInstruction: systemText } : {}),
     });
 
     const generationConfig: Record<string, unknown> = {};
@@ -75,7 +79,7 @@ export class GeminiProvider implements LLMProvider {
         contents,
         generationConfig,
         ...(toolsConfig ?? {}),
-      }),
+      } as any),
     );
 
     const geminiResp = response.response as unknown as Record<string, unknown>;

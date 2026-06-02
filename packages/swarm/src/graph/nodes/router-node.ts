@@ -1,5 +1,6 @@
 import { WorkflowStatus, Industry } from '@jak-swarm/shared';
 import { RouterAgent, AgentContext } from '@jak-swarm/agents';
+import type { RouterOutput } from '@jak-swarm/agents';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
@@ -43,7 +44,7 @@ export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>
   const result = await agent.execute(
     { plan: state.plan, industryPack },
     context,
-  );
+  ) as RouterOutput;
 
   const traces = context.getTraces();
 

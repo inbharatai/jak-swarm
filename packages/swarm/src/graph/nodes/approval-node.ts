@@ -1,4 +1,5 @@
 import { WorkflowStatus, generateId, TOOL_RISK_LEVEL_ORDER } from '@jak-swarm/shared';
+import type { ApprovalRequest } from '@jak-swarm/shared';
 import { ApprovalAgent, AgentContext } from '@jak-swarm/agents';
 import type { ApprovalInput } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
@@ -97,7 +98,7 @@ export async function approvalNode(state: SwarmState): Promise<Partial<SwarmStat
     idempotencyKey: state.idempotencyKey,
   };
 
-  const approvalRequest = await agent.execute(approvalInput, context);
+  const approvalRequest = await agent.execute(approvalInput, context) as ApprovalRequest;
   const traces = context.getTraces();
 
   return {

@@ -1,5 +1,6 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
 import { CommanderAgent, AgentContext, buildHelpfulClarification, inferIntentFromKeywords } from '@jak-swarm/agents';
+import type { CommanderOutput } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 
 /**
@@ -132,7 +133,7 @@ export async function commanderNode(
 
   const prefix = buildConversationPrefix(state.conversationHistory ?? []);
   const commanderInput = buildCommanderInput(prefix + state.goal, state.roleModes);
-  const result = await agent.execute(commanderInput, context);
+  const result = await agent.execute(commanderInput, context) as CommanderOutput;
 
   const traces = context.getTraces();
 

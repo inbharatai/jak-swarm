@@ -1,6 +1,6 @@
 import { WorkflowStatus } from '@jak-swarm/shared';
 import { GuardrailAgent, AgentContext } from '@jak-swarm/agents';
-import type { GuardrailInput } from '@jak-swarm/agents';
+import type { GuardrailInput, GuardrailResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 
@@ -70,7 +70,7 @@ export async function guardrailNode(state: SwarmState): Promise<Partial<SwarmSta
     checkType: 'ACTION',
   };
 
-  const result = await agent.execute(guardrailInput, context);
+  const result = await agent.execute(guardrailInput, context) as GuardrailResult;
 
   // ─── Verification Engine: auto-verify when task involves sensitive content ──
   const verificationType = detectVerificationType(task.description, task.toolsRequired);
