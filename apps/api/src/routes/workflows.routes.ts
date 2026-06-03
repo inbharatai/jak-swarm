@@ -16,7 +16,7 @@ export const createWorkflowBodySchema = z.object({
   industry: z.string().max(120).optional(),
   roleModes: z.array(z.string().min(1).max(64)).max(10).optional(),
   maxCostUsd: z.number().positive().max(1000).optional(),
-  conversationId: z.string().cuid().optional(),
+  conversationId: z.string().min(1).max(255).optional(),
 });
 
 export const resumeWorkflowBodySchema = z.object({

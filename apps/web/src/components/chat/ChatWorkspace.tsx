@@ -10,6 +10,7 @@ import { RolePicker } from './RolePicker';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   getWorkflowIdFromCreateResponse,
+  getErrorMessage,
   isWorkflowFollowupResponse,
   workflowApi,
 } from '@/lib/api-client';
@@ -691,7 +692,7 @@ export function ChatWorkspace() {
       addMessage(convId, {
         role: 'assistant',
         agentRole: null,
-        content: `Failed to start workflow: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`,
+        content: `Failed to start workflow: ${getErrorMessage(err)}. Please try again.`,
       });
     } finally {
       setIsSending(false);

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Home, LayoutDashboard, Network, FileText, BarChart3, BookOpen,
-  ShieldCheck, Plug, Clock, Code2, Search, ArrowRight, Megaphone, Wrench,
+  ShieldCheck, Plug, Clock, Code2, Search, ArrowRight, Megaphone, Wrench, Settings,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -31,6 +31,7 @@ const NAV_COMMANDS: CommandItem[] = [
   { id: 'integrations', label: 'Integrations', description: 'Connected services', icon: <Plug className="h-4 w-4" />, href: '/integrations', group: 'Navigation' },
   { id: 'knowledge', label: 'Knowledge', description: 'Memory store', icon: <BookOpen className="h-4 w-4" />, href: '/knowledge', group: 'Navigation' },
   { id: 'admin', label: 'Admin Console', description: 'Settings & users', icon: <ShieldCheck className="h-4 w-4" />, href: '/admin', group: 'Navigation' },
+  { id: 'settings', label: 'AI Backends', description: 'LLM provider settings & API keys', icon: <Settings className="h-4 w-4" />, href: '/settings', group: 'Navigation' },
 ];
 
 export function CommandPalette() {

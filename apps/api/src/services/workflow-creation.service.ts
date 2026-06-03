@@ -19,6 +19,7 @@ export async function createWorkflowOrchestration(
   },
 ): Promise<{ statusCode: number; body: unknown }> {
   const { goal, industry, roleModes, maxCostUsd, conversationId } = data;
+  const ceoMode = roleModes?.includes('ceo') ? 'ceo' as const : undefined;
   const { tenantId, userId } = request.user;
   const requestId = request.id;
 
@@ -109,6 +110,7 @@ export async function createWorkflowOrchestration(
         maxCostUsd: maxCostUsd ?? null,
         stateJson: {
           roleModes: roleModes ?? [],
+          ceoMode: ceoMode ?? null,
           requestedAt: new Date().toISOString(),
           requestedBy: userId,
         },
@@ -137,6 +139,7 @@ export async function createWorkflowOrchestration(
       conversationId,
       idempotencyKey,
       subscriptionTier,
+      ceoMode,
     });
 
     fastify.log.info(

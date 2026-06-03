@@ -11,6 +11,17 @@ import { createClient } from './supabase';
 import { clearToken, getRawToken } from './auth';
 
 /**
+ * Extract a human-readable error message from an API error or JS Error.
+ * API errors are thrown as plain objects { message, code, status }, not Error instances,
+ * so `err instanceof Error` is always false for them. This utility handles both cases.
+ */
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message);
+  return 'Unknown error';
+}
+
+/**
  * Resolve the API base URL with a strict production guard (P0-A fix).
  *
  * Behavior:

@@ -1,0 +1,91 @@
+flowchart TD
+    subgraph INPUT["🎤 Input Layer"]
+        A["💬 Natural Language Goal"]
+        B["🎤 Voice Command"]
+    end
+
+    subgraph SHIELD_IN["🛡️ JAK Shield — Input Gate"]
+        INJ["Injection Detector\n13+ languages, 6 stages"]
+        CYB["Offensive-Cyber Detector\nmalware · exploits · phishing"]
+    end
+
+    subgraph ORCH["🧠 Orchestration — LangGraph StateGraph"]
+        CMD["🎯 Commander\ninterprets intent, sets mission"]
+        PLN["📋 Planner\nbuilds dependency DAG"]
+        RTR["🔀 Router\nassigns agents + tiers"]
+        VER["✅ Verifier\nchecks output vs goal"]
+        GRD["🛡️ Guardrail\npolicy enforcement"]
+        APR["⚠️ Approval Gate\nhuman-in-the-loop"]
+    end
+
+    subgraph WORKERS["⚡ Worker Layer — 32 Specialist Agents"]
+        direction LR
+        EXEC["💼 Executive\nCEO · CTO · CFO · CMO"]
+        OPS["🏢 Operations\nContent · SEO · Legal · Analytics"]
+        CORE["⚙️ Core\nEmail · Calendar · CRM · Browser"]
+        VIBE["⚡ Vibe Coding\nArchitect · Generator · Debugger"]
+    end
+
+    subgraph PROVIDERS["🧠 LLM Provider Layer"]
+        direction LR
+        OAI["OpenAI\nGPT-5.5 · GPT-5.4"]
+        GEM["Gemini\n2.5 Pro · Flash · Flash-Lite"]
+    end
+
+    subgraph TOOLS["🔧 122 Classified Tools"]
+        direction LR
+        T1["📧 Email · 📅 Calendar"]
+        T2["👤 CRM · 📄 Document"]
+        T3["🌐 Browser · 🔍 Research"]
+        T4["📊 Spreadsheet · 🧠 Knowledge"]
+        T5["MCP: Slack · GitHub · Notion"]
+    end
+
+    subgraph SHIELD_OUT["🛡️ JAK Shield — Tool Gate"]
+        RISK["Risk Classifier\n6-tier lattice"]
+        PERM["Permission Layer\ntenant allowlists"]
+        AUDIT["Audit Logger\nHMAC-SHA256 signed"]
+    end
+
+    subgraph STATE["💾 Durable State"]
+        PG[("PostgreSQL\nLangGraph Checkpoints\nAudit Logs · Traces")]
+        RD[("Redis\nJob Queue · Cron\nVoice Sessions")]
+    end
+
+    subgraph MCP["🔌 21 MCP Connectors"]
+        direction LR
+        M1["Slack · GitHub · Google Drive"]
+        M2["Notion · Stripe · HubSpot"]
+        M3["Salesforce · Airtable · +13"]
+    end
+
+    A --> INJ
+    B --> INJ
+    INJ --> CMD
+    CYB --> CMD
+    CMD --> PLN --> GRD
+    GRD -->|"✅ Pass"| RTR
+    GRD -->|"🚫 Block"| CMD
+    RTR --> WORKERS
+    WORKERS --> PROVIDERS
+    PROVIDERS --> WORKERS
+    WORKERS --> TOOLS
+    TOOLS --> RISK
+    RISK -->|"READ_ONLY"| AUDIT
+    RISK -->|"DESTRUCTIVE"| APR
+    APR -->|"👍 Approved"| AUDIT
+    APR -->|"👎 Rejected"| CMD
+    AUDIT --> VER
+    VER -->|"✅ Pass"| OUTPUT["📊 Compiled Result"]
+    VER -->|"❌ Fail"| PLN
+
+    WORKERS <--> PG
+    WORKERS <--> RD
+    TOOLS <--> MCP
+
+    style SHIELD_IN fill:#fef2f2,stroke:#ef4444,color:#991b1b
+    style SHIELD_OUT fill:#fef2f2,stroke:#ef4444,color:#991b1b
+    style ORCH fill:#eff6ff,stroke:#3b82f6,color:#1e40af
+    style PROVIDERS fill:#f0fdf4,stroke:#22c55e,color:#166534
+    style STATE fill:#faf5ff,stroke:#a855f7,color:#6b21a8
+    style MCP fill:#fff7ed,stroke:#f97316,color:#9a3412

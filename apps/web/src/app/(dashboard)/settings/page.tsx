@@ -126,58 +126,56 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Preferred provider toggle — always visible, details hidden for non-identity users */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-sm">
+              <Server className="h-4 w-4 text-primary shrink-0" />
+              <div>
+                <span className="font-medium">Active provider</span>
+                <span className="text-muted-foreground ml-1">— all agents will use this LLM runtime</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {Object.entries(PROVIDER_META).map(([name, meta]) => {
+                const isActive = preferredProvider === name;
+                const isConfigured = canViewProviderIdentity ? !!providerByKey[name]?.configured : true;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => handleSetPreferredProvider(name)}
+                    disabled={switchingProvider || !isConfigured}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : isConfigured
+                          ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
+                    }`}
+                    title={!isConfigured ? `${meta.label} is not configured — add an API key first` : `Switch to ${meta.label}`}
+                  >
+                    {meta.icon}
+                    {meta.label}
+                    {switchingProvider && isActive && <Spinner size="sm" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {!canViewProviderIdentity && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4">
             <div className="flex items-start gap-3 text-sm">
               <Shield className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">Provider identity hidden</p>
+                <p className="font-medium">Provider details hidden</p>
                 <p className="text-muted-foreground mt-1">
-                  Provider names and model details are intentionally hidden for account security.
+                  Provider names and model details are hidden for account security. You can still switch the active runtime.
                 </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Preferred provider toggle — only shown when identity is visible */}
-      {canViewProviderIdentity && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-sm">
-                <Server className="h-4 w-4 text-primary shrink-0" />
-                <div>
-                  <span className="font-medium">Active provider</span>
-                  <span className="text-muted-foreground ml-1">— all agents will use this LLM runtime</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {Object.entries(PROVIDER_META).map(([name, meta]) => {
-                  const isActive = preferredProvider === name;
-                  const isConfigured = !!providerByKey[name]?.configured;
-                  return (
-                    <button
-                      key={name}
-                      onClick={() => handleSetPreferredProvider(name)}
-                      disabled={switchingProvider || !isConfigured}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : isConfigured
-                            ? 'bg-muted text-muted-foreground hover:bg-muted/80'
-                            : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
-                      }`}
-                      title={!isConfigured ? `${meta.label} is not configured — add an API key first` : `Switch to ${meta.label}`}
-                    >
-                      {meta.icon}
-                      {meta.label}
-                      {switchingProvider && isActive && <Spinner size="sm" />}
-                    </button>
-                  );
-                })}
               </div>
             </div>
           </CardContent>

@@ -105,6 +105,18 @@ const CEO_TRIGGER_PATTERNS: Array<{ pattern: RegExp; intent: string; functions: 
     functions: ['CEO', 'CFO'],
   },
   {
+    // Specific: executive summary / briefing / report
+    pattern: /\b(executive\s+summary|executive\s+briefing|executive\s+report)\b/i,
+    intent: 'executive_summary',
+    functions: ['CEO', 'CMO', 'CFO'],
+  },
+  {
+    // Specific: compile/summarize + activity/performance/last 30 days
+    pattern: /\b(summar(?:y|ize|ise)|compile\s+(?:a\s+)?(?:summary|brief|report|overview))\s+(?:of|for)\b.*\b(?:activity|performance|results?|metrics?|operations?|last|past|recent)\b/i,
+    intent: 'executive_summary',
+    functions: ['CEO', 'COO'],
+  },
+  {
     // Specific: function-owner request (run my company marketing)
     pattern: /\b(run my (?:company|business)'?s?)\s+(marketing|sales|operations|finance)/i,
     intent: 'function_owner_request',
