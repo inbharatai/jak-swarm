@@ -4,10 +4,13 @@
 
 ### The Closed-Loop Company Operating Layer for Agent Work
 
+[![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory)
+[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
+[![Tests](https://img.shields.io/badge/Tests-2232_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -42,7 +45,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 ### Honest boundary
 
-This is **beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
 
 ---
 
