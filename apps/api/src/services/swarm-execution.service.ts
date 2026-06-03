@@ -1063,11 +1063,20 @@ export class SwarmExecutionService extends EventEmitter {
         }
       }
 
+      // ── CEO mode with no connected data sources ──────────────────────────
+      // When CEO mode is active and there are no connected integrations,
+      // augment the goal so the planner produces a template/outline rather
+      // than fabricating metrics from empty context.
+      let effectiveGoal = goal;
+      if (ceoPreFlight?.isCEOMode && connectedProviders.length === 0) {
+        effectiveGoal = `${goal}\n\n[System note: No company data sources are connected. Produce a structured template or outline summary that highlights what data sources would be needed for a complete analysis. Do not fabricate metrics.]`;
+      }
+
       const result = await this.runner.run({
         workflowId,
         tenantId,
         userId,
-        goal,
+        goal: effectiveGoal,
         industry: effectiveIndustry,
         roleModes: params.roleModes,
         maxCostUsd: params.maxCostUsd,

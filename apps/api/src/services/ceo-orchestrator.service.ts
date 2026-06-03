@@ -385,19 +385,61 @@ export class CEOOrchestratorService {
   ): Promise<CEOSummaryResult> {
     const startedAt = Date.now();
     let result: CEOSummaryResult;
-    try {
-      result = await this.callLLMSummary(input);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger?.warn?.(
-        { workflowId: input.workflowId, err: msg },
-        '[CEOOrchestrator] Executive summary generation failed; surfacing honest error',
+
+    // ── No-artifact graceful degradation ──────────────────────────────────
+    // When there are zero worker outputs (no data connected, no tasks ran),
+    // produce a useful template instead of calling the LLM with empty context
+    // (which would fabricate metrics). Keep workflow status COMPLETED.
+    // If outputs exist (even short ones), fall through to the LLM call —
+    // the LLM can produce a summary from whatever content is available,
+    // and if it fails, the catch block surfaces the honest error.
+    if ((!input.outputs || input.outputs.length === 0) && input.status !== 'FAILED') {
+      this.logger?.info?.(
+        { workflowId: input.workflowId },
+        '[CEOOrchestrator] No worker outputs for executive summary — producing template',
       );
       result = {
-        summary: `Executive summary unavailable: ${msg}. Workflow finished with status ${input.status}.`,
-        nextActions: [],
-        generationError: msg,
+        summary: [
+          `# Executive Summary Template`,
+          ``,
+          `**Goal**: ${input.goal}`,
+          `**Intent**: ${input.intent}`,
+          `**Status**: Limited mode — no company activity data connected yet.`,
+          ``,
+          `## What you would get with connected data:`,
+          `- Performance metrics for the requested period`,
+          `- Key accomplishments and milestones`,
+          `- Financial overview and budget status`,
+          `- Operational highlights and team velocity`,
+          `- Risk indicators and recommended next steps`,
+          ``,
+          `## Recommended next actions:`,
+          `1. Connect your Google Workspace, GitHub, or Slack to start building your company brain`,
+          `2. Set up your Company Profile (name, industry, description) for personalized agent context`,
+          `3. Run this summary again after connecting data sources`,
+        ].join('\n'),
+        nextActions: [
+          'Connect a data source (Google Workspace, GitHub, Slack) to enable full summaries',
+          'Complete your Company Profile for personalized agent context',
+          'Re-run this summary after data sources are connected',
+        ],
+        generationError: undefined,
       };
+    } else {
+      try {
+        result = await this.callLLMSummary(input);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger?.warn?.(
+          { workflowId: input.workflowId, err: msg },
+          '[CEOOrchestrator] Executive summary generation failed; surfacing honest error',
+        );
+        result = {
+          summary: `Executive summary unavailable: ${msg}. Workflow finished with status ${input.status}.`,
+          nextActions: [],
+          generationError: msg,
+        };
+      }
     }
 
     const durationMs = Date.now() - startedAt;
