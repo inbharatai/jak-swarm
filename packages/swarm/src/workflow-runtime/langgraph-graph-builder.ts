@@ -61,6 +61,7 @@ import { validatorNode } from '../graph/nodes/validator-node.js';
 // (Sprint 2.5 / A.3 deferred follow-up: wire replan as a side-channel.)
 import {
   afterCommander,
+  afterPlanner,
   afterGuardrail,
   afterApproval,
   afterVerifier,
@@ -187,6 +188,10 @@ export type SwarmAnnotationT = typeof SwarmStateAnnotation.State;
 function commanderEdge(state: SwarmAnnotationT): 'planner' | 'end' {
   const next: NodeName = afterCommander(state as unknown as SwarmState);
   return next === '__end__' || next === '__clarification__' ? 'end' : 'planner';
+}
+function plannerEdge(state: SwarmAnnotationT): 'router' | 'end' {
+  const next: NodeName = afterPlanner(state as unknown as SwarmState);
+  return next === '__end__' ? 'end' : 'router';
 }
 function guardrailEdge(state: SwarmAnnotationT): 'approval' | 'worker' | 'end' {
   const next = afterGuardrail(state as unknown as SwarmState);
@@ -430,7 +435,10 @@ export function buildLangGraph(params: BuildLangGraphParams) {
       planner: 'planner',
       end: END,
     })
-    .addEdge('planner', 'router')
+    .addConditionalEdges('planner', plannerEdge, {
+      router: 'router',
+      end: END,
+    })
     .addEdge('router', 'guardrail')
     .addConditionalEdges('guardrail', guardrailEdge, {
       approval: 'approval',

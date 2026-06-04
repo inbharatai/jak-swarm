@@ -10,6 +10,7 @@
  * LangGraph's `END` by the builder; nothing else uses them.
  */
 
+import { WorkflowStatus } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
 import {
   getCurrentTask,
@@ -36,6 +37,14 @@ export function afterCommander(state: SwarmState): NodeName {
   if (state.directAnswer) return '__end__';
   if (state.clarificationNeeded) return '__clarification__';
   return 'planner';
+}
+
+export function afterPlanner(state: SwarmState): NodeName {
+  // If the planner failed (no LLM key, timeout, budget exceeded, etc.),
+  // do NOT advance to the router — it will crash with "no plan or mission
+  // brief". Instead, route to END with the FAILED status already set.
+  if (state.status === WorkflowStatus.FAILED || !state.plan) return '__end__';
+  return 'router';
 }
 
 export function afterGuardrail(state: SwarmState): NodeName {
