@@ -7,8 +7,11 @@ import { getActivityEmitter } from '../../supervisor/activity-registry.js';
 
 export async function routerNode(state: SwarmState): Promise<Partial<SwarmState>> {
   if (!state.plan || !state.missionBrief) {
+    const missing = [];
+    if (!state.missionBrief) missing.push('mission brief (commander output)');
+    if (!state.plan) missing.push('workflow plan (planner output)');
     return {
-      error: 'Router node received no plan or mission brief',
+      error: `Router node cannot proceed: missing ${missing.join(' and ')}. The ${!state.missionBrief ? 'commander' : 'planner'} node may have failed — check LLM provider configuration and API key.`,
       status: WorkflowStatus.FAILED,
     };
   }
