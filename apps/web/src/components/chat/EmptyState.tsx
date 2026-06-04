@@ -94,7 +94,7 @@ function getStarterPrompts(roles: RoleId[]): string[] {
     const role = ROLE_LIST.find((r) => r.id === roleId);
     if (role) pool.push(...role.examplePrompts);
   }
-  // YC-wedge starter prompts (2026-04-29). Each prompt maps to a real
+  // Starter prompts (2026-04-29). Each prompt maps to a real
   // system template seeded by `WorkflowTemplateService.seedSystemTemplates`,
   // so clicking one immediately exercises the full plan → execute → approve
   // loop without a cold start. Order is "fastest-to-wow first".

@@ -268,7 +268,7 @@ function ClosedLoopOsCard({ canEdit }: { canEdit: boolean }) {
           Closed-loop Company OS
         </CardTitle>
         <CardDescription>
-          Evidence artifacts, company graph entities, drift findings, and agent-executable specs. This is the YC-style operating layer, not a marketing-only claim.
+          Evidence artifacts, company graph entities, drift findings, and agent-executable specs. This is the closed-loop operating layer, not a marketing-only claim.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

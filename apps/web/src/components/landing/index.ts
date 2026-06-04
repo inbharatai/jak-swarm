@@ -3,7 +3,7 @@
 //
 //   Hero (with HeroCockpit)
 //   PainSection          — why fragmented context breaks execution
-//   WhatJakDoes          — YC-style company operating layer wedge
+//   WhatJakDoes          — company operating layer wedge
 //   HowItWorks           — 7-step pipeline
 //   ProductCockpit       — premium dashboard mockup
 //   ShowTheWork          — 4 outcome proof cards

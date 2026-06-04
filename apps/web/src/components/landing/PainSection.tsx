@@ -3,7 +3,7 @@
 /**
  * PainSection — three-card pain framing block.
  *
- * Sets up the YC-style positioning: companies do not only need another
+ * Sets up the company operating layer positioning: companies do not only need another
  * chatbot; they need a trustworthy loop between scattered context and
  * controlled execution.
  *

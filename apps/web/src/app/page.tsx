@@ -406,7 +406,7 @@ export default function HomePage() {
         </nav>
 
         {/* ── 1. Hero ─────────────────────────────────────────────────────────
-             YC-ready framing, but truth-locked to the current product:
+             Beta-first framing, truth-locked to the current product:
              company evidence -> drift detection -> executable specs ->
              approval-gated agent execution. */}
         <section className="relative min-h-[88vh] flex items-center gradient-bg px-4 pt-24 pb-20 sm:px-6 lg:px-8 grain-overlay overflow-hidden">

@@ -1438,7 +1438,7 @@ export const companyBrainApi = {
   templateForIntent: (intent: string) =>
     apiDataFetch<{ template: WorkflowTemplateClient }>(`/workflow-templates/by-intent/${encodeURIComponent(intent)}`),
 
-  // ── Company Operating Layer (Migration 107 / YC closed-loop) ─────────
+  // ── Company Operating Layer (Migration 107 / closed-loop) ─────────
   createArtifact: (body: {
     sourceType: 'github' | 'linear' | 'jira' | 'slack' | 'notion' | 'google_drive' | 'gmail' | 'meeting' | 'customer_call' | 'support' | 'document' | 'manual' | 'other';
     artifactType: 'ticket' | 'issue' | 'pull_request' | 'commit' | 'slack_thread' | 'notion_page' | 'document' | 'meeting_transcript' | 'customer_feedback' | 'support_ticket' | 'email' | 'decision_note' | 'other';

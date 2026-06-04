@@ -3,7 +3,7 @@
 /**
  * Company operating layer section.
  *
- * This is the YC-ready wedge, but the copy is intentionally bounded by the
+ * This is the company operating layer wedge, but the copy is intentionally bounded by the
  * implementation that exists today:
  *   1. evidence artifacts are real tenant-scoped records
  *   2. graph entities are extracted from evidence, not invented
@@ -87,7 +87,7 @@ export default function WhatJakDoes() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 max-w-3xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-400 mb-3 font-sans">
-            The YC wedge
+            Company operating layer
           </p>
           <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight text-white leading-[1.15]">
             Product and engineering alignment, closed loop.
