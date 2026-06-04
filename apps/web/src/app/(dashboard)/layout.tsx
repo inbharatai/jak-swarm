@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { useAuthSession } from '@/lib/auth';
 import { Spinner } from '@/components/ui/spinner';
 
 export default function DashboardLayout({
@@ -10,16 +10,19 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
+  // useAuthSession resolves in < 50ms (reads Supabase localStorage cache).
+  // The shell renders immediately instead of waiting for the /auth/me round-trip.
+  // Role-gated child pages use useAuthProfile() and show their own skeletons.
+  const { sessionUser, isSessionLoading } = useAuthSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isSessionLoading && !sessionUser) {
       router.replace('/login');
     }
-  }, [user, isLoading, router]);
+  }, [sessionUser, isSessionLoading, router]);
 
-  if (isLoading) {
+  if (isSessionLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />
@@ -27,7 +30,7 @@ export default function DashboardLayout({
     );
   }
 
-  if (!user) {
+  if (!sessionUser) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />

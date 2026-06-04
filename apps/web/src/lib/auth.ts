@@ -629,3 +629,162 @@ export function useAuth(): UseAuthReturn {
     isAuthenticated: state.user !== null,
   };
 }
+
+// ─── useAuthSession ──────────────────────────────────────────────────────────
+//
+// Reads the Supabase session from localStorage — typically resolves in < 50ms
+// on the first render. Returns a minimal AuthUser (role=VIEWER, no tenant
+// profile) sufficient for the dashboard shell to render immediately.
+// Role-gated features MUST wait for useAuthProfile().
+
+export interface AuthSessionState {
+  sessionUser: AuthUser | null;
+  accessToken: string | null;
+  isSessionLoading: boolean;
+}
+
+function readSessionFromStorage(): { user: SupabaseUser | null; accessToken: string | null } {
+  if (typeof window === 'undefined') return { user: null, accessToken: null };
+  const storageKey = Object.keys(localStorage).find(
+    (k) => k.startsWith('sb-') && k.endsWith('-auth-token'),
+  );
+  if (!storageKey) return { user: null, accessToken: null };
+  try {
+    const data = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as {
+      access_token?: string;
+      user?: SupabaseUser;
+    };
+    if (data?.access_token && data?.user) {
+      return { user: data.user, accessToken: data.access_token };
+    }
+  } catch {
+    // ignore — fall through
+  }
+  return { user: null, accessToken: null };
+}
+
+export function useAuthSession(): AuthSessionState {
+  const [state, setState] = useState<AuthSessionState>(() => {
+    if (DEV_BYPASS_ACTIVE) {
+      return { sessionUser: DEV_BYPASS_USER, accessToken: null, isSessionLoading: false };
+    }
+    // Try JAK's own stored user first (already fully hydrated)
+    const storedUser = getStoredJakUser();
+    if (storedUser) {
+      return {
+        sessionUser: storedUser,
+        accessToken: getRawToken(),
+        isSessionLoading: false,
+      };
+    }
+    // Try Supabase localStorage session for near-instant auth detection
+    const { user: sbUser, accessToken } = readSessionFromStorage();
+    if (sbUser) {
+      return {
+        sessionUser: mapSupabaseUser(sbUser),
+        accessToken,
+        isSessionLoading: false,
+      };
+    }
+    return { sessionUser: null, accessToken: null, isSessionLoading: true };
+  });
+
+  useEffect(() => {
+    if (DEV_BYPASS_ACTIVE) return;
+
+    if (!hasUsableSupabaseConfig()) {
+      setState({ sessionUser: null, accessToken: null, isSessionLoading: false });
+      return;
+    }
+
+    let cancelled = false;
+
+    // getSession() reads from Supabase's in-memory/localStorage cache — fast
+    getClient()
+      .auth.getSession()
+      .then((result) => {
+        if (cancelled) return;
+        const session = result.data.session;
+        setState({
+          sessionUser: session?.user ? mapSupabaseUser(session.user) : null,
+          accessToken: session?.access_token ?? null,
+          isSessionLoading: false,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ sessionUser: null, accessToken: null, isSessionLoading: false });
+      });
+
+    const {
+      data: { subscription },
+    } = getClient().auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      setState({
+        sessionUser: session?.user ? mapSupabaseUser(session.user) : null,
+        accessToken: session?.access_token ?? null,
+        isSessionLoading: false,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return state;
+}
+
+// ─── useAuthProfile ──────────────────────────────────────────────────────────
+//
+// Fetches the trusted user profile from GET /auth/me. This is the slow call
+// (network round-trip to the backend). Consume this only where role/tenant
+// data is actually needed; show skeleton states while it resolves.
+
+export interface AuthProfileState {
+  user: AuthUser | null;
+  isProfileLoading: boolean;
+  error: string | null;
+}
+
+export function useAuthProfile(accessToken: string | null): AuthProfileState {
+  const [state, setState] = useState<AuthProfileState>(() => {
+    if (DEV_BYPASS_ACTIVE) return { user: DEV_BYPASS_USER, isProfileLoading: false, error: null };
+    const storedUser = getStoredJakUser();
+    return {
+      user: storedUser,
+      isProfileLoading: !storedUser && accessToken !== null,
+      error: null,
+    };
+  });
+
+  useEffect(() => {
+    if (DEV_BYPASS_ACTIVE) return;
+    if (!accessToken) {
+      setState({ user: null, isProfileLoading: false, error: null });
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchTrustedAuthUser(accessToken)
+      .then((user) => {
+        if (!cancelled) setState({ user, isProfileLoading: false, error: null });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setState({
+            user: getStoredJakUser(),
+            isProfileLoading: false,
+            error: getAuthErrorMessage(err),
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  return state;
+}
