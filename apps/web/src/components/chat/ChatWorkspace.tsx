@@ -20,6 +20,8 @@ import { createClient } from '@/lib/supabase';
 import type { RoleId } from '@/lib/role-config';
 import type { WorkflowPlan, WorkflowPlanStep, AgentRole, TaskStatus, RiskLevel, WorkflowStatus } from '@/types';
 import { getAgentFriendlyLabel } from '@/lib/agent-friendly-names';
+import { getToolFriendlyLabel, formatToolInputPreview } from '@/lib/tool-friendly-names';
+import { renderAgentOutput } from '@/lib/render-agent-output';
 import { DetailDrawer } from './DetailDrawer';
 import { mapPlanStatus, updateCockpitTaskStatus, formatCockpitCost, formatCostFooter } from '@/lib/chat-helpers';
 import {
@@ -358,16 +360,18 @@ export function ChatWorkspace() {
           } else if (evType === 'tool_called') {
             const toolName = (ev.toolName as string) ?? 'tool';
             const inputPreview = (ev.inputSummary as string) ?? '';
-            const shortInput = inputPreview.length > 80 ? inputPreview.slice(0, 77) + '…' : inputPreview;
+            const friendlyLabel = getToolFriendlyLabel(toolName);
+            const displayInput = formatToolInputPreview(toolName, inputPreview);
             addMessage(convId, {
               role: 'assistant',
               agentRole: (ev.agentRole as RoleId) ?? null,
-              content: `🔧 Calling **${toolName}**${shortInput ? ` — \`${shortInput}\`` : ''}`,
+              content: `🔍 ${friendlyLabel}${displayInput ? ` — \`${displayInput}\`` : ''}`,
               executionTrace: { workflowId: workflow.id },
             });
           // Stage 2.2: tool call completed — honest success/failure + duration
           } else if (evType === 'tool_completed') {
             const toolName = (ev.toolName as string) ?? 'tool';
+            const friendlyLabel = getToolFriendlyLabel(toolName);
             const success = ev.success !== false;
             const duration = ev.durationMs ? ` (${((ev.durationMs as number) / 1000).toFixed(1)}s)` : '';
             const err = ev.error as string | undefined;
@@ -399,8 +403,8 @@ export function ChatWorkspace() {
               role: 'assistant',
               agentRole: (ev.agentRole as RoleId) ?? null,
               content: err
-                ? `${icon} **${toolName}** failed${duration} — ${err}`
-                : `${icon} **${toolName}** done${duration}${honestyTag}`,
+                ? `${icon} **${friendlyLabel}** failed${duration} — ${err}`
+                : `${icon} **${friendlyLabel}** done${duration}${honestyTag}`,
               executionTrace: { workflowId: workflow.id },
             });
           // Stage 2.3 + 2.6: accumulate cost_updated events locally so
@@ -450,10 +454,7 @@ export function ChatWorkspace() {
             terminalWorkflowsRef.current.add(workflow.id);
             void workflowApi.get(workflow.id).then((w) => {
               const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
-              const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
-              const display = raw.trim().length === 0 || STUB_RE.test(raw)
-                ? 'JAK completed the run, but no final response was generated. You can view the detailed trace in [Run Inspector](/swarm).'
-                : raw;
+              const display = renderAgentOutput(raw);
 
               // Stage 2.6: append a single honest cost footer to the
               // final message — accumulated from all cost_updated SSE
@@ -500,7 +501,6 @@ export function ChatWorkspace() {
           } else if (evType === 'failed') {
             terminalWorkflowsRef.current.add(workflow.id);
             const fallbackError = (ev.error as string) ?? (ev.message as string) ?? (ev.code as string);
-            const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
             setCockpitByWorkflow((prev) =>
               prev[workflow.id]
                 ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'failed' } }
@@ -508,8 +508,9 @@ export function ChatWorkspace() {
             );
             void workflowApi.get(workflow.id).then((w) => {
               const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
-              if (raw.trim().length > 0 && !STUB_RE.test(raw)) {
-                addFinalMessageOnce(raw, activeRoles[0] ?? null);
+              const rendered = renderAgentOutput(raw);
+              if (rendered.trim().length > 0 && !rendered.startsWith('JAK completed the run, but no final')) {
+                addFinalMessageOnce(rendered, activeRoles[0] ?? null);
               } else {
                 addFinalMessageOnce(
                   `Workflow failed: ${fallbackError ?? 'Unknown error'}. You can view the detailed trace in [Run Inspector](/swarm?workflowId=${workflow.id}).`,
@@ -570,6 +571,30 @@ export function ChatWorkspace() {
                 ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'paused' } }
                 : prev,
             );
+            // The workflow is paused waiting for human input — clear the
+            // "Thinking…" spinner so the user sees the approval card
+            // instead of a stale loading state.
+            setIsSending(false);
+            setIsStuck(false);
+          } else if (evType === 'cancelled') {
+            // Workflow cancelled (e.g. approval rejected, manual cancel).
+            // The backend emits this event when the workflow transitions to
+            // CANCELLED status during an active SSE stream.
+            terminalWorkflowsRef.current.add(workflow.id);
+            const cancelReason = (ev.reason as string) ?? 'Workflow was cancelled';
+            addMessage(convId, {
+              role: 'assistant',
+              agentRole: null,
+              content: `⛔ ${cancelReason}. You can view the details in [Run Inspector](/swarm?workflowId=${workflow.id}).`,
+              executionTrace: { workflowId: workflow.id },
+            });
+            setCockpitByWorkflow((prev) =>
+              prev[workflow.id]
+                ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'failed' } }
+                : prev,
+            );
+            setIsSending(false);
+            setIsStuck(false);
           }
         },
         onError: () => {
@@ -675,12 +700,7 @@ export function ChatWorkspace() {
                 }
 
                 const raw = typeof w.finalOutput === 'string' ? w.finalOutput : '';
-                const STUB_RE = /Agents completed their work but did not produce a user-facing response|No output produced/i;
-                const display = raw.trim().length === 0 || STUB_RE.test(raw)
-                  ? (w.status === 'COMPLETED'
-                    ? 'JAK completed the run, but no final response was generated. You can view the detailed trace in [Run Inspector](/swarm).'
-                    : `Workflow ended with status **${w.status}**. No final response was generated.`)
-                  : raw;
+                const display = renderAgentOutput(raw);
                 addFinalMessageOnce(display, activeRoles[0] ?? null);
                 setCockpitByWorkflow((prev) =>
                   prev[workflow.id]

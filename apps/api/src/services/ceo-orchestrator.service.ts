@@ -77,6 +77,8 @@ export interface CEOSummaryInput {
   /** Workflow error if any. */
   error?: string;
   durationMs: number;
+  /** Parsed time range in days (from goal text like "last 30 days" or "past week"). Default: 30. */
+  timeRangeDays?: number;
 }
 
 export interface CEOSummaryResult {
@@ -87,6 +89,34 @@ export interface CEOSummaryResult {
 }
 
 export type ExecutiveFunction = 'CEO' | 'CMO' | 'CTO' | 'CFO' | 'COO';
+
+// ─── Time-range parsing ──────────────────────────────────────────────────
+// Extracts a day count from goal text like "last 30 days", "past week",
+// "previous month", "last quarter". Returns undefined when no explicit
+// range is found — callers should default to 30 days.
+
+function parseTimeRangeDays(goalText: string): number | undefined {
+  if (!goalText) return undefined;
+  const lower = goalText.toLowerCase();
+
+  // "last/past/previous N days" → N
+  const daysMatch = lower.match(/(?:last|past|previous|over|in the)\s+(\d+)\s+days?/);
+  if (daysMatch && daysMatch[1]) return Math.min(parseInt(daysMatch[1], 10), 365);
+
+  // Named ranges
+  if (/\b(?:last|past|previous|this)\s+week\b/.test(lower)) return 7;
+  if (/\b(?:last|past|previous)\s+(?:1\s+)?month\b/.test(lower)) return 30;
+  if (/\b(?:last|past|previous)\s+(?:3\s+)?months?\b/.test(lower) || /\blast\s+quarter\b/.test(lower)) return 90;
+  if (/\b(?:last|past|previous)\s+(?:6\s+)?months?\b/.test(lower)) return 180;
+  if (/\b(?:last|past|previous)\s+year\b/.test(lower)) return 365;
+  if (/\byear\s+to\s+date\b|\bytd\b/.test(lower)) {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    return Math.ceil((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+  }
+
+  return undefined;
+}
 
 // ─── CEO trigger detection ────────────────────────────────────────────────
 
@@ -386,6 +416,11 @@ export class CEOOrchestratorService {
     const startedAt = Date.now();
     let result: CEOSummaryResult;
 
+    // Parse time range from goal text (e.g. "last 30 days" → 30).
+    // Falls back to 30 days when no explicit range is found.
+    const timeRangeDays = input.timeRangeDays ?? parseTimeRangeDays(input.goal) ?? 30;
+    const enrichedInput = { ...input, timeRangeDays };
+
     // ── No-artifact graceful degradation ──────────────────────────────────
     // When there are zero worker outputs (no data connected, no tasks ran),
     // produce a useful template instead of calling the LLM with empty context
@@ -398,16 +433,18 @@ export class CEOOrchestratorService {
         { workflowId: input.workflowId },
         '[CEOOrchestrator] No worker outputs for executive summary — producing template',
       );
+      const timeRangeLabel = `the last ${timeRangeDays} day${timeRangeDays !== 1 ? 's' : ''}`;
       result = {
         summary: [
           `# Executive Summary Template`,
           ``,
           `**Goal**: ${input.goal}`,
           `**Intent**: ${input.intent}`,
+          `**Time range**: ${timeRangeLabel}`,
           `**Status**: Limited mode — no company activity data connected yet.`,
           ``,
           `## What you would get with connected data:`,
-          `- Performance metrics for the requested period`,
+          `- Performance metrics for ${timeRangeLabel}`,
           `- Key accomplishments and milestones`,
           `- Financial overview and budget status`,
           `- Operational highlights and team velocity`,
@@ -427,7 +464,7 @@ export class CEOOrchestratorService {
       };
     } else {
       try {
-        result = await this.callLLMSummary(input);
+        result = await this.callLLMSummary(enrichedInput);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger?.warn?.(
@@ -491,6 +528,10 @@ export class CEOOrchestratorService {
       .map((o, i) => `${i + 1}. ${typeof o === 'string' ? o.slice(0, 500) : JSON.stringify(o).slice(0, 500)}`)
       .join('\n');
 
+    const timeRangeLabel = input.timeRangeDays
+      ? `the last ${input.timeRangeDays} day${input.timeRangeDays !== 1 ? 's' : ''}`
+      : 'the last 30 days';
+
     const messages = [
       {
         role: 'system' as const,
@@ -499,13 +540,15 @@ export class CEOOrchestratorService {
           `A workflow just completed. Write an honest executive summary (3-6 sentences) ` +
           `describing what was accomplished and ANY caveats. Then list 1-5 concrete next actions ` +
           `the human owner should take. Be specific. Never fabricate metrics. ` +
-          `If the workflow failed, say so plainly.`,
+          `If the workflow failed, say so plainly. ` +
+          `The user asked about ${timeRangeLabel} — reference this time range in the summary.`,
       },
       {
         role: 'user' as const,
         content:
           `Goal: ${input.goal}\n` +
           `Intent: ${input.intent}\n` +
+          `Time range: ${timeRangeLabel}\n` +
           `Executive functions involved: ${input.executiveFunctions.join(', ')}\n` +
           `Final status: ${input.status}\n` +
           (input.error ? `Error: ${input.error}\n` : '') +
