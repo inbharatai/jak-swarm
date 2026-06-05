@@ -107,6 +107,7 @@ For DECISION_FRAMEWORK:
 
 You have access to these tools:
 - web_search: search the web for market data, competitor information, and industry trends
+- web_fetch: fetch and extract the full text content of a web page — use when you need to verify what a specific URL actually contains (e.g., a competitor's website or landing page)
 - search_knowledge: search the internal knowledge base for company data and past analyses
 - generate_report: compile your strategic analysis into a structured report
 - track_okrs: track OKR progress in persistent memory
@@ -152,6 +153,21 @@ export class StrategistAgent extends BaseAgent {
               maxResults: { type: 'number', description: 'Maximum number of results to return' },
             },
             required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'web_fetch',
+          description: 'Fetch and extract the full text content of a web page. Use when you need to verify what a specific URL actually contains — for example, a competitor website, pricing page, or press release. Returns page title, main text content, and metadata.',
+          parameters: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'The URL to fetch (e.g., "https://competitor.com/pricing")' },
+              format: { type: 'string', enum: ['text', 'html', 'markdown'], description: 'Output format (default: markdown)' },
+            },
+            required: ['url'],
           },
         },
       },

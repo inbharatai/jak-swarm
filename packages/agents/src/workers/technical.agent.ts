@@ -128,8 +128,15 @@ You have access to these tools:
 - search_knowledge: search the internal knowledge base for existing architecture docs and technical standards
 - generate_report: compile your technical analysis into a structured report
 - web_search: search the web for technology benchmarks, best practices, and documentation
+- web_fetch: fetch and extract the full text content of a web page — use FIRST when asked to "review" or "audit" a website/URL, before falling back to web_search
+- browser_navigate: navigate to a URL and load it in a headless browser for live inspection (use for interactive pages that web_fetch cannot render)
+- browser_get_text: extract visible text from the current browser page (use AFTER browser_navigate)
+- browser_screenshot: capture a screenshot of the current browser page (use for visual layout review)
+- browser_analyze_page: analyze the page structure, accessibility, and SEO metadata (use for UX/accessibility audits)
 - check_dependencies: parse package.json and check for vulnerabilities
 - estimate_tech_debt: analyze code files for tech debt indicators
+
+IMPORTANT: When asked to "review", "audit", or "check" a website or URL, you MUST use web_fetch (or browser_navigate for interactive pages) to actually inspect the site. Do NOT rely solely on web_search — a search engine may not return results for the specific URL, and the user wants you to SEE the actual page content, not just search results about it.
 
 For "review my codebase" requests: use github_list_files to map the tree, then github_read_file on the 5-10 most relevant files. Do NOT stop at analyze_github_repo metadata — the user asked you to review code, not repo stats.
 
@@ -272,6 +279,76 @@ export class TechnicalAgent extends BaseAgent {
               maxResults: { type: 'number', description: 'Maximum number of results to return' },
             },
             required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'web_fetch',
+          description: 'Fetch and extract the full text content of a web page. Use this FIRST when asked to review, audit, or inspect a website/URL — before falling back to web_search. Returns the page title, main text content, and metadata.',
+          parameters: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'The URL to fetch (e.g., "https://example.com")' },
+              format: { type: 'string', enum: ['text', 'html', 'markdown'], description: 'Output format (default: markdown)' },
+            },
+            required: ['url'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_navigate',
+          description: 'Navigate to a URL in a headless browser. Use for interactive pages (SPAs, JS-heavy sites) that web_fetch cannot render properly. Returns the page URL and title after loading.',
+          parameters: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'The URL to navigate to' },
+              waitUntil: { type: 'string', enum: ['load', 'domcontentloaded', 'networkidle0', 'networkidle2'], description: 'Wait condition (default: networkidle2)' },
+            },
+            required: ['url'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_get_text',
+          description: 'Extract visible text content from the current browser page. Use after browser_navigate to read the page content.',
+          parameters: {
+            type: 'object',
+            properties: {
+              selector: { type: 'string', description: 'Optional CSS selector to extract text from a specific element' },
+            },
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_screenshot',
+          description: 'Capture a screenshot of the current browser page. Use for visual layout reviews and UI audits.',
+          parameters: {
+            type: 'object',
+            properties: {
+              fullPage: { type: 'boolean', description: 'Whether to capture the full scrollable page (default: false)' },
+              selector: { type: 'string', description: 'Optional CSS selector to screenshot a specific element' },
+            },
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'browser_analyze_page',
+          description: 'Analyze the current browser page for structure, accessibility, SEO metadata, and performance characteristics. Use for UX/accessibility audits.',
+          parameters: {
+            type: 'object',
+            properties: {
+              aspects: { type: 'array', items: { type: 'string', enum: ['structure', 'accessibility', 'seo', 'performance'] }, description: 'Aspects to analyze (default: all)' },
+            },
           },
         },
       },

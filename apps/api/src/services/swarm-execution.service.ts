@@ -1768,6 +1768,14 @@ export class SwarmExecutionService extends EventEmitter {
         'CANCELLED',
         `Rejected by ${reviewedBy}${comment ? `: ${comment}` : ''}`,
       );
+      // Emit SSE event so connected clients clear the spinner on
+      // approval rejection. Without this, the frontend never receives
+      // a 'cancelled' event type and the spinner stays forever.
+      this.emit(`workflow:${workflowId}`, {
+        type: 'cancelled',
+        workflowId,
+        reason: `Rejected by ${reviewedBy}${comment ? `: ${comment}` : ''}`,
+      });
       return;
     }
 
@@ -1840,6 +1848,15 @@ export class SwarmExecutionService extends EventEmitter {
         timestamp: new Date().toISOString(),
       }, params.tenantId, params.cancelledBy);
     }
+    // Also emit an SSE event so connected clients clear the spinner.
+    // Without this, the frontend's onMessage handler never receives
+    // a 'cancelled' event, and the spinner stays forever until the
+    // polling fallback catches it.
+    this.emit(`workflow:${params.workflowId}`, {
+      type: 'cancelled',
+      workflowId: params.workflowId,
+      reason: params.reason,
+    });
   }
 
   /** Pause a running workflow (it will pause between nodes). */
