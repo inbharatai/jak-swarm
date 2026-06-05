@@ -32,6 +32,10 @@ export type NodeName =
   | '__clarification__';
 
 export function afterCommander(state: SwarmState): NodeName {
+  // If commander failed (provider error, timeout, malformed response),
+  // stop immediately so planner doesn't run without a mission brief.
+  if (state.status === WorkflowStatus.FAILED) return '__end__';
+
   // Short-circuit: Commander answered the user directly (greeting,
   // trivial factual Q). Skip Planner/Router/Workers/Verifier entirely.
   if (state.directAnswer) return '__end__';

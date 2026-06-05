@@ -1323,10 +1323,23 @@ export class SwarmExecutionService extends EventEmitter {
         // Short-circuit #1: result.directAnswer set by commander-node when
         // the graph routes to __end__ on a trivial input. Use verbatim.
         const directAnswer = (result as { directAnswer?: string }).directAnswer;
+        const clarificationQuestion = result.clarificationNeeded
+          ? (typeof result.clarificationQuestion === 'string' ? result.clarificationQuestion.trim() : '')
+          : '';
+        const clarificationFromOutputs = result.clarificationNeeded
+          ? (() => {
+              const first = result.outputs[0];
+              return typeof first === 'string' ? first.trim() : '';
+            })()
+          : '';
         let finalOutput: string;
         if (typeof directAnswer === 'string' && directAnswer.trim().length > 0) {
           finalOutput = directAnswer.trim();
           directAnswerOverride = finalOutput;
+        } else if (clarificationQuestion.length > 0 || clarificationFromOutputs.length > 0) {
+          // Short-circuit #2: clarification workflows should always return a
+          // user-visible question, even if traces are absent or stale.
+          finalOutput = clarificationQuestion.length > 0 ? clarificationQuestion : clarificationFromOutputs;
         } else {
           // Prefer in-memory traces from the runner over a second DB round-trip.
           // This defends against silent persistence gaps (e.g. one trace
@@ -1354,7 +1367,16 @@ export class SwarmExecutionService extends EventEmitter {
             finalOutput = traceDirectAnswer;
             directAnswerOverride = finalOutput;
           } else {
+            // Short-circuit #3: recover clarifications embedded in the
+            // commander trace before falling back to worker-output compile.
+            const traceClarification = typeof (commanderOut as { clarificationQuestion?: unknown } | null | undefined)?.clarificationQuestion === 'string'
+              ? String((commanderOut as { clarificationQuestion?: unknown }).clarificationQuestion).trim()
+              : '';
+            if (traceClarification.length > 0) {
+              finalOutput = traceClarification;
+            } else {
             finalOutput = this.compileFinalOutput(traceRecords);
+            }
           }
         }
         await (this.db.workflow.update as any)({

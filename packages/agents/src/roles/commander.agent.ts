@@ -187,6 +187,43 @@ function normalizeUrls(text: string): string {
   return text.replace(/\b(www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,})(\/[^\s]*)?\b/g, 'https://$1$2');
 }
 
+/**
+ * Fast clarification route for dashboard/card copy pasted as input.
+ *
+ * Example input pattern:
+ * "Billing Manage your subscription and payment method. Current Plan ..."
+ *
+ * These snippets are usually UI text without an explicit user action and can
+ * be answered immediately without paying LLM latency.
+ */
+export function inferFastClarificationFromUiCard(rawInput: string): string | null {
+  const compact = rawInput.replace(/\s+/g, ' ').trim();
+  if (!compact) return null;
+
+  const lower = compact.toLowerCase();
+  const billingSignals = [
+    /\bbilling\b/,
+    /\bsubscription\b/,
+    /\bpayment method\b/,
+    /\bcurrent plan\b/,
+    /\bincluded usage\b/,
+  ];
+  const signalHits = billingSignals.reduce((count, pattern) =>
+    count + (pattern.test(lower) ? 1 : 0), 0,
+  );
+
+  // Require multiple billing-specific markers to avoid false positives.
+  if (signalHits < 3) return null;
+
+  const looksLikeCardCopy = /manage your subscription/i.test(lower) || /current plan/i.test(lower);
+  if (!looksLikeCardCopy) return null;
+
+  const hasExplicitAction = /\b(summar(?:ize|ise)|review|draft|write|create|generate|analy(?:ze|se)|compare|fix|troubleshoot|debug|explain|optimi(?:ze|se)|help|recommend)\b/i.test(lower);
+  if (hasExplicitAction) return null;
+
+  return 'What should I do with this billing/subscription info: summarize it, review pricing/plan messaging, draft customer-facing copy, or troubleshoot a payment issue?';
+}
+
 const COMMANDER_SUPPLEMENT = `You are a Commander agent. Your role is to understand user intent precisely and either (a) answer trivial requests directly to avoid unnecessary orchestration, or (b) extract structured intelligence from raw user input so specialist agents can execute.
 
 Respond with strict JSON only — no markdown fences, no prose prefix, no explanation.
@@ -262,6 +299,22 @@ export class CommanderAgent extends BaseAgent {
 
     // Normalize URLs so the LLM sees full https:// URLs
     const normalizedInput = normalizeUrls(rawInput);
+
+    // Fast path: when the user pasted billing card copy with no explicit ask,
+    // avoid a slow LLM round-trip and return a deterministic clarification.
+    const fastClarification = inferFastClarificationFromUiCard(normalizedInput);
+    if (fastClarification) {
+      const output: CommanderOutput = {
+        clarificationNeeded: true,
+        clarificationQuestion: fastClarification,
+      };
+      this.recordTrace(context, input, output, [], startedAt);
+      this.logger.info(
+        { runId: context.runId, source: 'ui_card_fast_clarification' },
+        'Commander returned deterministic clarification for dashboard card copy',
+      );
+      return output;
+    }
 
     this.logger.info({ runId: context.runId, inputPreview: normalizedInput.slice(0, 120) }, 'Commander processing input');
 

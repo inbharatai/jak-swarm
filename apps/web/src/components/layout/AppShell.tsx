@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppLayout } from './AppLayout';
-import { useAuth } from '@/lib/auth';
+import { useAuthSession } from '@/lib/auth-session';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const AUTH_PATHS = ['/login', '/register', '/', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms', '/trial'];
@@ -13,8 +13,19 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const pathname = usePathname();
+
+  // Hydration fix: defer the shell decision until after the first
+  // client-side render. During SSR, `user` is always null (no session
+  // on the server), so the server renders `<>{children}</>`. On the
+  // client, `user` is populated from localStorage/session, causing a
+  // structural hydration mismatch (React error #418). By waiting until
+  // `mounted` is true, we ensure the server and client render the same
+  // tree structure on the first pass, then switch to the authenticated
+  // shell on the next render cycle.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Service-worker registration. Co-located here (already a client
   // component) instead of a raw `<script>` in layout.tsx — Next.js 16
@@ -42,8 +53,15 @@ export function AppShell({ children }: AppShellProps) {
     p => pathname === p,
   ) || pathname.startsWith('/auth/') || pathname.startsWith('/trial/');
 
-  // Auth/landing pages and unauthenticated users render without shell
-  if (isAuthPage || !user) {
+  // Auth/landing pages always render without shell
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
+  // Before hydration completes, render the same structure as SSR:
+  // no shell (unauthenticated view). This avoids the hydration mismatch.
+  // After mounting, if the user is authenticated, switch to the shell.
+  if (!mounted || !user) {
     return <>{children}</>;
   }
 

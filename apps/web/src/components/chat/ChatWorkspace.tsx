@@ -474,6 +474,13 @@ export function ChatWorkspace() {
                   ? { ...prev, [workflow.id]: { ...prev[workflow.id]!, status: 'completed' } }
                   : prev,
               );
+            }).catch(() => {
+              // GET /workflows/:id failed (network, auth, timeout) — show a
+              // fallback so the user isn't left with a blank response.
+              addFinalMessageOnce(
+                'Workflow completed but the final response could not be loaded. You can view the detailed trace in [Run Inspector](/swarm).',
+                activeRoles[0] ?? null,
+              );
             });
             // QA fix: stuck-workflow banner persisted after the terminal
             // event because isSending only cleared on SSE onError. Clear

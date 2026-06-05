@@ -50,7 +50,9 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { useAuth } from '@/lib/auth';
+import { useAuthSession } from '@/lib/auth-session';
+import { useAuthProfile } from '@/lib/auth-profile';
+import { ProfileGateSkeleton } from '@/components/ui';
 
 // ─── Route registry ────────────────────────────────────────────────────────
 // Matches the routes that used to live in `ChatSidebar.NAV_ITEMS` plus the
@@ -110,7 +112,8 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
 
 export function CommandPalette() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { session } = useAuthSession();
+  const { profile, isLoading: isProfileLoading } = useAuthProfile(session.accessToken);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -119,19 +122,22 @@ export function CommandPalette() {
   // Same string-tolerant role logic as ChatSidebar — Supabase user_metadata
   // can carry legacy literals ('ADMIN' from older register flows) that don't
   // match the current UserRole enum exactly.
-  const roleStr = String(user?.role ?? '');
+  const roleStr = String(profile?.role ?? '');
   const isAdmin = roleStr === 'TENANT_ADMIN' || roleStr === 'SYSTEM_ADMIN' || roleStr === 'ADMIN';
   const isReviewerOrAdmin = isAdmin || roleStr === 'REVIEWER' || roleStr === 'OPERATOR';
   const isSystemAdmin = roleStr === 'SYSTEM_ADMIN';
 
   const visibleEntries = useMemo(() => {
     return PALETTE_ENTRIES.filter((entry) => {
+      if (isProfileLoading && (entry.adminOnly || entry.reviewerOrAdmin || entry.systemAdminOnly)) {
+        return false;
+      }
       if (entry.adminOnly && !isAdmin) return false;
       if (entry.reviewerOrAdmin && !isReviewerOrAdmin) return false;
       if (entry.systemAdminOnly && !isSystemAdmin) return false;
       return true;
     });
-  }, [isAdmin, isReviewerOrAdmin, isSystemAdmin]);
+  }, [isAdmin, isProfileLoading, isReviewerOrAdmin, isSystemAdmin]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -258,6 +264,14 @@ export function CommandPalette() {
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto py-2">
+          {isProfileLoading && (
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
+                Loading role-based commands
+              </p>
+              <ProfileGateSkeleton className="mt-2 h-10" />
+            </div>
+          )}
           {grouped.length === 0 ? (
             <p className="px-4 py-6 text-sm text-center text-muted-foreground">
               No matches for &quot;{query}&quot;.
