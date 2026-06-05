@@ -31,6 +31,7 @@ export {
 export { Spinner } from './spinner';
 
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
+export { ProfileGateSkeleton } from './profile-gate-skeleton';
 
 // ─── Inline components ────────────────────────────────────────────────────────
 

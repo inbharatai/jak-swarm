@@ -349,121 +349,31 @@ async function runAuthRequest<T>(
 }
 
 export function useAuth(): UseAuthReturn {
-  const storedJakUser = getStoredJakUser();
-  const [state, setState] = useState<AuthState>({
-    // In dev-bypass mode, start with the synthetic user already populated
-    // so the dashboard layout's "redirect when no user" check is satisfied
-    // on the very first render. Skips the loading spinner entirely.
-    user: DEV_BYPASS_ACTIVE ? DEV_BYPASS_USER : storedJakUser,
-    isLoading: !DEV_BYPASS_ACTIVE && !storedJakUser,
-    error: null,
-  });
+  // Non-blocking composition: session resolves first, profile hydrates later.
+  // This keeps shell rendering fast while role/tenant data is fetched.
+  const { sessionUser, accessToken, isSessionLoading } = useAuthSession();
+  const { user: profileUser, error: profileError } = useAuthProfile(accessToken);
+  const [isMutating, setIsMutating] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // DEV-ONLY: in bypass mode the synthetic user is already in state;
-    // skip every Supabase round-trip to keep the cockpit responsive
-    // and avoid pinging Supabase with a non-existent session.
-    if (DEV_BYPASS_ACTIVE) return;
-    const localUser = getStoredJakUser();
-    if (localUser) {
-      setState({ user: localUser, isLoading: false, error: null });
-      return;
-    }
-
-    if (!hasUsableSupabaseConfig()) {
-      setState({
-        user: null,
-        isLoading: false,
-        error: AUTH_SERVICE_UNAVAILABLE_MESSAGE,
-      });
-      return;
-    }
-
-    let cancelled = false;
-    const hydrateTrustedUser = async (
-      supabaseUser: SupabaseUser | null | undefined,
-      accessToken?: string | null,
-    ): Promise<void> => {
-      if (!supabaseUser) {
-        if (!cancelled) {
-          setState({ user: null, isLoading: false, error: null });
-        }
-        return;
-      }
-      try {
-        const trustedUser = await fetchTrustedAuthUser(accessToken, supabaseUser);
-        if (!cancelled) {
-          setState({
-            user: trustedUser,
-            isLoading: false,
-            error: null,
-          });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          // Never strand the dashboard on a blank/suspended loading view if
-          // trusted profile hydration fails. Fall back to a safe minimal user
-          // shape (role=VIEWER) so navigation can recover and show errors.
-          setState({
-            user: mapSupabaseUser(supabaseUser),
-            isLoading: false,
-            error: getAuthErrorMessage(error),
-          });
-        }
-      }
-    };
-
-    // Get initial session and hydrate role/tenant from the trusted API.
-    runAuthRequest(() => getClient().auth.getSession())
-      .then((result) => {
-        void hydrateTrustedUser(result.data.session?.user, result.data.session?.access_token);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setState({
-            user: null,
-            isLoading: false,
-            error: getAuthErrorMessage(error),
-          });
-        }
-      });
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = getClient().auth.onAuthStateChange((_event, session) => {
-      void hydrateTrustedUser(session?.user, session?.access_token).catch((error) => {
-        if (!cancelled) {
-          setState({
-            user: null,
-            isLoading: false,
-            error: getAuthErrorMessage(error),
-          });
-        }
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, []);
+  const user = profileUser ?? sessionUser;
+  const isLoading = isMutating || isSessionLoading;
+  const error = authError ?? profileError;
 
   const failAuth = useCallback((error: unknown, fallback?: string): never => {
     const message = getAuthErrorMessage(error, fallback);
-    setState(prev => ({
-      ...prev,
-      isLoading: false,
-      error: message,
-    }));
+    setIsMutating(false);
+    setAuthError(message);
     throw new Error(message);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     clearToken();
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setIsMutating(true);
+    setAuthError(null);
 
-    // Primary path: Supabase password auth + trusted profile hydration.
+    // Primary path: Supabase password auth (near instant).
+    // Profile/role hydration continues asynchronously via useAuthProfile().
     // Fallback path: backend /auth/login when Supabase is unavailable.
     if (hasUsableSupabaseConfig()) {
       try {
@@ -474,15 +384,11 @@ export function useAuth(): UseAuthReturn {
           failAuth(error);
         }
 
-        if (data.user) {
-          const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user);
-          setState({
-            user: trustedUser,
-            isLoading: false,
-            error: null,
-          });
-          return;
+        if (data.session?.access_token && data.user) {
+          setToken(data.session.access_token, mapSupabaseUser(data.user));
         }
+        setIsMutating(false);
+        return;
       } catch (error) {
         if (!shouldFallbackToBackendAuth(error)) {
           failAuth(error);
@@ -490,17 +396,15 @@ export function useAuth(): UseAuthReturn {
       }
     }
 
-    const backendUser = await loginWithBackendPassword(email, password).catch((error) => failAuth(error));
-    setState({
-      user: backendUser,
-      isLoading: false,
-      error: null,
-    });
+    await loginWithBackendPassword(email, password).catch((error) => failAuth(error));
+    setIsMutating(false);
+    setAuthError(null);
   }, [failAuth]);
 
   const requestMagicPin = useCallback(async (email: string) => {
     clearToken();
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setIsMutating(true);
+    setAuthError(null);
     const { error } = await runAuthRequest(
       () => getClient().auth.signInWithOtp({
         email,
@@ -514,11 +418,13 @@ export function useAuth(): UseAuthReturn {
       failAuth(error);
     }
 
-    setState(prev => ({ ...prev, isLoading: false, error: null }));
+    setIsMutating(false);
+    setAuthError(null);
   }, [failAuth]);
 
   const verifyMagicPin = useCallback(async (email: string, token: string) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setIsMutating(true);
+    setAuthError(null);
     const { data, error } = await runAuthRequest(
       () => getClient().auth.verifyOtp({
         email,
@@ -529,12 +435,13 @@ export function useAuth(): UseAuthReturn {
     if (error) {
       failAuth(error);
     }
-    const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.user).catch(error => failAuth(error));
-    setState({
-      user: trustedUser,
-      isLoading: false,
-      error: null,
-    });
+
+    if (data.session?.access_token && data.user) {
+      setToken(data.session.access_token, mapSupabaseUser(data.user));
+    }
+
+    setIsMutating(false);
+    setAuthError(null);
   }, [failAuth]);
 
   const register = useCallback(
@@ -546,7 +453,8 @@ export function useAuth(): UseAuthReturn {
       industry: string;
     }) => {
       clearToken();
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      setIsMutating(true);
+      setAuthError(null);
       const { error } = await runAuthRequest(
         () => getClient().auth.signUp({
           email: data.email,
@@ -564,13 +472,15 @@ export function useAuth(): UseAuthReturn {
       if (error) {
         failAuth(error);
       }
-      setState(prev => ({ ...prev, isLoading: false, error: null }));
+      setIsMutating(false);
+      setAuthError(null);
     },
     [failAuth],
   );
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setIsMutating(true);
+    setAuthError(null);
     const { error } = await runAuthRequest(
       () => getClient().auth.resetPasswordForEmail(email, {
         redirectTo: buildAbsoluteUrl('/auth/confirm?next=/reset-password'),
@@ -581,11 +491,13 @@ export function useAuth(): UseAuthReturn {
       failAuth(error);
     }
 
-    setState(prev => ({ ...prev, isLoading: false, error: null }));
+    setIsMutating(false);
+    setAuthError(null);
   }, [failAuth]);
 
   const updatePassword = useCallback(async (password: string) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setIsMutating(true);
+    setAuthError(null);
     const { error } = await runAuthRequest(
       () => getClient().auth.updateUser({ password }),
     ).catch(error => failAuth(error));
@@ -594,31 +506,29 @@ export function useAuth(): UseAuthReturn {
       failAuth(error);
     }
 
-    const { data } = await runAuthRequest(
-      () => getClient().auth.getSession(),
-    ).catch(error => failAuth(error));
-    const trustedUser = await fetchTrustedAuthUser(data.session?.access_token, data.session?.user).catch(error => failAuth(error));
-    setState({
-      user: trustedUser,
-      isLoading: false,
-      error: null,
-    });
+    setIsMutating(false);
+    setAuthError(null);
   }, [failAuth]);
 
   const logout = useCallback(async () => {
     clearToken();
+    setIsMutating(true);
+    setAuthError(null);
     await runAuthRequest(
       () => getClient().auth.signOut(),
       'Unable to reach the authentication service; local session was cleared.',
     ).catch(() => undefined);
-    setState({ user: null, isLoading: false, error: null });
+    setIsMutating(false);
+    setAuthError(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
   }, []);
 
   return {
-    ...state,
+    user,
+    isLoading,
+    error,
     login,
     requestMagicPin,
     verifyMagicPin,
@@ -626,7 +536,7 @@ export function useAuth(): UseAuthReturn {
     requestPasswordReset,
     updatePassword,
     logout,
-    isAuthenticated: state.user !== null,
+    isAuthenticated: user !== null,
   };
 }
 
@@ -638,9 +548,27 @@ export function useAuth(): UseAuthReturn {
 // Role-gated features MUST wait for useAuthProfile().
 
 export interface AuthSessionState {
+  user: AuthUser | null;
+  session: { accessToken: string | null };
+  isLoading: boolean;
   sessionUser: AuthUser | null;
   accessToken: string | null;
   isSessionLoading: boolean;
+}
+
+function createAuthSessionState(
+  sessionUser: AuthUser | null,
+  accessToken: string | null,
+  isSessionLoading: boolean,
+): AuthSessionState {
+  return {
+    user: sessionUser,
+    session: { accessToken },
+    isLoading: isSessionLoading,
+    sessionUser,
+    accessToken,
+    isSessionLoading,
+  };
 }
 
 function readSessionFromStorage(): { user: SupabaseUser | null; accessToken: string | null } {
@@ -666,34 +594,26 @@ function readSessionFromStorage(): { user: SupabaseUser | null; accessToken: str
 export function useAuthSession(): AuthSessionState {
   const [state, setState] = useState<AuthSessionState>(() => {
     if (DEV_BYPASS_ACTIVE) {
-      return { sessionUser: DEV_BYPASS_USER, accessToken: null, isSessionLoading: false };
+      return createAuthSessionState(DEV_BYPASS_USER, null, false);
     }
     // Try JAK's own stored user first (already fully hydrated)
     const storedUser = getStoredJakUser();
     if (storedUser) {
-      return {
-        sessionUser: storedUser,
-        accessToken: getRawToken(),
-        isSessionLoading: false,
-      };
+      return createAuthSessionState(storedUser, getRawToken(), false);
     }
     // Try Supabase localStorage session for near-instant auth detection
     const { user: sbUser, accessToken } = readSessionFromStorage();
     if (sbUser) {
-      return {
-        sessionUser: mapSupabaseUser(sbUser),
-        accessToken,
-        isSessionLoading: false,
-      };
+      return createAuthSessionState(mapSupabaseUser(sbUser), accessToken, false);
     }
-    return { sessionUser: null, accessToken: null, isSessionLoading: true };
+    return createAuthSessionState(null, null, true);
   });
 
   useEffect(() => {
     if (DEV_BYPASS_ACTIVE) return;
 
     if (!hasUsableSupabaseConfig()) {
-      setState({ sessionUser: null, accessToken: null, isSessionLoading: false });
+      setState(createAuthSessionState(null, null, false));
       return;
     }
 
@@ -705,25 +625,29 @@ export function useAuthSession(): AuthSessionState {
       .then((result) => {
         if (cancelled) return;
         const session = result.data.session;
-        setState({
-          sessionUser: session?.user ? mapSupabaseUser(session.user) : null,
-          accessToken: session?.access_token ?? null,
-          isSessionLoading: false,
-        });
+        setState(
+          createAuthSessionState(
+            session?.user ? mapSupabaseUser(session.user) : null,
+            session?.access_token ?? null,
+            false,
+          ),
+        );
       })
       .catch(() => {
-        if (!cancelled) setState({ sessionUser: null, accessToken: null, isSessionLoading: false });
+        if (!cancelled) setState(createAuthSessionState(null, null, false));
       });
 
     const {
       data: { subscription },
     } = getClient().auth.onAuthStateChange((_event, session) => {
       if (cancelled) return;
-      setState({
-        sessionUser: session?.user ? mapSupabaseUser(session.user) : null,
-        accessToken: session?.access_token ?? null,
-        isSessionLoading: false,
-      });
+      setState(
+        createAuthSessionState(
+          session?.user ? mapSupabaseUser(session.user) : null,
+          session?.access_token ?? null,
+          false,
+        ),
+      );
     });
 
     return () => {
@@ -742,26 +666,38 @@ export function useAuthSession(): AuthSessionState {
 // data is actually needed; show skeleton states while it resolves.
 
 export interface AuthProfileState {
+  profile: AuthUser | null;
+  isLoading: boolean;
+  error: string | null;
   user: AuthUser | null;
   isProfileLoading: boolean;
-  error: string | null;
+}
+
+function createAuthProfileState(
+  user: AuthUser | null,
+  isProfileLoading: boolean,
+  error: string | null,
+): AuthProfileState {
+  return {
+    profile: user,
+    isLoading: isProfileLoading,
+    error,
+    user,
+    isProfileLoading,
+  };
 }
 
 export function useAuthProfile(accessToken: string | null): AuthProfileState {
   const [state, setState] = useState<AuthProfileState>(() => {
-    if (DEV_BYPASS_ACTIVE) return { user: DEV_BYPASS_USER, isProfileLoading: false, error: null };
+    if (DEV_BYPASS_ACTIVE) return createAuthProfileState(DEV_BYPASS_USER, false, null);
     const storedUser = getStoredJakUser();
-    return {
-      user: storedUser,
-      isProfileLoading: !storedUser && accessToken !== null,
-      error: null,
-    };
+    return createAuthProfileState(storedUser, !storedUser && accessToken !== null, null);
   });
 
   useEffect(() => {
     if (DEV_BYPASS_ACTIVE) return;
     if (!accessToken) {
-      setState({ user: null, isProfileLoading: false, error: null });
+      setState(createAuthProfileState(null, false, null));
       return;
     }
 
@@ -769,15 +705,11 @@ export function useAuthProfile(accessToken: string | null): AuthProfileState {
 
     fetchTrustedAuthUser(accessToken)
       .then((user) => {
-        if (!cancelled) setState({ user, isProfileLoading: false, error: null });
+        if (!cancelled) setState(createAuthProfileState(user, false, null));
       })
       .catch((err) => {
         if (!cancelled) {
-          setState({
-            user: getStoredJakUser(),
-            isProfileLoading: false,
-            error: getAuthErrorMessage(err),
-          });
+          setState(createAuthProfileState(getStoredJakUser(), false, getAuthErrorMessage(err)));
         }
       });
 

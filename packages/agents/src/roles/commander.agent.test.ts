@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { inferIntentFromKeywords, buildHelpfulClarification } from './commander.agent.js';
+import {
+  inferIntentFromKeywords,
+  buildHelpfulClarification,
+  inferFastClarificationFromUiCard,
+} from './commander.agent.js';
 import { Industry } from '@jak-swarm/shared';
 
 describe('inferIntentFromKeywords', () => {
@@ -131,5 +135,27 @@ describe('buildHelpfulClarification', () => {
     const q = buildHelpfulClarification('some random thing that does not match', Industry.GENERAL);
     expect(q).toContain('specialist');
     expect(q).toMatch(/review|draft|plan|research/i);
+  });
+});
+
+describe('inferFastClarificationFromUiCard', () => {
+  it('detects billing card copy and returns deterministic clarification', () => {
+    const q = inferFastClarificationFromUiCard(
+      'Billing Manage your subscription and payment method. Current Plan Founding 500 - $200/year - $0 included usage',
+    );
+    expect(q).not.toBeNull();
+    expect(q).toContain('billing/subscription');
+  });
+
+  it('does not trigger when the user already asked for a concrete action', () => {
+    const q = inferFastClarificationFromUiCard(
+      'Billing manage your subscription and payment method. Current plan Founding 500. Please summarize this in 2 bullets.',
+    );
+    expect(q).toBeNull();
+  });
+
+  it('returns null for non-billing text', () => {
+    const q = inferFastClarificationFromUiCard('Review jakswarm.com and suggest improvements');
+    expect(q).toBeNull();
   });
 });

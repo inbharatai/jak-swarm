@@ -31,6 +31,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Brain,
   FileText,
   LogOut,
   MessageSquare,
@@ -38,15 +39,22 @@ import {
   Plug,
   ScrollText,
   Settings,
+  Sparkles,
   X,
   type LucideIcon,
 } from 'lucide-react';
+import useSWR from 'swr';
 
 import { cn } from '@/lib/cn';
 import { useConversationStore } from '@/store/conversation-store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useAuth } from '@/lib/auth';
+import { useAuthSession } from '@/lib/auth-session';
+import { useAuthProfile } from '@/lib/auth-profile';
+import { apiFetch } from '@/lib/api-client';
 import { getRoleColor } from '@/lib/role-config';
+import { ProfileGateSkeleton } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
 
 // ─── Zone registry ─────────────────────────────────────────────────────────
 // Five top-level zones. Every other dashboard page is reachable via the
@@ -73,12 +81,98 @@ const ZONES: Zone[] = [
   { id: 'audit', label: 'Audit', href: '/audit', icon: ScrollText, match: ['/audit', '/admin'], gate: 'reviewerOrAdmin' },
 ];
 
+interface SidebarLlmProvider {
+  providerKey?: string;
+  configured: boolean;
+}
+
+interface SidebarLlmResponse {
+  success: boolean;
+  data: {
+    providers: SidebarLlmProvider[];
+    canViewProviderIdentity: boolean;
+    preferredProvider?: string;
+  };
+}
+
+const SIDEBAR_PROVIDER_OPTIONS: Array<{
+  id: 'openai' | 'gemini';
+  label: string;
+  mobileLabel: string;
+  icon: LucideIcon;
+}> = [
+  { id: 'openai', label: 'Agent Runtime', mobileLabel: 'Agent', icon: Brain },
+  { id: 'gemini', label: 'Gemini Runtime', mobileLabel: 'Gemini', icon: Sparkles },
+];
+
 // ─── Sidebar ───────────────────────────────────────────────────────────────
 
 export function ChatSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const toast = useToast();
+  const { logout } = useAuth();
+  const { session } = useAuthSession();
+  const { profile, isLoading: isProfileLoading } = useAuthProfile(session.accessToken);
+  const {
+    data: llmData,
+    mutate: mutateLlmData,
+  } = useSWR<SidebarLlmResponse>(
+    '/settings/llm',
+    (url: string) => apiFetch<SidebarLlmResponse>(url),
+    { revalidateOnFocus: false },
+  );
+  const [switchingProvider, setSwitchingProvider] = useState<'openai' | 'gemini' | null>(null);
+
+  const preferredProvider = llmData?.data?.preferredProvider === 'gemini' ? 'gemini' : 'openai';
+  const canViewProviderIdentity = llmData?.data?.canViewProviderIdentity ?? false;
+  const providerConfig = React.useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const provider of llmData?.data?.providers ?? []) {
+      if (provider.providerKey) map[provider.providerKey] = !!provider.configured;
+    }
+    return map;
+  }, [llmData]);
+
+  const canUseProvider = React.useCallback((providerId: 'openai' | 'gemini') => {
+    if (!canViewProviderIdentity) return true;
+    return !!providerConfig[providerId];
+  }, [canViewProviderIdentity, providerConfig]);
+
+  const handlePreferredProviderChange = React.useCallback(async (providerId: 'openai' | 'gemini') => {
+    if (providerId === preferredProvider || switchingProvider) return;
+    if (!canUseProvider(providerId)) return;
+
+    setSwitchingProvider(providerId);
+    try {
+      await apiFetch('/settings/llm/preferred-provider', {
+        method: 'PUT',
+        body: { provider: providerId },
+      });
+
+      await mutateLlmData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            preferredProvider: providerId,
+          },
+        };
+      }, { revalidate: false });
+
+      const label = providerId === 'openai' ? 'Agent Runtime' : 'Gemini Runtime';
+      toast.success(`Switched to ${label}`);
+    } catch (error) {
+      toast.error(
+        'Failed to switch runtime',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    } finally {
+      setSwitchingProvider(null);
+    }
+  }, [canUseProvider, mutateLlmData, preferredProvider, switchingProvider, toast]);
+
   const collapsed = useConversationStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationStore((s) => s.setSidebarCollapsed);
   const conversations = useConversationStore((s) => s.conversations);
@@ -91,12 +185,15 @@ export function ChatSidebar() {
   // Same string-tolerant role logic as before — Supabase user_metadata can
   // carry legacy role strings ('ADMIN' from older register flows) that
   // don't match the current UserRole enum exactly.
-  const roleStr = String(user?.role ?? '');
+  const roleStr = String(profile?.role ?? '');
   const isAdmin = roleStr === 'TENANT_ADMIN' || roleStr === 'SYSTEM_ADMIN' || roleStr === 'ADMIN';
   const isReviewerOrAdmin = isAdmin || roleStr === 'REVIEWER' || roleStr === 'OPERATOR';
 
   const visibleZones = ZONES.filter((zone) => {
-    if (zone.gate === 'reviewerOrAdmin' && !isReviewerOrAdmin) return false;
+    if (zone.gate === 'reviewerOrAdmin') {
+      if (isProfileLoading) return false;
+      if (!isReviewerOrAdmin) return false;
+    }
     return true;
   });
 
@@ -197,6 +294,52 @@ export function ChatSidebar() {
           New chat
         </span>
       </button>
+
+      {/* Runtime toggle pinned to top-left rail for quick provider switching. */}
+      <div className={cn('mb-3 w-full', isMobile ? 'px-2' : 'px-1')}>
+        <div className={cn(
+          'rounded-lg border border-border/60 bg-muted/20 p-1',
+          isMobile ? 'flex items-center gap-1' : 'flex flex-col gap-1',
+        )}>
+          {SIDEBAR_PROVIDER_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const active = preferredProvider === option.id;
+            const disabled = switchingProvider !== null || !canUseProvider(option.id);
+
+            return (
+              <button
+                key={option.id}
+                onClick={() => handlePreferredProviderChange(option.id)}
+                disabled={disabled}
+                className={cn(
+                  'group relative flex rounded-md text-[11px] font-medium transition-colors',
+                  isMobile ? 'h-8 flex-1 items-center justify-center gap-1.5' : 'h-8 w-10 items-center justify-center',
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground',
+                  disabled && 'cursor-not-allowed opacity-60',
+                )}
+                aria-label={option.label}
+                title={option.label}
+              >
+                {switchingProvider === option.id ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border border-current border-t-transparent" />
+                ) : (
+                  <Icon className="h-3.5 w-3.5" />
+                )}
+
+                {isMobile && <span>{option.mobileLabel}</span>}
+
+                {!isMobile && (
+                  <span className="absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block">
+                    {option.label}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Zone rail */}
       <nav className="flex flex-col gap-1" aria-label="Primary zones">
@@ -309,6 +452,11 @@ export function ChatSidebar() {
             </div>
           );
         })}
+        {isProfileLoading && (
+          <div className="p-0.5" title="Loading role-based navigation">
+            <ProfileGateSkeleton compact className="h-10 w-10" />
+          </div>
+        )}
       </nav>
 
       {/* Spacer pushes footer icons to the bottom */}
@@ -318,26 +466,38 @@ export function ChatSidebar() {
       <div className="flex flex-col gap-1">
         <Link
           href="/settings"
-          className="group flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+          className={cn(
+            'group flex h-10 rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors',
+            isMobile ? 'w-full items-center justify-start gap-2 px-3' : 'w-10 items-center justify-center',
+          )}
           aria-label="Settings"
           title="Settings"
         >
           <Settings className="h-4 w-4" />
-          <span className="absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block">
-            Settings
-          </span>
+          {isMobile && <span className="text-xs font-medium">Settings</span>}
+          {!isMobile && (
+            <span className="absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block">
+              Settings
+            </span>
+          )}
         </Link>
         <button
           type="button"
           onClick={handleSignOut}
-          className="group flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+          className={cn(
+            'group flex h-10 rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors',
+            isMobile ? 'w-full items-center justify-start gap-2 px-3' : 'w-10 items-center justify-center',
+          )}
           aria-label="Sign out"
           title="Sign out"
         >
           <LogOut className="h-4 w-4" />
-          <span className="absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block">
-            Sign out
-          </span>
+          {isMobile && <span className="text-xs font-medium">Sign out</span>}
+          {!isMobile && (
+            <span className="absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block">
+              Sign out
+            </span>
+          )}
         </button>
       </div>
     </div>
@@ -352,7 +512,7 @@ export function ChatSidebar() {
           onClick={() => setSidebarCollapsed(true)}
           aria-hidden
         />
-        <aside className="chat-sidebar fixed inset-y-0 left-0 z-50 w-[64px] shadow-2xl bg-background border-r border-border">
+        <aside className="chat-sidebar fixed inset-y-0 left-0 z-50 w-[220px] shadow-2xl bg-background border-r border-border">
           {railContent}
         </aside>
       </>

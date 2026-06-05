@@ -25,12 +25,25 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 const SITE = (process.env['QA_SITE'] ?? process.env['E2E_BASE_URL'] ?? `http://127.0.0.1:${process.env['E2E_WEB_PORT'] ?? '3100'}`).replace(/\/$/, '');
+const API_BASE_URL = (process.env['E2E_API_BASE_URL'] ?? 'https://jak-swarm-api-production.up.railway.app').replace(/\/$/, '');
+const SUPABASE_URL = (process.env['E2E_SUPABASE_URL'] ?? 'https://ttrhawuqydfecndehdhx.supabase.co').replace(/\/$/, '');
+const SUPABASE_PUBLISHABLE_KEY = process.env['E2E_SUPABASE_PUBLISHABLE_KEY'] ?? 'sb_publishable_j8cWRDR821e5jb9ys2TG9g_8PiLfKRH';
+const SUPABASE_STORAGE_KEY = (() => {
+  try {
+    const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0] ?? '';
+    if (!projectRef) throw new Error('missing project ref');
+    return `sb-${projectRef}-auth-token`;
+  } catch {
+    return process.env['E2E_SUPABASE_STORAGE_KEY'] ?? 'sb-ttrhawuqydfecndehdhx-auth-token';
+  }
+})();
 const ARTIFACTS = 'C:/Users/reetu/Desktop/JAK/jak-swarm/qa/playwright-artifacts/a-to-z';
 const FINDINGS_PATH = 'C:/Users/reetu/Desktop/JAK/jak-swarm/qa/a-to-z-findings.json';
 const EMAIL = process.env['E2E_AUTH_EMAIL'];
 const PASSWORD = process.env['E2E_AUTH_PASSWORD'];
+const PROMPT_TIMEOUT_CAP_MS = Number(process.env['E2E_PROMPT_TIMEOUT_MS'] ?? '90000');
 
-test.skip(!EMAIL || !PASSWORD, 'Set E2E_AUTH_EMAIL + E2E_AUTH_PASSWORD to run the authenticated A-to-Z audit.');
+const KNOWN_ROLE_LABELS = ['CEO', 'CTO', 'CMO', 'Code', 'Research', 'Design', 'Auto', 'Legal'] as const;
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
 type Verdict = 'working' | 'partial' | 'inert' | 'misleading' | 'broken' | 'blocked' | 'marketing-only';
@@ -66,7 +79,7 @@ function record(f: Omit<Finding, 'timestamp'>) {
 async function snap(page: Page, subfolder: string, name: string): Promise<string> {
   const safe = name.replace(/[^a-z0-9-_.]/gi, '-').toLowerCase();
   const full = path.join(ARTIFACTS, subfolder, safe.endsWith('.png') ? safe : `${safe}.png`);
-  await page.screenshot({ path: full, fullPage: true }).catch(() => {});
+  await page.screenshot({ path: full, fullPage: false }).catch(() => {});
   return full;
 }
 
@@ -102,7 +115,160 @@ function flushBuffers() {
 let ctx: BrowserContext;
 let page: Page;
 
+interface BootstrapAuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  tenantId: string;
+  tenantName: string;
+  industry: string;
+}
+
+function toBase64Url(input: string): string {
+  return Buffer.from(input, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function normalizeAuthEnvelope(payload: unknown): { token: string; user: BootstrapAuthUser } {
+  const envelope = (payload && typeof payload === 'object')
+    ? (payload as { success?: unknown; data?: unknown })
+    : null;
+  const data = envelope && envelope.success === true && envelope.data ? envelope.data : payload;
+  const source = (data && typeof data === 'object') ? (data as Record<string, unknown>) : {};
+  const userRaw = (source['user'] && typeof source['user'] === 'object')
+    ? (source['user'] as Record<string, unknown>)
+    : source;
+
+  const token = String(source['token'] ?? '');
+  const user: BootstrapAuthUser = {
+    id: String(userRaw['id'] ?? userRaw['userId'] ?? userRaw['sub'] ?? ''),
+    email: String(userRaw['email'] ?? ''),
+    name: String(userRaw['name'] ?? userRaw['fullName'] ?? 'Playwright QA Bot'),
+    role: String(userRaw['role'] ?? 'TENANT_ADMIN'),
+    tenantId: String(userRaw['tenantId'] ?? source['tenantId'] ?? ''),
+    tenantName: String(userRaw['tenantName'] ?? 'E2E QA Tenant'),
+    industry: String(userRaw['industry'] ?? 'TECHNOLOGY'),
+  };
+
+  if (!token || !user.id || !user.email || !user.tenantId) {
+    throw new Error('bootstrap auth payload missing token/user fields');
+  }
+
+  return { token, user };
+}
+
+async function createBootstrapAuth(): Promise<{ token: string; user: BootstrapAuthUser; sbCookieValue: string }> {
+  const seed = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const email = `playwright+${seed}@example.com`;
+  const password = `E2ePass!${Math.floor(Math.random() * 9000) + 1000}`;
+  const tenantSlug = `e2e-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+
+  const registerBody = {
+    email,
+    password,
+    name: 'Playwright QA Bot',
+    tenantName: 'E2E QA Tenant',
+    tenantSlug,
+    industry: 'TECHNOLOGY',
+  };
+
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(registerBody),
+  });
+
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (payload && typeof payload === 'object' && 'error' in payload)
+      ? String((payload as { error?: { message?: unknown } }).error?.message ?? `register failed (${res.status})`)
+      : `register failed (${res.status})`;
+    throw new Error(`bootstrap register failed: ${message}`);
+  }
+
+  const { token, user } = normalizeAuthEnvelope(payload);
+  const now = Math.floor(Date.now() / 1000);
+  const sbSession = {
+    access_token: token,
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: now + 3600,
+    refresh_token: `e2e-refresh-${seed}`,
+    user: {
+      id: user.id,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: user.email,
+      app_metadata: { provider: 'email', providers: ['email'] },
+      user_metadata: {
+        name: user.name,
+        tenantId: user.tenantId,
+        tenantName: user.tenantName,
+        industry: user.industry,
+      },
+      identities: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_anonymous: false,
+    },
+  };
+
+  const sbCookieValue = `base64-${toBase64Url(JSON.stringify(sbSession))}`;
+  return { token, user, sbCookieValue };
+}
+
+async function bootstrapSessionWithoutCredentials() {
+  const bootstrap = await createBootstrapAuth();
+
+  await page.goto('/login?redirectTo=%2Fworkspace', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(
+    ({ token, user, storageKey, sbCookieValue }) => {
+      const clearCookie = (name: string) => {
+        document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+        document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+      };
+
+      clearCookie('jak-auth-token');
+      for (const part of document.cookie.split(';')) {
+        const key = part.trim().split('=')[0] ?? '';
+        if (key === storageKey || key.startsWith(`${storageKey}.`)) {
+          clearCookie(key);
+        }
+      }
+
+      document.cookie = `jak-auth-token=${encodeURIComponent(token)}; Path=/; SameSite=Lax; Secure`;
+      document.cookie = `${storageKey}=${sbCookieValue}; Path=/; SameSite=Lax; Secure`;
+
+      localStorage.setItem('jak-auth-token', token);
+      localStorage.setItem('jak-auth-user', JSON.stringify(user));
+      localStorage.setItem(storageKey, JSON.stringify({ access_token: token, user: { id: user.id, email: user.email } }));
+    },
+    {
+      token: bootstrap.token,
+      user: bootstrap.user,
+      storageKey: SUPABASE_STORAGE_KEY,
+      sbCookieValue: bootstrap.sbCookieValue,
+    },
+  );
+
+  await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+  await page.waitForURL((u) => !/\/(login|register)/.test(u.pathname), { timeout: 20_000 });
+  await page.waitForTimeout(2500);
+}
+
 async function login() {
+  if (!EMAIL || !PASSWORD) {
+    await bootstrapSessionWithoutCredentials();
+    return;
+  }
+
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   await page.locator('input[type="email"]').first().fill(EMAIL!);
@@ -112,6 +278,22 @@ async function login() {
     await page.waitForURL((u) => !/\/(login|register)/.test(u.pathname), { timeout: 20_000 });
   } catch { /* surface to caller */ }
   await page.waitForTimeout(2500);
+}
+
+async function fetchApiText(pathname: string): Promise<{ status: number; body: string; url: string; error?: string }> {
+  const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const url = `${API_BASE_URL}${normalized}`;
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    return { status: res.status, body: await res.text(), url };
+  } catch (err) {
+    return {
+      status: 0,
+      body: '',
+      url,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 /**
@@ -130,6 +312,18 @@ async function runRolePrompt(role: string, prompt: string, timeoutMs: number): P
   await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
 
+  const readAssistantTexts = async (): Promise<string[]> => {
+    // MessageThread.tsx renders assistant text as <span class="whitespace-pre-wrap">,
+    // not <p>. The old selectors used `p.whitespace-pre-wrap` which never matched,
+    // causing false "no final assistant answer" failures.
+    const primary = page.locator('[data-testid="assistant-message"] span.whitespace-pre-wrap');
+    if ((await primary.count()) > 0) {
+      return primary.allInnerTexts().catch(() => []);
+    }
+    // Fallback for the current production UI where messages are rendered without testids.
+    return page.locator('main span.whitespace-pre-wrap').allInnerTexts().catch(() => []);
+  };
+
   // Always start a fresh conversation so we count only new bubbles
   const newChat = page.locator('button:has-text("New chat")').first();
   if ((await newChat.count()) > 0) {
@@ -146,13 +340,19 @@ async function runRolePrompt(role: string, prompt: string, timeoutMs: number): P
   }
   shots.push(await snap(page, 'roles', `${role.toLowerCase()}-role-selected`));
 
-  const textarea = page.locator('textarea').first();
-  if (!(await textarea.count())) {
+  let composer = page.getByRole('textbox', { name: /message/i }).first();
+  if (!(await composer.count())) composer = page.locator('textarea').first();
+  if (!(await composer.count())) composer = page.locator('[contenteditable="true"][role="textbox"]').first();
+  if (!(await composer.count())) composer = page.locator('[contenteditable="true"]').first();
+  if (!(await composer.count())) {
     return { finalAnswer: '__NO_TEXTAREA__', statusLines: [], apiCalls: [], screenshots: shots };
   }
-  const initialBubbles = await page.locator('[data-testid="assistant-message"]').count();
-  await textarea.click();
-  await textarea.fill(prompt);
+  const initialBubbles = (await readAssistantTexts()).length;
+  await composer.click();
+  await composer.fill(prompt).catch(async () => {
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(prompt);
+  });
   shots.push(await snap(page, 'roles', `${role.toLowerCase()}-prompt-typed`));
 
   const apiCallsBefore = currentApiCalls.length;
@@ -163,20 +363,23 @@ async function runRolePrompt(role: string, prompt: string, timeoutMs: number): P
   await send.click();
   shots.push(await snap(page, 'roles', `${role.toLowerCase()}-sent`));
 
-  const deadline = Date.now() + timeoutMs;
+  const effectiveTimeoutMs = Number.isFinite(PROMPT_TIMEOUT_CAP_MS)
+    ? Math.min(timeoutMs, Math.max(30_000, PROMPT_TIMEOUT_CAP_MS))
+    : timeoutMs;
+  const deadline = Date.now() + effectiveTimeoutMs;
   let finalAnswer = '';
   let statusLines: string[] = [];
   let workflowId: string | undefined;
   while (Date.now() < deadline) {
     await page.waitForTimeout(2500);
-    const bubbles = await page.locator('[data-testid="assistant-message"] p.whitespace-pre-wrap').allInnerTexts().catch(() => []);
+    const bubbles = await readAssistantTexts();
     if (bubbles.length > initialBubbles) {
       const newBubbles = bubbles.slice(initialBubbles);
       statusLines = newBubbles.filter(b => /^(⏳|✓|✗|Workflow (started|paused|completed|failed)|Live stream)/.test(b.trim()));
       const subst = newBubbles.filter(b => !/^(⏳|✓|✗|Workflow (started|paused|completed|failed)|Live stream)/.test(b.trim()) && b.trim().length > 0);
       const last = subst[subst.length - 1] ?? '';
-      const textareaDisabled = await textarea.isDisabled().catch(() => false);
-      if (last.length > 0 && !textareaDisabled) { finalAnswer = last; break; }
+      const sendDisabled = await send.isDisabled().catch(() => false);
+      if (last.length > 0 && !sendDisabled) { finalAnswer = last; break; }
     }
   }
   shots.push(await snap(page, 'roles', `${role.toLowerCase()}-final`));
@@ -201,8 +404,11 @@ function classifyAnswer(answer: string, prompt: string, requiredSubstrings: Arra
   severity: Severity;
   reason: string;
 } {
-  if (!answer || answer === '__NO_TEXTAREA__') {
+  if (answer === '__NO_TEXTAREA__') {
     return { verdict: 'blocked', severity: 'Critical', reason: 'no textarea — workspace requires function-selection first (H1)' };
+  }
+  if (!answer) {
+    return { verdict: 'broken', severity: 'High', reason: 'no final assistant answer before timeout' };
   }
   if (answer === '__NO_SEND__') {
     return { verdict: 'broken', severity: 'Critical', reason: 'no Send button' };
@@ -227,6 +433,9 @@ function classifyAnswer(answer: string, prompt: string, requiredSubstrings: Arra
 test.describe.configure({ mode: 'serial' });
 
 test.describe('JAK Swarm — A-to-Z product evaluation', () => {
+  // Role/workflow prompts can legitimately run for a few minutes.
+  test.setTimeout(600_000);
+
   test.beforeAll(async ({ browser }) => {
     ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: SITE });
     page = await ctx.newPage();
@@ -266,7 +475,7 @@ test.describe('JAK Swarm — A-to-Z product evaluation', () => {
       timeout: 180_000,
     },
     {
-      role: 'Coding',
+      role: 'Code',
       prompt: 'Write a Python script that accepts a CSV path, reads it with pandas, and prints the top 5 rows by a "revenue" column descending. Include error handling.',
       required: [/pandas|read_csv/i, /sort_values|head\(/i],
       timeout: 150_000,
@@ -290,15 +499,15 @@ test.describe('JAK Swarm — A-to-Z product evaluation', () => {
       timeout: 180_000,
     },
     {
-      role: 'Marketing',
+      role: 'CMO',
       prompt: 'Create a 30-day campaign plan for launching JAK Swarm to startup founders. Give channels, weekly milestones, KPIs.',
       required: [/channel/i, /week|milestone/i, /kpi|metric/i],
       timeout: 180_000,
     },
   ];
 
-  for (const t of ROLE_PROMPTS) {
-    test(`P4 role — ${t.role}`, async () => {
+  for (const [index, t] of ROLE_PROMPTS.entries()) {
+    test(`P4 role ${index + 1} — ${t.role}`, async () => {
       flushBuffers();
       const r = await runRolePrompt(t.role, t.prompt, t.timeout);
       const buf = flushBuffers();
@@ -581,40 +790,40 @@ test.describe('JAK Swarm — A-to-Z product evaluation', () => {
   // ─── PART 6 — Backend / API verification ────────────────────────────────
   test('P6.1 Backend /version confirms deployed commit + flag state', async () => {
     flushBuffers();
-    const r = await page.evaluate(async () => {
-      const res = await fetch('https://jak-swarm-api.onrender.com/version');
-      return { status: res.status, body: await res.text() };
-    });
+    const r = await fetchApiText('/version');
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(r.body); } catch { /* ignore */ }
+    const title = r.status > 0
+      ? `API /version returned ${r.status}; gitCommit=${parsed.gitCommit ?? '?'} engine=${parsed.executionEngine ?? '?'} runtime=${parsed.workflowRuntime ?? '?'}`
+      : `API /version request failed (${r.error ?? 'unknown error'})`;
     record({
       phase: 6, area: 'Backend/Version',
-      title: `API /version returned ${r.status}; gitCommit=${parsed.gitCommit ?? '?'} engine=${parsed.executionEngine ?? '?'} runtime=${parsed.workflowRuntime ?? '?'}`,
+      title,
       severity: r.status === 200 ? 'Info' : 'Critical',
       verdict: r.status === 200 ? 'working' : 'broken',
-      evidence: r.body.slice(0, 400),
-      url: 'https://jak-swarm-api.onrender.com/version',
+      evidence: r.status > 0 ? r.body.slice(0, 400) : (r.error ?? 'request failed'),
+      url: r.url,
       ...flushBuffers(),
     });
   });
 
   test('P6.2 Backend /health — DB + Redis reachable', async () => {
     flushBuffers();
-    const r = await page.evaluate(async () => {
-      const res = await fetch('https://jak-swarm-api.onrender.com/health');
-      return { status: res.status, body: await res.text() };
-    });
+    const r = await fetchApiText('/health');
     let parsed: { status?: string; checks?: Record<string, { status?: string }> } = {};
     try { parsed = JSON.parse(r.body); } catch { /* ignore */ }
     const dbOk = parsed.checks?.database?.status === 'ok';
     const redisOk = parsed.checks?.redis?.status === 'ok' || parsed.checks?.redis?.status === 'disabled';
+    const title = r.status > 0
+      ? `health=${parsed.status}; db=${parsed.checks?.database?.status} redis=${parsed.checks?.redis?.status}`
+      : `health request failed (${r.error ?? 'unknown error'})`;
     record({
       phase: 6, area: 'Backend/Health',
-      title: `health=${parsed.status}; db=${parsed.checks?.database?.status} redis=${parsed.checks?.redis?.status}`,
+      title,
       severity: dbOk && redisOk ? 'Info' : 'High',
       verdict: dbOk && redisOk ? 'working' : 'partial',
-      evidence: r.body.slice(0, 400),
-      url: 'https://jak-swarm-api.onrender.com/health',
+      evidence: r.status > 0 ? r.body.slice(0, 400) : (r.error ?? 'request failed'),
+      url: r.url,
       ...flushBuffers(),
     });
   });
