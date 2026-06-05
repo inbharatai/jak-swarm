@@ -127,6 +127,12 @@ export interface ConversationActions {
    *  from `onRehydrateStorage`. Tests can call it manually to skip the
    *  hydration race. */
   _setHasHydrated: (hydrated: boolean) => void;
+  /**
+   * Clear all conversations and messages. Used when the user
+   * identity changes (different email login) to prevent stale
+   * data from a previous account appearing in the workspace.
+   */
+  clearAll: () => void;
 }
 
 type PersistedConversationState = Pick<
@@ -425,6 +431,17 @@ export const useConversationStore = create<ConversationState & ConversationActio
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setDrawerOpen: (open) => set({ drawerOpen: open }),
       _setHasHydrated: (hydrated) => set({ _hasHydrated: hydrated }),
+
+      /**
+       * Clear all conversations and messages. Used when the user
+       * identity changes (different email login) to prevent stale
+       * data from a previous account appearing in the workspace.
+       */
+      clearAll: () => set({
+        conversations: [],
+        activeConversationId: null,
+        messages: {},
+      }),
     }),
     {
       name: 'jak-conversations',

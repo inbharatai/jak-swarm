@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppLayout } from './AppLayout';
 import { useAuthSession } from '@/lib/auth-session';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useConversationStore } from '@/store/conversation-store';
 
 const AUTH_PATHS = ['/login', '/register', '/', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms', '/trial'];
 
@@ -15,6 +16,22 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const { user } = useAuthSession();
   const pathname = usePathname();
+  const clearConversations = useConversationStore((s) => s.clearAll);
+  const prevUserIdRef = useRef<string | null>(null);
+
+  // ── Clear stale conversations on user identity change ──────────────
+  // When the user logs in with a different email, localStorage still
+  // holds conversations from the previous account. Those conversations
+  // have no server-side data for the new user, causing a "blank
+  // workspace" experience. Detect the user change and wipe the store.
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    if (prevUserIdRef.current !== null && currentId !== null && currentId !== prevUserIdRef.current) {
+      // User identity changed — clear stale conversation data
+      clearConversations();
+    }
+    prevUserIdRef.current = currentId;
+  }, [user?.id, clearConversations]);
 
   // Hydration fix: defer the shell decision until after the first
   // client-side render. During SSR, `user` is always null (no session
