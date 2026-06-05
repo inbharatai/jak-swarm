@@ -286,12 +286,12 @@ export class TechnicalAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'web_fetch',
-          description: 'Fetch and extract the full text content of a web page. Use this FIRST when asked to review, audit, or inspect a website/URL — before falling back to web_search. Returns the page title, main text content, and metadata.',
+          description: 'Fetch a specific URL and extract its readable text content. Use this FIRST when asked to review, audit, or inspect a website/URL — before falling back to web_search. Returns page title, main text content, and metadata.',
           parameters: {
             type: 'object',
             properties: {
-              url: { type: 'string', description: 'The URL to fetch (e.g., "https://example.com")' },
-              format: { type: 'string', enum: ['text', 'html', 'markdown'], description: 'Output format (default: markdown)' },
+              url: { type: 'string', description: 'URL to fetch' },
+              maxChars: { type: 'number', description: 'Maximum characters to extract (default: 5000)' },
             },
             required: ['url'],
           },
@@ -301,12 +301,11 @@ export class TechnicalAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'browser_navigate',
-          description: 'Navigate to a URL in a headless browser. Use for interactive pages (SPAs, JS-heavy sites) that web_fetch cannot render properly. Returns the page URL and title after loading.',
+          description: 'Navigate a real Chromium browser to a URL. Returns page title, final URL, HTTP status code, and extracted text content. Use for interactive pages (SPAs, JS-heavy sites) that web_fetch cannot render properly.',
           parameters: {
             type: 'object',
             properties: {
-              url: { type: 'string', description: 'The URL to navigate to' },
-              waitUntil: { type: 'string', enum: ['load', 'domcontentloaded', 'networkidle0', 'networkidle2'], description: 'Wait condition (default: networkidle2)' },
+              url: { type: 'string', description: 'URL to navigate to' },
             },
             required: ['url'],
           },
@@ -316,11 +315,11 @@ export class TechnicalAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'browser_get_text',
-          description: 'Extract visible text content from the current browser page. Use after browser_navigate to read the page content.',
+          description: 'Get all visible text content from a web page. Returns cleaned text with scripts/styles/nav stripped. Pass a URL to navigate first, or omit to read the current active page.',
           parameters: {
             type: 'object',
             properties: {
-              selector: { type: 'string', description: 'Optional CSS selector to extract text from a specific element' },
+              url: { type: 'string', description: 'URL to navigate to and extract text from (optional, uses active page if omitted)' },
             },
           },
         },
@@ -329,12 +328,11 @@ export class TechnicalAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'browser_screenshot',
-          description: 'Capture a screenshot of the current browser page. Use for visual layout reviews and UI audits.',
+          description: 'Take a screenshot of a web page. Returns a base64-encoded PNG image. Pass a URL to navigate first, or omit to screenshot the current active page.',
           parameters: {
             type: 'object',
             properties: {
-              fullPage: { type: 'boolean', description: 'Whether to capture the full scrollable page (default: false)' },
-              selector: { type: 'string', description: 'Optional CSS selector to screenshot a specific element' },
+              url: { type: 'string', description: 'URL to navigate to and screenshot (optional, uses active page if omitted)' },
             },
           },
         },
@@ -343,11 +341,12 @@ export class TechnicalAgent extends BaseAgent {
         type: 'function',
         function: {
           name: 'browser_analyze_page',
-          description: 'Analyze the current browser page for structure, accessibility, SEO metadata, and performance characteristics. Use for UX/accessibility audits.',
+          description: 'Take a screenshot of the current browser page and analyze it using vision AI. Returns a detailed description of layout, text, buttons, forms, images, and data. Use for UX/accessibility audits.',
           parameters: {
             type: 'object',
             properties: {
-              aspects: { type: 'array', items: { type: 'string', enum: ['structure', 'accessibility', 'seo', 'performance'] }, description: 'Aspects to analyze (default: all)' },
+              prompt: { type: 'string', description: 'What to look for in the page (optional, default: general analysis)' },
+              fullPage: { type: 'boolean', description: 'Capture full page or just viewport (default: viewport only)' },
             },
           },
         },

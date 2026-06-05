@@ -164,8 +164,8 @@ export class StrategistAgent extends BaseAgent {
           parameters: {
             type: 'object',
             properties: {
-              url: { type: 'string', description: 'The URL to fetch (e.g., "https://competitor.com/pricing")' },
-              format: { type: 'string', enum: ['text', 'html', 'markdown'], description: 'Output format (default: markdown)' },
+              url: { type: 'string', description: 'URL to fetch' },
+              maxChars: { type: 'number', description: 'Maximum characters to extract (default: 5000)' },
             },
             required: ['url'],
           },
