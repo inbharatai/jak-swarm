@@ -487,6 +487,7 @@ export interface WorkflowSchedule {
   cronExpression: string;
   enabled: boolean;
   maxCostUsd?: number;
+  roleModes?: string[];
   lastRunAt?: string;
   nextRunAt?: string;
   lastRunStatus?: string;

@@ -58,6 +58,7 @@ interface ScheduleFormData {
   description: string;
   industry: string;
   maxCostUsd: string;
+  roleModes: string[];
 }
 
 const emptyForm: ScheduleFormData = {
@@ -67,6 +68,7 @@ const emptyForm: ScheduleFormData = {
   description: '',
   industry: '',
   maxCostUsd: '',
+  roleModes: [],
 };
 
 function cronToHuman(cron: string): string {
@@ -116,6 +118,7 @@ export default function SchedulesPage() {
       description: schedule.description ?? '',
       industry: schedule.industry ?? '',
       maxCostUsd: schedule.maxCostUsd?.toString() ?? '',
+      roleModes: schedule.roleModes ?? [],
     });
     setError(null);
     setDialogOpen(true);
@@ -136,6 +139,7 @@ export default function SchedulesPage() {
         description: form.description.trim() || undefined,
         industry: form.industry || undefined,
         maxCostUsd: form.maxCostUsd ? parseFloat(form.maxCostUsd) : undefined,
+        roleModes: form.roleModes.length > 0 ? form.roleModes : undefined,
       };
 
       if (editingId) {
@@ -363,6 +367,34 @@ export default function SchedulesPage() {
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
             />
+
+            {/* Role picker — select which agent roles run on each schedule fire */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Agent roles</label>
+              <p className="text-xs text-muted-foreground">Select which specialist runs each scheduled workflow. Leave empty for auto-mode.</p>
+              <div className="flex flex-wrap gap-2">
+                {['ceo', 'cto', 'cmo', 'cfo', 'coo', 'legal', 'hr', 'finance', 'worker'].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                      form.roleModes.includes(role)
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50',
+                    )}
+                    onClick={() => {
+                      const next = form.roleModes.includes(role)
+                        ? form.roleModes.filter((r) => r !== role)
+                        : [...form.roleModes, role];
+                      updateField('roleModes', next as unknown as string);
+                    }}
+                  >
+                    {role.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {error && (
               <p className="text-xs text-destructive">{error}</p>
