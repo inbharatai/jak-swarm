@@ -95,6 +95,10 @@ export function ChatWorkspace() {
   // activeConversationId. See store comment for the contract.
   const hasHydrated = useConversationStore((s) => s._hasHydrated);
   const isMobile = useMediaQuery('(max-width: 767px)');
+  // Narrow breakpoint: tablets and small desktops where the 480px drawer
+  // squeezes the chat area below usable width. On these viewports we force
+  // the mobile bottom-sheet pattern instead.
+  const isNarrow = useMediaQuery('(max-width: 860px)');
   const abortRef = useRef<AbortController | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -854,11 +858,11 @@ export function ChatWorkspace() {
           />
         </div>
 
-        {/* Detail drawer — desktop: side panel, mobile: bottom sheet overlay */}
-        {drawerOpen && !isMobile && (
+        {/* Detail drawer — desktop: side panel, narrow/mobile: bottom sheet overlay */}
+        {drawerOpen && !isNarrow && (
           <aside
             className={cn(
-              'w-[480px] shrink-0 border-l border-border bg-card overflow-y-auto',
+              'w-[320px] md:w-[400px] lg:w-[480px] shrink-0 border-l border-border bg-card overflow-y-auto',
               'animate-fade-up',
             )}
           >
@@ -869,7 +873,7 @@ export function ChatWorkspace() {
           </aside>
         )}
 
-        {drawerOpen && isMobile && (
+        {drawerOpen && isNarrow && (
           <>
             <div
               className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"

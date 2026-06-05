@@ -1668,7 +1668,7 @@ export const toolToggleApi = {
 export const scheduleApi = {
   list: () => apiClient.get<unknown>('/schedules'),
   get: (id: string) => apiClient.get<unknown>(`/schedules/${id}`),
-  create: (body: { name: string; goal: string; cronExpression: string; description?: string; industry?: string; maxCostUsd?: number }) =>
+  create: (body: { name: string; goal: string; cronExpression: string; description?: string; industry?: string; maxCostUsd?: number; roleModes?: string[] }) =>
     apiClient.post<unknown>('/schedules', body),
   update: (id: string, body: Record<string, unknown>) =>
     apiClient.patch<unknown>(`/schedules/${id}`, body),

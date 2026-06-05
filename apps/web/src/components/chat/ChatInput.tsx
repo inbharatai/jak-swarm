@@ -38,6 +38,7 @@ interface ChatInputProps {
 // Same accept + size limits as the /files page for consistency.
 const ATTACH_ACCEPT = '.pdf,.txt,.md,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp';
 const ATTACH_MAX_BYTES = 25 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'txt', 'md', 'csv', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'webp']);
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -118,6 +119,11 @@ export function ChatInput({
     setAttachError(null);
     if (file.size > ATTACH_MAX_BYTES) {
       setAttachError(`${file.name} is ${formatBytes(file.size)} — max ${formatBytes(ATTACH_MAX_BYTES)}.`);
+      return;
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      setAttachError(`"${file.name}" is not a supported file type. Supported: PDF, TXT, MD, CSV, DOCX, XLSX, PNG, JPG, WEBP.`);
       return;
     }
 
@@ -352,9 +358,9 @@ export function ChatInput({
         </div>
       )}
 
-      {/* Input row */}
+      {/* Input row — responsive: tighter on mobile (390px), spacious on desktop */}
       <div className={cn(
-        'flex items-end gap-2 rounded-xl border border-border bg-card px-4 py-3 transition-colors',
+        'flex items-end gap-1.5 sm:gap-2 rounded-xl border border-border bg-card px-2 sm:px-4 py-2 sm:py-3 transition-colors',
         'focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20',
         isListening && 'border-primary/50 ring-1 ring-primary/20',
       )}>
@@ -406,7 +412,7 @@ export function ChatInput({
           onClick={handleAttachClick}
           disabled={disabled}
           className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
+            'flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg transition-all',
             'text-muted-foreground hover:text-foreground hover:bg-muted',
             disabled && 'opacity-40 cursor-not-allowed',
           )}
@@ -423,7 +429,7 @@ export function ChatInput({
             onClick={handleMicClick}
             disabled={disabled}
             className={cn(
-              'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
+              'relative flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg transition-all',
               isListening
                 ? 'bg-primary/15 text-primary hover:bg-primary/25'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -448,7 +454,7 @@ export function ChatInput({
           onClick={handleSend}
           disabled={!canSend}
           className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
+            'flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg transition-all',
             canSend
               ? 'bg-primary text-primary-foreground hover:bg-primary/90'
               : 'text-muted-foreground/40',
