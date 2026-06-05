@@ -6355,32 +6355,32 @@ Date: _______________`;
   toolRegistry.register(
     {
       name: 'compile_executive_summary',
-      description: 'Compile an executive dashboard summary from recent workflows, memory, and traces. Used by the Strategist/CEO agent.',
+      description: 'Compile an executive dashboard summary from recent workflows, conversations, memory, traces, audit logs, and approval decisions. Used by the Strategist/CEO agent. Defaults to last 30 days.',
       category: ToolCategory.KNOWLEDGE,
       riskClass: ToolRiskClass.READ_ONLY,
       requiresApproval: false,
       inputSchema: {
         type: 'object',
         properties: {
-          timeRangeDays: { type: 'number', description: 'Number of days to look back (default: 7)' },
+          timeRangeDays: { type: 'number', description: 'Number of days to look back (default: 30)' },
         },
       },
       outputSchema: { type: 'object' },
       maturity: 'real_external',
-      version: '1.0.0',
+      version: '2.0.0',
       sideEffectLevel: 'read',
     },
     async (input: unknown, context: ToolExecutionContext) => {
-      const { timeRangeDays = 7 } = input as { timeRangeDays?: number };
+      const { timeRangeDays = 30 } = input as { timeRangeDays?: number };
       const since = new Date(Date.now() - timeRangeDays * 24 * 60 * 60 * 1000);
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const dbModule = require('@jak-swarm/db');
         const prisma = dbModule.prisma;
-        if (!prisma) return { error: 'Database not available.' };
+        if (!prisma) return { error: 'Database not available.', connected: false };
 
-        const [workflows, recentMemory, recentTraces] = await Promise.all([
+        const [workflows, recentMemory, recentTraces, conversations, auditLogs, approvalRequests] = await Promise.all([
           prisma.workflow.findMany({
             where: { tenantId: context.tenantId, createdAt: { gte: since } },
             select: { id: true, goal: true, status: true, totalCostUsd: true, createdAt: true },
@@ -6406,7 +6406,42 @@ Date: _______________`;
             select: { agentRole: true, durationMs: true, error: true },
             take: 200,
           }),
+          prisma.conversation.findMany({
+            where: { tenantId: context.tenantId, createdAt: { gte: since } },
+            select: { id: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          }).catch(() => []),
+          prisma.auditLog.findMany({
+            where: { tenantId: context.tenantId, createdAt: { gte: since } },
+            select: { id: true, action: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }).catch(() => []),
+          prisma.approvalRequest.findMany({
+            where: { workflow: { tenantId: context.tenantId }, createdAt: { gte: since } },
+            select: { id: true, status: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          }).catch(() => []),
         ]);
+
+        // ── No-data guard ──────────────────────────────────────────────
+        // When every table returns zero rows, return a clear "no data yet"
+        // message instead of a zeroed-out template that misleadingly shows
+        // `connected: true` with empty counts.
+        const totalRows = workflows.length + recentMemory.length + recentTraces.length
+          + conversations.length + auditLogs.length + approvalRequests.length;
+        if (totalRows === 0) {
+          return {
+            dataUnavailable: true,
+            message: `No activity data found for the last ${timeRangeDays} days. This could mean the workspace is new, no workflows have been run, or data retention has been cleared.`,
+            period: { days: timeRangeDays, since: since.toISOString() },
+            sourcesChecked: ['workflows', 'memory', 'agentTraces', 'conversations', 'auditLogs', 'approvalRequests'],
+            sourcesNeeded: ['At least one completed workflow', 'Conversation history', 'Memory entries'],
+            connected: true,
+          };
+        }
 
         // Aggregate
         const statusCounts: Record<string, number> = {};
@@ -6428,6 +6463,27 @@ Date: _______________`;
           agentUsage[role]!.avgDurationMs = Math.round(agentUsage[role]!.avgDurationMs / agentUsage[role]!.calls);
         }
 
+        // Conversation stats
+        const conversationsByDay: Record<string, number> = {};
+        for (const c of conversations) {
+          const day = (c as { createdAt: Date }).createdAt.toISOString().slice(0, 10);
+          conversationsByDay[day] = (conversationsByDay[day] ?? 0) + 1;
+        }
+
+        // Approval decision stats
+        const approvalCounts: Record<string, number> = {};
+        for (const a of approvalRequests) {
+          const status = (a as { status: string }).status;
+          approvalCounts[status] = (approvalCounts[status] ?? 0) + 1;
+        }
+
+        // Audit log top actions
+        const auditActionCounts: Record<string, number> = {};
+        for (const log of auditLogs) {
+          const action = (log as { action: string }).action;
+          auditActionCounts[action] = (auditActionCounts[action] ?? 0) + 1;
+        }
+
         return {
           period: { days: timeRangeDays, since: since.toISOString() },
           workflows: {
@@ -6436,8 +6492,23 @@ Date: _______________`;
             totalCostUsd: Math.round(totalCost * 100) / 100,
             recentGoals: workflows.slice(0, 10).map((w: { goal: string; status: string }) => ({ goal: w.goal, status: w.status })),
           },
+          conversations: {
+            total: conversations.length,
+            byDay: conversationsByDay,
+          },
           agentUsage,
           knowledgeEntries: recentMemory.length,
+          auditEvents: {
+            total: auditLogs.length,
+            topActions: Object.entries(auditActionCounts)
+              .sort(([, a], [, b]) => (b as number) - (a as number))
+              .slice(0, 10)
+              .map(([action, count]) => ({ action, count })),
+          },
+          approvalDecisions: {
+            total: approvalRequests.length,
+            breakdown: approvalCounts,
+          },
           connected: true,
         };
       } catch {

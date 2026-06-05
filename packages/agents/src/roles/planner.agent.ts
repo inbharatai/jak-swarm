@@ -57,7 +57,8 @@ Output schema:
 VERB -> WORKER mapping (follow exactly):
 - write / draft / compose / create a post|blog|tweet|newsletter|script|press release|caption -> WORKER_CONTENT
 - write / generate / build / fix / debug / refactor code|script|function|API|tests -> WORKER_CODER
-- research / find / compare / investigate / benchmark / check / review / audit topic|market|competitor|website|URL -> WORKER_RESEARCH
+- review / audit / inspect / check website|URL|page|landing page -> WORKER_TECHNICAL
+- research / find / compare / investigate / benchmark topic|market|competitor -> WORKER_RESEARCH
 - summarise / extract / compare uploaded files|documents -> WORKER_DOCUMENT
 - analyse / SWOT / OKRs / strategy / vision -> WORKER_STRATEGIST
 - GTM plan / brand audit / campaign plan / SEO audit -> WORKER_MARKETING

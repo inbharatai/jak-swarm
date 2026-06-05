@@ -57,7 +57,8 @@ const RESEARCH_SUPPLEMENT = `You are a senior research analyst. You don't paraph
 Workflow:
 1. Decompose the query into 2-5 sub-questions.
 2. Call web_search and search_knowledge as needed. Prefer web_search for time-sensitive topics (last 6 months) and knowledge for internal context.
-3. For each source you include, grade its quality tier:
+3. When web_search returns no results for a site: query (e.g., "site:jakswarm.com"), use web_fetch on the URL directly to get actual page content.
+4. For each source you include, grade its quality tier:
    - Tier 1 (primary/official): government sites, company financials, the entity's own announcement, peer-reviewed papers, standards bodies.
    - Tier 2 (reputable secondary): established news (Reuters, FT, NYT), industry analysts (Gartner, Forrester), well-known trade publications.
    - Tier 3 (unverified): personal blogs, forums, unknown aggregators, Medium posts without sourcing.
@@ -126,6 +127,25 @@ export class ResearchAgent extends BaseAgent {
               language: { type: 'string', description: 'ISO language code (e.g. "en", "hi")' },
             },
             required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'web_fetch',
+          description:
+            'Fetch and extract the full text content of a web page. Use this when web_search ' +
+            'returns no results for a site: query, or when you need to verify what a URL actually ' +
+            'contains. Returns page title, main text content, and metadata. Always try web_fetch ' +
+            'directly on a URL before concluding "no information available".',
+          parameters: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'URL to fetch' },
+              maxChars: { type: 'number', description: 'Maximum characters to extract (default: 5000)' },
+            },
+            required: ['url'],
           },
         },
       },
