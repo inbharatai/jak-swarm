@@ -64,6 +64,7 @@ RUN pnpm --filter @jak-swarm/shared build && \
     pnpm --filter @jak-swarm/agents build && \
     pnpm --filter @jak-swarm/industry-packs build && \
     pnpm --filter @jak-swarm/swarm build && \
+    pnpm --filter @jak-swarm/adk build && \
     pnpm --filter @jak-swarm/api build
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
