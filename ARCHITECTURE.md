@@ -1,7 +1,5 @@
 # JAK Swarm -- System Architecture
 
-file:///C:/Users/reetu/Downloads/JAK_Complete_Architecture_Google_Competition_Blueprint.pdf
-
 This document describes the internal architecture of JAK Swarm: how a user goal becomes a planned, routed, executed, verified result.
 
 ---
