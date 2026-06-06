@@ -27,6 +27,11 @@ COPY packages/industry-packs/package.json packages/industry-packs/
 # "Cannot find module '@jak-swarm/skills'". Mirrors the dependency-
 # ordered build below + the .github/workflows/ci.yml fix at f1d16df.
 COPY packages/skills/package.json packages/skills/
+# @jak-swarm/adk is a workspace dependency of @jak-swarm/api.
+# If this COPY is missing, pnpm install fails to resolve the workspace
+# package AND the api build errors with TS2307 "Cannot find module
+# '@jak-swarm/adk'" — same class of bug as the skills COPY fix at f1d16df.
+COPY packages/adk/package.json packages/adk/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY tests/package.json tests/
