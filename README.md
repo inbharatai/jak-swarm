@@ -23,6 +23,12 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 </div>
 
+<nav align="center">
+
+**[📖 Documentation](#-documentation)** · **[⚖️ License](#-license)** · **[🔐 Security](SECURITY.md)** · **[🏗️ Architecture](ARCHITECTURE.md)** · **[🤖 Agents](AGENTS.md)** · **[❓ FAQ](docs/faq.md)** · **[🚀 Quick Start](#-quick-start)**
+
+</nav>
+
 ---
 
 ## What JAK Swarm Does
