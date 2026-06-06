@@ -52,3 +52,9 @@ export {
   isAdkModeEnabled,
   type AdkRunResult,
 } from './orchestration/adk-runner.js';
+
+// Agent Engine deployment (Layer 3 — bonus)
+export {
+  createJakGatewayAgent,
+  createJakDirectAgent,
+} from './deploy/agent-engine-entry.js';
