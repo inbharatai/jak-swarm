@@ -199,3 +199,51 @@ export function geminiResponseIsBlocked(
   const finishReason = response.candidates?.[0]?.finishReason;
   return finishReason === 'SAFETY' || finishReason === 'RECITATION';
 }
+
+// ─── Grounding metadata ───────────────────────────────────────────────────
+// When Google Search grounding or Vertex AI Search is enabled, the Gemini
+// API returns groundingMetadata on the candidate. This includes web search
+// queries, source URLs (grounding chunks), and per-claim support mapping.
+// All fields are optional — older Gemini models or non-grounded calls omit them.
+
+export interface GeminiGroundingMetadata {
+  /** Search queries the model executed internally via Google Search. */
+  webSearchQueries?: string[];
+  /** Source URLs and titles from grounding. */
+  groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>;
+  /** Links response text segments to specific grounding chunks. */
+  groundingSupports?: Array<{
+    groundingChunkIndices: number[];
+    segment: { start_index: number; end_index: number; text: string };
+    confidenceScore?: number;
+  }>;
+  /** HTML/CSS rendered content for Google Search Suggestions (ToS requirement). */
+  searchEntryPoint?: { renderedContent?: string };
+}
+
+/**
+ * Extract grounding metadata from a Gemini response.
+ * Returns undefined if no grounding metadata is present (non-grounded calls).
+ */
+export function extractGroundingMetadata(
+  response: Record<string, unknown>,
+): GeminiGroundingMetadata | undefined {
+  const candidate = (response as { candidates?: Array<Record<string, unknown>> }).candidates?.[0];
+  if (!candidate) return undefined;
+
+  const gm = candidate.groundingMetadata as Record<string, unknown> | undefined;
+  if (!gm) return undefined;
+
+  return {
+    webSearchQueries: Array.isArray(gm.webSearchQueries)
+      ? gm.webSearchQueries as string[]
+      : undefined,
+    groundingChunks: Array.isArray(gm.groundingChunks)
+      ? gm.groundingChunks as GeminiGroundingMetadata['groundingChunks']
+      : undefined,
+    groundingSupports: Array.isArray(gm.groundingSupports)
+      ? gm.groundingSupports as GeminiGroundingMetadata['groundingSupports']
+      : undefined,
+    searchEntryPoint: gm.searchEntryPoint as GeminiGroundingMetadata['searchEntryPoint'] ?? undefined,
+  };
+}

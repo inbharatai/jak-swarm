@@ -41,6 +41,11 @@ let warnedAboutIgnoredLegacyEngine = false;
 export interface ProviderHints {
   provider?: 'openai' | 'gemini';
   apiKey?: string;
+  /** Google Search grounding + Vertex AI Search config (Gemini only). Ignored for OpenAI. */
+  grounding?: {
+    googleSearchEnabled?: boolean;
+    vertexAISearchDatastore?: string;
+  };
 }
 
 /**
@@ -67,7 +72,7 @@ export function getRuntime(
     const apiKey = hints.apiKey ?? process.env['GEMINI_API_KEY'];
     if (apiKey) {
       const { GeminiRuntime } = require('./gemini-runtime.js') as { GeminiRuntime: typeof import('./gemini-runtime.js').GeminiRuntime };
-      return new GeminiRuntime({ apiKey });
+      return new GeminiRuntime({ apiKey, grounding: hints.grounding });
     }
     // No key available for Gemini — fall through to env-var logic
   }
@@ -130,6 +135,7 @@ export type { LLMRuntime, LLMCallOptions, ToolLoopOptions, ToolLoopResult } from
 export { LegacyRuntime } from './legacy-runtime.js';
 export type { LegacyAgentBackend } from './legacy-runtime.js';
 export { OpenAIRuntime } from './openai-runtime.js';
-export { GeminiRuntime } from './gemini-runtime.js';
+export { GeminiRuntime, type GeminiGroundingConfig } from './gemini-runtime.js';
+export { extractGroundingMetadata, type GeminiGroundingMetadata } from './gemini-response-parser.js';
 export type { HostedToolsConfig } from './openai-tool-adapter.js';
 export { modelForGeminiTier, getDefaultGeminiModel, isGeminiModel } from './gemini-model-resolver.js';

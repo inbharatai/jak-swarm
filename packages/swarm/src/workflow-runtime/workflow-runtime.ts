@@ -62,6 +62,14 @@ export interface StartContext {
    * that don't yet wire the audit emitter.
    */
   onLifecycle?: WorkflowLifecycleEmitter;
+  /** Per-tenant LLM provider preference ('openai' | 'gemini'). Undefined = env-var default. */
+  llmProvider?: 'openai' | 'gemini';
+  /** Enable Google Search grounding for Gemini. Falls back to env var. */
+  googleSearchGrounding?: boolean;
+  /** Vertex AI Search datastore path for Gemini. Falls back to env var. */
+  vertexAISearchDatastore?: string;
+  /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
+  openaiWebSearch?: boolean;
 }
 
 /**

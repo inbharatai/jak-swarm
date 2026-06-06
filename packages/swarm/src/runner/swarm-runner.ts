@@ -87,6 +87,12 @@ export interface RunParams {
   llmProvider?: 'openai' | 'gemini';
   /** Per-tenant decrypted API key for the selected provider (side-channel only). */
   llmApiKey?: string;
+  /** Enable Google Search grounding for Gemini. Falls back to env var. */
+  googleSearchGrounding?: boolean;
+  /** Vertex AI Search datastore path for Gemini. Falls back to env var. */
+  vertexAISearchDatastore?: string;
+  /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
+  openaiWebSearch?: boolean;
 }
 
 export interface SwarmResult {
@@ -320,6 +326,9 @@ export class SwarmRunner {
           ...(params.conversationHistory !== undefined ? { conversationHistory: params.conversationHistory } : {}),
           ...(params.onLifecycle ? { onLifecycle: params.onLifecycle } : {}),
           ...(params.llmProvider !== undefined ? { llmProvider: params.llmProvider } : {}),
+          ...(params.googleSearchGrounding !== undefined ? { googleSearchGrounding: params.googleSearchGrounding } : {}),
+          ...(params.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: params.vertexAISearchDatastore } : {}),
+          ...(params.openaiWebSearch !== undefined ? { openaiWebSearch: params.openaiWebSearch } : {}),
         }),
         timeoutMs,
         workflowId,

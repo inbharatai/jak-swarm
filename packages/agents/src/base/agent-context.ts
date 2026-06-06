@@ -219,6 +219,25 @@ export interface AgentContextParams {
    * TenantMemory at workflow-start time by swarm-execution.service.ts.
    */
   llmApiKey?: string;
+  /**
+   * Enable Google Search grounding for Gemini (adds { googleSearch: {} } to tools).
+   * Only effective when llmProvider='gemini'. Ignored for OpenAI.
+   * Falls back to GEMINI_GOOGLE_SEARCH_GROUNDING env var when unset.
+   */
+  googleSearchGrounding?: boolean;
+  /**
+   * Vertex AI Search datastore path for Gemini (e.g. "projects/.../dataStores/...").
+   * Only effective when llmProvider='gemini'. Ignored for OpenAI.
+   * Falls back to GEMINI_VERTEX_AI_SEARCH_DATASTORE env var when unset.
+   */
+  vertexAISearchDatastore?: string;
+  /**
+   * Enable OpenAI's hosted web_search tool. Provides real-time web access
+   * natively without Serper/Tavily. Mirrors Gemini's Google Search grounding.
+   * Only effective when llmProvider='openai'. Ignored for Gemini.
+   * Falls back to OPENAI_WEB_SEARCH env var when unset.
+   */
+  openaiWebSearch?: boolean;
 }
 
 export class AgentContext {
@@ -241,6 +260,9 @@ export class AgentContext {
   readonly onActivity: AgentActivityEmitter | undefined;
   readonly llmProvider: 'openai' | 'gemini' | undefined;
   readonly llmApiKey: string | undefined;
+  readonly googleSearchGrounding: boolean | undefined;
+  readonly vertexAISearchDatastore: string | undefined;
+  readonly openaiWebSearch: boolean | undefined;
   private steps: AgentTrace[] = [];
   private llmUsages: AgentLLMUsage[] = [];
 
@@ -264,6 +286,9 @@ export class AgentContext {
     this.onActivity = params.onActivity;
     this.llmProvider = params.llmProvider;
     this.llmApiKey = params.llmApiKey;
+    this.googleSearchGrounding = params.googleSearchGrounding;
+    this.vertexAISearchDatastore = params.vertexAISearchDatastore;
+    this.openaiWebSearch = params.openaiWebSearch;
   }
 
   /** Safe activity-emit helper — swallows errors so emission never breaks agent execution. */
@@ -324,6 +349,9 @@ export class AgentContext {
       ...(this.onActivity ? { onActivity: this.onActivity } : {}),
       ...(this.llmProvider ? { llmProvider: this.llmProvider } : {}),
       ...(this.llmApiKey ? { llmApiKey: this.llmApiKey } : {}),
+      ...(this.googleSearchGrounding !== undefined ? { googleSearchGrounding: this.googleSearchGrounding } : {}),
+      ...(this.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: this.vertexAISearchDatastore } : {}),
+      ...(this.openaiWebSearch !== undefined ? { openaiWebSearch: this.openaiWebSearch } : {}),
       ...overrides,
     });
   }

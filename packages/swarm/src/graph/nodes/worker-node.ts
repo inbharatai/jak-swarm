@@ -78,6 +78,10 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     ...(state.llmProvider && getLLMApiKey(state.workflowId)
       ? { llmApiKey: getLLMApiKey(state.workflowId) }
       : {}),
+    // Google grounding config (Gemini-only; ignored by OpenAI)
+    ...(state.googleSearchGrounding !== undefined ? { googleSearchGrounding: state.googleSearchGrounding } : {}),
+    ...(state.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: state.vertexAISearchDatastore } : {}),
+    ...(state.openaiWebSearch !== undefined ? { openaiWebSearch: state.openaiWebSearch } : {}),
   });
 
   let output: unknown;

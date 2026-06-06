@@ -101,6 +101,10 @@ export class LangGraphRuntime implements WorkflowRuntime {
       subscriptionTier: ctx.subscriptionTier,
       userRole: ctx.userRole,
       conversationHistory: ctx.conversationHistory,
+      ...(ctx.llmProvider ? { llmProvider: ctx.llmProvider } : {}),
+      ...(ctx.googleSearchGrounding !== undefined ? { googleSearchGrounding: ctx.googleSearchGrounding } : {}),
+      ...(ctx.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: ctx.vertexAISearchDatastore } : {}),
+      ...(ctx.openaiWebSearch !== undefined ? { openaiWebSearch: ctx.openaiWebSearch } : {}),
     });
 
     const config = makeRunnableConfig(ctx.workflowId, ctx.tenantId);

@@ -12,7 +12,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus, getWorkflowRuntime } from '@jak-swarm/swarm';
 import type { SwarmResult, WorkflowRuntime, WorkflowLifecycleEvent } from '@jak-swarm/swarm';
 import { config } from '../config.js';
-import { Industry, ToolRiskClass } from '@jak-swarm/shared';
+import { Industry, ToolRiskClass, WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
 import { COMPANY_OS_INTENTS, INTENT_REQUIRED_CONTEXT, type CompanyOSIntent } from '@jak-swarm/agents';
 import { IntentRecordService } from './company-brain/intent-record.service.js';
@@ -1072,7 +1072,60 @@ export class SwarmExecutionService extends EventEmitter {
         effectiveGoal = `${goal}\n\n[System note: No company data sources are connected. Produce a structured template or outline summary that highlights what data sources would be needed for a complete analysis. Do not fabricate metrics.]`;
       }
 
-      const result = await this.runner.run({
+      // ── Execute workflow (ADK or LangGraph) ────────────────────────────────
+      // JAK_ADK_MODE=1 routes through @google/adk orchestration (satisfies
+      // Google Agents Challenge). Falls back to LangGraph on ADK error or
+      // when the flag is not set. Both paths produce the same SwarmResult shape.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let result: SwarmResult | undefined;
+
+      if (process.env['JAK_ADK_MODE']?.trim() === '1') {
+        try {
+          const { runWithAdk } = await import('@jak-swarm/adk');
+          const { toolRegistry } = await import('@jak-swarm/tools');
+          const jakToolMetadata = toolRegistry.list();
+          const adkResult = await runWithAdk({
+            workflowId,
+            goal: effectiveGoal,
+            tenantId,
+            userId,
+            provider: llmProvider ?? 'gemini',
+            jakToolMetadata,
+            toolContext: {
+              tenantId,
+              userId,
+              workflowId,
+              runId: `adk_${workflowId}`,
+            },
+            workerRoles: params.roleModes?.length ? params.roleModes : undefined,
+            googleSearchGrounding: process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() === '1' || true,
+            openaiWebSearch: process.env['OPENAI_WEB_SEARCH']?.trim() === '1',
+          });
+
+          result = {
+            workflowId,
+            status: adkResult.success ? WorkflowStatus.COMPLETED : WorkflowStatus.FAILED,
+            outputs: adkResult.state.outputs ?? [],
+            traces: (adkResult.state.traces ?? []) as SharedAgentTrace[],
+            pendingApprovals: [],
+            clarificationNeeded: false,
+            ...(adkResult.error ? { error: adkResult.error } : {}),
+            durationMs: 0,
+            startedAt: new Date(),
+            completedAt: new Date(),
+          } as any;
+
+          this.log.info({ workflowId, provider: llmProvider ?? 'gemini', mode: 'adk' },
+            '[Swarm] Workflow completed via ADK orchestration');
+        } catch (adkErr) {
+          this.log.error({ workflowId, err: adkErr instanceof Error ? adkErr.message : String(adkErr) },
+            '[Swarm] ADK mode failed; falling back to LangGraph');
+        }
+      }
+
+      // Fallback to LangGraph when ADK is not enabled or failed
+      if (!result) {
+      result = await this.runner.run({
         workflowId,
         tenantId,
         userId,
@@ -1087,6 +1140,11 @@ export class SwarmExecutionService extends EventEmitter {
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         ...(llmProvider ? { llmProvider } : {}),
         ...(llmApiKey ? { llmApiKey } : {}),
+        // Google grounding config (Gemini-only; read from env vars per-tenant future)
+        ...(process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() === '1' ? { googleSearchGrounding: true } : {}),
+        ...(process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE']?.trim() ? { vertexAISearchDatastore: process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE'].trim() } : {}),
+        // OpenAI web_search hosted tool (native search without Serper/Tavily)
+        ...(process.env['OPENAI_WEB_SEARCH']?.trim() === '1' ? { openaiWebSearch: true } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;
@@ -1295,8 +1353,9 @@ export class SwarmExecutionService extends EventEmitter {
           }
         },
       });
+      } // end if (!result) — ADK fallback block
 
-      await this.persistTraces(result, tenantId, workflowId);
+      await this.persistTraces(result!, tenantId, workflowId);
       await this.persistApprovals(result, tenantId, workflowId);
 
       // Migration 16 — emit intent_detected, persist IntentRecord, emit

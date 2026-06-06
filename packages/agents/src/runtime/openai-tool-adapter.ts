@@ -6,25 +6,17 @@
  * name, description, parameters }` instead of Chat's nested
  * `{ type: 'function', function: { name, description, parameters } }`.
  *
- * Production hosted tools we support (STABLE only — no preview surfaces):
+ * Production hosted tools we support:
+ *   - web_search        — OpenAI-hosted web search (stable since Responses API v2)
  *   - file_search       — OpenAI-hosted RAG over caller-supplied vector stores
  *   - code_interpreter  — sandboxed Python execution
  *
- * Notable exclusions and WHY:
- *   - web_search_preview — PREVIEW API. JAK Swarm's production web search is
- *     the Serper-primary strategy chain in `packages/tools/src/adapters/search/`
- *     (Serper → Tavily → DuckDuckGo). That path gives Google-grade SERP data
- *     (answerBox, knowledgeGraph, peopleAlsoAsk) the OpenAI hosted tool does
- *     not surface, plus an explicit fallback chain and a paid/free tier gate.
- *     Route every agent web-search call through `web_search` in the tool
- *     registry, not through this hosted surface.
- *   - computer-preview — PREVIEW API. Not wired; browser automation goes
- *     through the Playwright adapter in `packages/tools/src/adapters/browser/`
- *     which is stable and observable.
- *
- * If OpenAI promotes web_search or computer-use to stable, re-evaluate.
- * Until then, keep this surface preview-free so we never ship an agent that
- * silently depends on an un-SLA'd API.
+ * Provider-native search strategy:
+ *   - Gemini: Google Search grounding ({ googleSearch: {} }) in GeminiRuntime
+ *   - OpenAI: web_search hosted tool here
+ *   - Both provide real-time web access without paid Serper/Tavily keys.
+ *   - JAK's existing tool-registry web_search (Serper→Tavily→DDG) remains as
+ *     the custom FunctionTool path for backward compatibility.
  */
 
 import type OpenAI from 'openai';
@@ -36,6 +28,10 @@ import type OpenAI from 'openai';
  * Every option here must be a STABLE (non-preview) Responses API feature.
  */
 export interface HostedToolsConfig {
+  /** Enable OpenAI's hosted web_search tool. Provides real-time web access
+   *  natively — no Serper/Tavily API keys needed. Mirrors Gemini's
+   *  Google Search grounding for provider parity. */
+  webSearch?: boolean | { searchContextSize?: 'low' | 'medium' | 'high'; userLocation?: { city?: string; country?: string; region?: string; timezone?: string } };
   fileSearch?: { vectorStoreIds: string[]; maxNumResults?: number };
   codeInterpreter?: boolean | { container?: { type: 'auto' } };
 }
@@ -69,6 +65,14 @@ export function adaptChatToolsToResponses(
   }
 
   // Hosted tools — stable surfaces only, included when caller explicitly opts in
+  if (hosted?.webSearch) {
+    const cfg = typeof hosted.webSearch === 'object' ? hosted.webSearch : {};
+    out.push({
+      type: 'web_search_preview',
+      ...(cfg.searchContextSize ? { search_context_size: cfg.searchContextSize } : {}),
+      ...(cfg.userLocation ? { user_location: cfg.userLocation } : {}),
+    } as ResponsesTool);
+  }
   if (hosted?.fileSearch) {
     out.push({
       type: 'file_search',

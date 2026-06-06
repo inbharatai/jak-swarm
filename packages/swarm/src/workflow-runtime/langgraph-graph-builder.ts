@@ -173,6 +173,11 @@ export const SwarmStateAnnotation = Annotation.Root({
   connectedProviders: Annotation<string[]>({ reducer: lwwReducer, default: () => [] }),
   subscriptionTier: Annotation<'free' | 'paid' | undefined>({ reducer: lwwReducer, default: () => undefined }),
 
+  // Google grounding config (Gemini-only)
+  googleSearchGrounding: Annotation<boolean | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  vertexAISearchDatastore: Annotation<string | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  openaiWebSearch: Annotation<boolean | undefined>({ reducer: lwwReducer, default: () => undefined }),
+
   // Output / terminal
   status: Annotation<WorkflowStatus>({ reducer: lwwReducer, default: () => WorkflowStatus.PENDING }),
   error: Annotation<string | undefined>({ reducer: lwwReducer, default: () => undefined }),

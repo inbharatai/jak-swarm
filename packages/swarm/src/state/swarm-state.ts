@@ -120,6 +120,18 @@ export interface SwarmState {
    * 'openai' | 'gemini'. Undefined = use env-var default.
    */
   llmProvider?: 'openai' | 'gemini';
+  /**
+   * Enable Google Search grounding for Gemini. Falls back to
+   * GEMINI_GOOGLE_SEARCH_GROUNDING env var when unset.
+   */
+  googleSearchGrounding?: boolean;
+  /**
+   * Vertex AI Search datastore path for Gemini.
+   * Falls back to GEMINI_VERTEX_AI_SEARCH_DATASTORE env var when unset.
+   */
+  vertexAISearchDatastore?: string;
+  /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
+  openaiWebSearch?: boolean;
 }
 
 export function createInitialSwarmState(params: {
@@ -143,6 +155,9 @@ export function createInitialSwarmState(params: {
   userRole?: string;
   conversationHistory?: Array<{ role: string; content: string }>;
   llmProvider?: 'openai' | 'gemini';
+  googleSearchGrounding?: boolean;
+  vertexAISearchDatastore?: string;
+  openaiWebSearch?: boolean;
 }): SwarmState {
   return {
     goal: params.goal,
@@ -180,6 +195,9 @@ export function createInitialSwarmState(params: {
     subscriptionTier: params.subscriptionTier,
     userRole: params.userRole,
     llmProvider: params.llmProvider,
+    googleSearchGrounding: params.googleSearchGrounding,
+    vertexAISearchDatastore: params.vertexAISearchDatastore,
+    openaiWebSearch: params.openaiWebSearch,
     status: WS.PENDING,
     error: undefined,
     outputs: [],

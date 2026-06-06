@@ -328,9 +328,15 @@ export abstract class BaseAgent {
 
     // Build override provider + runtime
     const tier = getTierForAgent(this.role);
-    const hints: { provider: 'openai' | 'gemini'; apiKey?: string } = {
+    const hints: { provider: 'openai' | 'gemini'; apiKey?: string; grounding?: { googleSearchEnabled?: boolean; vertexAISearchDatastore?: string } } = {
       provider: context.llmProvider,
       ...(context.llmApiKey ? { apiKey: context.llmApiKey } : {}),
+      ...(context.llmProvider === 'gemini' ? {
+        grounding: {
+          ...(context.googleSearchGrounding !== undefined ? { googleSearchEnabled: context.googleSearchGrounding } : {}),
+          ...(context.vertexAISearchDatastore ? { vertexAISearchDatastore: context.vertexAISearchDatastore } : {}),
+        },
+      } : {}),
     };
 
     const overrideProvider = getProviderForTier(tier, hints);

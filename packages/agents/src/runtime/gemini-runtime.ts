@@ -30,13 +30,25 @@ import type {
 import type { ProviderTier } from '../base/provider-router.js';
 import { chatMessagesToGeminiContents, type OpenAIMessage } from './gemini-message-adapter.js';
 import { chatToolsToFunctionDeclarations } from './gemini-tool-adapter.js';
-import { geminiResponseToChatCompletion, geminiResponseIsBlocked } from './gemini-response-parser.js';
+import { geminiResponseToChatCompletion, geminiResponseIsBlocked, extractGroundingMetadata } from './gemini-response-parser.js';
 import { modelForGeminiTier } from './gemini-model-resolver.js';
 
 const MAX_TOOL_LOOP_ITERATIONS_DEFAULT = 10;
 const DEFAULT_TIER: ProviderTier = 2;
 const GEMINI_MAX_RETRIES = 3;
 const GEMINI_RETRY_BASE_MS = 1000;
+
+// ─── Grounding configuration ────────────────────────────────────────────────
+// When Google Search grounding or Vertex AI Search are enabled, the Gemini
+// API receives built-in tool entries alongside custom function declarations.
+// This is Gemini-specific — the OpenAI runtime ignores these entirely.
+
+export interface GeminiGroundingConfig {
+  /** Enable Google Search grounding (Gemini 2.0+). Adds { googleSearch: {} } to tools. */
+  googleSearchEnabled?: boolean;
+  /** Vertex AI Search datastore path. Adds { vertex_ai_search: { datastore } } to tools. */
+  vertexAISearchDatastore?: string;
+}
 
 // ─── Gemini SDK type stubs (loaded dynamically) ───────────────────────────────
 // We import the SDK lazily so it's never loaded when LLM_PROVIDER=existing.
@@ -49,8 +61,9 @@ export class GeminiRuntime implements LLMRuntime {
   private readonly client: GoogleGenerativeAI;
   private readonly explicitModel: string | undefined;
   private readonly defaultTier: ProviderTier;
+  private readonly grounding: GeminiGroundingConfig;
 
-  constructor(opts: { apiKey?: string; model?: string; tier?: ProviderTier } = {}) {
+  constructor(opts: { apiKey?: string; model?: string; tier?: ProviderTier; grounding?: GeminiGroundingConfig } = {}) {
     const apiKey = opts.apiKey ?? process.env['GEMINI_API_KEY'];
     if (!apiKey) {
       throw new Error(
@@ -65,6 +78,35 @@ export class GeminiRuntime implements LLMRuntime {
     this.client = new GenAI(apiKey);
     this.explicitModel = opts.model ?? (process.env['GEMINI_MODEL']?.trim() || undefined);
     this.defaultTier = opts.tier ?? DEFAULT_TIER;
+
+    // Grounding: prefer constructor arg, fall back to env vars
+    this.grounding = {
+      googleSearchEnabled:
+        opts.grounding?.googleSearchEnabled
+        ?? (process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() === '1'),
+      vertexAISearchDatastore:
+        opts.grounding?.vertexAISearchDatastore
+        ?? (process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE']?.trim() || undefined),
+    };
+  }
+
+  // ─── buildToolsConfig ─────────────────────────────────────────────────────
+  // Shared logic for constructing the Gemini tools array. Combines custom
+  // function declarations with Google built-in tools (Google Search grounding,
+  // Vertex AI Search). Used by both callTools() and respond().
+
+  private buildToolsConfig(functionDeclarations: Array<Record<string, unknown>>): Record<string, unknown> | undefined {
+    const toolsArray: Array<Record<string, unknown>> = [];
+    if (functionDeclarations.length > 0) {
+      toolsArray.push({ functionDeclarations });
+    }
+    if (this.grounding.googleSearchEnabled) {
+      toolsArray.push({ googleSearch: {} });
+    }
+    if (this.grounding.vertexAISearchDatastore) {
+      toolsArray.push({ vertex_ai_search: { datastore: this.grounding.vertexAISearchDatastore } });
+    }
+    return toolsArray.length > 0 ? { tools: toolsArray } : undefined;
   }
 
   // ─── resolveModel ─────────────────────────────────────────────────────────
@@ -104,8 +146,17 @@ export class GeminiRuntime implements LLMRuntime {
     if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
     if (options.jsonMode) generationConfig.responseMimeType = 'application/json';
 
+    // Inject Google built-in tools (grounding) even for non-tool-loop calls.
+    // When googleSearchEnabled or vertexAISearchDatastore are set, the Gemini
+    // model can use Google Search / Vertex AI Search to ground its response.
+    const groundingToolsConfig = this.buildToolsConfig([]);
+
     const response = await this.callWithRetry(() =>
-      geminiModel.generateContent({ contents, generationConfig } as any),
+      geminiModel.generateContent({
+        contents,
+        generationConfig,
+        ...(groundingToolsConfig ?? {}),
+      } as any),
     );
 
     const chatCompletion = geminiResponseToChatCompletion(
@@ -158,9 +209,7 @@ export class GeminiRuntime implements LLMRuntime {
       if (options.maxTokens) generationConfig.maxOutputTokens = options.maxTokens;
       if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
 
-      const toolsConfig = functionDeclarations.length > 0
-        ? { tools: [{ functionDeclarations }] }
-        : undefined;
+      const toolsConfig = this.buildToolsConfig(functionDeclarations as unknown as Array<Record<string, unknown>>);
 
       const response = await this.callWithRetry(() =>
         geminiModel.generateContent({
@@ -194,6 +243,20 @@ export class GeminiRuntime implements LLMRuntime {
           (part: unknown) => typeof part === 'object' && part !== null && 'text' in (part as Record<string, unknown>),
         ) as Array<{ text: string }>;
         const content = textParts.map((p) => p.text).join('');
+
+        // Emit grounding metadata as an activity event (if present)
+        const groundingMeta = extractGroundingMetadata(geminiResp);
+        if (groundingMeta) {
+          context.emitActivity({
+            type: 'grounding_metadata',
+            agentRole: context.agentRole ?? 'UNKNOWN',
+            runtime: 'gemini',
+            webSearchQueries: groundingMeta.webSearchQueries,
+            groundingChunkCount: groundingMeta.groundingChunks?.length ?? 0,
+            hasVertexAISearch: Boolean(this.grounding.vertexAISearchDatastore),
+            timestamp: new Date().toISOString(),
+          } as any); // cast to any — activity event type union is extended by callers
+        }
 
         this.recordUsage(geminiResp, model, context);
 
