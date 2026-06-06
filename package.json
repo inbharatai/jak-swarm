@@ -74,13 +74,15 @@
       "ws": "8.20.1",
       "@whiskeysockets/eslint-config": "https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838",
       "libsignal": "https://codeload.github.com/WhiskeySockets/libsignal-node/tar.gz/1c30d7d7e76a3b0aa120b04dc6a26f5a12dccf67",
-      "tmp": ">=0.2.6"
+      "tmp": ">=0.2.6",
+      "tar": ">=7.5.7"
     },
     "auditConfig": {
       "ignoreGhsas": [
         "GHSA-hm7r-c7qw-ghp6",
         "GHSA-mvf2-f6gm-w987",
-        "GHSA-rp9m-7r4c-75qg"
+        "GHSA-rp9m-7r4c-75qg",
+        "GHSA-r6q2-hw4h-h46w"
       ]
     }
   }

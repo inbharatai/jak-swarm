@@ -191,7 +191,7 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Sec
 | 🛡️ | **Audit & Compliance Pack** | SOC 2 Type 2 (63) + HIPAA (37) + ISO 27001 (82) = 182 controls seeded. 108 operationally backed, 74 require reviewer attestation. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed evidence packs, External Auditor Portal. [Full details →](docs/audit-compliance-agent-pack.md) |
 | 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). Email, calendar, browser, CRM, research, document, spreadsheet, knowledge, webhook. [Inventory →](#-tool-inventory) |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. Durable workflow, auto-snapshots with diff, checkpoint-revert. [Details →](docs/vibe-coding.md) |
-| 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-4o/4o-mini) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
+| 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-5.5/5.4) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
 | 🔍 | **Provider-Native Search** | Google Search Grounding (free, citation-backed) for Gemini. `web_search_preview` (free, native) for OpenAI. No Serper, no Tavily, no external search API keys required. |
 | 🧬 | **ADK Orchestration** | Google Agent Development Kit (`@google/adk`) for multi-agent orchestration. `SequentialAgent` + `ParallelAgent` pipeline mirrors JAK's DAG. Activated via `JAK_ADK_MODE=1`. |
 | 🧠 | **Memory System** | LLM-powered fact extraction, token-budgeted retrieval injected via `<memory>` tags. Server-side conversation threads with full history injection into LangGraph state. |
@@ -279,7 +279,7 @@ Full agent details with input/output contracts, handoff logic, and error contrac
 
 | Provider | Models | Use Case |
 |:--------:|:------:|:---------|
-| ![OpenAI](https://img.shields.io/badge/LLM-GPT--4o_%2F_4o--mini-412991?style=flat-square&logo=openai) | GPT-4o, GPT-4o-mini | Responses API, strict structured output, prompt-cache-aware telemetry |
+| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_5.4-412991?style=flat-square&logo=openai) | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry |
 | ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5-4285f4?style=flat-square&logo=google) | 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output, **Google Search Grounding** |
 
 **Per-tenant provider switching** — each tenant chooses OpenAI or Gemini from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
@@ -288,9 +288,9 @@ Full agent details with input/output contracts, handoff logic, and error contrac
 
 | Tier | OpenAI | Gemini | Assigned to |
 |:----:|:------:|:------:|:-----------|
-| 💎 Premium | GPT-4o | Gemini 2.5 Pro | Commander, Planner, Verifier, CEO/CMO/CFO |
-| ⚡ Balanced | GPT-4o-mini | Gemini 2.5 Flash | Code Generator, Architect, Research |
-| 💰 Economy | GPT-4o-mini | Gemini 2.5 Flash-Lite | Router, Guardrail, simple workers |
+| 💎 Premium | GPT-5.5 | Gemini 2.5 Pro | Commander, Planner, Verifier, CEO/CMO/CFO |
+| ⚡ Balanced | GPT-5.4 | Gemini 2.5 Flash | Code Generator, Architect, Research |
+| 💰 Economy | GPT-5.4 | Gemini 2.5 Flash-Lite | Router, Guardrail, simple workers |
 
 All three Gemini models support parallel function calling, structured output, and controllable thinking — no capability downgrade when switching providers.
 
@@ -516,7 +516,7 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 | **Auth** | Supabase (email/password + OAuth) + NextAuth |
 | **Durable Workflows** | LangGraph StateGraph + PostgresCheckpointSaver |
 | **ADK Orchestration** | @google/adk (SequentialAgent + ParallelAgent) |
-| **LLM — OpenAI** | GPT-4o / GPT-4o-mini — Responses API, json_schema strict mode |
+| **LLM — OpenAI** | GPT-5.5 / GPT-5.4 — Responses API, json_schema strict mode |
 | **LLM — Gemini** | Gemini 2.5 Pro / Flash / Flash-Lite — parallel function calling, responseSchema, Google Search Grounding |
 | **Search — Gemini** | GOOGLE_SEARCH (ADK built-in) / googleSearch grounding — free, citation-backed |
 | **Search — OpenAI** | web_search_preview hosted tool — free, native |

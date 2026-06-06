@@ -49,7 +49,6 @@ import { cn } from '@/lib/cn';
 import { useConversationStore } from '@/store/conversation-store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useAuth } from '@/lib/auth';
-import { useAuthSession } from '@/lib/auth-session';
 import { useAuthProfile } from '@/lib/auth-profile';
 import { apiFetch } from '@/lib/api-client';
 import { getRoleColor } from '@/lib/role-config';
@@ -112,8 +111,7 @@ export function ChatSidebar() {
   const router = useRouter();
   const toast = useToast();
   const { logout } = useAuth();
-  const { session } = useAuthSession();
-  const { profile, isLoading: isProfileLoading } = useAuthProfile(session.accessToken);
+  const { profile, isLoading: isProfileLoading } = useAuthProfile();
   const {
     data: llmData,
     mutate: mutateLlmData,

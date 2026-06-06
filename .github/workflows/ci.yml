@@ -54,6 +54,8 @@ jobs:
           pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
+          # @jak-swarm/adk depends on swarm + agents + tools + shared; api depends on adk
+          pnpm --filter @jak-swarm/adk build
           pnpm --filter @jak-swarm/client build
           pnpm --filter @jak-swarm/voice build
           pnpm --filter @jak-swarm/workflows build
@@ -136,6 +138,8 @@ jobs:
           pnpm --filter @jak-swarm/skills build
           pnpm --filter @jak-swarm/agents build
           pnpm --filter @jak-swarm/swarm build
+          # @jak-swarm/adk depends on swarm + agents + tools + shared; api depends on adk
+          pnpm --filter @jak-swarm/adk build
           pnpm --filter @jak-swarm/client build
           pnpm --filter @jak-swarm/voice build
           pnpm --filter @jak-swarm/workflows build

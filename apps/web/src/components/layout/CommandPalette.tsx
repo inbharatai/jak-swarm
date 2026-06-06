@@ -50,7 +50,6 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { useAuthSession } from '@/lib/auth-session';
 import { useAuthProfile } from '@/lib/auth-profile';
 import { ProfileGateSkeleton } from '@/components/ui';
 
@@ -112,8 +111,7 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
 
 export function CommandPalette() {
   const router = useRouter();
-  const { session } = useAuthSession();
-  const { profile, isLoading: isProfileLoading } = useAuthProfile(session.accessToken);
+  const { profile, isLoading: isProfileLoading } = useAuthProfile();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);

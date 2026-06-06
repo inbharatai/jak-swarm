@@ -15,8 +15,8 @@ export interface UseAuthProfileReturn {
   isProfileLoading: boolean;
 }
 
-export function useAuthProfile(accessToken: string | null): UseAuthProfileReturn {
-  const state: AuthProfileState = useCoreAuthProfile(accessToken);
+export function useAuthProfile(): UseAuthProfileReturn {
+  const state: AuthProfileState = useCoreAuthProfile();
   return {
     profile: state.profile,
     isLoading: state.isLoading,

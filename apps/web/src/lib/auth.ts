@@ -349,10 +349,11 @@ async function runAuthRequest<T>(
 }
 
 export function useAuth(): UseAuthReturn {
-  // Non-blocking composition: session resolves first, profile hydrates later.
-  // This keeps shell rendering fast while role/tenant data is fetched.
-  const { sessionUser, accessToken, isSessionLoading } = useAuthSession();
-  const { user: profileUser, error: profileError } = useAuthProfile(accessToken);
+  // Both hooks now resolve in parallel — useAuthSession reads Supabase session,
+  // useAuthProfile reads the token from localStorage directly and fires /auth/me
+  // immediately on first render (no React state waterfall).
+  const { sessionUser, isSessionLoading } = useAuthSession();
+  const { user: profileUser, error: profileError } = useAuthProfile();
   const [isMutating, setIsMutating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -549,9 +550,11 @@ export function useAuth(): UseAuthReturn {
 
 export interface AuthSessionState {
   user: AuthUser | null;
+  /** @deprecated Use getRawToken() or useAuthProfile() instead — accessToken will be removed in a future release. */
   session: { accessToken: string | null };
   isLoading: boolean;
   sessionUser: AuthUser | null;
+  /** @deprecated Use getRawToken() or useAuthProfile() instead — accessToken will be removed in a future release. */
   accessToken: string | null;
   isSessionLoading: boolean;
 }
@@ -661,9 +664,15 @@ export function useAuthSession(): AuthSessionState {
 
 // ─── useAuthProfile ──────────────────────────────────────────────────────────
 //
-// Fetches the trusted user profile from GET /auth/me. This is the slow call
-// (network round-trip to the backend). Consume this only where role/tenant
-// data is actually needed; show skeleton states while it resolves.
+// Fetches the trusted user profile from GET /auth/me. Self-contained — reads
+// the access token from localStorage directly so it can fire in parallel with
+// useAuthSession, eliminating the 3-hop serial waterfall on cold starts:
+//
+//   Before: localStorage → getSession() → [React re-render] → GET /auth/me
+//   After:  localStorage → getSession() ║ GET /auth/me  (parallel)
+//
+// Consume this only where role/tenant data is needed; show skeleton states
+// while it resolves.
 
 export interface AuthProfileState {
   profile: AuthUser | null;
@@ -687,36 +696,91 @@ function createAuthProfileState(
   };
 }
 
-export function useAuthProfile(accessToken: string | null): AuthProfileState {
+/**
+ * Read the access token directly from localStorage — no React state dependency.
+ * This lets useAuthProfile fire /auth/me on the first render instead of waiting
+ * for useAuthSession's state to propagate.
+ */
+function getAccessTokenSync(): string | null {
+  if (typeof window === 'undefined') return null;
+  // Try JAK's own stored token first (set by setToken())
+  const jakToken = window.localStorage.getItem(JAK_TOKEN_KEY) ?? window.localStorage.getItem('jak_token');
+  if (jakToken) return jakToken;
+  // Fall back to Supabase localStorage session
+  const storageKey = Object.keys(localStorage).find(
+    (k) => k.startsWith('sb-') && k.endsWith('-auth-token'),
+  );
+  if (!storageKey) return null;
+  try {
+    const data = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as {
+      access_token?: string;
+    };
+    return data?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function useAuthProfile(): AuthProfileState {
   const [state, setState] = useState<AuthProfileState>(() => {
     if (DEV_BYPASS_ACTIVE) return createAuthProfileState(DEV_BYPASS_USER, false, null);
+    // Try cached user from localStorage — avoids network hop on repeat visits
     const storedUser = getStoredJakUser();
-    return createAuthProfileState(storedUser, !storedUser && accessToken !== null, null);
+    if (storedUser) return createAuthProfileState(storedUser, false, null);
+    // No cached user, but token exists — mark loading so the effect fires immediately
+    const token = getAccessTokenSync();
+    return createAuthProfileState(null, token !== null, null);
   });
 
   useEffect(() => {
     if (DEV_BYPASS_ACTIVE) return;
-    if (!accessToken) {
-      setState(createAuthProfileState(null, false, null));
-      return;
-    }
+
+    // Read token synchronously from localStorage (not React state)
+    const initialToken = getAccessTokenSync();
 
     let cancelled = false;
+    let currentToken = initialToken;
 
-    fetchTrustedAuthUser(accessToken)
-      .then((user) => {
-        if (!cancelled) setState(createAuthProfileState(user, false, null));
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setState(createAuthProfileState(getStoredJakUser(), false, getAuthErrorMessage(err)));
-        }
-      });
+    function fetchProfile(token: string | null): void {
+      if (!token) {
+        if (!cancelled) setState(createAuthProfileState(null, false, null));
+        return;
+      }
+      if (!cancelled) setState((prev) => createAuthProfileState(prev.user, true, prev.error));
+      fetchTrustedAuthUser(token)
+        .then((user) => {
+          if (!cancelled) setState(createAuthProfileState(user, false, null));
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setState(createAuthProfileState(getStoredJakUser(), false, getAuthErrorMessage(err)));
+          }
+        });
+    }
+
+    // Fire /auth/me immediately using the localStorage token — no React re-render gap
+    fetchProfile(initialToken);
+
+    // Subscribe to Supabase auth state changes for token refresh / login / logout
+    if (!hasUsableSupabaseConfig()) return;
+
+    const {
+      data: { subscription },
+    } = getClient().auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      const newToken = session?.access_token ?? null;
+      // Re-fetch profile when token changes (login, refresh, logout)
+      if (newToken !== currentToken) {
+        currentToken = newToken;
+        fetchProfile(newToken);
+      }
+    });
 
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
-  }, [accessToken]);
+  }, []);
 
   return state;
 }

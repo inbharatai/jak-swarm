@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { apiFetch } from '@/lib/api-client';
-import { useAuthSession } from '@/lib/auth-session';
 import { useAuthProfile } from '@/lib/auth-profile';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Spinner, ProfileGateSkeleton } from '@/components/ui';
@@ -29,8 +28,7 @@ const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; desc
 
 export default function SettingsPage() {
   const toast = useToast();
-  const { session } = useAuthSession();
-  const { isLoading: isProfileLoading } = useAuthProfile(session.accessToken);
+  const { isLoading: isProfileLoading } = useAuthProfile();
   const { data, isLoading, mutate } = useSWR<{
     success: boolean;
     data: {
