@@ -15,7 +15,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-> 🏆 **Google for Startups AI Agents Challenge** — JAK Swarm is built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, uses **Gemini 2.5 Pro/Flash/Flash-Lite** as a first-class LLM runtime alongside OpenAI, and integrates **Google Search Grounding** for real-time, citation-backed responses. Every one of JAK's 38 specialist agents runs end-to-end on Gemini with tool calling, structured output, and controllable thinking. Per-tenant provider switching in the Settings UI means each organization independently selects OpenAI or Gemini — no code changes, no env-var swaps.
+> 🏆 **Google for Startups AI Agents Challenge** — Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, uses **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, and integrates **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching — no code changes, no env-var swaps.
 
 **JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
@@ -34,10 +34,10 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 - **Evidence graph before agent action** — artifacts become graph entities; graph entities become drift findings; drift findings become agent-executable specs. This is the closed-loop Company OS foundation — intentionally citation-first, not chatbot memory. ([`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts))
 - **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator, emit lifecycle events, and feed the signed audit pack. ([`docs/team-and-trial.md`](docs/team-and-trial.md))
 - **JAK Shield as the trust layer** — every agent action runs through six defenses before it touches your code, browser, files, or business tools. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
-- **Google ADK orchestration** — when `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) using `SequentialAgent` and `ParallelAgent` for multi-agent orchestration that satisfies the Google Agents Challenge requirement. Google Search Grounding provides real-time, citation-backed responses. ([`packages/adk/`](packages/adk/))
-- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no external search API keys needed. ([`jak-tool-bridge.ts`](packages/adk/src/bridge/jak-tool-bridge.ts))
-- **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps (20 agent runs, 5 external-action approvals, 120 tool minutes, 200 K LLM tokens) protect both your data AND your budget. ([`usage-counter.service.ts`](apps/api/src/services/trial/usage-counter.service.ts))
-- **Integrate, don't rebuild** — JAK is the cockpit for your existing stack. Gmail, Google Calendar, Slack, GitHub, Notion, browser automation, and MCP surfaces exist in code; deeper Company OS auto-sync jobs for every source remain a roadmap item until implemented and smoke-tested.
+- **Google ADK orchestration** — when `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) using `SequentialAgent` and `ParallelAgent` for multi-agent orchestration. Google Search Grounding provides real-time, citation-backed responses. ([`packages/adk/`](packages/adk/))
+- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no external search API keys needed.
+- **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps protect both your data AND your budget.
+- **Integrate, don't rebuild** — JAK is the cockpit for your existing stack. Gmail, Google Calendar, Slack, GitHub, Notion, browser automation, and MCP surfaces exist in code.
 
 ### Who it's for
 
@@ -48,7 +48,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 ### Honest boundary
 
-This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
 
 ---
 
@@ -68,8 +68,6 @@ For OpenAI, the native `web_search_preview` hosted tool provides equivalent real
 | `GEMINI_VERTEX_AI_SEARCH_DATASTORE=projects/.../dataStores/...` | Enables Vertex AI Search |
 | `OPENAI_WEB_SEARCH=1` | Enables web_search_preview for OpenAI |
 
-Config flows through: `AgentContext → SwarmState → LangGraph annotations → worker-node → base-agent ProviderHints → GeminiRuntime/OpenAIRuntime`
-
 ### Layer 2: ADK Agent Wrappers + Orchestration
 
 When `JAK_ADK_MODE=1`, workflows route through `@google/adk` instead of LangGraph:
@@ -86,7 +84,7 @@ SequentialAgent(root)
   └── VerifierAgent            (quality assurance)
 ```
 
-**Provider-native search**: Gemini agents use `GOOGLE_SEARCH` (ADK built-in, free). OpenAI agents use `web_search_preview` (hosted tool, free). No external search API keys required.
+**Provider-native search**: Gemini agents use `GOOGLE_SEARCH` (ADK built-in, free). OpenAI agents use `web_search_preview` (hosted tool, free).
 
 Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/adk/src/bridge/jak-tool-bridge.ts) · [`jak-adk-agents.ts`](packages/adk/src/agents/jak-adk-agents.ts) · [`adk-pipeline.ts`](packages/adk/src/orchestration/adk-pipeline.ts) · [`adk-runner.ts`](packages/adk/src/orchestration/adk-runner.ts)
 
@@ -99,15 +97,9 @@ Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/
 | `LLM_PROVIDER=gemini` + `GEMINI_GOOGLE_SEARCH_GROUNDING=1` | GeminiRuntime with Google Search grounding |
 | `LLM_PROVIDER=gemini` + `JAK_ADK_MODE=1` | ADK orchestration with Gemini + grounding |
 
-No code path touches `@google/adk` unless `JAK_ADK_MODE=1`. The package is lazy-loaded.
-
 ---
 
 ## 🏗️ How It Works
-
-JAK Swarm is a self-orchestrating AI system built as a TypeScript monorepo. In the Company OS path, source-labeled evidence becomes graph entities, graph entities become drift findings, and drift findings become reviewer-gated execution specs. In the workflow path, you give it a high-level goal in natural language; a Commander interprets it, a Planner decomposes it into a dependency-aware task graph, a Router assigns tasks to the right specialist workers, and a Verifier checks outputs before delivery.
-
-The orchestrator is a native [`@langchain/langgraph`](https://langchain-ai.github.io/langgraphjs/) `StateGraph` — checkpoints persist to Postgres via `PostgresCheckpointSaver`; approval pauses use LangGraph's native `interrupt()` + `Command(resume=…)`. When `JAK_ADK_MODE=1`, an alternative orchestration path uses Google's ADK `SequentialAgent` + `ParallelAgent` instead.
 
 ```mermaid
 flowchart TD
@@ -167,12 +159,12 @@ Before any agent touches your code, browser, files, email, GitHub, or business t
 
 | # | Defense | What it does | Code |
 |---|---------|-------------|------|
-| 1 | **Agent Firewall** | Blocks prompt-injection attacks AND offensive-cyber requests before the LLM sees them. Defensive markers (audit, OWASP, SAST) down-weight confidence so legitimate security work passes. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) + [`injection-detector.ts`](packages/security/src/guardrails/injection-detector.ts) |
+| 1 | **Agent Firewall** | Blocks prompt-injection attacks AND offensive-cyber requests before the LLM sees them. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) · [`injection-detector.ts`](packages/security/src/guardrails/injection-detector.ts) |
 | 2 | **Risk-Based Approvals** | Every tool call classified across the 6-tier `ToolRiskLevel` lattice. Risky calls pause the workflow. Approval bound to exact payload via SHA-256 hash. | [`approval-policy.ts`](packages/tools/src/registry/approval-policy.ts) |
 | 3 | **Secure Tool Permissions** | Per-tenant tool registry + industry-pack restrictions + Standing Orders (allowed-tools whitelist + blocked-actions list + budget cap + expiry). | [`tenant-tool-registry.ts`](packages/tools/src/registry/tenant-tool-registry.ts) |
 | 4 | **Sandboxed Execution** | Browser sessions: per-tenant data dirs, 500 MB disk quota, URL allowlist, DNS-rebind defense. Subprocess: literal argv, 60s timeout, stripped env. | [`playwright-browser-operator.ts`](packages/tools/src/browser-operator/playwright-browser-operator.ts) |
 | 5 | **Defensive Vulnerability Triage** | Supports defensive security work — repo audits, dependency scans, secret-leak detection. Offensive work is blocked at the boundary. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) |
-| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace PII-redacted at write time. Workflow fields AES-256-GCM encrypted at rest. Evidence bundles HMAC-SHA256 signed. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) + [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) |
+| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace PII-redacted at write time. Workflow fields AES-256-GCM encrypted at rest. Evidence bundles HMAC-SHA256 signed. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) · [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) |
 
 **Safety boundary:** JAK Shield is built for defensive security, safe automation, permissioned workflows, and audit-ready agent execution. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation.
 
@@ -189,8 +181,8 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Sec
 | 🎯 | **Intent Vocabulary + Templates** | 18 named CompanyOSIntents constrained at the LLM layer via strict Zod schema. 6 system-seeded WorkflowTemplates provide pre-tuned decompositions. |
 | 💬 | **Follow-up NL Parser** | Rule-based parser maps short chat inputs to workflow actions: approve, reject, continue, pause, resume, cancel, show graph/cost/failed, "what is the CMO doing?" |
 | 🛡️ | **Audit & Compliance Pack** | SOC 2 Type 2 (63) + HIPAA (37) + ISO 27001 (82) = 182 controls seeded. 108 operationally backed, 74 require reviewer attestation. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed evidence packs, External Auditor Portal. [Full details →](docs/audit-compliance-agent-pack.md) |
-| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). Email, calendar, browser, CRM, research, document, spreadsheet, knowledge, webhook. [Inventory →](#-tool-inventory) |
-| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. Durable workflow, auto-snapshots with diff, checkpoint-revert. [Details →](docs/vibe-coding.md) |
+| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). [Inventory →](#-tool-inventory) |
+| ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. [Details →](docs/vibe-coding.md) |
 | 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-5.5/5.4) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
 | 🔍 | **Provider-Native Search** | Google Search Grounding (free, citation-backed) for Gemini. `web_search_preview` (free, native) for OpenAI. No Serper, no Tavily, no external search API keys required. |
 | 🧬 | **ADK Orchestration** | Google Agent Development Kit (`@google/adk`) for multi-agent orchestration. `SequentialAgent` + `ParallelAgent` pipeline mirrors JAK's DAG. Activated via `JAK_ADK_MODE=1`. |
@@ -271,7 +263,7 @@ graph LR
 | **🏢 Operations** | 8 | Content, SEO, PR, Legal, Analytics, Product, Project management |
 | **⚙️ Core Workers** | 11 | Email, Calendar, CRM, Browser, Research, Voice, infrastructure tools |
 
-Full agent details with input/output contracts, handoff logic, and error contracts: [`AGENTS.md`](AGENTS.md)
+Full agent details: [`AGENTS.md`](AGENTS.md)
 
 ---
 
@@ -292,18 +284,12 @@ Full agent details with input/output contracts, handoff logic, and error contrac
 | ⚡ Balanced | GPT-5.4 | Gemini 2.5 Flash | Code Generator, Architect, Research |
 | 💰 Economy | GPT-5.4 | Gemini 2.5 Flash-Lite | Router, Guardrail, simple workers |
 
-All three Gemini models support parallel function calling, structured output, and controllable thinking — no capability downgrade when switching providers.
-
 **Provider-native search** — no paid search API keys required:
 
 | Provider | Search Method | Cost | Citations |
 |:--------:|:-------------:|:----:|:---------:|
 | Gemini | `GOOGLE_SEARCH` (ADK built-in) or `googleSearch` grounding | Free | ✅ URLs + snippets |
 | OpenAI | `web_search_preview` hosted tool | Free | ✅ Source URLs |
-
-Key files: [`gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) · [`gemini-response-parser.ts`](packages/agents/src/runtime/gemini-response-parser.ts) · [`openai-tool-adapter.ts`](packages/agents/src/runtime/openai-tool-adapter.ts) · [`jak-adk-agents.ts`](packages/adk/src/agents/jak-adk-agents.ts) · [`base-agent.ts`](packages/agents/src/base/base-agent.ts)
-
-Provider switching architecture diagram in [`ARCHITECTURE.md`](ARCHITECTURE.md#llm-provider-routing).
 
 ---
 
@@ -332,7 +318,7 @@ pnpm install
 cp .env.example .env
 ```
 
-Edit `.env` — API keys are required for external LLM providers (OpenAI, Gemini, or both). At minimum set:
+At minimum set:
 
 ```bash
 # LLM provider (set one or both — per-tenant switching available in the dashboard)
@@ -340,23 +326,20 @@ OPENAI_API_KEY=sk-your-openai-key-here
 GEMINI_API_KEY=your-gemini-key-here          # Optional: enables Gemini 2.5 Pro/Flash
 
 # Google ADK orchestration (optional — activates ADK multi-agent pipeline)
-JAK_ADK_MODE=1                                # Routes workflows through @google/adk instead of LangGraph
-GEMINI_GOOGLE_SEARCH_GROUNDING=1              # Enables Google Search grounding for Gemini
-GEMINI_VERTEX_AI_SEARCH_DATASTORE=projects/your-project/locations/us/dataStores/your-store  # Optional: Vertex AI Search
-OPENAI_WEB_SEARCH=1                           # Enables native web_search for OpenAI
+JAK_ADK_MODE=1                                # Routes workflows through @google/adk
+GEMINI_GOOGLE_SEARCH_GROUNDING=1              # Google Search grounding for Gemini
+OPENAI_WEB_SEARCH=1                           # Native web_search for OpenAI
 
 DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
 AUTH_SECRET=your-random-32-char-string-here
-
-# Required for Audit & Compliance final-pack signing
 EVIDENCE_SIGNING_SECRET=$(openssl rand -base64 48)
 
-# Supabase (required for production auth — anonymous auth works in dev)
+# Supabase (required for production auth)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Full environment variable reference: [`docs/environment-setup.md`](docs/environment-setup.md)
+Full reference: [`docs/environment-setup.md`](docs/environment-setup.md)
 
 ### 3. Setup Database
 
@@ -364,7 +347,6 @@ Full environment variable reference: [`docs/environment-setup.md`](docs/environm
 pnpm --filter @jak-swarm/db db:migrate
 pnpm --filter @jak-swarm/db db:seed              # optional: seed sample data
 pnpm seed:compliance                             # seeds 182 SOC 2 / HIPAA / ISO 27001 controls
-pnpm seed:audit-demo                            # optional: seeds a demo audit run
 ```
 
 ### 4. Build & Run
@@ -381,29 +363,24 @@ pnpm --filter @jak-swarm/web dev
 
 Open **http://localhost:3000** — give it a goal and watch the swarm execute.
 
-Docker setup: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production topology: [`docker-compose.prod.yml`](docker-compose.prod.yml)
+Docker: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production: [`docker-compose.prod.yml`](docker-compose.prod.yml)
 
 ### Deploy to Railway
 
 ```bash
-# Install Railway CLI
 npm i -g @railway/cli
-
-# Link and deploy
 railway link
 railway up
 ```
-
-The `Dockerfile` builds all packages in dependency order, runs Prisma migrations on startup, and exposes `/healthz` for health checks. See [`railway.toml`](railway.toml) for configuration.
 
 ### Integration Setup
 
 <details>
 <summary><b>📧 Gmail (IMAP/SMTP)</b></summary>
 
-1. Enable 2-Factor Authentication → generate an App Password at [Google App Passwords](https://myaccount.google.com/apppasswords)
+1. Enable 2FA → generate an App Password at [Google App Passwords](https://myaccount.google.com/apppasswords)
 2. Add to `.env`: `GMAIL_EMAIL="you@gmail.com"` + `GMAIL_APP_PASSWORD="abcd efgh ijkl mnop"`
-3. System auto-detects these and switches from mock to real adapters
+3. System auto-detects and switches from mock to real adapters
 
 </details>
 
@@ -423,8 +400,6 @@ The `Dockerfile` builds all packages in dependency order, runs Prisma migrations
 - **Notion**: Create integration at [notion.so/my-integrations](https://www.notion.so/my-integrations) → copy Internal Integration Secret → share pages with integration → paste in **Settings > Integrations > Notion**
 
 </details>
-
-Full integration setup guide: [`docs/environment-setup.md`](docs/environment-setup.md)
 
 ---
 
@@ -600,7 +575,7 @@ jak-swarm/
 - **4-layer hallucination detection** (heuristic/regex-based) on every agent output
 - **RBAC** roles: `END_USER` < `REVIEWER` < `OPERATOR` < `TENANT_ADMIN` < `SYSTEM_ADMIN` + `EXTERNAL_AUDITOR`
 
-Full security policy and vulnerability reporting: [`SECURITY.md`](SECURITY.md)
+Full security policy: [`SECURITY.md`](SECURITY.md)
 
 ---
 
@@ -610,7 +585,7 @@ Full security policy and vulnerability reporting: [`SECURITY.md`](SECURITY.md)
 pnpm test                  # Run all tests (2156 passing)
 pnpm typecheck             # Type checking (strict mode, zero errors)
 pnpm lint                  # Lint
-pnpm check:truth           # Verify tool classifications + landing claims match code
+pnpm check:truth           # Verify tool classifications + landing claims
 pnpm audit:tools           # Audit all 122 tools against registry
 
 # Run specific package tests
