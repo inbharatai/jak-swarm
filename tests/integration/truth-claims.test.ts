@@ -84,6 +84,7 @@ describe('Product truth claims', () => {
       'packages/swarm/package.json',
       'packages/tools/package.json',
       'packages/verification/package.json',
+      'packages/adk/package.json',
       'packages/voice/package.json',
       'packages/whatsapp-client/package.json',
       'packages/workflows/package.json',

@@ -35,7 +35,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 - **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator, emit lifecycle events, and feed the signed audit pack. ([`docs/team-and-trial.md`](docs/team-and-trial.md))
 - **JAK Shield as the trust layer** — every agent action runs through six defenses before it touches your code, browser, files, or business tools. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
 - **Google ADK orchestration** — when `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) using `SequentialAgent` and `ParallelAgent` for multi-agent orchestration. Google Search Grounding provides real-time, citation-backed responses. ([`packages/adk/`](packages/adk/))
-- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no external search API keys needed.
+- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no third-party search API keys needed. API keys are required for OpenAI and Gemini — JAK does not bundle or provide free LLM API keys.
 - **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps protect both your data AND your budget.
 - **Integrate, don't rebuild** — JAK is the cockpit for your existing stack. Gmail, Google Calendar, Slack, GitHub, Notion, browser automation, and MCP surfaces exist in code.
 
@@ -48,7 +48,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 ### Honest boundary
 
-This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." API keys are required for external LLM providers (OpenAI, Gemini) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
 
 ---
 
