@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐝 JAK Swarm
+# 🐝 JAKx
 
 ### The Closed-Loop Company Operating Layer for Agent Work
 
