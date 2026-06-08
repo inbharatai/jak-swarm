@@ -14,7 +14,7 @@
 #
 # Usage:
 #   gcloud builds submit --config=cloudbuild-api.yaml \
-#     --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=jak-docker \
+#     --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=jak-docker,_IMAGE_TAG=manual-20260608 \
 #     --project=crafty-haiku-498807-v8
 
 steps:
@@ -25,7 +25,7 @@ steps:
       - '-f'
       - 'Dockerfile.api'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
       - '.'
@@ -35,43 +35,35 @@ steps:
     args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}']
 
   # ─── Step 3: Deploy to Cloud Run ──────────────────────────────────────────
+  # Cloud Run sets the PORT env var automatically. The API reads process.env.PORT
+  # and defaults to 4000. Do NOT set PORT in --set-env-vars — Cloud Run injects
+  # it and the app respects it.
   - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - '${_SERVICE_NAME}'
-      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
-      - '--region=${_REGION}'
-      - '--platform=managed'
-      - '--port=4000'
-      - '--memory=2Gi'
-      - '--cpu=2'
-      - '--min-instances=1'
-      - '--max-instances=10'
-      - '--timeout=300'
-      - '--no-allow-unauthenticated'
-      - '--set-env-vars=NODE_ENV=production,PORT=4000,WORKFLOW_WORKER_MODE=embedded,PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser,REQUIRE_REDIS_IN_PROD=true'
-      # ── Secrets (mounted from Google Secret Manager) ──
-      # Update these after creating secrets with scripts/create-gcp-secrets.sh
-      # Uncomment and adjust once secrets are created:
-      # - '--set-secrets=DATABASE_URL=DATABASE_URL:latest'
-      # - '--set-secrets=AUTH_SECRET=AUTH_SECRET:latest'
-      # - '--set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest'
-      # - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      # - '--set-secrets=REDIS_URL=REDIS_URL:latest'
-      # - '--set-secrets=DIRECT_URL=DIRECT_URL:latest'
-      # - '--set-secrets=SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest'
-      # - '--set-secrets=EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest'
-      # - '--set-secrets=METRICS_TOKEN=METRICS_TOKEN:latest'
-      # - '--set-secrets=NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest'
-      # - '--set-secrets=NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest'
-      # - '--set-secrets=CORS_ORIGINS=CORS_ORIGINS:latest'
+      - '-c'
+      - |
+        gcloud run deploy ${_SERVICE_NAME} \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG} \
+          --region=${_REGION} \
+          --platform=managed \
+          --port=4000 \
+          --memory=2Gi \
+          --cpu=2 \
+          --min-instances=1 \
+          --max-instances=10 \
+          --timeout=300 \
+          --service-account=jak-cloud-run-sa@crafty-haiku-498807-v8.iam.gserviceaccount.com \
+          --no-allow-unauthenticated \
+          --set-secrets="DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,REDIS_URL=REDIS_URL:latest,DIRECT_URL=DIRECT_URL:latest,NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,METRICS_TOKEN=METRICS_TOKEN:latest,CORS_ORIGINS=CORS_ORIGINS:latest" \
+          --set-env-vars="NODE_ENV=production,WORKFLOW_WORKER_MODE=embedded,PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser,REQUIRE_REDIS_IN_PROD=true,LLM_PROVIDER=gemini,JAK_ADK_MODE=1,GEMINI_GOOGLE_SEARCH_GROUNDING=1,OPENAI_WEB_SEARCH=1"
 
 substitutions:
   _REGION: asia-south1
   _SERVICE_NAME: jak-swarm-api
   _REPO_NAME: jak-docker
+  _IMAGE_TAG: latest
 
 images:
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}'
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'

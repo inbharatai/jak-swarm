@@ -55,9 +55,12 @@ function validateWorkerEnv(log: pino.Logger): void {
   }
   if (problems.length > 0) {
     for (const p of problems) log.error(`[Worker] Env validation: ${p}`);
+    // On Cloud Run the container MUST start listening within a strict
+    // timeout. Exiting prevents the port from binding, causing a crash
+    // loop. Log errors instead and let /healthz keep the container alive.
+    // /ready reports the degraded state so load balancers stop routing.
     if (config.nodeEnv === 'production') {
-      log.fatal('[Worker] Refusing to start in production with missing required env');
-      process.exit(1);
+      log.fatal('[Worker] Missing required env vars — starting in degraded mode; /ready will report 503');
     }
   }
 }
@@ -115,8 +118,19 @@ async function main(): Promise<void> {
     '[Worker] Environment loaded',
   );
 
-  await prisma.$connect();
-  log.info('[Worker] Prisma client connected');
+  // Best-effort DB connection — don't block startup. On Cloud Run the
+  // container must start listening within a strict timeout. If the DB is
+  // temporarily unreachable, Prisma reconnects automatically and /healthz
+  // keeps the container alive while /ready reports 503.
+  try {
+    await prisma.$connect();
+    log.info('[Worker] Prisma client connected');
+  } catch (err) {
+    log.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      '[Worker] Prisma client could not connect — worker starting in degraded mode; /ready will report 503 until DB is reachable',
+    );
+  }
   try {
     metrics.postgresConnectivityStatus.set(1);
   } catch { /* swallow */ }

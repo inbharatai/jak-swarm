@@ -89,14 +89,16 @@ function createFastifyStub() {
   };
 }
 
-async function runBootValidation(overrides: EnvMap = {}): Promise<void> {
+async function runBootValidation(overrides: EnvMap = {}): Promise<ReturnType<typeof createFastifyStub>> {
   applyEnv(overrides);
   vi.resetModules();
   const { validateConfigOnBoot } = await import('../../apps/api/src/boot/validate-config.ts');
-  await validateConfigOnBoot(createFastifyStub() as any);
+  const stub = createFastifyStub();
+  await validateConfigOnBoot(stub as any);
+  return stub;
 }
 
-describe('validateConfigOnBoot production fail-hard behavior', () => {
+describe('validateConfigOnBoot production degraded-start behavior', () => {
   beforeAll(() => {
     for (const key of ENV_KEYS) {
       originalEnv[key] = process.env[key];
@@ -109,25 +111,38 @@ describe('validateConfigOnBoot production fail-hard behavior', () => {
     vi.clearAllMocks();
   });
 
-  it('passes with a valid production baseline', async () => {
-    await expect(runBootValidation()).resolves.toBeUndefined();
+  it('passes with a valid production baseline (no errors logged)', async () => {
+    const stub = await runBootValidation();
+    // Valid config should not log any errors
+    expect(stub.log.error).not.toHaveBeenCalled();
   });
 
-  it('fails hard for weak AUTH_SECRET values', async () => {
-    await expect(runBootValidation({ AUTH_SECRET: weakAuthSecretFixture })).rejects.toThrow(
-      /AUTH_SECRET_STRENGTH/i,
+  it('logs AUTH_SECRET_STRENGTH error for weak secrets instead of throwing', async () => {
+    const stub = await runBootValidation({ AUTH_SECRET: weakAuthSecretFixture });
+    // The function no longer throws — it logs errors and returns.
+    // Verify the error was logged.
+    const errorCalls = stub.log.error.mock.calls.map((c: any[]) => c[0] ?? c[1] ?? '');
+    const hasAuthError = errorCalls.some((msg: string) =>
+      typeof msg === 'string' && msg.includes('AUTH_SECRET_STRENGTH'),
     );
+    expect(hasAuthError).toBe(true);
   });
 
-  it('fails hard for malformed space-separated CORS_ORIGINS', async () => {
-    await expect(
-      runBootValidation({ CORS_ORIGINS: 'https://jakswarm.com https://www.jakswarm.com' }),
-    ).rejects.toThrow(/CORS_ORIGINS_FORMAT/i);
-  });
-
-  it('fails hard for unresolved template expressions in critical env vars', async () => {
-    await expect(runBootValidation({ REDIS_URL: '${{Redis.REDIS_URL}}' })).rejects.toThrow(
-      /ENV_TEMPLATE_RESOLUTION/i,
+  it('logs CORS_ORIGINS_FORMAT error for space-separated origins instead of throwing', async () => {
+    const stub = await runBootValidation({ CORS_ORIGINS: 'https://jakswarm.com https://www.jakswarm.com' });
+    const errorCalls = stub.log.error.mock.calls.map((c: any[]) => c[0] ?? c[1] ?? '');
+    const hasCorsError = errorCalls.some((msg: string) =>
+      typeof msg === 'string' && msg.includes('CORS_ORIGINS_FORMAT'),
     );
+    expect(hasCorsError).toBe(true);
+  });
+
+  it('logs ENV_TEMPLATE_RESOLUTION error for unresolved template expressions instead of throwing', async () => {
+    const stub = await runBootValidation({ REDIS_URL: '${{Redis.REDIS_URL}}' });
+    const errorCalls = stub.log.error.mock.calls.map((c: any[]) => c[0] ?? c[1] ?? '');
+    const hasTemplateError = errorCalls.some((msg: string) =>
+      typeof msg === 'string' && msg.includes('ENV_TEMPLATE_RESOLUTION'),
+    );
+    expect(hasTemplateError).toBe(true);
   });
 });

@@ -185,36 +185,20 @@ done
 ## Step 5: Build & Deploy the API
 
 ```bash
+# Set a unique image tag for this deploy
+export IMAGE_TAG=manual-$(date +%Y%m%d%H%M%S)
+
 # Build and deploy in one command
+# Secrets and env vars are configured inline in cloudbuild-api.yaml
+# so no separate gcloud run services update step is needed.
 gcloud builds submit --config=cloudbuild-api.yaml \
-  --substitutions=_REGION=$REGION,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=$REPO_NAME \
+  --substitutions=_REGION=$REGION,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=$REPO_NAME,_IMAGE_TAG=$IMAGE_TAG \
   --project=$PROJECT_ID
 ```
 
-### Configure secrets and env vars after first deploy
-
-After the first deploy succeeds, update the service with secrets:
-
-```bash
-gcloud run services update jak-swarm-api \
-  --region=$REGION \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,\
-AUTH_SECRET=AUTH_SECRET:latest,\
-OPENAI_API_KEY=OPENAI_API_KEY:latest,\
-REDIS_URL=REDIS_URL:latest,\
-NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,\
-NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest,\
-SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,\
-EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,\
-METRICS_TOKEN=METRICS_TOKEN:latest,\
-CORS_ORIGINS=CORS_ORIGINS:latest" \
-  --set-env-vars="NODE_ENV=production,PORT=4000,WORKFLOW_WORKER_MODE=embedded,\
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser,\
-LLM_PROVIDER=gemini,JAK_ADK_MODE=1" \
-  --project=$PROJECT_ID
-```
-
-> **Note**: Add `GEMINI_API_KEY=GEMINI_API_KEY:latest` to `--set-secrets` if you created that secret.
+> **Note**: The `cloudbuild-api.yaml` now includes `--set-secrets` and `--set-env-vars` inline,
+> so secrets are mounted during the first deploy. No separate update step is needed.
+> Do NOT set `PORT` in `--set-env-vars` — Cloud Run injects it automatically and the app reads `process.env.PORT`.
 
 ### Allow unauthenticated access (API needs to accept requests from Vercel)
 
@@ -233,27 +217,13 @@ gcloud run services add-iam-policy-binding jak-swarm-api \
 > **⚠️ The Worker is a long-running queue listener.** It polls PostgreSQL with `FOR UPDATE SKIP LOCKED` and subscribes to Redis for workflow signals. Scaling to zero would stop background processing entirely. `min-instances=1` is set in `cloudbuild-worker.yaml` to keep the worker always-on.
 
 ```bash
+# Set a unique image tag for this deploy
+export IMAGE_TAG=manual-$(date +%Y%m%d%H%M%S)
+
+# Build and deploy in one command
+# Secrets and env vars are configured inline in cloudbuild-worker.yaml
 gcloud builds submit --config=cloudbuild-worker.yaml \
-  --substitutions=_REGION=$REGION,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=$REPO_NAME \
-  --project=$PROJECT_ID
-```
-
-### Configure secrets and env vars after first deploy
-
-```bash
-gcloud run services update jak-swarm-worker \
-  --region=$REGION \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,\
-AUTH_SECRET=AUTH_SECRET:latest,\
-OPENAI_API_KEY=OPENAI_API_KEY:latest,\
-REDIS_URL=REDIS_URL:latest,\
-NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,\
-SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,\
-EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,\
-METRICS_TOKEN=METRICS_TOKEN:latest" \
-  --set-env-vars="NODE_ENV=production,PORT=9464,\
-WORKFLOW_WORKER_MODE=standalone,REQUIRE_REDIS_IN_PROD=true,\
-WORKER_METRICS_PORT=9464,LLM_PROVIDER=gemini,JAK_ADK_MODE=1" \
+  --substitutions=_REGION=$REGION,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=$REPO_NAME,_IMAGE_TAG=$IMAGE_TAG \
   --project=$PROJECT_ID
 ```
 

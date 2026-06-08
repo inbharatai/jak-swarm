@@ -175,40 +175,26 @@ echo -n "NEW_VALUE_HERE" | \
 After all secrets are created and verified:
 
 ```bash
+# Set a unique image tag for this deploy
+export IMAGE_TAG=manual-$(date +%Y%m%d%H%M%S)
+
 # Build and deploy API
+# Secrets and env vars are configured inline in cloudbuild-api.yaml
+# so no separate gcloud run services update step is needed.
 gcloud builds submit --config=cloudbuild-api.yaml \
-  --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=jak-docker \
+  --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=jak-docker,_IMAGE_TAG=$IMAGE_TAG \
   --project=crafty-haiku-498807-v8
 
-# Build and deploy Worker
+# Build and deploy Worker (after API is verified)
+# Secrets and env vars are configured inline in cloudbuild-worker.yaml
 gcloud builds submit --config=cloudbuild-worker.yaml \
-  --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=jak-docker \
+  --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=jak-docker,_IMAGE_TAG=$IMAGE_TAG \
   --project=crafty-haiku-498807-v8
 ```
 
-### Configure secrets on the API service after first deploy
-
-```bash
-gcloud run services update jak-swarm-api \
-  --region=asia-south1 \
-  --set-secrets="DATABASE_URL=DATABASE_URL:latest,\
-AUTH_SECRET=AUTH_SECRET:latest,\
-OPENAI_API_KEY=OPENAI_API_KEY:latest,\
-GEMINI_API_KEY=GEMINI_API_KEY:latest,\
-REDIS_URL=REDIS_URL:latest,\
-DIRECT_URL=DIRECT_URL:latest,\
-NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,\
-NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest,\
-SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,\
-EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,\
-METRICS_TOKEN=METRICS_TOKEN:latest,\
-CORS_ORIGINS=CORS_ORIGINS:latest" \
-  --set-env-vars="NODE_ENV=production,PORT=4000,WORKFLOW_WORKER_MODE=embedded,\
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser,\
-REQUIRE_REDIS_IN_PROD=true,LLM_PROVIDER=gemini,JAK_ADK_MODE=1,\
-GEMINI_GOOGLE_SEARCH_GROUNDING=1,OPENAI_WEB_SEARCH=1" \
-  --project=crafty-haiku-498807-v8
-```
+> **Note**: The cloudbuild files now include `--set-secrets` and `--set-env-vars` inline, so secrets
+> are mounted during the first deploy. No separate `gcloud run services update` step is needed.
+> Do NOT set `PORT` in env vars — Cloud Run injects it automatically and the app reads `process.env.PORT`.
 
 ### Allow unauthenticated access to the API
 
@@ -220,31 +206,15 @@ gcloud run services add-iam-policy-binding jak-swarm-api \
   --project=crafty-haiku-498807-v8
 ```
 
-### Configure secrets on the Worker service after first deploy
+The Worker does NOT need `--allow-unauthenticated` — it only processes internal queue jobs.
+
+---
 
 ```bash
 gcloud run services update jak-swarm-worker \
   --region=asia-south1 \
   --set-secrets="DATABASE_URL=DATABASE_URL:latest,\
 AUTH_SECRET=AUTH_SECRET:latest,\
-OPENAI_API_KEY=OPENAI_API_KEY:latest,\
-GEMINI_API_KEY=GEMINI_API_KEY:latest,\
-REDIS_URL=REDIS_URL:latest,\
-DIRECT_URL=DIRECT_URL:latest,\
-SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,\
-EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,\
-METRICS_TOKEN=METRICS_TOKEN:latest" \
-  --set-env-vars="NODE_ENV=production,PORT=9464,\
-WORKFLOW_WORKER_MODE=standalone,REQUIRE_REDIS_IN_PROD=true,\
-WORKER_METRICS_PORT=9464,LLM_PROVIDER=gemini,JAK_ADK_MODE=1,\
-GEMINI_GOOGLE_SEARCH_GROUNDING=1,OPENAI_WEB_SEARCH=1" \
-  --project=crafty-haiku-498807-v8
-```
-
-The Worker does NOT need `--allow-unauthenticated` — it only processes internal queue jobs.
-
----
-
 ## Step 8: Smoke Tests
 
 ```bash

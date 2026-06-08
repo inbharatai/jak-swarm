@@ -89,14 +89,17 @@ RUN addgroup -g 1001 -S jak && \
     adduser -S jak -u 1001 -G jak
 USER jak
 
-# Cloud Run sets the PORT env var. The API reads process.env.PORT (default 4000).
+# Cloud Run sets the PORT env var automatically. The API reads
+# process.env.PORT and defaults to 4000. The Dockerfile default ensures
+# the healthcheck works in local docker and on Railway (which doesn't
+# override PORT). On Cloud Run, the injected PORT takes precedence.
 ENV NODE_ENV=production
 ENV PORT=4000
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4000}/healthz || exit 1
 
 CMD ["/app/apps/api/scripts/start-with-migrations.sh"]

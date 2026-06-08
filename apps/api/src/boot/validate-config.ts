@@ -346,11 +346,15 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
     `[boot] Config validation: ${ok.length} ok, ${warnings.length} warnings, ${errors.length} errors`,
   );
 
-  // In production, fail hard if there are critical errors
+  // In production, log critical errors but do NOT throw — the server must
+  // start listening on Cloud Run within a strict timeout. Throwing prevents
+  // the port from binding, causing the container to be killed and restarted
+  // in a crash loop. Instead, /ready reports the degraded state (503) while
+  // /healthz returns 200 (liveness) so Cloud Run keeps the container alive
+  // and retries can self-heal once secrets/DB/Redis become available.
   if (isProd && errors.length > 0) {
-    throw new Error(
-      `[boot] ${errors.length} critical config error(s) — refusing to start:\n` +
-        errors.map((e) => `  - ${e.name}: ${e.message}`).join('\n'),
+    fastify.log.error(
+      `[boot] ${errors.length} critical config error(s) — server starting in degraded mode; /ready will return 503 until resolved`,
     );
   }
 }

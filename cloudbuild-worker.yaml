@@ -15,7 +15,7 @@
 #
 # Usage:
 #   gcloud builds submit --config=cloudbuild-worker.yaml \
-#     --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=jak-docker \
+#     --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=jak-docker,_IMAGE_TAG=manual-20260608 \
 #     --project=crafty-haiku-498807-v8
 
 steps:
@@ -26,7 +26,7 @@ steps:
       - '-f'
       - 'Dockerfile.worker'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
       - '.'
@@ -36,41 +36,36 @@ steps:
     args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}']
 
   # ─── Step 3: Deploy to Cloud Run ──────────────────────────────────────────
+  # The Worker listens on port 9464 (WORKER_METRICS_PORT) for health/metrics.
+  # It does NOT need public access (--no-allow-unauthenticated).
+  # CPU is always allocated because the worker continuously polls the database.
   - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - '${_SERVICE_NAME}'
-      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
-      - '--region=${_REGION}'
-      - '--platform=managed'
-      - '--port=9464'
-      - '--memory=1Gi'
-      - '--cpu=1'
-      - '--min-instances=1'
-      - '--max-instances=5'
-      - '--cpu-allocated-always'
-      - '--timeout=300'
-      - '--no-allow-unauthenticated'
-      - '--set-env-vars=NODE_ENV=production,PORT=9464,WORKFLOW_WORKER_MODE=standalone,REQUIRE_REDIS_IN_PROD=true,WORKER_METRICS_PORT=9464'
-      # ── Secrets (mounted from Google Secret Manager) ──
-      # Update these after creating secrets with scripts/create-gcp-secrets.sh
-      # Uncomment and adjust once secrets are created:
-      # - '--set-secrets=DATABASE_URL=DATABASE_URL:latest'
-      # - '--set-secrets=AUTH_SECRET=AUTH_SECRET:latest'
-      # - '--set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest'
-      # - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      # - '--set-secrets=REDIS_URL=REDIS_URL:latest'
-      # - '--set-secrets=DIRECT_URL=DIRECT_URL:latest'
-      # - '--set-secrets=SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest'
-      # - '--set-secrets=EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest'
-      # - '--set-secrets=METRICS_TOKEN=METRICS_TOKEN:latest'
+      - '-c'
+      - |
+        gcloud run deploy ${_SERVICE_NAME} \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG} \
+          --region=${_REGION} \
+          --platform=managed \
+          --port=9464 \
+          --memory=1Gi \
+          --cpu=1 \
+          --min-instances=1 \
+          --max-instances=5 \
+          --cpu-allocated-always \
+          --timeout=300 \
+          --service-account=jak-cloud-run-sa@crafty-haiku-498807-v8.iam.gserviceaccount.com \
+          --no-allow-unauthenticated \
+          --set-secrets="DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,REDIS_URL=REDIS_URL:latest,DIRECT_URL=DIRECT_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest,METRICS_TOKEN=METRICS_TOKEN:latest" \
+          --set-env-vars="NODE_ENV=production,WORKFLOW_WORKER_MODE=standalone,REQUIRE_REDIS_IN_PROD=true,WORKER_METRICS_PORT=9464,LLM_PROVIDER=gemini,JAK_ADK_MODE=1,GEMINI_GOOGLE_SEARCH_GROUNDING=1,OPENAI_WEB_SEARCH=1"
 
 substitutions:
   _REGION: asia-south1
   _SERVICE_NAME: jak-swarm-worker
   _REPO_NAME: jak-docker
+  _IMAGE_TAG: latest
 
 images:
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}'
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
