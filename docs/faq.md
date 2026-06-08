@@ -32,7 +32,7 @@ Still not complete:
 - First-party background sync jobs for every connector source
 - Real customer-call/meeting transcript ingestion pipeline into the graph
 - Cross-tool drift monitors that run continuously without manual trigger
-- Production smoke tests against the hosted Vercel + Railway + Supabase + Upstash environment
+- Production smoke tests against the hosted Vercel + Railway + Supabase + Railway Redis environment
 
 So the accurate public phrase is **"closed-loop Company OS beta foundation"**, not "finished company AI OS."
 
@@ -271,4 +271,4 @@ In-flight workflows survive API restarts via DB-backed checkpoints (LangGraph's 
 
 ### What is the active hosted beta deployment target?
 
-Frontend stays on Vercel. API and worker move to Railway. Postgres stays on Supabase for pgvector. Redis stays on Upstash. The old Render setup is legacy rollback reference only; do not run the Render worker and Railway worker against the same production Redis queue at the same time.
+Frontend stays on Vercel. API and worker run on Railway. Postgres stays on Supabase for pgvector. Redis runs on Railway managed Redis. A parallel Google Cloud Run deployment is available for the Google AI Agents Challenge — traffic switches via `NEXT_PUBLIC_API_URL` in Vercel.

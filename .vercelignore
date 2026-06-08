@@ -1,0 +1,17 @@
+# Monorepo caches and local build artifacts
+.git
+.turbo
+**/.next
+**/dist
+**/coverage
+**/tmp
+**/.cache
+
+# Dependencies are installed in Vercel build environment
+node_modules
+**/node_modules
+
+# Local editor/system noise
+.vscode
+.idea
+*.log

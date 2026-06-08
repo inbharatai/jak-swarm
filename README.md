@@ -379,6 +379,22 @@ railway link
 railway up
 ```
 
+See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Railway runbook.
+
+### Deploy to Google Cloud Run
+
+Parallel deployment for the Google AI Agents Challenge. API + Worker as separate Cloud Run services, sharing the same Railway Redis and Supabase PostgreSQL. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel — no code changes.
+
+```bash
+# Prerequisites: gcloud CLI, billing-enabled GCP project
+# See docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md for full setup
+
+gcloud builds submit --config=cloudbuild-api.yaml
+gcloud builds submit --config=cloudbuild-worker.yaml
+```
+
+See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for step-by-step instructions.
+
 ### Integration Setup
 
 <details>
@@ -647,6 +663,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`docs/vibe-coding.md`](docs/vibe-coding.md) | Vibe Coding pipeline, cost tables, feature comparison |
 | [`docs/faq.md`](docs/faq.md) | Full FAQ — product, trial, security, integrations, costs |
 | [`docs/api-reference.md`](docs/api-reference.md) | Complete API endpoint reference |
+| [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) | Google Cloud Run deployment guide (API + Worker) |
 | [`docs/environment-setup.md`](docs/environment-setup.md) | Environment variables, integration setup, troubleshooting |
 | [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
 | [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |

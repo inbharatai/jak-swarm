@@ -230,6 +230,8 @@ gcloud run services add-iam-policy-binding jak-swarm-api \
 
 ## Step 6: Build & Deploy the Worker
 
+> **⚠️ The Worker is a long-running queue listener.** It polls PostgreSQL with `FOR UPDATE SKIP LOCKED` and subscribes to Redis for workflow signals. Scaling to zero would stop background processing entirely. `min-instances=1` is set in `cloudbuild-worker.yaml` to keep the worker always-on.
+
 ```bash
 gcloud builds submit --config=cloudbuild-worker.yaml \
   --substitutions=_REGION=$REGION,_SERVICE_NAME=jak-swarm-worker,_REPO_NAME=$REPO_NAME \
@@ -256,6 +258,16 @@ WORKER_METRICS_PORT=9464,LLM_PROVIDER=gemini,JAK_ADK_MODE=1" \
 ```
 
 The Worker does NOT need `--allow-unauthenticated` — it only processes internal queue jobs.
+
+### Worker port and health endpoints
+
+The Worker listens on `WORKER_METRICS_PORT` (default `9464`), not `process.env.PORT`. Cloud Run's `--port=9464` flag must match. The `PORT=9464` env var is set for consistency but the Worker code uses `WORKER_METRICS_PORT`.
+
+| Endpoint | Purpose | Cloud Run Use |
+|----------|---------|---------------|
+| `GET /healthz` | Liveness — process alive, not shutting down | Liveness probe |
+| `GET /ready` | Readiness — Postgres connected, Redis connected (if configured) | Readiness probe |
+| `GET /metrics` | Prometheus metrics (bearer token gated via `METRICS_TOKEN`) | Monitoring |
 
 ---
 
@@ -308,9 +320,46 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
 
 ---
 
-## Step 8: Switch Traffic to Cloud Run
+## Step 8: Safe Deployment Sequence
 
-Only after all smoke tests pass:
+> **⚠️ Do NOT deploy both API and Worker at the same time and switch traffic in one step.** The worker processes a shared PostgreSQL queue. If both Railway Worker and Cloud Run Worker run simultaneously without coordination, they will race for the same jobs. Follow this sequence:
+
+### Phase 1: Deploy and test the Cloud Run API
+
+1. Deploy the API service (Steps 1–5)
+2. Configure secrets and env vars
+3. Run API smoke tests: `/healthz`, `/ready`, `/version`
+4. **Do NOT switch Vercel traffic yet** — Railway API is still serving production
+
+### Phase 2: Test Cloud Run API with Railway Worker
+
+5. Update `NEXT_PUBLIC_API_URL` in Vercel to the Cloud Run API URL
+6. Redeploy Vercel (`vercel --prod`)
+7. Create a test workflow from the dashboard
+8. Verify SSE streaming works — the Railway Worker should process jobs from the Cloud Run API
+9. Verify workflow completes end-to-end (Commander → Planner → Workers → Verifier)
+
+### Phase 3: Switch the Worker
+
+10. **Pause the Railway Worker** (Railway dashboard → jak-swarm-worker → Settings → Pause, or set `WORKFLOW_QUEUE_CONCURRENCY=0`)
+11. Deploy the Cloud Run Worker (Step 6)
+12. Configure Worker secrets and env vars
+13. Wait for `/healthz` to return `{ "status": "ok" }`
+14. Wait for `/ready` to return `{ "ready": true }`
+15. Create another test workflow — verify the Cloud Run Worker picks it up
+16. Check Cloud Run logs: `gcloud run logs read jak-swarm-worker --region=$REGION --limit=50`
+
+### Phase 4: Full traffic on Cloud Run
+
+17. Monitor for 15–30 minutes — check for workflow failures, queue depth, error rate
+18. If stable, the Railway Worker can remain paused as a hot standby
+19. If issues arise, see rollback steps below
+
+---
+
+## Step 9: Switch Traffic to Cloud Run
+
+Only after Phase 2 smoke tests pass:
 
 ```bash
 # In Vercel, update the environment variable:
@@ -329,11 +378,14 @@ Only after all smoke tests pass:
 If Cloud Run has issues:
 
 ```bash
-# 1. Switch NEXT_PUBLIC_API_URL back to Railway
+# 1. Resume the Railway Worker if it was paused
+# Railway dashboard → jak-swarm-worker → Settings → Resume (or reset WORKFLOW_QUEUE_CONCURRENCY)
+
+# 2. Switch NEXT_PUBLIC_API_URL back to Railway
 # In Vercel: NEXT_PUBLIC_API_URL = https://jak-swarm-api-production.up.railway.app
 # Then: vercel --prod
 
-# 2. (Optional) Scale down Cloud Run to save costs
+# 3. (Optional) Scale down Cloud Run to save costs
 gcloud run services update jak-swarm-api \
   --region=$REGION \
   --min-instances=0 \
@@ -344,7 +396,7 @@ gcloud run services update jak-swarm-worker \
   --min-instances=0 \
   --project=$PROJECT_ID
 
-# 3. (Optional) Delete Cloud Run services entirely
+# 4. (Optional) Delete Cloud Run services entirely
 gcloud run services delete jak-swarm-api --region=$REGION --project=$PROJECT_ID
 gcloud run services delete jak-swarm-worker --region=$REGION --project=$PROJECT_ID
 ```
@@ -390,15 +442,15 @@ gcloud run services delete jak-swarm-worker --region=$REGION --project=$PROJECT_
 
 ## Cost Considerations
 
-- **Cloud Run pricing**: Pay per request and container runtime. With `min-instances=1` for API, expect ~$15-25/month for idle time alone.
+- **Cloud Run pricing**: Pay per request and container runtime. With `min-instances=1` for both API and Worker, expect ~$25-40/month for idle time.
 - **API with min-instances=1**: ~$10-15/month (2 vCPU, 2Gi RAM, always-on)
-- **Worker with min-instances=0**: ~$0-5/month (scales to zero, only runs during workflows)
+- **Worker with min-instances=1**: ~$10-15/month (1 vCPU, 1Gi RAM, always-on — required because the Worker is a long-running queue listener that must continuously poll PostgreSQL)
 - **Network egress**: Cloud Run → Railway Redis/Supabase traffic is billable
 - **Secret Manager**: 6 free secrets, then $0.06/10,000 access operations
 
-To minimize costs for the challenge demo:
-- Set `--min-instances=0` for both services after the demo
-- Use `--cpu=1 --memory=512Mi` for the worker
+To minimize costs after the challenge demo:
+- Scale the Worker to `min-instances=0` only if you accept that background queue processing stops when idle — the Worker is a long-running listener, not a request-driven service
+- Use `--cpu=1 --memory=512Mi` for the worker in low-traffic periods
 - Delete Cloud Run services when not needed
 
 ---

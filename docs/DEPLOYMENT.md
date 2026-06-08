@@ -6,14 +6,14 @@ The active beta path is Vercel for the frontend, Railway for the API and worker,
 
 | Piece | Where | What runs |
 |---|---|---|
-| `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the Railway API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
+| `apps/web` (Next.js landing + builder UI) | **Vercel** | Points at the API via `NEXT_PUBLIC_API_URL`. Supabase session cookies. |
 | `apps/api` (Fastify HTTP + SSE + auth + enqueue) | **Railway** `jak-swarm-api` (public service) | `WORKFLOW_WORKER_MODE=standalone` — API DOES NOT run the queue worker |
 | `apps/api/dist/worker-entry.js` (durable queue consumer) | **Railway** `jak-swarm-worker` (private/background service) | Owns all queue claims. Exposes `/metrics` + `/healthz` + `/ready` on :9464 |
 | Postgres (+ pgvector) | **Supabase** | `DATABASE_URL` = pooler:6543, `DIRECT_URL` = direct:5432 (migrations only) |
 | Redis | **Railway managed Redis** | `REDIS_URL=${{Redis.REDIS_URL}}` shared by API + worker over Railway private networking |
 | Observability | **Railway logs/metrics + optional Sentry/OTel** | Adequate pre-launch; add Grafana Cloud only after real user load. |
 
-**When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Railway logs/metrics plus Sentry cover the critical failure modes. The old Render blueprint remains as legacy rollback reference only; do not treat it as the active beta path.
+**When to add a 3rd observability service** (Grafana Agent + Grafana Cloud): only after you have real user load (>50 paying users OR >500 workflows/day). Until then, Railway logs/metrics plus Sentry cover the critical failure modes.
 
 **CORS alignment:** the API's `CORS_ORIGINS` must list your exact Vercel origins. For production beta use `https://jakswarm.com,https://www.jakswarm.com`. Parsing is comma-separated with trim per entry, so spaces after commas are accepted, but commas are still required.
 
@@ -21,18 +21,35 @@ The active beta path is Vercel for the frontend, Railway for the API and worker,
 
 ---
 
+## Parallel deployment: Google Cloud Run
+
+A parallel Cloud Run deployment exists for the Google AI Agents Challenge. Both Railway and Cloud Run can run simultaneously — traffic shifts via `NEXT_PUBLIC_API_URL` in Vercel. See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for the full setup guide.
+
+| Piece | Where | What runs |
+|---|---|---|
+| `apps/api` | **Cloud Run** `jak-swarm-api` (public) | 2 GiB RAM, 2 CPU, min 1 instance. Port 4000. |
+| `apps/api/dist/worker-entry.js` | **Cloud Run** `jak-swarm-worker` (private) | 1 GiB RAM, 1 CPU, min 0 (scales to zero). Port 9464. |
+| Redis | **Railway** (shared) | Same Railway Redis instance used by both deployments |
+| Postgres | **Supabase** (shared) | Same Supabase instance used by both deployments |
+| Secrets | **Google Secret Manager** | All sensitive env vars mounted as secrets |
+
+**Traffic switching**: Update `NEXT_PUBLIC_API_URL` in Vercel and redeploy. No code changes. Rollback is switching the URL back to Railway.
+
+---
+
 ## Two deploy modes — which one you're on
 
 JAK ships with ONE binary + TWO runtime roles. The env var `WORKFLOW_WORKER_MODE` picks which role(s) the API process plays. The worker binary (`apps/api/dist/worker-entry.js`) is always the standalone worker.
 
-### Mode B — Two-service (production beta default)
+### Mode B — Two-service (production default)
 
-`WORKFLOW_WORKER_MODE=standalone` on the API + separate `jak-swarm-worker` service running `node apps/api/dist/worker-entry.js`. This is the Railway beta shape.
+`WORKFLOW_WORKER_MODE=standalone` on the API + separate worker service running `node apps/api/dist/worker-entry.js`. This is the Railway beta shape and the Cloud Run shape.
 
 - API p95 latency stays flat regardless of queue depth.
 - Worker scales horizontally without touching the API plan.
 - Each worker exposes its own `/metrics` + `/healthz` + `/ready` on :9464.
-- Grafana Agent scrapes both by internal DNS (`jak-swarm-api:4000`, `jak-swarm-worker:9464`).
+- On Railway: internal DNS (`jak-swarm-api:4000`, `jak-swarm-worker:9464`).
+- On Cloud Run: Cloud Run internal URLs + load balancer.
 
 ### Mode A — Single-service (development / staging only)
 
@@ -71,25 +88,20 @@ When deployed as two services, the graph is:
                   │
                   ▼
             ┌────────────┐        ┌──────────┐
-            │ Prometheus │◀───────│ Grafana  │
-            │ /metrics   │        │ dashbrd  │
-            └─────┬──────┘        └──────────┘
-                  │
-                  ▼
-            ┌────────────┐
-            │Alertmanager│
-            └────────────┘
+            │ Prometheus │◀───────│  Sentry  │
+            │ /metrics   │        │  (opt)   │
+            └────────────┘        └──────────┘
 ```
 
 Reference implementation: `docker-compose.prod.yml` at repo root shows the
-full topology locally. Use it as a template for Railway, Kubernetes, ECS, or
+full topology locally. Use it as a template for Railway, Cloud Run, Kubernetes, or
 Fly.io deployments.
 
 ## What the application provides (code-side)
 
 | Capability | Endpoint / Module | Notes |
 |---|---|---|
-| API Prometheus metrics | `GET /metrics` on API (:4000) | prom-client, 35+ metric types (workflow, agent, tool, LLM cost, queue, worker, signal, SSE, Vibe Coder, provider) |
+| API Prometheus metrics | `GET /metrics` on API (:4000) | prom-client, 20+ custom metric types (workflow, agent, tool, LLM cost, queue, worker, signal, SSE, Vibe Coder, provider) |
 | Worker Prometheus metrics | `GET /metrics` on Worker (:9464) | Same registry; each worker exposes per-instance gauges |
 | Liveness probe | `GET /healthz` on API AND Worker | Process alive check, no dependencies |
 | Readiness probe | `GET /ready` on API AND Worker | DB + Redis connectivity, returns 503 during shutdown |
@@ -131,10 +143,7 @@ ${{Redis.REDIS_URL}}
 - Set the **identical** `REDIS_URL` expression on both `jak-swarm-api` and `jak-swarm-worker` (same Railway Redis service — they coordinate through it).
 - `REQUIRE_REDIS_IN_PROD=true` on both services. Without this, a missing `REDIS_URL` silently degrades to in-memory coordination which breaks cross-instance signals and SSE fan-out ([apps/api/src/config.ts:72](../apps/api/src/config.ts)).
 - If you intentionally use an external Redis provider, keep the same URL on API and worker and prefer TLS endpoints (`rediss://`) where supported.
-
-## Legacy Render healthcheck gotcha
-
-Render is no longer the active beta target. If you keep Render as rollback, remember the worker pserv's `/healthz` is on **port 9464**, not the default `PORT`.
+- On Cloud Run, `REDIS_URL` points to the same Railway Redis instance over the public internet (TLS required).
 
 ## CORS_ORIGINS gotcha
 
@@ -162,7 +171,7 @@ docker compose -f docker-compose.staging.yml up -d
 | Service | Purpose | Recommended Setup |
 |---|---|---|
 | **PostgreSQL 15+ with pgvector** | Primary DB + vector search | Managed (RDS/Supabase/Neon), read replica |
-| **Redis 7+** | Cache + rate limiting | Managed (Railway Redis / ElastiCache / Upstash), 1GB |
+| **Redis 7+** | Cache + rate limiting | Managed (Railway Redis / ElastiCache), 1GB |
 | **Prometheus** | Metrics collection | Scrapes `/metrics` every 15s |
 | **Grafana** | Dashboards + alerting | Connect to Prometheus data source |
 
@@ -338,6 +347,9 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 | Variable | Feature |
 |---|---|
 | `REDIS_URL` | Session cache, rate limiting, voice |
+| `GEMINI_API_KEY` | Gemini LLM provider (required when `LLM_PROVIDER=gemini`) |
+| `LLM_PROVIDER` | `openai`, `gemini`, or `existing` (default) |
+| `JAK_ADK_MODE` | Set to `1` to enable Google ADK pipeline |
 | `HUBSPOT_API_KEY` | CRM integration |
 | `GITHUB_PAT` | Repo creation, PR review, code push |
 | `VERCEL_TOKEN` | App deployment |
@@ -345,6 +357,7 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 | `TWITTER_API_KEY` + related | Social posting |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry trace export |
 | `METRICS_ENABLED` | Prometheus metrics (default: true) |
+| `CORS_ORIGINS` | Comma-separated allowed origins |
 
 ---
 
@@ -354,7 +367,9 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 |---|---|---|
 | PostgreSQL (Supabase) | 500MB | ~$25/mo (Pro) |
 | PostgreSQL (Neon) | 500MB | ~$19/mo |
-| Redis (Railway managed / Upstash) | Varies by provider tier | Varies by usage/plan |
+| Redis (Railway managed) | Varies by plan | ~$5-10/mo |
+| Cloud Run API (min 1 instance) | — | ~$10-15/mo |
+| Cloud Run Worker (min 0 instances) | — | ~$0-5/mo |
 | Prometheus + Grafana (Cloud) | 10K metrics | ~$0 (free tier) |
 | Sentry | 5K events/mo | ~$0 (free tier) |
 | Total staging | — | ~$0-25/mo |

@@ -359,7 +359,8 @@ describe('Landing — public marketing copy stays honest', () => {
     const envExample = read('.env.example');
     const railwayApiEnv = read('scripts/automation/env-templates/railway-api.env.example');
     const railwayWorkerEnv = read('scripts/automation/env-templates/railway-worker.env.example');
-    const renderYaml = read('render.yaml');
+    const cloudbuildApi = read('cloudbuild-api.yaml');
+    const cloudbuildWorker = read('cloudbuild-worker.yaml');
     const doctor = read('scripts/doctor.ps1');
     const truth = read('apps/web/src/lib/product-truth.ts');
 
@@ -371,7 +372,7 @@ describe('Landing — public marketing copy stays honest', () => {
     expect(truth).toMatch(/label:\s*'Agent Runtime'/);
     expect(truth).toMatch(/suffix:\s*''/);
 
-    const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, renderYaml, doctor].join('\n');
+    const activeDeploySurfaces = [railwayApiEnv, railwayWorkerEnv, cloudbuildApi, cloudbuildWorker, doctor].join('\n');
     expect(activeDeploySurfaces).not.toMatch(/ANTHROPIC_API_KEY|DEEPSEEK_API_KEY|OPENROUTER_API_KEY|OLLAMA_(URL|BASE_URL|MODEL)|OPENAI_FALLBACK_MODEL|LLM_ROUTING_STRATEGY/);
   });
 });
