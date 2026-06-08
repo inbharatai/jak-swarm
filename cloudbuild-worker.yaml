@@ -1,0 +1,75 @@
+# ─── JAK Swarm Worker — Cloud Build + Cloud Run ──────────────────────────────
+#
+# Build the Worker Docker image and deploy to Cloud Run.
+#
+# The worker is a long-running queue processor with an HTTP metrics server.
+# It scales to zero when idle and wakes on Redis queue activity.
+#
+# Prerequisites:
+#   1. gcloud CLI installed and authenticated
+#   2. Artifact Registry repo created (see DEPLOYMENT_GOOGLE_CLOUD_RUN.md)
+#   3. Secret Manager secrets created for all sensitive env vars
+#   4. Service account with roles/run.admin, roles/secretmanager.secretAccessor
+#
+# Usage:
+#   gcloud builds submit --config=cloudbuild-worker.yaml \
+#     --substitutions=_REGION=us-central1,_SERVICE_NAME=jak-swarm-worker
+#
+# Or use the deployment guide for step-by-step instructions.
+
+steps:
+  # ─── Step 1: Build the Docker image ───────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.worker'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
+      - '.'
+
+  # ─── Step 2: Push images to Artifact Registry ─────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}']
+
+  # ─── Step 3: Deploy to Cloud Run ──────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--port=9464'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=5'
+      - '--timeout=300'
+      - '--no-allow-unauthenticated'
+      - '--set-env-vars=NODE_ENV=production,PORT=9464,WORKFLOW_WORKER_MODE=standalone,REQUIRE_REDIS_IN_PROD=true,WORKER_METRICS_PORT=9464'
+      # ── Secrets (mounted from Google Secret Manager) ──
+      # Uncomment and adjust once secrets are created:
+      # - '--set-secrets=DATABASE_URL=DATABASE_URL:latest'
+      # - '--set-secrets=AUTH_SECRET=AUTH_SECRET:latest'
+      # - '--set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest'
+      # - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
+      # - '--set-secrets=REDIS_URL=REDIS_URL:latest'
+      # - '--set-secrets=SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest'
+      # - '--set-secrets=EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest'
+      # - '--set-secrets=METRICS_TOKEN=METRICS_TOKEN:latest'
+      # - '--set-secrets=NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest'
+      # - '--set-secrets=NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest'
+      # - '--set-secrets=CORS_ORIGINS=CORS_ORIGINS:latest'
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: jak-swarm-worker
+  _REPO_NAME: jak-swarm
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'

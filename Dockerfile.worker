@@ -1,0 +1,99 @@
+# ─── JAK Swarm Worker — Google Cloud Run ─────────────────────────────────────
+#
+# Standalone workflow worker for Cloud Run.
+#   - No Chromium (worker doesn't do browser automation)
+#   - Runs worker-entry.js (queue processor + metrics server)
+#   - Port 9464 for /healthz, /ready, /metrics endpoints
+#   - WORKFLOW_WORKER_MODE=standalone + REQUIRE_REDIS_IN_PROD=true
+#
+# Railway users: the root Dockerfile remains unchanged. This is a parallel path.
+
+# ─── Stage 1: Build ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+WORKDIR /app
+
+# Copy workspace config
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
+
+# Copy all package.json files for dependency resolution
+COPY packages/shared/package.json packages/shared/
+COPY packages/db/package.json packages/db/
+COPY packages/agents/package.json packages/agents/
+COPY packages/tools/package.json packages/tools/
+COPY packages/swarm/package.json packages/swarm/
+COPY packages/security/package.json packages/security/
+COPY packages/verification/package.json packages/verification/
+COPY packages/voice/package.json packages/voice/
+COPY packages/workflows/package.json packages/workflows/
+COPY packages/industry-packs/package.json packages/industry-packs/
+COPY packages/skills/package.json packages/skills/
+COPY packages/adk/package.json packages/adk/
+COPY packages/client/package.json packages/client/
+COPY apps/api/package.json apps/api/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source code (worker is in apps/api/src/worker-entry.ts)
+COPY packages/ packages/
+COPY apps/api/ apps/api/
+
+# Nuke stale dist/ + .tsbuildinfo
+RUN find packages apps -type d -name dist -exec rm -rf {} + 2>/dev/null || true
+RUN find packages apps -name "*.tsbuildinfo" -delete 2>/dev/null || true
+
+# Generate Prisma client
+RUN pnpm --filter @jak-swarm/db exec prisma generate
+
+# Build all packages in dependency order (same as API — worker shares the same compiled code)
+RUN pnpm --filter @jak-swarm/shared build && \
+    pnpm --filter @jak-swarm/security build && \
+    pnpm --filter @jak-swarm/db build && \
+    pnpm --filter @jak-swarm/verification build && \
+    pnpm --filter @jak-swarm/tools build && \
+    pnpm --filter @jak-swarm/skills build && \
+    pnpm --filter @jak-swarm/agents build && \
+    pnpm --filter @jak-swarm/industry-packs build && \
+    pnpm --filter @jak-swarm/swarm build && \
+    pnpm --filter @jak-swarm/adk build && \
+    pnpm --filter @jak-swarm/api build
+
+# ─── Stage 2: Runtime ────────────────────────────────────────────────────────
+FROM node:20-alpine AS runtime
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+# No Chromium — worker doesn't do browser automation
+# This saves ~200MB compared to the API image.
+
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api ./apps/api
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+# Security: non-root user
+RUN addgroup -g 1001 -S jak && \
+    adduser -S jak -u 1001 -G jak
+USER jak
+
+# Worker runtime configuration
+ENV NODE_ENV=production
+ENV PORT=9464
+ENV WORKFLOW_WORKER_MODE=standalone
+ENV REQUIRE_REDIS_IN_PROD=true
+ENV WORKER_METRICS_PORT=9464
+
+EXPOSE 9464
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:9464/healthz || exit 1
+
+# Worker entry point — no Prisma migrations (API handles those)
+CMD ["node", "apps/api/dist/worker-entry.js"]
