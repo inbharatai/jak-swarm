@@ -435,5 +435,5 @@ Both deployments share the same Redis and PostgreSQL instances. Traffic shifts t
 
 ### Environment Tiers
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging
-- **staging** — Railway deployment with test credentials (active beta)
+- **staging-ready** — Railway deployment with test credentials (active beta)
 - **production** — Railway + Cloud Run (parallel), managed PostgreSQL (Supabase), Railway Redis, observability stack

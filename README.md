@@ -462,6 +462,19 @@ See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md)
 | 🧠 **Knowledge** | Memory store — facts, preferences, policies |
 | ⚙️ **Settings** | LLM provider config, approval thresholds |
 | 👑 **Admin** | Tenant management, users, API keys, tool toggles |
+| 📁 **Files** | Document upload, storage, and management |
+| 📋 **My Tasks** | Personal task list and assignments |
+| 👥 **Team** | Team management, departments, member roles |
+| 🏢 **Company** | Company profile, brand voice, competitors, goals |
+| 📨 **Inbox** | Notification center and message feed |
+| 📅 **Calendar** | Calendar events and scheduling |
+| 💬 **Social** | Social media management and drafts |
+| ✏️ **Social Drafts** | Draft social media posts for review |
+| 🔧 **Tool Installer** | Tool installation and configuration |
+| 📜 **Standing Orders** | Persistent tool allowlists and blocked actions |
+| 💡 **Skills** | Reusable workflow templates and skill library |
+| 🏃 **Runs** | Workflow run history and results |
+| 💳 **Billing** | Subscription plans, usage, credits |
 
 ---
 
@@ -490,7 +503,7 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **122** | 50+ | Custom | ~10 |
-| Built-in UI | **13 pages** | — | LangSmith | IDE |
+| Built-in UI | **26 pages** | — | LangSmith | IDE |
 | **Gemini + OpenAI** (per-tenant) | ✅ | ❌ | ❌ | ❌ |
 | **Google ADK orchestration** | ✅ | ❌ | ❌ | ❌ |
 | **Google Search Grounding** | ✅ | ❌ | ❌ | ❌ |
@@ -540,7 +553,7 @@ jak-swarm/
 │   │       ├── middleware/       # Auth, RBAC, rate limiting
 │   │       └── openapi/         # Zod → JSON Schema → OpenAPI spec
 │   └── web/                     # Next.js 16 dashboard (port 3000)
-│       └── src/app/(dashboard)/ # 13 dashboard pages
+│       └── src/app/(dashboard)/ # 26 dashboard pages
 ├── packages/
 │   ├── adk/                      # 🆕 Google ADK orchestration (JAK_ADK_MODE=1)
 │   │   ├── bridge/              # JAK → ADK tool bridge (FunctionTool, GOOGLE_SEARCH)
@@ -586,15 +599,17 @@ jak-swarm/
 | Risk Level | Examples | Approval Required |
 |:-----------|:---------|:-----------------:|
 | 🟢 `READ_ONLY` | web_search, file_read, list_calendar | Never |
-| 🟡 `WRITE` | file_write, create_event, update_crm | Configurable |
-| 🔴 `DESTRUCTIVE` | delete records, clear data | Always |
-| 🟠 `EXTERNAL_SIDE_EFFECT` | send_email, send_webhook, post_slack | Always |
+| 🟡 `DRAFT_ONLY` | draft_email, create_calendar_event (uncommitted) | Never |
+| 🟡 `SANDBOX_EDIT` | Browser ops within sandbox | Configurable |
+| 🟠 `LOCAL_EXEC_ALLOWLIST` | Code execution, file write (allowlisted tools) | Configurable |
+| 🟠 `EXTERNAL_ACTION_APPROVAL` | send_email, send_webhook, post_slack | Always |
+| 🔴 `CRITICAL_MANUAL_ONLY` | delete records, credential rotation, production deploys | Always |
 
 - **AES-256-GCM** encryption for OAuth tokens and LLM API keys at rest
 - **JWT** auth with per-tenant isolation enforced at middleware level
 - **bcrypt** password hashing (12 rounds)
 - **PII redaction** at LLM boundary and at write time
-- **4-layer hallucination detection** (heuristic/regex-based) on every agent output
+- **5-layer hallucination detection** (heuristic/regex-based) on every agent output: grounding check, invented statistics, fabricated sources, overconfidence, impossible claims
 - **RBAC** roles: `END_USER` < `REVIEWER` < `OPERATOR` < `TENANT_ADMIN` < `SYSTEM_ADMIN` + `EXTERNAL_AUDITOR`
 
 Full security policy: [`SECURITY.md`](SECURITY.md)
