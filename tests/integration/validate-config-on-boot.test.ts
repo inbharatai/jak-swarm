@@ -98,7 +98,7 @@ async function runBootValidation(overrides: EnvMap = {}): Promise<ReturnType<typ
   return stub;
 }
 
-describe('validateConfigOnBoot production degraded-start behavior', () => {
+describe('validateConfigOnBoot production behavior', () => {
   beforeAll(() => {
     for (const key of ENV_KEYS) {
       originalEnv[key] = process.env[key];
@@ -113,14 +113,33 @@ describe('validateConfigOnBoot production degraded-start behavior', () => {
 
   it('passes with a valid production baseline (no errors logged)', async () => {
     const stub = await runBootValidation();
-    // Valid config should not log any errors
     expect(stub.log.error).not.toHaveBeenCalled();
   });
 
+  // ── Fatal errors: MUST throw (refuse to start) ────────────────────────
+
+  it('throws for the default dev AUTH_SECRET (truly dangerous, can never self-heal)', async () => {
+    // AUTH_SECRET='dev-secret-change-me-NEVER-USE-IN-PROD' is the hardcoded
+    // default — a fatal misconfiguration that makes the server dangerous.
+    await expect(
+      runBootValidation({ AUTH_SECRET: 'dev-secret-change-me-NEVER-USE-IN-PROD' }),
+    ).rejects.toThrow(/AUTH_SECRET/i);
+  });
+
+  it('throws for unresolved template expressions in critical env vars', async () => {
+    // Template expressions like ${{Redis.REDIS_URL}} can never resolve at
+    // runtime — a fatal misconfiguration.
+    await expect(runBootValidation({ REDIS_URL: '${{Redis.REDIS_URL}}' })).rejects.toThrow(
+      /ENV_TEMPLATE_RESOLUTION/i,
+    );
+  });
+
+  // ── Non-fatal errors: log but continue (degraded mode) ─────────────────
+  // These can self-heal (secrets rotated in, DB reconnects) so the server
+  // must start listening so Cloud Run health checks keep it alive.
+
   it('logs AUTH_SECRET_STRENGTH error for weak secrets instead of throwing', async () => {
     const stub = await runBootValidation({ AUTH_SECRET: weakAuthSecretFixture });
-    // The function no longer throws — it logs errors and returns.
-    // Verify the error was logged.
     const errorCalls = stub.log.error.mock.calls.map((c: any[]) => c[0] ?? c[1] ?? '');
     const hasAuthError = errorCalls.some((msg: string) =>
       typeof msg === 'string' && msg.includes('AUTH_SECRET_STRENGTH'),
@@ -135,14 +154,5 @@ describe('validateConfigOnBoot production degraded-start behavior', () => {
       typeof msg === 'string' && msg.includes('CORS_ORIGINS_FORMAT'),
     );
     expect(hasCorsError).toBe(true);
-  });
-
-  it('logs ENV_TEMPLATE_RESOLUTION error for unresolved template expressions instead of throwing', async () => {
-    const stub = await runBootValidation({ REDIS_URL: '${{Redis.REDIS_URL}}' });
-    const errorCalls = stub.log.error.mock.calls.map((c: any[]) => c[0] ?? c[1] ?? '');
-    const hasTemplateError = errorCalls.some((msg: string) =>
-      typeof msg === 'string' && msg.includes('ENV_TEMPLATE_RESOLUTION'),
-    );
-    expect(hasTemplateError).toBe(true);
   });
 });
