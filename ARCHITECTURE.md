@@ -2,6 +2,8 @@
 
 This document describes the internal architecture of JAK Swarm: how a user goal becomes a planned, routed, executed, verified result.
 
+For deployment topology (Railway, Google Cloud Run, infrastructure diagrams), see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For the deployment runbook, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ---
 
 ## High-Level Flow
@@ -89,6 +91,17 @@ The core execution engine. Contains:
 
 - **Worker Agents** (`workers/`): 32 domain specialists. Each declares which tools it needs and has a specialized system prompt for its domain.
 
+### `packages/adk` -- Google ADK Integration
+
+When `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) instead of LangGraph:
+
+- **jak-tool-bridge.ts**: Converts JAK tools to ADK `FunctionTool` format
+- **jak-adk-agents.ts**: Wraps JAK agents as ADK `LlmAgent` instances
+- **adk-pipeline.ts**: Orchestrates agents via `SequentialAgent` (Commander → Planner → ParallelAgent(workers) → SynthesisAgent → VerifierAgent)
+- **adk-runner.ts**: Bridges ADK output back to JAK's SwarmState shape
+
+When ADK is not enabled, the existing LangGraph path runs unchanged. This is an additive layer — the OpenAI + LangGraph pipeline is never modified.
+
 ### `packages/tools` -- Tool System
 
 122 tools (built-in + sandbox + MCP) managed by a singleton ToolRegistry:
@@ -115,12 +128,39 @@ The core execution engine. Contains:
 TypeScript enums and interfaces used across all packages:
 
 - `AgentRole` (38 agent roles + `WAITING_APPROVAL`), `AgentStatus`, `AgentHandoff`, `ToolCall`, `AgentTrace`
-- `ToolCategory` (11 categories), `ToolRiskClass` (4 levels), `ToolMetadata`, `ToolResult`
+- `ToolCategory` (11 categories), `ToolRiskLevel` (6 tiers: `READ_ONLY`, `DRAFT_ONLY`, `SANDBOX_EDIT`, `LOCAL_EXEC_ALLOWLIST`, `EXTERNAL_ACTION_APPROVAL`, `CRITICAL_MANUAL_ONLY`), `ToolMetadata`, `ToolResult`
 - `WorkflowStatus`, `TaskStatus`, `RiskLevel`, `WorkflowTask`, `WorkflowPlan`, `ApprovalRequest`
 
 ### `packages/db` -- Database
 
 Prisma ORM with PostgreSQL. Schema covers tenants, users, workflows, tasks, traces, integrations, credentials, schedules, memory, skills, and the Audit & Compliance product surface (`ComplianceFramework`, `ComplianceControl`, `ControlEvidenceMapping`, `ManualEvidence`, `ScheduledAttestation`, `ControlAttestation`, `WorkflowArtifact`, `AuditRun`, `ControlTest`, `AuditException`, `AuditWorkpaper`).
+
+### `packages/security` -- JAK Shield (6-Stage Pipeline)
+
+- **Stage 1 — Agent Firewall**: 22 regex patterns for prompt injection + 6 offensive-cyber categories
+- **Stage 2 — Risk-Based Approvals**: 6-tier `ToolRiskLevel` lattice with payload hash binding
+- **Stage 3 — Secure Tool Permissions**: Per-tenant registry, role-gated installer, Standing Orders (tool whitelists propagated through SwarmState)
+- **Stage 4 — Sandboxed Execution**: Per-tenant browser sessions, URL allowlists, path-traversal guards, 500MB disk quotas
+- **Stage 5 — Defensive Vulnerability Triage**: Allows defensive security work, blocks offensive requests
+- **Stage 6 — Audit Evidence Layer**: HMAC-SHA256 signed bundles with per-tenant key derivation
+
+For the full threat model, see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). The standalone JAK Shield MCP service is at https://github.com/inbharatai/jak-shield
+
+### `packages/verification` -- Output Verification
+
+Email/document/transaction verification tools and the Verifier agent's structured evaluation pipeline.
+
+### `packages/skills` -- Skill System
+
+Operators can propose new Tier 3 skills that go through a sandbox-and-review pipeline before activation. Skills define tool allowlists (`ToolRiskLevel` per tool) and agent prompts per vertical.
+
+### `packages/industry-packs` -- Industry Configuration
+
+13 industry-specific agent configurations (healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, manufacturing, consulting, general). Each pack provides agent prompt supplements, policy overlays, recommended approval thresholds, and restricted tool lists.
+
+### `packages/client` -- TypeScript SDK
+
+`@jak-swarm/client` — auto-generated TypeScript client for the API. Used by `apps/web` and available for external integrations.
 
 ### `apps/api/src/services/audit` -- Audit & Compliance Agent Pack
 
@@ -138,20 +178,13 @@ Routes: `apps/api/src/routes/audit-runs.routes.ts` (14 endpoints, REVIEWER+ on w
 
 Optional Temporal workflow and activity definitions for durable, long-running workflows (batch processing, scheduled reports, multi-day approval escalations). The primary workflow engine is LangGraph + QueueWorker in `packages/swarm` and `apps/api`. Temporal is only needed for jobs that must survive full process restarts.
 
-### `packages/security` -- Security Layer
-
-- **Audit logging**: Records all tool executions and approval decisions.
-- **RBAC**: Role-based access control for tenant/user permissions.
-- **Guardrails**: Configurable rules for blocking dangerous operations.
-- **Tool Risk Classification**: Maps every tool to a risk class (READ_ONLY, WRITE, DESTRUCTIVE, EXTERNAL_SIDE_EFFECT) used by the approval system.
-
 ### `packages/voice` -- Voice Pipeline
 
-Real-time voice interaction using OpenAI Realtime API via WebRTC. Optional STT (Deepgram) and TTS (ElevenLabs) adapters.
+Real-time voice interaction using OpenAI Realtime API via WebRTC. Session creation, ephemeral token exchange, and provider abstraction (OpenAI Realtime, Deepgram STT, ElevenLabs TTS, mock provider for testing).
 
-### `packages/industry-packs` -- Industry Configuration
+### `packages/whatsapp-client` -- WhatsApp Bridge
 
-Pre-configured agent behaviors and tool permissions for specific industries (e.g., healthcare restricts certain tool categories, finance requires approval on all write operations).
+WhatsApp Cloud API integration for workflow control via chat. QR verification for session establishment.
 
 ---
 
@@ -193,6 +226,10 @@ JAK Swarm supports two first-class LLM providers with per-tenant switching:
 
 Per-tenant provider preference is stored in `TenantMemory` (key: `llm:preferred_provider`) and flows through the entire execution pipeline: `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
 
+### Gemini Grounding
+
+When `GEMINI_GOOGLE_SEARCH_GROUNDING=1`, Gemini agents inject `{ googleSearch: {} }` into the API tools array. Responses include `groundingMetadata` with web search queries, source URLs, and confidence scores. For OpenAI, `web_search_preview` provides equivalent real-time search — no Serper or Tavily keys needed.
+
 ### Tier Assignments
 
 | Tier | OpenAI Model | Gemini Model | Assigned to |
@@ -227,11 +264,16 @@ Agent decides to call a tool
         Result fed back to LLM for next decision
 ```
 
-Risk classes determine approval requirements:
-- `READ_ONLY`: Never requires approval
-- `WRITE`: Requires approval if `DEFAULT_APPROVAL_REQUIRED=true`
-- `DESTRUCTIVE`: Always requires approval
-- `EXTERNAL_SIDE_EFFECT`: Always requires approval (sends emails, posts to Slack, etc.)
+Risk levels determine approval requirements (6-tier `ToolRiskLevel` lattice):
+
+| Level | Approval | Examples |
+|:-----:|:--------:|:--------|
+| `READ_ONLY` | Never | web_search, file_read, list_calendar |
+| `DRAFT_ONLY` | Never | draft_email, create_calendar_event (uncommitted) |
+| `SANDBOX_EDIT` | Configurable | Browser operations within sandbox |
+| `LOCAL_EXEC_ALLOWLIST` | Configurable | Code execution, file write (allowlisted tools) |
+| `EXTERNAL_ACTION_APPROVAL` | Always | send_email, send_webhook, post_slack |
+| `CRITICAL_MANUAL_ONLY` | Always | delete records, credential rotation, production deploys |
 
 ---
 
@@ -248,6 +290,23 @@ Every agent output passes through four heuristic checks before acceptance. These
 4. **Impossible Claims**: Rule-based detection of logically inconsistent or physically impossible assertions.
 
 Each check contributes to a grounding score (0.0 to 1.0). If the combined score falls below threshold, the Verifier flags the output for re-generation or human review.
+
+---
+
+## Agent Error Feedback & Learning
+
+### Cross-agent error propagation
+
+- **Verifier → Worker loop**: When verification fails, `needsRetry=true` routes back to the worker (up to 3 retries)
+- **Self-correction**: Workers run `reflectAndCorrect()` before the verifier — up to 2 reflection passes (strict for factual roles, lenient for creative roles)
+- **Repair loop**: The `RepairService` classifies errors into 9 categories and auto-retries with backoff, or escalates to human for destructive actions
+- **Replanning**: If tasks fail, the Planner re-plans with failed tasks and completed results
+
+### Agent memory persistence
+
+- **persistLearning / recallLearnings**: Agents store and retrieve facts across workflows via per-role memory keyed by tenant
+- **Post-workflow fact extraction**: `memory-extractor.ts` extracts up to 10 facts per completed workflow
+- **Standing Orders**: Per-tenant tool whitelists and blocked-actions lists propagated through SwarmState
 
 ---
 
@@ -322,8 +381,9 @@ Key UI components:
 | Tool | Tool execution fails | Agent receives error message, adapts approach and tries alternative tool or strategy |
 | Agent | LLM call fails (rate limit, network) | Exponential backoff retry (3 attempts) via ProviderRouter |
 | Node | Node execution hangs | 120s timeout (`NODE_TIMEOUT_MS`), node skipped, dependent tasks cancelled |
-| Task | Task verification fails | Worker re-executes with Verifier feedback (2 attempts max) |
-| Workflow | Multiple tasks fail | Auto-repair: Replanner rewrites failed task subgraph, Router re-assigns (1 attempt) |
+| Task | Task verification fails | Worker re-executes with Verifier feedback (up to 3 retries, `needsRetry=true`) |
+| Task | Worker self-correction | `reflectAndCorrect()` runs before verifier (2 passes max, strict for factual roles) |
+| Workflow | Multiple tasks fail | Auto-repair: Replanner rewrites failed task subgraph, Router re-assigns (`MAX_REPAIR_LOOPS=4`) |
 | System | Server crash mid-workflow | State persisted to PostgreSQL after every node; stale workflows detected and marked FAILED on restart via `recoverStaleWorkflows` |
 | Approval | Approval timeout | Request expires to EXPIRED status; workflow remains PAUSED until manual intervention |
 
@@ -345,6 +405,18 @@ When a task fails, the Task Scheduler determines the impact:
 
 ---
 
+## Deployment
+
+JAK Swarm runs as two services: an API server (Fastify, port 4000) and a queue worker (`worker-entry.js`, port 9464). Both share the same codebase; the `WORKFLOW_WORKER_MODE` env var selects the role.
+
+- **Railway (active beta)**: API + Worker on Railway, Redis on Railway, PostgreSQL on Supabase, Frontend on Vercel
+- **Google Cloud Run (parallel)**: API + Worker on Cloud Run, sharing the same Railway Redis and Supabase PostgreSQL. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel
+- **Local development**: `pnpm dev` runs both API and web; `pnpm --filter @jak-swarm/api worker` runs the standalone worker
+
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full deployment guide and [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for Cloud Run setup.
+
+---
+
 ## Scaling Considerations
 
 ### Current Architecture Constraints
@@ -359,12 +431,12 @@ When a task fails, the Task Scheduler determines the impact:
 
 ### Horizontal Scaling Path
 
-The current architecture runs as a single API process. To scale horizontally:
+The architecture supports two running modes:
 
-1. **Database**: PostgreSQL handles concurrent reads/writes. All workflow state is persisted after every node, making the DB the source of truth.
-2. **Stateless API**: The Fastify API is stateless except for in-memory SwarmRunner state. Multiple API instances can serve reads, but workflow execution is currently pinned to the instance that started it.
-3. **Temporal integration**: For true distributed execution, enable the Temporal workflow engine (`packages/workflows/`). Temporal handles workflow scheduling, retry, and state persistence across multiple worker processes.
-4. **Redis**: Required for scheduling, voice sessions, and (future) cross-instance workflow event pub/sub.
+1. **Mode A (embedded)**: `WORKFLOW_WORKER_MODE=embedded`. Single process does HTTP + queue. For local dev and staging only.
+2. **Mode B (two-service)**: `WORKFLOW_WORKER_MODE=standalone` on API + separate worker process. Production default. API p95 latency stays flat regardless of queue depth. Worker scales independently.
+
+On Railway and Cloud Run, Mode B is used. The worker is a long-running process (`min-instances=1`) that continuously polls PostgreSQL with `FOR UPDATE SKIP LOCKED` and subscribes to Redis for workflow signals.
 
 ### Memory Management
 
@@ -408,3 +480,16 @@ LLM API keys stored via the dashboard are encrypted using AES-256-GCM:
 ### Tenant Isolation
 
 Every database query is scoped by `tenantId`. The `enforceTenantIsolation` middleware verifies that the `tenantId` in the JWT matches the resource being accessed. Cross-tenant access is only permitted for `SYSTEM_ADMIN` role.
+
+### JAK Shield
+
+Six-stage defense pipeline that runs before any agent action touches code, browser, files, or business tools:
+
+1. **Agent Firewall** -- 22 regex patterns for prompt injection + 6 offensive-cyber categories
+2. **Risk-Based Approvals** -- 6-tier tool risk lattice with payload hash binding
+3. **Secure Tool Permissions** -- Per-tenant registry, role-gated installer, Standing Orders
+4. **Sandboxed Execution** -- Per-tenant browser sessions, URL allowlists, path-traversal guards
+5. **Defensive Vulnerability Triage** -- Allows defensive security work, blocks offensive requests
+6. **Audit Evidence Layer** -- HMAC-SHA256 signed bundles with per-tenant key derivation
+
+For the full threat model, see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md).
