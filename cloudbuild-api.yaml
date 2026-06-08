@@ -2,17 +2,20 @@
 #
 # Build the API Docker image and deploy to Cloud Run.
 #
+# The API serves HTTP requests (port 4000), runs Chromium for browser tools,
+# and can optionally run an embedded queue worker (WORKFLOW_WORKER_MODE=embedded).
+# In production we use standalone mode — the worker runs as a separate service.
+#
 # Prerequisites:
 #   1. gcloud CLI installed and authenticated
-#   2. Artifact Registry repo created (see DEPLOYMENT_GOOGLE_CLOUD_RUN.md)
-#   3. Secret Manager secrets created for all sensitive env vars
+#   2. Artifact Registry repo created (see docs/GOOGLE_SECRET_MANAGER_SETUP.md)
+#   3. Secret Manager secrets created (see scripts/create-gcp-secrets.sh)
 #   4. Service account with roles/run.admin, roles/secretmanager.secretAccessor
 #
 # Usage:
 #   gcloud builds submit --config=cloudbuild-api.yaml \
-#     --substitutions=_REGION=us-central1,_SERVICE_NAME=jak-swarm-api
-#
-# Or use the deployment guide for step-by-step instructions.
+#     --substitutions=_REGION=asia-south1,_SERVICE_NAME=jak-swarm-api,_REPO_NAME=jak-docker \
+#     --project=crafty-haiku-498807-v8
 
 steps:
   # ─── Step 1: Build the Docker image ───────────────────────────────────────
@@ -47,15 +50,16 @@ steps:
       - '--max-instances=10'
       - '--timeout=300'
       - '--no-allow-unauthenticated'
-      - '--set-env-vars=NODE_ENV=production,PORT=4000,WORKFLOW_WORKER_MODE=embedded,PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser'
+      - '--set-env-vars=NODE_ENV=production,PORT=4000,WORKFLOW_WORKER_MODE=embedded,PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser,REQUIRE_REDIS_IN_PROD=true'
       # ── Secrets (mounted from Google Secret Manager) ──
-      # Update these after creating secrets with deploy/create-secrets.sh
+      # Update these after creating secrets with scripts/create-gcp-secrets.sh
       # Uncomment and adjust once secrets are created:
       # - '--set-secrets=DATABASE_URL=DATABASE_URL:latest'
       # - '--set-secrets=AUTH_SECRET=AUTH_SECRET:latest'
       # - '--set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest'
       # - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
       # - '--set-secrets=REDIS_URL=REDIS_URL:latest'
+      # - '--set-secrets=DIRECT_URL=DIRECT_URL:latest'
       # - '--set-secrets=SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest'
       # - '--set-secrets=EVIDENCE_SIGNING_SECRET=EVIDENCE_SIGNING_SECRET:latest'
       # - '--set-secrets=METRICS_TOKEN=METRICS_TOKEN:latest'
@@ -64,9 +68,9 @@ steps:
       # - '--set-secrets=CORS_ORIGINS=CORS_ORIGINS:latest'
 
 substitutions:
-  _REGION: us-central1
+  _REGION: asia-south1
   _SERVICE_NAME: jak-swarm-api
-  _REPO_NAME: jak-swarm
+  _REPO_NAME: jak-docker
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
