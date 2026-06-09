@@ -96,8 +96,8 @@ describe('Product truth claims', () => {
     }
     expect(readme).toContain('Beta `0.1.0-beta.0`');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
-    expect(readme).toContain('hosted Vercel + Railway beta must be smoke-tested');
-    expect(beta).toContain('hosted Vercel/Railway health');
+    expect(readme).toContain('hosted Cloud Run API must be fully smoke-tested');
+    expect(beta).toContain('hosted Cloud Run / Railway health');
     expect(readRepoFile('docs/railway-deployment.md')).toContain('API | Railway');
     expect(readRepoFile('docs/railway-deployment.md')).toContain('Worker | Railway');
     expect(beta).toContain('not yet ready for unqualified public/enterprise promises');

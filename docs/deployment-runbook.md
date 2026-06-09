@@ -1,6 +1,6 @@
 # JAK Swarm — Deployment Runbook (P0-A fix sprint)
 
-> Legacy note: this runbook documents the old Render API/worker deployment. The active beta target is Railway API + Railway worker, Vercel frontend, Supabase Postgres, and Railway managed Redis. Use [`docs/railway-deployment.md`](railway-deployment.md) for new beta deploys.
+> Legacy note: this runbook documents the old Render API/worker deployment. The primary deployment is now Google Cloud Run (`jak-swarm-api`), with Railway as rollback/fallback. Vercel frontend, Supabase Postgres, and Railway managed Redis. Use [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for Cloud Run setup and [`docs/railway-deployment.md`](railway-deployment.md) for the Railway runbook.
 
 This doc replaces the implicit knowledge that the live `jakswarm.com`
 deploy was missing — specifically why the dashboard buttons were calling

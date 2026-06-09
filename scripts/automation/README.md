@@ -1,6 +1,6 @@
 # JAK Swarm — Deployment Automation
 
-The active beta deploy target is now Railway for API/worker, Vercel for frontend, Supabase Postgres, and Railway managed Redis. See [`docs/railway-deployment.md`](../../docs/railway-deployment.md).
+The primary deploy target is Google Cloud Run for the API (`jak-swarm-api`), with Railway as rollback/fallback for API/worker. Vercel for frontend (currently pointing to Railway), Supabase Postgres, and Railway managed Redis. See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](../../docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for Cloud Run setup and [`docs/railway-deployment.md`](../../docs/railway-deployment.md) for the Railway runbook.
 
 The Render scripts in this folder are **legacy rollback/migration helpers only**. Do not use them for the active beta path unless you are intentionally restoring the old Render setup.
 

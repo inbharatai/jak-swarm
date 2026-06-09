@@ -1,8 +1,8 @@
 # JAK Swarm — Production Deployment Guide
 
-## Active beta topology (Vercel + Railway + Supabase + Railway Redis)
+## Active topology (Cloud Run primary + Railway fallback + Vercel + Supabase + Railway Redis)
 
-The active beta path is Vercel for the frontend, Railway for the API and worker, Supabase Postgres for pgvector-backed state, and Railway-managed Redis for queue/signals/cache. See [`docs/railway-deployment.md`](railway-deployment.md) for the step-by-step Railway runbook.
+The primary API deployment is Google Cloud Run (`jak-swarm-api` in `asia-south1`). Railway remains the rollback/fallback path for both API and worker. Vercel serves the frontend (currently still pointing to Railway until `NEXT_PUBLIC_API_URL` is switched). Supabase Postgres for pgvector-backed state, Railway-managed Redis for queue/signals/cache. See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for Cloud Run setup and [`docs/railway-deployment.md`](railway-deployment.md) for the Railway runbook.
 
 | Piece | Where | What runs |
 |---|---|---|

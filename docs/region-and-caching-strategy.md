@@ -3,7 +3,7 @@
 Investigation into the ~489ms Postgres query latency observed in production
 (`/ready` reports `database.latencyMs = 489`) and options for cutting it.
 
-> Historical context note: this analysis was captured during the Render-era deployment. Current active beta runtime is Railway API + Railway worker + Railway managed Redis; keep this document as latency-baseline context, not as the active infra map.
+> Historical context note: this analysis was captured during the Render-era deployment. The primary deployment is now Google Cloud Run (`jak-swarm-api`), with Railway as rollback/fallback; keep this document as latency-baseline context, not as the active infra map.
 
 **TL;DR**: the latency is real, it's from Supabase-Tokyo ↔ Render-Oregon
 (~120ms RTT × ~4 round-trips per ready check), and there are three paths

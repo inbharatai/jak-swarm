@@ -9,11 +9,11 @@ Status: beta release candidate for self-hosted users and design partners. This i
 
 Current local production-readiness rating: **8.5 / 10**.
 
-That rating means the core architecture is now credible enough for controlled beta validation, but not yet ready for unqualified public/enterprise promises. The score depends on local verification only; hosted Vercel/Railway health, live credentials, model access, migrations, queues, and external connector accounts must still be verified in the target environment.
+That rating means the core architecture is now credible enough for controlled beta validation, but not yet ready for unqualified public/enterprise promises. The score depends on local verification only; hosted Cloud Run / Railway health, live credentials, model access, migrations, queues, and external connector accounts must still be verified in the target environment.
 
 ## What Is In Scope
 
-- OpenAI-first model execution policy, with non-OpenAI provider keys removed from active deploy templates.
+- Gemini-first model execution policy for the Google AI Agents Challenge (OpenAI available as alternate provider).
 - LangGraph-backed workflow runtime with Postgres checkpointing.
 - JAK Shield gateway seam around agent and route safety checks.
 - Risk-tiered tool execution and human approval pause semantics.

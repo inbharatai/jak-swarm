@@ -32,7 +32,7 @@ Still not complete:
 - First-party background sync jobs for every connector source
 - Real customer-call/meeting transcript ingestion pipeline into the graph
 - Cross-tool drift monitors that run continuously without manual trigger
-- Production smoke tests against the hosted Vercel + Railway + Supabase + Railway Redis environment
+- Production smoke tests against the hosted Cloud Run + Railway + Supabase + Railway Redis environment
 
 So the accurate public phrase is **"closed-loop Company OS beta foundation"**, not "finished company AI OS."
 
@@ -85,7 +85,7 @@ Because a single bad-actor workflow can drain a 30-day budget in two hours. Per-
 
 **For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers we name openly:
 
-1. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment, environment variables, migrations, queues, connector credentials, or LLM model entitlements are healthy.
+1. The hosted Cloud Run API must be smoke-tested before inviting public users; local tests do not prove the live deployment, environment variables, migrations, queues, connector credentials, or LLM model entitlements are healthy.
 2. No third-party security audit (no SOC 2 Type 1/2, no ISO 27001 certification). The control infrastructure is shipped (182 controls seeded, 108 operationally backed) but the certification audit itself has not happened.
 3. Lawyer-reviewed Terms of Service / Privacy Policy / DPA are not in place — required for B2B and EU-region sales.
 4. No third-party penetration test against the running system.
