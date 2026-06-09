@@ -576,6 +576,56 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 
 ---
 
+## 🔭 Long-Term Vision
+
+JAK is evolving from a multi-agent workflow operator into an ever-learning Company OS that remembers company context, understands departmental roles, and safely completes approved work across the organisation.
+
+<details>
+<summary><b>Vision diagram and time horizons</b></summary>
+
+```mermaid
+flowchart TB
+    subgraph INPUTS["1. Company Inputs"]
+        I1["Calls"] & I2["Meetings"] & I3["Docs"] & I4["Websites"]
+        I5["Emails"] & I6["Code"] & I7["Tasks"] & I8["CRM"] & I9["Support"]
+    end
+
+    subgraph MEMORY["2. Company Memory Layer"]
+        M1["Transcripts"] & M2["Decisions"] & M3["Policies"] & M4["People"]
+        M5["Projects"] & M6["Risks"] & M7["Evidence"]
+    end
+
+    subgraph INTELLIGENCE["3. Role-Based Intelligence Layer"]
+        R1["CEO"] & R2["HR"] & R3["CTO"] & R4["CMO"]
+        R5["Finance"] & R6["Legal"] & R7["Ops"] & R8["Support"]
+    end
+
+    subgraph PERMISSIONS["4. Permission + Shield Layer"]
+        P1["RBAC"] & P2["Dept access"] & P3["Approval gates"]
+        P4["JAK Shield"] & P5["Audit evidence"]
+    end
+
+    subgraph EXECUTION["5. Autonomous Execution Layer"]
+        E1["Plan"] & E2["Assign"] & E3["Execute"]
+        E4["Verify"] & E5["Report"] & E6["Learn again"]
+    end
+
+    INPUTS --> MEMORY --> INTELLIGENCE --> PERMISSIONS --> EXECUTION
+    EXECUTION -->|"feedback loop"| MEMORY
+```
+
+**Short term** — Company Memory Layer: transcripts, decisions, policies, people, projects extracted from existing connectors into a persistent, queryable evidence graph.
+
+**Medium term** — Role-Based Intelligence + Permission Shield: department-aware agents with RBAC-scoped context, approval gates per department, and JAK Shield enforcement at the role boundary.
+
+**Long term** — Autonomous Execution Layer: plan, assign, execute, verify, report, learn again — a closed loop where approved work completes across the organisation and the system improves from each cycle.
+
+</details>
+
+Full roadmap with implementation milestones and honest scope boundaries: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+
+---
+
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
@@ -745,6 +795,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`docs/environment-setup.md`](docs/environment-setup.md) | Environment variables, integration setup, troubleshooting |
 | [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
 | [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Long-term vision, 5-layer Company OS evolution, honest scope boundaries |
 
 ---
 

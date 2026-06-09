@@ -514,3 +514,29 @@ Six-stage defense pipeline that runs inside the JAK Swarm process before any age
 6. **Audit Evidence Layer** -- HMAC-SHA256 signed bundles with per-tenant key derivation
 
 For the full threat model, see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md).
+
+---
+
+## Roadmap: Company OS Evolution
+
+JAK Swarm is a beta closed-loop operating layer today. The architectural direction is toward an ever-learning Company OS. This section describes the evolution path and what exists in code today versus what is planned.
+
+### Current foundation (shipped)
+
+- **Company Operating Layer** ([`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts)): artifact ingestion, entity extraction, drift detection, and agent-executable spec generation. The evidence graph is tenant-scoped and citation-first.
+- **Company Brain** ([`company-profile.service.ts`](apps/api/src/services/company-brain/company-profile.service.ts)): LLM-extracted company profiles (industry, brand voice, competitors, goals) approved by the user, grounding every agent prompt.
+- **JAK Shield** (6-stage pipeline): Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer.
+- **Role-based agents**: 38 specialist agents across Executive, Operations, Core, and Vibe Coding layers, each with domain-scoped prompts and tool allowlists.
+- **Industry Packs**: 13 vertical configurations with agent prompt supplements, policy overlays, and restricted tool lists.
+
+### Evolving toward (roadmap, not shipped)
+
+| Layer | Direction | Current code status |
+|:------|:----------|:-------------------|
+| **Company Inputs** | Calls, meetings, docs, websites, emails, code, tasks, CRM, support flowing automatically into the evidence graph | Manual ingestion + 7 artifact sources. Full auto-sync is a product build item. |
+| **Company Memory** | Transcripts, decisions, policies, people, projects, risks, evidence as persistent, queryable context | `company-operating-layer.service.ts` implements artifact → entity → drift finding → spec pipeline. Cross-workflow recall via `persistLearning` / `recallLearnings`. Memory is session-scoped; cross-session grounding is evolving. |
+| **Role-Based Intelligence** | CEO, HR, CTO, CMO, Finance, Legal, Ops, Support agents with department-scoped context, RBAC, and approval gates | Agent roles exist. Department-scoped RBAC (5 roles) is tenant-scoped, not department-scoped. Per-department approval gates are a roadmap item. |
+| **Permission + Shield** | RBAC, department access, approval gates, JAK Shield enforcement at role boundary | JAK Shield 6-stage pipeline is shipped. Department-scoped Shield boundaries and per-department approval policies are evolving. |
+| **Autonomous Execution** | Plan, assign, execute, verify, report, learn again in a self-improving closed loop | Commander → Planner → Router → Worker → Verifier loop is shipped. Self-improving cycles and cross-workflow learning are evolving. |
+
+Full roadmap with milestones and honest scope: [`docs/ROADMAP.md`](docs/ROADMAP.md)
