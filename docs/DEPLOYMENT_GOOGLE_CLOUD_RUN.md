@@ -60,9 +60,10 @@
          │  (port 4000)     │ │  (port 4000)     │      │
          └────────┬─────────┘ └────────┬─────────┘      │
                   │                     │                │
-         ┌────────┐                     │                │
-         │ Worker │ (not deployed)      │                │
-         └────────┘                      │               │
+         ┌──────────────────┐          │                │
+         │  Cloud Run Worker│          │                │
+         │  (not deployed)  │          │                │
+         └────────┬─────────┘          │                │
                   │                     │                │
                   └──────────┬──────────┘                │
                              │                          │
@@ -297,11 +298,16 @@ echo "API URL: $API_URL"
 ### Health check
 
 ```bash
+# Note: /healthz currently returns 404 (not yet wired as a liveness probe).
+# Use /ready for readiness checks and /health for deep diagnostics.
 curl -s "$API_URL/healthz" | jq .
-# Expected: { "status": "alive", "uptime": ..., "shuttingDown": false }
+# Currently returns 404 — see Known Remaining Work above
 
 curl -s "$API_URL/ready" | jq .
 # Expected: { "status": "ready", "checks": { "db": "ok", "redis": "ok", ... } }
+
+curl -s "$API_URL/health" | jq .
+# Deep diagnostic — may show Prisma pooler warning (non-blocking)
 
 curl -s "$API_URL/version" | jq .
 # Expected: { "version": "0.1.0-beta.0", "engine": "openai-first", ... }
