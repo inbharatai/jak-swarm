@@ -371,7 +371,9 @@ Open **http://localhost:3000** — give it a goal and watch the swarm execute.
 
 Docker: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production: [`docker-compose.prod.yml`](docker-compose.prod.yml)
 
-### Deploy to Railway
+### Deploy to Railway (Rollback / Fallback)
+
+Railway is the fallback deployment path. Cloud Run is the primary production deployment.
 
 ```bash
 npm i -g @railway/cli
@@ -383,7 +385,7 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ### Deploy to Google Cloud Run
 
-Parallel deployment for the Google AI Agents Challenge. API runs as a Cloud Run service in `asia-south1`, sharing the same Supabase PostgreSQL and Railway Redis (public endpoint) as the Railway deployment. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel — no code changes.
+JAK Swarm API is deployed on Google Cloud Run (primary). Railway remains available as a rollback/fallback deployment path.
 
 ```bash
 # Prerequisites: gcloud CLI, billing-enabled GCP project
@@ -395,39 +397,66 @@ gcloud builds submit --config=cloudbuild-api.yaml
 
 See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for step-by-step instructions.
 
-#### Google Cloud Run — Current Status
+#### Current Deployment Status
+
+JAK Swarm API is currently deployed successfully on Google Cloud Run.
+
+| Field | Value |
+|-------|-------|
+| Service | `jak-swarm-api` |
+| Region | `asia-south1` |
+| URL | `https://jak-swarm-api-565531938617.asia-south1.run.app` |
+| Last deployed by | `reetu004@gmail.com` |
+| Last deployed at | `2026-06-09T05:50:22Z` (≈ 11:20 AM IST) |
+
+**Verification commands:**
+
+```bash
+gcloud config get-value project
+
+gcloud run services list --platform managed
+
+gcloud run services describe jak-swarm-api \
+  --region asia-south1 \
+  --format="value(status.url,status.conditions[0].status,status.conditions[0].type)"
+
+curl -i https://jak-swarm-api-565531938617.asia-south1.run.app/health
+
+gcloud run services logs read jak-swarm-api \
+  --region asia-south1 \
+  --limit=50
+```
+
+**Component Status:**
 
 | Component | Status |
 |-----------|--------|
-| Cloud Run API | ✅ Deployed, publicly reachable |
-| Cloud Run Worker | ⏳ Not deployed yet |
+| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, publicly reachable |
+| Cloud Run Worker (`jak-swarm-worker`) | ⏳ Not deployed yet |
 | Supabase PostgreSQL | ✅ Connected (shared with Railway) |
-| Redis | ✅ Connected via Railway public endpoint (not `.railway.internal`) |
-| Secret Manager | ✅ Configured, 12 secrets mounted |
-| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Still pointing at Railway |
+| Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
+| Google Secret Manager | ✅ Configured, 12 secrets mounted |
+| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Still pointing at Railway (switch after Worker validation) |
 
-**Current Health Status:**
+**Health Endpoints:**
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
 | `/ready` | ✅ PASS | Primary readiness check. Env, DB, Redis, LLM all pass. |
-| `/health` | ⚠️ PARTIAL | Deep diagnostic. Redis OK. Prisma/Supabase pooler prepared-statement issue remains under investigation. |
-| `/healthz` | ❌ NOT WIRED | Returns 404. Simple liveness endpoint to be added. |
+| `/health` | ⚠️ PARTIAL | Deep diagnostic. Redis OK. Prisma/Supabase pooler has a prepared-statement compatibility warning (non-blocking — queries still work). |
+| `/healthz` | ❌ NOT WIRED | Returns 404. Liveness endpoint needs to be added or Cloud Run health probe configured to use `/ready`. |
 
 **Known Remaining Work:**
 
 - Wire `/healthz` as a fast liveness probe (no dependency checks, always returns 200)
 - Fix `/health` Prisma prepared-statement warning (Supabase pooler session mode or direct URL)
-- Deploy Cloud Run Worker after API diagnostics are clean
-- Switch Vercel `NEXT_PUBLIC_API_URL` only after Worker and API are fully validated
+- Deploy Cloud Run Worker after API validation is complete
+- Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after Worker and API are fully validated
 - Rotate exposed secrets after final validation
 
-**Do Not Do Yet:**
+**Railway as Rollback:**
 
-- ❌ Do not deploy Cloud Run Worker
-- ❌ Do not update Vercel `NEXT_PUBLIC_API_URL`
-- ❌ Do not delete Railway services
-- ❌ Do not remove Railway Redis/API/Worker until rollback is no longer needed
+Railway remains the fallback deployment path. If Cloud Run has issues, switch `NEXT_PUBLIC_API_URL` in Vercel back to the Railway URL and redeploy — no code changes needed. Do not delete Railway services until rollback is no longer needed.
 
 ### Integration Setup
 
