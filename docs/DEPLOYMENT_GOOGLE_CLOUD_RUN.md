@@ -2,6 +2,45 @@
 
 > **Coexistence**: Railway remains the primary deployment. Cloud Run is a parallel path for the Google AI Agents Challenge. Both can run simultaneously — traffic shifts to Cloud Run only after smoke tests pass, and can shift back to Railway at any time.
 
+> **Google AI Agents Challenge**: This deployment demonstrates JAK Swarm running on Google Cloud infrastructure with Gemini integration. The API uses per-tenant LLM provider switching (OpenAI ↔ Gemini) with zero code changes, and Google ADK orchestration via `JAK_ADK_MODE=1`.
+
+---
+
+## Current Deployment Status
+
+| Component | Status |
+|-----------|--------|
+| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, publicly reachable |
+| Cloud Run Worker (`jak-swarm-worker`) | ⏳ Not deployed yet |
+| Supabase PostgreSQL | ✅ Connected (shared with Railway) |
+| Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
+| Google Secret Manager | ✅ Configured, 12 secrets mounted |
+| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Still pointing at Railway |
+
+### Health Endpoints
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `GET /ready` | ✅ PASS | Primary readiness check. Env, DB, Redis, LLM all pass. |
+| `GET /health` | ⚠️ PARTIAL | Deep diagnostic. Redis OK. Prisma/Supabase pooler has a prepared-statement compatibility warning (non-blocking — queries still work). |
+| `GET /healthz` | ❌ NOT WIRED | Returns 404. Liveness endpoint needs to be added or Cloud Run health probe configured to use `/ready` instead. |
+
+### Known Remaining Work
+
+1. **Wire `/healthz`** as a fast liveness probe (no dependency checks, always returns 200) — or configure Cloud Run liveness probe to use `/ready`
+2. **Fix `/health` Prisma prepared-statement warning** — Supabase pooler (port 6543) uses transaction mode which conflicts with Prisma prepared statements. Options: use session mode, switch to direct URL (port 5432), or configure `pgbouncer` compatibility
+3. **Deploy Cloud Run Worker** after API diagnostics are fully clean
+4. **Switch Vercel `NEXT_PUBLIC_API_URL`** only after Worker and API are fully validated
+5. **Rotate exposed secrets** after final validation
+
+### Do Not Do Yet
+
+- ❌ Do not deploy Cloud Run Worker
+- ❌ Do not update Vercel `NEXT_PUBLIC_API_URL`
+- ❌ Do not delete Railway services
+- ❌ Do not remove Railway Redis/API/Worker until rollback is no longer needed
+- ❌ Do not switch traffic to Cloud Run until `/health` returns fully clean
+
 ---
 
 ## Architecture
@@ -21,22 +60,23 @@
          │  (port 4000)     │ │  (port 4000)     │      │
          └────────┬─────────┘ └────────┬─────────┘      │
                   │                     │                │
-         ┌────────▼─────────┐ ┌────────▼─────────┐     │
-         │  Cloud Run Worker│ │  Railway Worker   │     │
-         │  (port 9464)     │ │  (port 9464)      │     │
-         └────────┬─────────┘ └────────┬─────────┘     │
+         ┌────────┐                     │                │
+         │ Worker │ (not deployed)      │                │
+         └────────┘                      │               │
                   │                     │                │
                   └──────────┬──────────┘                │
                              │                          │
                     ┌────────▼────────┐ ┌────────────────┘
-                    │  Railway Redis  │ │ Supabase PostgreSQL
-                    │  (shared)       │ │ (shared)
+                    │  Railway Redis    │ │ Supabase PostgreSQL
+                    │  (public endpoint│ │ (shared)
+                    │   rediss://)     │ │
                     └─────────────────┘ └────────────────┘
 ```
 
-- **API** and **Worker** each deploy as separate Cloud Run services
-- **Redis** and **PostgreSQL** stay on Railway/Supabase (shared by both deployments)
-- **Vercel** frontend points to whichever API URL passes smoke tests
+- **API** deploys as a Cloud Run service; **Worker** is not yet deployed
+- **Redis** uses Railway's **public endpoint** (`rediss://`) — the `.railway.internal` private DNS is unreachable from Cloud Run
+- **PostgreSQL** stays on Supabase (shared by both deployments)
+- **Vercel** frontend currently points to Railway; switching to Cloud Run requires updating `NEXT_PUBLIC_API_URL`
 
 ---
 

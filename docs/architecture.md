@@ -417,21 +417,23 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
             ▼             ▼                  │
  ┌──────────────────┐ ┌──────────────────┐  │
  │  Cloud Run API    │ │  Cloud Run Worker │  │
- │  jak-swarm-api    │ │  jak-swarm-worker │  │
+ │  jak-swarm-api    │ │  (not deployed)   │  │
  │  :4000            │ │  :9464            │  │
  │  2Gi RAM, 2 CPU  │ │  1Gi RAM, 1 CPU   │  │
- │  min 1 instance   │ │  min 0 instances   │  │
+ │  min 1 instance   │ │  min 1 instance   │  │
  └────────┬─────────┘ └────────┬───────────┘  │
           │                    │               │
           └──────────┬────────┘               │
                      │                        │
             ┌────────▼────────┐ ┌─────────────────┘
-            │  Railway Redis   │ │ Supabase PostgreSQL
-            │  (shared)        │ │ (shared)
+            │  Railway Redis    │ │ Supabase PostgreSQL
+            │  (public endpoint)│ │ (shared)
             └─────────────────┘ └─────────────────┘
 ```
 
-Both deployments share the same Redis and PostgreSQL instances. Traffic shifts to Cloud Run by changing `NEXT_PUBLIC_API_URL` in Vercel and redeploying. Rollback is switching the URL back to Railway. See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for full setup instructions.
+Both deployments share the same Redis and PostgreSQL instances. Cloud Run connects to Railway Redis via its **public endpoint** (not `.railway.internal` private DNS, which is unreachable from outside Railway). Traffic shifts to Cloud Run by changing `NEXT_PUBLIC_API_URL` in Vercel and redeploying. Rollback is switching the URL back to Railway. See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for full setup instructions.
+
+**Current status:** API deployed and reachable; Worker not yet deployed. `/ready` passes all checks; `/health` shows a Prisma prepared-statement warning with the Supabase pooler (non-blocking). `/healthz` not yet wired as a Cloud Run liveness probe.
 
 ### Environment Tiers
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging

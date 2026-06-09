@@ -271,4 +271,4 @@ In-flight workflows survive API restarts via DB-backed checkpoints (LangGraph's 
 
 ### What is the active hosted beta deployment target?
 
-Frontend stays on Vercel. API and worker run on Railway. Postgres stays on Supabase for pgvector. Redis runs on Railway managed Redis. A parallel Google Cloud Run deployment is available for the Google AI Agents Challenge — traffic switches via `NEXT_PUBLIC_API_URL` in Vercel.
+Frontend stays on Vercel. API and worker run on Railway. Postgres stays on Supabase for pgvector. Redis runs on Railway managed Redis. A parallel Google Cloud Run deployment exists for the Google AI Agents Challenge — the API is deployed and reachable, but the Worker is not yet deployed and traffic has not been switched from Railway. Cloud Run connects to Railway Redis via its public `rediss://` endpoint (`.railway.internal` private DNS is unreachable from outside Railway). See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for current status.

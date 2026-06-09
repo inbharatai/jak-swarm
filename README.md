@@ -198,7 +198,7 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Sec
 | 🎤 | **Voice Sessions** | OpenAI Realtime API via WebRTC. Optional Deepgram STT / ElevenLabs TTS adapters. |
 | 🏢 | **Multi-Tenant SaaS** | RBAC (5 roles + External Auditor), approval gates, audit logging, tenant isolation, AES-256-GCM encrypted secrets. |
 | 💰 | **Credit-Based Billing** | 4 plans (Free / Pro / Team / Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard. |
-| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/healthz` + `/ready` probes. |
+| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/ready` + `/health` probes. |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. Worker-lease reclaim: dead workers' jobs auto-recovered in 30s. |
 
 ---
@@ -383,17 +383,51 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ### Deploy to Google Cloud Run
 
-Parallel deployment for the Google AI Agents Challenge. API + Worker as separate Cloud Run services, sharing the same Railway Redis and Supabase PostgreSQL. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel — no code changes.
+Parallel deployment for the Google AI Agents Challenge. API runs as a Cloud Run service in `asia-south1`, sharing the same Supabase PostgreSQL and Railway Redis (public endpoint) as the Railway deployment. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel — no code changes.
 
 ```bash
 # Prerequisites: gcloud CLI, billing-enabled GCP project
 # See docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md for full setup
 
 gcloud builds submit --config=cloudbuild-api.yaml
-gcloud builds submit --config=cloudbuild-worker.yaml
+# Worker deployment pending — see Current Status below
 ```
 
 See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for step-by-step instructions.
+
+#### Google Cloud Run — Current Status
+
+| Component | Status |
+|-----------|--------|
+| Cloud Run API | ✅ Deployed, publicly reachable |
+| Cloud Run Worker | ⏳ Not deployed yet |
+| Supabase PostgreSQL | ✅ Connected (shared with Railway) |
+| Redis | ✅ Connected via Railway public endpoint (not `.railway.internal`) |
+| Secret Manager | ✅ Configured, 12 secrets mounted |
+| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Still pointing at Railway |
+
+**Current Health Status:**
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `/ready` | ✅ PASS | Primary readiness check. Env, DB, Redis, LLM all pass. |
+| `/health` | ⚠️ PARTIAL | Deep diagnostic. Redis OK. Prisma/Supabase pooler prepared-statement issue remains under investigation. |
+| `/healthz` | ❌ NOT WIRED | Returns 404. Simple liveness endpoint to be added. |
+
+**Known Remaining Work:**
+
+- Wire `/healthz` as a fast liveness probe (no dependency checks, always returns 200)
+- Fix `/health` Prisma prepared-statement warning (Supabase pooler session mode or direct URL)
+- Deploy Cloud Run Worker after API diagnostics are clean
+- Switch Vercel `NEXT_PUBLIC_API_URL` only after Worker and API are fully validated
+- Rotate exposed secrets after final validation
+
+**Do Not Do Yet:**
+
+- ❌ Do not deploy Cloud Run Worker
+- ❌ Do not update Vercel `NEXT_PUBLIC_API_URL`
+- ❌ Do not delete Railway services
+- ❌ Do not remove Railway Redis/API/Worker until rollback is no longer needed
 
 ### Integration Setup
 
