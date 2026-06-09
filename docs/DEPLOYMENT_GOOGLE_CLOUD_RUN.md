@@ -352,7 +352,7 @@ curl -s "$API_URL/health" | jq .
 # Deep diagnostic — may show Prisma pooler warning (non-blocking)
 
 curl -s "$API_URL/version" | jq .
-# Expected: { "version": "0.1.0-beta.0", "engine": "openai-first", ... }
+# Expected: { "version": "0.1.0-beta.0", "engine": "gemini", ... }
 ```
 
 ### Worker health check

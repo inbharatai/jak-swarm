@@ -234,7 +234,7 @@ curl -s "$API_URL/ready" | jq .
 # Expected: { "status": "ready", "checks": { "db": "ok", "redis": "ok", ... } }
 
 curl -s "$API_URL/version" | jq .
-# Expected: { "version": "0.1.0-beta.0", "engine": "openai-first", ... }
+# Expected: { "version": "0.1.0-beta.0", "engine": "gemini", ... }
 ```
 
 ---

@@ -176,7 +176,7 @@ UPDATE "Tenant" SET "monthlyTokenBudget" = 500000 WHERE id = '<tenant-id>';
 - `GET /settings/llm/status` shows OpenAI as unconfigured or unavailable.
 
 ### Recovery
-JAK Swarm is OpenAI-only. Do not attempt to configure Anthropic, Gemini, DeepSeek, Ollama, or OpenRouter as an emergency fallback.
+JAK Swarm supports Gemini and OpenAI as LLM providers. Do not attempt to configure Anthropic, DeepSeek, Ollama, or OpenRouter as an emergency fallback.
 
 **Immediate operator actions:**
 ```bash

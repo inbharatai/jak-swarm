@@ -2,7 +2,7 @@
 
 This document describes the internal architecture of JAK Swarm: how a user goal becomes a planned, routed, executed, verified result.
 
-For deployment topology (Railway, Google Cloud Run, infrastructure diagrams), see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For the deployment runbook, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+For deployment topology (Google Cloud Run primary, Railway fallback, infrastructure diagrams), see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For the deployment runbook, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 
@@ -81,9 +81,9 @@ The core execution engine. Contains:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
-  - `OpenAIRuntime`: Primary LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry.
-  - `GeminiRuntime`: First-class alternative runtime. Bridges Google's Generative AI SDK (Gemini 2.5 Pro/Flash/Flash-Lite) to JAK's agent-first architecture via `geminiResponseToChatCompletion()`. Supports parallel function calling, `responseSchema` structured output, and controllable thinking. Per-tenant provider switching from Settings UI stored in `TenantMemory` → `BaseAgent.setContextOverride()`.
-  - `ModelRouter`: Tier-based routing. When OpenAI is selected: Tier 3 → GPT-5.5, Tier 1/2 → GPT-5.4. When Gemini is selected: Tier 3 → Gemini 2.5 Pro, Tier 2 → Gemini 2.5 Flash, Tier 1 → Gemini 2.5 Flash-Lite.
+  - `GeminiRuntime`: Primary LLM execution path for the Google AI Agents Challenge. Bridges Google's Generative AI SDK (Gemini 2.5 Pro/Flash/Flash-Lite) to JAK's agent-first architecture via `geminiResponseToChatCompletion()`. Supports parallel function calling, `responseSchema` structured output, controllable thinking, and Google Search Grounding. Per-tenant provider switching from Settings UI stored in `TenantMemory` → `BaseAgent.setContextOverride()`.
+  - `OpenAIRuntime`: Alternate LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry. Available for tenants that prefer OpenAI models.
+  - `ModelRouter`: Tier-based routing. When Gemini is selected: Tier 3 → Gemini 2.5 Pro, Tier 2 → Gemini 2.5 Flash, Tier 1 → Gemini 2.5 Flash-Lite. When OpenAI is selected: Tier 3 → GPT-5.5, Tier 1/2 → GPT-5.4.
   - `AntiHallucination`: Four detection layers run on every agent output before it's accepted.
   - `TokenOptimizer`: Estimates token counts, compresses context when approaching limits, selects optimal model based on input size.
 
@@ -100,7 +100,7 @@ When `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`
 - **adk-pipeline.ts**: Orchestrates agents via `SequentialAgent` (Commander → Planner → ParallelAgent(workers) → SynthesisAgent → VerifierAgent)
 - **adk-runner.ts**: Bridges ADK output back to JAK's SwarmState shape
 
-When ADK is not enabled, the existing LangGraph path runs unchanged. This is an additive layer — the OpenAI + LangGraph pipeline is never modified.
+When ADK is not enabled, the existing LangGraph path runs unchanged. ADK is an additive layer — the Gemini + ADK orchestration pipeline runs alongside the existing LangGraph pipeline without modifying it.
 
 ### `packages/tools` -- Tool System
 
@@ -167,7 +167,7 @@ Operators can propose new Tier 3 skills that go through a sandbox-and-review pip
 Five tenant-scoped services that drive a full audit engagement end-to-end:
 
 - **`AuditRunService`** -- Engagement lifecycle (`PLANNING → PLANNED → MAPPING → TESTING → REVIEWING → READY_TO_PACK → FINAL_PACK → COMPLETED`) with `assertAuditTransition()` refusing illegal jumps. Emits 13 audit-specific lifecycle events with `agentRole` attribution.
-- **`ControlTestService`** -- Builds test procedures + evaluates evidence via `OpenAIRuntime.respondStructured` with strict zod schema. Falls back to a deterministic coverage rule (with explicit "no LLM key" rationale) when `OPENAI_API_KEY` is unset.
+- **`ControlTestService`** -- Builds test procedures + evaluates evidence via the configured LLM runtime's `respondStructured` with strict zod schema. Falls back to a deterministic coverage rule (with explicit "no LLM key" rationale) when the API key is unset.
 - **`AuditExceptionService`** -- Auto-creates exceptions on test fail/exception. Independent state machine for the remediation lifecycle (`open → remediation_planned → … → closed`).
 - **`WorkpaperService`** -- Renders per-control PDFs via existing `exportPdf` (pdfkit) and persists as `WorkflowArtifact` with `approvalState='REQUIRES_APPROVAL'`. Lazy-creates one backing `Workflow` row per `AuditRun`.
 - **`FinalAuditPackService`** -- Hard gate: `FinalPackGateError` if any workpaper is unapproved. Bundles workpapers + control matrix CSV + exceptions JSON + executive summary PDF + HMAC-SHA256 signature via existing `bundle-signing.service`.
@@ -190,25 +190,9 @@ WhatsApp Cloud API integration for workflow control via chat. QR verification fo
 
 ## LLM Provider Routing
 
-JAK Swarm supports two first-class LLM providers with per-tenant switching:
+JAK Swarm supports two first-class LLM providers with per-tenant switching. Gemini is the primary provider for the Google AI Agents Challenge; OpenAI is an alternate supported path.
 
-### OpenAI Path
-
-```
-                        ModelRouter
-                             |
-              ┌──────────────┼──────────────┐
-              v              v              v
-          Tier 1         Tier 2         Tier 3
-       (cost opt)      (balanced)     (premium)
-              |              |              |
-              v              v              v
-          GPT-5.4       GPT-5.4        GPT-5.5
-       lower-cost      standard          +
-       routing        worker          vision
-```
-
-### Gemini Path
+### Gemini Path (primary for Google competition)
 
 ```
                         ModelRouter
@@ -224,19 +208,39 @@ JAK Swarm supports two first-class LLM providers with per-tenant switching:
        workers         itect         planner/verifier
 ```
 
+### OpenAI Path (alternate provider)
+
+```
+                        ModelRouter
+                             |
+              ┌──────────────┼──────────────┐
+              v              v              v
+          Tier 1         Tier 2         Tier 3
+       (cost opt)      (balanced)     (premium)
+              |              |              |
+              v              v              v
+          GPT-5.4       GPT-5.4        GPT-5.5
+       lower-cost      standard          +
+       routing        worker          vision
+```
+
 Per-tenant provider preference is stored in `TenantMemory` (key: `llm:preferred_provider`) and flows through the entire execution pipeline: `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
 
-### Gemini Grounding
+### Gemini Grounding (primary search)
 
-When `GEMINI_GOOGLE_SEARCH_GROUNDING=1`, Gemini agents inject `{ googleSearch: {} }` into the API tools array. Responses include `groundingMetadata` with web search queries, source URLs, and confidence scores. For OpenAI, `web_search_preview` provides equivalent real-time search — no Serper or Tavily keys needed.
+When `GEMINI_GOOGLE_SEARCH_GROUNDING=1`, Gemini agents inject `{ googleSearch: {} }` into the API tools array. Responses include `groundingMetadata` with web search queries, source URLs, and confidence scores. When ADK is enabled, the built-in `GOOGLE_SEARCH` tool provides free, citation-backed search.
+
+### OpenAI Web Search (alternate provider)
+
+For OpenAI, `web_search_preview` provides equivalent real-time search — no Serper or Tavily keys needed.
 
 ### Tier Assignments
 
-| Tier | OpenAI Model | Gemini Model | Assigned to |
+| Tier | Gemini Model | OpenAI Model | Assigned to |
 |:----:|:------------:|:------------:|:-----------|
-| Tier 1 | GPT-5.4 (lower-cost) | Gemini 2.5 Flash-Lite | Parallel workers, email, calendar, CRM |
-| Tier 2 | GPT-5.4 (standard) | Gemini 2.5 Flash | Code generator, designer, architect |
-| Tier 3 | GPT-5.5 | Gemini 2.5 Pro | Commander, Planner, Verifier, vision tasks |
+| Tier 1 | Gemini 2.5 Flash-Lite | GPT-5.4 (lower-cost) | Parallel workers, email, calendar, CRM |
+| Tier 2 | Gemini 2.5 Flash | GPT-5.4 (standard) | Code generator, designer, architect |
+| Tier 3 | Gemini 2.5 Pro | GPT-5.5 | Commander, Planner, Verifier, vision tasks |
 
 Key files:
 - [`packages/agents/src/runtime/gemini-runtime.ts`](packages/agents/src/runtime/gemini-runtime.ts) — Gemini SDK adapter
@@ -405,12 +409,29 @@ When a task fails, the Task Scheduler determines the impact:
 
 ---
 
+## Current Deployment Reality
+
+As of 2026-06-09, JAK Swarm API is live on Google Cloud Run:
+
+- Service: `jak-swarm-api`
+- Region: `asia-south1`
+- URL: `https://jak-swarm-api-565531938617.asia-south1.run.app`
+- `/ready`: passing
+- `/health`: partial due to non-blocking Prisma/Supabase pooler prepared-statement warning
+- `/healthz`: not wired yet
+
+Railway remains the rollback/fallback path. Cloud Run Worker and Vercel API cutover are pending.
+
+---
+
 ## Deployment
 
 JAK Swarm runs as two services: an API server (Fastify, port 4000) and a queue worker (`worker-entry.js`, port 9464). Both share the same codebase; the `WORKFLOW_WORKER_MODE` env var selects the role.
 
-- **Railway (active beta)**: API + Worker on Railway, Redis on Railway, PostgreSQL on Supabase, Frontend on Vercel
-- **Google Cloud Run (parallel)**: API + Worker on Cloud Run, sharing the same Railway Redis and Supabase PostgreSQL. Traffic switches via `NEXT_PUBLIC_API_URL` in Vercel
+- **Google Cloud Run (current primary API)**: `jak-swarm-api` is deployed in `asia-south1` and publicly reachable. It runs the Fastify API / agent gateway.
+- **Railway (rollback/fallback)**: Railway API + Worker remain available as the fallback path until Cloud Run Worker and Vercel cutover are fully validated.
+- **Cloud Run Worker (pending)**: A standalone Cloud Run worker is not yet deployed. Do not claim Cloud Run Worker is live.
+- **Vercel Frontend**: Still points to Railway until `NEXT_PUBLIC_API_URL` is intentionally switched after worker validation.
 - **Local development**: `pnpm dev` runs both API and web; `pnpm --filter @jak-swarm/api worker` runs the standalone worker
 
 See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full deployment guide and [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for Cloud Run setup.
@@ -436,7 +457,7 @@ The architecture supports two running modes:
 1. **Mode A (embedded)**: `WORKFLOW_WORKER_MODE=embedded`. Single process does HTTP + queue. For local dev and staging only.
 2. **Mode B (two-service)**: `WORKFLOW_WORKER_MODE=standalone` on API + separate worker process. Production default. API p95 latency stays flat regardless of queue depth. Worker scales independently.
 
-On Railway and Cloud Run, Mode B is used. The worker is a long-running process (`min-instances=1`) that continuously polls PostgreSQL with `FOR UPDATE SKIP LOCKED` and subscribes to Redis for workflow signals.
+Production target is Mode B, with API and worker as separate services. Currently Railway still runs the worker path, while Cloud Run has the API live. Cloud Run Worker deployment remains pending and must not be claimed as completed.
 
 ### Memory Management
 
@@ -481,9 +502,9 @@ LLM API keys stored via the dashboard are encrypted using AES-256-GCM:
 
 Every database query is scoped by `tenantId`. The `enforceTenantIsolation` middleware verifies that the `tenantId` in the JWT matches the resource being accessed. Cross-tenant access is only permitted for `SYSTEM_ADMIN` role.
 
-### JAK Shield
+### JAK Shield (6-Stage In-Process Pipeline)
 
-Six-stage defense pipeline that runs before any agent action touches code, browser, files, or business tools:
+Six-stage defense pipeline that runs inside the JAK Swarm process before any agent action touches code, browser, files, or business tools. (The standalone JAK Shield MCP service at https://github.com/inbharatai/jak-shield has a broader architecture; within JAK Swarm, the 6-stage pipeline is the in-process implementation.)
 
 1. **Agent Firewall** -- 22 regex patterns for prompt injection + 6 offensive-cyber categories
 2. **Risk-Based Approvals** -- 6-tier tool risk lattice with payload hash binding

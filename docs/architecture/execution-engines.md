@@ -28,11 +28,11 @@ JAK Swarm supports two LLM providers (OpenAI and Gemini) selected via `LLM_PROVI
 | `GEMINI_MODEL_TIER_2` | Optional override for Tier 2; default `gemini-2.5-flash`. |
 | `GEMINI_MODEL_TIER_3` | Optional override for Tier 3; default `gemini-2.5-pro`. |
 | `GEMINI_REQUEST_TIMEOUT_MS` | Optional; default `60000`. |
-| `JAK_EXECUTION_ENGINE` | Deprecated. Must be unset or `openai-first` in API config. |
+| `JAK_EXECUTION_ENGINE` | Deprecated. Must be unset or left at default in API config. |
 | `JAK_WORKFLOW_RUNTIME` | Deprecated. Must be unset or `langgraph` in API config. |
 | `JAK_OPENAI_RUNTIME_AGENTS` | Deprecated diagnostic/backcompat allowlist. It no longer limits OpenAI usage. |
 
-Providers not yet integrated (Anthropic, DeepSeek, Ollama, OpenRouter) must not be configured as runtime keys. Gemini is the only non-OpenAI provider currently supported.
+Providers not yet integrated (Anthropic, DeepSeek, Ollama, OpenRouter) must not be configured as runtime keys. Gemini and OpenAI are the two supported providers.
 
 ## Runtime Invariants
 

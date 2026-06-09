@@ -54,13 +54,13 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 ### Honest boundary
 
-This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Vercel + Railway beta must be smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." API keys are required for external LLM providers (OpenAI, Gemini) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Cloud Run API must be fully smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
 
 ---
 
 ## 🔮 Google ADK + Grounding
 
-JAK Swarm integrates Google's Agent Development Kit at three layers, each independently activatable and completely additive — the existing OpenAI + LangGraph path is never modified.
+JAK Swarm integrates Google's Agent Development Kit at three layers, each independently activatable and completely additive — the Gemini + ADK orchestration pipeline runs alongside the existing LangGraph pipeline without modifying it.
 
 ### Layer 1: Google Search Grounding + Vertex AI Search
 
@@ -277,18 +277,18 @@ Full agent details: [`AGENTS.md`](AGENTS.md)
 
 | Provider | Models | Use Case |
 |:--------:|:------:|:---------|
-| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_5.4-412991?style=flat-square&logo=openai) | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry |
 | ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5-4285f4?style=flat-square&logo=google) | 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output, **Google Search Grounding** |
+| ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_5.4-412991?style=flat-square&logo=openai) | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry (alternate provider) |
 
-**Per-tenant provider switching** — each tenant chooses OpenAI or Gemini from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
+**Per-tenant provider switching** — each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
 
 **Tier-based model selection:**
 
-| Tier | OpenAI | Gemini | Assigned to |
+| Tier | Gemini | OpenAI | Assigned to |
 |:----:|:------:|:------:|:-----------|
-| 💎 Premium | GPT-5.5 | Gemini 2.5 Pro | Commander, Planner, Verifier, CEO/CMO/CFO |
-| ⚡ Balanced | GPT-5.4 | Gemini 2.5 Flash | Code Generator, Architect, Research |
-| 💰 Economy | GPT-5.4 | Gemini 2.5 Flash-Lite | Router, Guardrail, simple workers |
+| 💎 Premium | Gemini 2.5 Pro | GPT-5.5 | Commander, Planner, Verifier, CEO/CMO/CFO |
+| ⚡ Balanced | Gemini 2.5 Flash | GPT-5.4 | Code Generator, Architect, Research |
+| 💰 Economy | Gemini 2.5 Flash-Lite | GPT-5.4 | Router, Guardrail, simple workers |
 
 **Provider-native search** — no paid search API keys required:
 
@@ -741,7 +741,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`docs/vibe-coding.md`](docs/vibe-coding.md) | Vibe Coding pipeline, cost tables, feature comparison |
 | [`docs/faq.md`](docs/faq.md) | Full FAQ — product, trial, security, integrations, costs |
 | [`docs/api-reference.md`](docs/api-reference.md) | Complete API endpoint reference |
-| [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) | Google Cloud Run deployment guide (API + Worker) |
+| [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) | Google Cloud Run deployment guide for live API and pending Worker rollout |
 | [`docs/environment-setup.md`](docs/environment-setup.md) | Environment variables, integration setup, troubleshooting |
 | [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
 | [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |
