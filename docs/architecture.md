@@ -403,7 +403,7 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
 - One process can be restarted without affecting the other
 - Each worker carries a stable `WORKFLOW_WORKER_INSTANCE_ID` so reclaim logs correlate with dead workers
 
-### Google Cloud Run (parallel — challenge demo)
+### Google Cloud Run (parallel — Google AI Agents Challenge)
 
 ```
             ┌──────────────────┐
@@ -433,7 +433,7 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
 
 Both deployments share the same Redis and PostgreSQL instances. Cloud Run connects to Railway Redis via its **public endpoint** (not `.railway.internal` private DNS, which is unreachable from outside Railway). Traffic shifts to Cloud Run by changing `NEXT_PUBLIC_API_URL` in Vercel and redeploying. Rollback is switching the URL back to Railway. See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for full setup instructions.
 
-**Current status:** API deployed and reachable; Worker not yet deployed. `/ready` passes all checks; `/health` shows a Prisma prepared-statement warning with the Supabase pooler (non-blocking). `/healthz` not yet wired as a Cloud Run liveness probe.
+**Current status:** API deployed and reachable; Worker not yet deployed. `/ready` ✅ PASS (all checks). `/health` ⚠️ PARTIAL (Redis OK, Prisma prepared-statement warning with Supabase pooler — non-blocking). `/healthz` ❌ NOT WIRED (returns 404).
 
 ### Environment Tiers
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging
