@@ -1,7 +1,35 @@
-# JAK Swarm — Complete Evolution Plan: Company Operating System
+# JAK Swarm — Evolution Plan: Company Operating System
 
 > **Planning document only. No code changes made.**
-> Generated: 2026-06-10
+> **Revised:** 2026-06-10 — incorporating terminology, schema, sequencing, and architecture corrections.
+
+---
+
+## Terminology Convention
+
+| Term | Meaning | Not |
+|---|---|---|
+| **JAK Shield** | The existing 6-stage in-process trust/security pipeline (Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer). Described in [`docs/jak-shield-manifest.md`](jak-shield-manifest.md). | Never called "6+ stage" or "Stages 7–10". No new numbered stages are added to JAK Shield. |
+| **Agent Governance Overlay** | A new, separate governance layer that *calls* JAK Shield and `PolicyEngine` to enforce agent profiles, memory scopes, autonomy boundaries, and role boundaries. It is not part of JAK Shield — it is a consumer of it. | Not "JAK Shield Stage 7". Not a modification of JAK Shield. |
+| **Company Memory Base** | Structured memory layer storing typed, scoped, confidence-scored facts extracted from company data sources. | Not a replacement for `TenantMemory` or `MemoryItem`. It extends them. |
+| **Ability Pack** | Department-level configuration defining allowed tools, blocked tools, memory scopes, approval rules, and autonomy levels for agents in that department. | Not a new industry pack. It operates *within* industry packs, scoping tools and memory per role. |
+| **Agent Forge** | A controlled system for drafting, sandbox-testing, and proposing temporary or permanent agents with least-privilege defaults. | Not unrestricted agent creation. All Forge output requires approval. |
+
+---
+
+## Deployment Truth
+
+| Component | Status |
+|---|---|
+| Cloud Run API | ✅ Live |
+| Cloud Run Worker | ⏳ Not deployed yet |
+| Railway | Rollback/fallback |
+| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Pending cutover from Railway |
+| GKE | Not deployed. Not claimed. |
+| Full autonomy | Not claimed. |
+| Gemini + Google ADK | Primary Google-facing path. Remains so. |
+| OpenAI | Alternate supported provider path. Remains so. |
+| JAK Shield | 6-stage in-process security/trust pipeline. Described as-is. No "6+ stage" claims. |
 
 ---
 
@@ -11,49 +39,34 @@
 
 | Capability | Current Implementation | Maps To Vision |
 |---|---|---|
-| **Commander** | `commander-node.ts` + `CommanderAgent` — Parses user goal, produces `MissionBrief`, can short-circuit with `directAnswer`. Resolves UX role modes to canonical `AgentRole`. | Commander Coach foundation. Needs extension to capability gap detection, agent building, and coaching. |
-| **Guardrail** | `guardrail-node.ts` + `GuardrailAgent` + JAK Shield 6-stage pipeline. Injection detection, offensive cyber blocking, PII redaction, tool risk classification. | Core of JAK Shield. Needs extension for agent profile validation, memory scope enforcement, autonomy level checks. |
-| **Planner** | `planner-node.ts` + `PlannerAgent` — Decomposes `MissionBrief` into `WorkflowPlan` with DAG tasks, risk levels. | Stays. Will receive coaching from Commander. |
-| **Router** | `router-node.ts` + `RouterAgent` — Maps tasks to agent roles, applies industry-pack restrictions. | Needs extension to route to temporary/dynamic agents and respect ability packs. |
-| **Task Scheduler** | LangGraph `StateGraph` with dependency resolution, parallel execution. | Stays. Will handle Agent Forge agents. |
-| **Worker Execution Loop** | `worker-node.ts` — Circuit breaker, `reflectAndCorrect()`, `RepairService` retry loop, context summarization. | Stays. Will be coached by Commander. |
-| **Verifier** | `verifier-node.ts` + `VerifierAgent` + `@jak-swarm/verification` — Risk-tiered verification, email/document/transaction/identity analyzers. | Foundation for Agent Evaluation System. Needs extension for agent performance scoring. |
-| **Replanner** | `replanner-node.ts` — Replans around failures. | Stays. |
-| **SwarmState** | 35+ fields, LangGraph `SwarmStateAnnotation` with custom reducers. | Needs new fields: `capabilityGaps`, `coachingNotes`, `agentProfiles`, `memoryScopes`. |
-| **LangGraph Orchestration** | `LangGraphRuntime`, `PostgresCheckpointSaver`, 8-node `StateGraph`. | Stays as primary orchestration. ADK remains alternate path. |
-| **Google ADK Integration** | `packages/adk/` — Full bridge, `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1`. | Remains primary Google-facing path. |
-| **Gemini/OpenAI Runtime** | `GeminiRuntime`, `OpenAIRuntime`, `ProviderRouter`, tier-based model resolution, hallucination detection. | Stays. Dual-provider support continues. |
-| **ToolRegistry** | 122 tools, `DefaultApprovalPolicy` (6-tier `ToolActionCategory`), `TenantToolRegistry`, `StandingOrder` allowlists. | Needs extension: ability pack tool boundaries, per-role tool access. |
-| **38 Agents** | 6 orchestrators + 8 executive + 5 vibe-coding + 8 operations + 11 core workers. | Foundation. Will grow with temporary/sandboxed agents from Agent Forge. |
-| **JAK Shield (6-stage)** | Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Vulnerability Triage, Audit Evidence. | Core security layer. Must extend to cover agent creation, memory scope, autonomy level, and role boundary enforcement. |
-| **Tenant-Scoped Memory** | `TenantMemory` (key-value), `MemoryItem` (scoped, versioned, with approval workflow: extracted→suggested→user_approved/rejected), `MemoryEvent` (append-only audit trail). | Foundation for Company Memory Base. Currently flat key-value. Needs structured entity storage, scoped queries, and ingestion pipelines. |
-| **Company Brain** | `CompanyProfileService` (LLM-extracted profiles), `CompanyOperatingLayerService` (artifact ingestion, entity extraction, drift detection, spec generation), `IntentRecordService`, `WorkflowTemplateService`. | Strong foundation. Currently manual ingestion. Needs auto-sync, cross-session grounding, and role-based access. |
-| **Company Operating Layer** | `CompanyArtifact`, `CompanyKnowledgeSource`, `CompanyGraphEntity`, `ExecutionDriftFinding`, `AgentExecutableSpec`. | Schema exists. Needs ingestion pipelines for calls, documents, websites, emails, CRM, etc. |
-| **Memory Approval** | `MemoryApprovalService` — Agents suggest memories (status: `extracted/suggested`), reviewers approve/reject. Full audit trail. | Exists and works. Will be extended for Company Memory Base. |
-| **Vector Memory** | `PgVectorAdapter` (pgvector), `DocumentIngestor`, `EmbeddingService` (OpenAI + local fallback). | Exists. Needs expansion for multi-source ingestion and role-scoped retrieval. |
-| **Approval Gates** | `approval-node.ts`, `ApprovalRequest` model with SHA-256 payload binding, `ApprovalScope` (replay prevention), `ApprovalAuditLog`, tenant-configurable thresholds. | Strong foundation. Needs extension for agent creation approvals, autonomy upgrade approvals, role-boundary approvals. |
-| **Audit Evidence** | `AuditLogger` (40+ action types), `AuditLog` table, HMAC-signed evidence bundles, `AuditRunService` (full SOC 2/HIPAA/ISO 27001 engagement lifecycle). | Excellent foundation. Will cover all new agent/memory/autonomy actions. |
-| **RBAC** | 5 roles: `END_USER`, `REVIEWER`, `OPERATOR`, `TENANT_ADMIN`, `SYSTEM_ADMIN`. `PolicyEngine` with `canApproveRiskLevel`, `canStartWorkflow`, `canManageSkills`, `canExecuteTool`, etc. | Foundation. Needs department-scoped RBAC, role-based memory boundaries, ability pack enforcement. |
-| **Industry Packs** | 13 vertical configurations with restricted tools, allowed agents, compliance notes. | Foundation for Ability Packs. Needs role-based extension within each vertical. |
-| **Skills System** | SKILL.md parser, cascade loading (workspace→project→org→tenant→user→bundled), 4 bundled packs. | Foundation for Skill Upgrade Loop. Needs learning extraction and recommendation. |
-| **Departments** | `Department` model exists in Prisma schema (with `name`, `description`, `tenantId`). | Schema foundation for role-based memory and ability packs. Needs population and service layer. |
-| **Task Assignments** | `TaskAssignment` model exists (assignedToUserId, assignedByUserId, dueDate, priority, status). | Foundation for human task assignment. |
-| **Standing Orders** | `StandingOrder` model — persistent allowlists, blocked actions, approval gates, budget caps, expiry. | Strong foundation for autonomy policy. |
-| **Subscriptions & Billing** | `Subscription`, `UsageLedger`, `RoutingLog`, `CreditService`, daily caps, 4 pricing tiers. | Exists. Will need to account for new services. |
-| **Integrations/MCP** | 22 MCP connectors, `TenantMcpManager`, auto-start on boot. | Foundation for data ingestion pipelines. |
-| **Dashboard Pages** | 26+ pages: workspace, company brain, audit, compliance, team, schedules, etc. | Foundation. New pages needed for threads, memory base, agent profiles, ability packs, etc. |
-
-### Deployment Truth (Verified)
-
-- **Cloud Run API**: Live at `https://jak-swarm-api-565531938617.asia-south1.run.app`
-- **Cloud Run Worker**: Dockerfile exists (`Dockerfile.worker`), but not deployed yet
-- **Railway**: Active as rollback/fallback
-- **Vercel**: Frontend deployed, `NEXT_PUBLIC_API_URL` still pending cutover from Railway to Cloud Run
-- **Supabase**: PostgreSQL + pgvector (primary DB)
-- **Redis**: Railway managed instance (for locks, SSE relay, leader election)
-- **GKE**: Not deployed
-- **Full Cloud Run cutover**: Not claimed
-- **Full autonomy**: Not claimed
+| **Commander** | `commander-node.ts` + `CommanderAgent` — Parses goal, produces `MissionBrief`, short-circuits with `directAnswer`. Resolves UX role modes to canonical `AgentRole`. | Foundation. Will *orchestrate* CommanderCoachService, CapabilityGapDetectorService, AgentForgeService — not contain all logic itself. |
+| **Guardrail** | `guardrail-node.ts` + `GuardrailAgent` + JAK Shield 6-stage pipeline. | JAK Shield stays as-is. Agent governance enforcement (profiles, memory scope, autonomy, role boundaries) becomes a separate Agent Governance Overlay that *calls* JAK Shield. |
+| **Planner** | `planner-node.ts` + `PlannerAgent` | Stays. Will receive coaching notes from Commander. |
+| **Router** | `router-node.ts` + `RouterAgent` | Will route to dynamic/temporary agents and respect ability packs. |
+| **Task Scheduler** | LangGraph `StateGraph` with dependency resolution, parallel execution | Stays. |
+| **Worker Execution Loop** | `worker-node.ts` — Circuit breaker, `reflectAndCorrect()`, `RepairService` | Stays. Will be coached by Commander. |
+| **Verifier** | `verifier-node.ts` + `VerifierAgent` + `@jak-swarm/verification` | Foundation for Agent Evaluation System. |
+| **Replanner** | `replanner-node.ts` | Stays. |
+| **SwarmState** | 35+ fields, LangGraph `SwarmStateAnnotation` | Will gain optional fields: `coachingNotes`, `capabilityGaps`, `threadId`, `agentProfileIds`. Existing workflows unaffected. |
+| **LangGraph Orchestration** | `LangGraphRuntime`, `PostgresCheckpointSaver`, 8-node `StateGraph` | Stays as primary orchestration. ADK remains alternate path. |
+| **Google ADK Integration** | `packages/adk/` — Full bridge, `JAK_ADK_MODE=1` | Remains primary Google-facing path. |
+| **Gemini/OpenAI Runtime** | `GeminiRuntime`, `OpenAIRuntime`, `ProviderRouter` | Stays. Dual-provider support continues. |
+| **ToolRegistry** | 122 tools, `DefaultApprovalPolicy`, `TenantToolRegistry`, `StandingOrder` | Will be extended with ability pack boundaries and per-role tool access. |
+| **38 Agents** | 6 orchestrators + 8 executive + 5 vibe-coding + 8 operations + 11 core workers | Foundation. Will grow with temporary/sandboxed agents from Agent Forge. |
+| **JAK Shield** | 6-stage in-process pipeline (Firewall, Approvals, Tool Permissions, Sandbox, Vuln Triage, Audit Evidence). **No modifications. No new stages.** | Agent Governance Overlay will *call* JAK Shield, not extend it. |
+| **Tenant-Scoped Memory** | `TenantMemory` (key-value), `MemoryItem` (scoped, versioned, approval workflow), `MemoryEvent` (audit trail) | Foundation. Extended with structured types, scopes, and ingestion pipelines. |
+| **Company Brain** | `CompanyProfileService`, `CompanyOperatingLayerService`, `IntentRecordService`, `WorkflowTemplateService` | Strong foundation. Needs auto-sync, cross-session grounding, and role-based access. |
+| **Memory Approval** | `MemoryApprovalService` (extracted→suggested→user_approved/rejected) | Extended for Company Memory Base. |
+| **Vector Memory** | `PgVectorAdapter`, `DocumentIngestor`, `EmbeddingService` | Extended for multi-source ingestion and role-scoped retrieval. |
+| **Approval Gates** | `ApprovalRequest` with SHA-256 payload binding, `ApprovalScope`, `ApprovalAuditLog` | Extended with new approval types for agent/memory/autonomy changes. |
+| **Audit Evidence** | `AuditLogger` (40+ actions), `AuditLog`, HMAC-signed evidence bundles, `AuditRunService` | Extended with new audit action types. |
+| **RBAC** | 5 roles: `END_USER`, `REVIEWER`, `OPERATOR`, `TENANT_ADMIN`, `SYSTEM_ADMIN`. `PolicyEngine`. | Foundation. Extended with department-scoped access and ability pack enforcement. |
+| **Industry Packs** | 13 vertical configurations | Foundation for Ability Packs. |
+| **Skills System** | SKILL.md parser, cascade loading | Foundation for Skill Upgrade Loop. |
+| **Departments** | `Department` model in Prisma schema | Foundation. Needs population and service layer. |
+| **Standing Orders** | Persistent allowlists, blocked actions, approval gates, budget caps | Foundation for autonomy policy. |
+| **Integrations/MCP** | 22 MCP connectors, `TenantMcpManager` | Foundation for data ingestion pipelines. |
+| **Dashboard Pages** | 26+ pages | Foundation. New pages needed for threads, memory, agents, etc. |
 
 ---
 
@@ -61,239 +74,113 @@
 
 ### 2.1 Company Memory Base
 
-**What exists:** `TenantMemory` (flat key-value), `MemoryItem` (scoped, versioned, with approval workflow), `MemoryEvent` (audit trail), `CompanyArtifact`/`CompanyKnowledgeSource`/`CompanyGraphEntity` (schema for structured knowledge), `PgVectorAdapter` (vector search), `DocumentIngestor` (text/PDF→chunks→embeddings), `EmbeddingService` (OpenAI + local).
-
-**What is missing:**
-- Structured memory types beyond key-value: people memory, project memory, decision memory, policy memory, technical memory, HR memory, marketing memory, finance memory, sales memory, legal/compliance memory, risk memory, customer memory, evidence memory, learning history
-- Cross-session grounding (memory that improves across workflows without manual re-specification)
-- Memory ingestion pipelines for: calls, meeting recordings, websites, emails, Slack/WhatsApp conversations, GitHub/code repositories, CRM data, HR records, finance documents, customer feedback
-- Role-based memory scope enforcement at the retrieval layer
-- Memory deduplication across sources (same fact from email + Slack + meeting transcript)
-- Memory confidence scoring at the entity level (not just extraction level)
-- Memory expiry/retention policies per scope
-- Memory lineage tracking (which source produced which memory)
-- Proactive memory surfacing (system tells you what changed, not just answers when asked)
+**Missing:** Structured memory types (people, project, decision, policy, etc.), cross-session grounding, ingestion pipelines for calls/websites/emails/Slack/GitHub/CRM, role-based memory scope enforcement, memory deduplication across sources, entity-level confidence scoring, memory expiry/retention policies, memory lineage tracking, proactive memory surfacing.
 
 ### 2.2 Call/Document/Website Ingestion
 
-**What exists:** `DocumentIngestor` for text/PDF→chunks→embeddings, `CompanyKnowledgeSource` model, manual artifact upload via `/company/brain` endpoints.
-
-**What is missing:**
-- Call recording ingestion pipeline (audio→transcript→entities→memory)
-- Meeting recording ingestion
-- Website crawling/ingestion service
-- Email ingestion pipeline (beyond Gmail IMAP adapter that currently sends/receives, not ingests)
-- Slack/WhatsApp conversation ingestion
-- GitHub/code repository ingestion
-- CRM data ingestion (beyond CRM adapter for contacts/deals)
-- Entity extraction pipeline (extract people, decisions, risks, obligations, owners, deadlines, reusable facts from ingested content)
-- Source-level deduplication
-- Incremental sync (only process new content since last sync)
+**Missing:** Call recording ingestion, meeting recording ingestion, website crawling, email ingestion pipeline, Slack/WhatsApp conversation ingestion, GitHub/code ingestion, CRM data ingestion, HR/finance ingestion, entity extraction pipeline, incremental sync.
 
 ### 2.3 Role-Based Memory
 
-**What exists:** `Department` model, `MemoryItem` with `scopeType`/`scopeId` fields, `TenantToolRegistry` (per-tenant tool filtering), `PolicyEngine` (5-role RBAC).
-
-**What is missing:**
-- Department-scoped RBAC (HR agents see HR memory only; Finance agents see Finance memory only)
-- Memory scope definition per department/role
-- Memory access boundaries enforced at the service/repository layer
-- Role-based memory retrieval in agent context injection
-- Sensitivity classification for memory items
-- Approval requirements for cross-department memory access
-- Retention policies per memory scope
+**Missing:** Department-scoped RBAC, memory scope definition per department/role, memory access boundaries at the service layer, role-based retrieval in agent context, sensitivity classification, cross-department access approvals, retention policies.
 
 ### 2.4 HyperAgent Fleet
 
-**What exists:** 38 static agents with fixed roles, industry packs with restricted tools, `AgentRole` enum, `BaseAgent` with tool loop and runtime adapters.
-
-**What is missing:**
-- Dynamic agent creation (temporary, sandboxed agents)
-- Agent profile registry (tracking agent_id, display_name, department, role, purpose, system_prompt_profile, allowed_tools, blocked_tools, memory_scopes, data_sources, approval_policy, autonomy_level, risk_level, output_contract, status, version, performance_score)
-- Ability packs (department-level packs defining allowed tools, blocked tools, memory scopes, approval rules, autonomy levels, output formats, evaluation criteria)
-- Agent cards (visual representation in UI showing connected data, memory scope, ability pack)
-- Thread model (persistent task context storing goal, agents, memory used, tools used, approvals, decisions, output, verification, learning, skill recommendations, audit evidence)
-- Agent Fleet page (UI for browsing, selecting, and configuring agents)
+**Missing:** Dynamic agent creation, agent profile registry, ability packs, agent cards, thread model, fleet UI.
 
 ### 2.5 Commander Coaching
 
-**What exists:** `CommanderAgent` that parses goals, produces mission briefs, and can short-circuit with direct answers. `VerifierAgent` that validates output. `RepairService` with error categorization.
-
-**What is missing:**
-- Commander as Mission Coach: review whether goal is understood, whether plan is correct
-- Commander as Capability Judge: check whether existing agents/tools/memory are sufficient
-- Commander as Agent Doctor: detect weak, shallow, or incomplete agent outputs; send corrective instructions
-- Commander as Agent Builder: trigger temporary agent creation when capability is missing
-- Coaching feedback loop: Commander reviews entire workflow and produces improvement suggestions
-- Performance scoring: rate agents on quality, grounding, completeness, efficiency
-- Coaching notes in SwarmState: structured feedback from Commander that influences downstream execution
+**Missing:** Commander as Mission Coach, Capability Judge, Agent Doctor, Agent Builder. These should be **separate services** that Commander orchestrates, not logic inside Commander itself.
 
 ### 2.6 Capability Gap Detection
 
-**What exists:** `IntentRecord` model, `IntentVocabulary` (18 canonical intents), industry packs with allowed/restricted tools.
-
-**What is missing:**
-- Automatic comparison of task requirements against available agents, tools, skills, memory, integrations
-- Gap decision logic: use existing agent, combine agents, create temporary specialist, request integration, request human input, reject due to safety
-- Gap report in SwarmState
-- Integration with Agent Forge for gap resolution
-- Persistent gap history (learn from past gaps)
+**Missing:** Automatic task-vs-capability comparison, gap decision logic, persistent gap history.
 
 ### 2.7 Agent Forge
 
-**What exists:** `BaseAgent` class, `AgentRole` enum, `agent-factory.ts`, `ROLE_MANIFEST` with maturity labels.
-
-**What is missing:**
-- Temporary agent creation system
-- Agent profile drafting (name, role, department, purpose, prompt, memory scope, tools, risk level, approval rules, output contract, evaluation criteria, sandbox test plan)
-- Sandbox execution environment for temporary agents
-- Evaluation of temporary agent output
-- Promotion workflow: temporary→draft→sandboxed→approved→permanent
-- Least privilege enforcement for all new agents
-- JAK Shield review before agent activation
-- Human approval for permanent agent creation
+**Missing:** Temporary agent creation, profile drafting with least privilege, sandbox execution, evaluation, promotion workflow, JAK Shield review, human approval.
 
 ### 2.8 Agent Evaluation
 
-**What exists:** `VerifierAgent` validates output against goals. `RepairService` classifies errors into 9 categories. `AntiHallucination` detection. Token and cost tracking per workflow.
-
-**What is missing:**
-- Agent performance scoring (quality, grounding, completeness, tool use, memory use, safety, policy compliance, repeatability, cost, speed)
-- Persistent agent evaluation history
-- Agent performance comparison across workflows
-- Weakness pattern detection (consistently weak in X)
-- Automatic upgrade recommendations
-- Integration with Commander coaching
+**Missing:** Multi-dimensional performance scoring, persistent evaluation history, weakness pattern detection, upgrade recommendations.
 
 ### 2.9 Ability Packs
 
-**What exists:** 13 industry packs with restricted tools, allowed agents, context prompts, compliance notes. `Department` model.
-
-**What is missing:**
-- Department-level ability packs (HR Pack, CTO Pack, CMO Pack, Sales Pack, Finance Pack, Legal Pack, Ops Pack, Customer Support Pack, Compliance Pack, Website Reviewer Pack, Data Analyst Pack, Chief of Staff Pack)
-- Each pack defining: allowed tools, blocked tools, memory scopes, approval rules, autonomy level, output formats, evaluation criteria, sensitive data boundaries
-- Pack assignment to agents and departments
-- Pack override policies (tenant-level overrides)
-- Pack versioning
+**Missing:** Department-level packs (HR, CTO, CMO, Sales, Finance, Legal, Ops, Support, Compliance, Data Analyst, Chief of Staff), each defining tools, memory scopes, approval rules, autonomy levels, evaluation criteria, sensitive data boundaries.
 
 ### 2.10 Autonomy Ladder
 
-**What exists:** `StandingOrder` (allowlists, blocked actions, approval gates, budget caps), `DefaultApprovalPolicy` (6-tier `ToolActionCategory`), `ApprovalRequest` model with SHA-256 payload binding, tenant-configurable `autoApproveEnabled` and `approvalThreshold`.
-
-**What is missing:**
-- Per-agent autonomy levels (L0: answer only, L1: draft only, L2: recommend action, L3: execute low-risk internal, L4: execute with approval, L5: autonomous loop within policy)
-- Autonomy policy engine that combines agent autonomy level + tool risk level + memory scope sensitivity + department policy
-- Autonomy upgrade workflow with human approval
-- Audit logging for autonomy level changes
-- Escalation rules (when agent hits autonomy boundary, what happens)
+**Missing:** Per-agent autonomy levels (L0–L5), autonomy policy engine, upgrade workflow with human approval, audit logging for level changes, escalation rules.
 
 ### 2.11 Learning Loop
 
-**What exists:** `MemoryExtractor` (LLM-powered fact extraction from completed workflows, with dedup and confidence filtering), `MemoryApprovalService` (suggest→approve/reject workflow), `persistLearning`/`recallLearnings` per-role memory, `CompanyProfileService` (LLM-extracted profiles), `CompanyOperatingLayerService` (drift detection).
-
-**What is missing:**
-- Workflow pattern extraction (identify reusable workflow patterns across executions)
-- Skill recommendation from successful workflows (propose new SKILL.md)
-- Agent upgrade recommendation (propose prompt improvements, new tools, expanded memory)
-- Cross-workflow learning (insights from one department inform another)
-- Proactive learning (system identifies what it should learn, not just what was extracted)
-- Learning history tracking
-- Admin approval for skill/agent upgrades before production activation
+**Missing:** Workflow pattern extraction, skill recommendation, agent upgrade recommendation, cross-workflow learning, learning history tracking, admin approval for upgrades.
 
 ### 2.12 Admin Approvals
 
-**What exists:** `ApprovalRequest` model, `ApprovalScope` (payload binding), `ApprovalAuditLog`, approval routes, `autoApproveEnabled`/`approvalThreshold` per tenant.
-
-**What is missing:**
-- Approval workflows for: new agent creation, agent profile changes, autonomy level upgrades, memory scope changes, ability pack changes, tool permission changes, skill activation, external communication, production deployment, secret rotation
-- Role-based approval routing (HR changes need HR admin, Finance changes need Finance admin)
-- Approval chain support (multi-person approval)
-- Approval expiry and escalation
-- Approval templates for common actions
+**Missing:** Approval workflows for agent creation, profile changes, autonomy upgrades, memory scope changes, ability pack changes, tool permission changes, skill activation, external communication, production deployment, secret rotation. Role-based approval routing. Approval chains.
 
 ### 2.13 Audit Evidence
 
-**What exists:** `AuditLogger` (40+ action types), `AuditLog` table, HMAC-signed evidence bundles, `AuditRunService` (full SOC 2/HIPAA/ISO 27001 engagement lifecycle), `ControlTest`, `AuditException`, `AuditWorkpaper`, `ExternalAuditorPortal`.
-
-**What is missing:**
-- Audit actions for: agent creation, agent upgrade, autonomy level change, memory scope change, ability pack change, tool permission change, Commander coaching decisions, capability gap resolutions
-- Agent-creation audit trail (who created what, with what permissions, approved by whom)
-- Memory access audit trail (who accessed what memory, from what scope)
-- Autonomy level change audit trail
-- Cross-department access audit trail
-- Compliance evidence for agent operations (not just workflows)
+**Missing:** Audit actions for agent creation, upgrade, autonomy change, memory scope change, ability pack change, tool permission change, coaching decisions, capability gap resolutions. Agent-creation audit trail. Memory access audit trail. Autonomy change audit trail.
 
 ---
 
 ## 3. Proposed Target Architecture
 
-### 3.1 High-Level Architecture Diagram
+### 3.1 High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        USER / ADMIN INTERFACE                       │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
-│  │ /threads/ │ │HyperAgent│ │  Memory   │ │Approval  │ │  Agent   ││
-│  │   new    │ │   Fleet   │ │   Base   │ │  Center  │ │  Forge   ││
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘│
+│  /threads/new · HyperAgent Fleet · Memory Base · Approvals · Forge │
 ├─────────────────────────────────────────────────────────────────────┤
-│                         FRONTEND LAYER                              │
-│  Next.js 16 App Router + React 19 + Zustand + React Flow           │
+│                         FRONTEND (Next.js 16)                       │
 ├─────────────────────────────────────────────────────────────────────┤
-│                           API LAYER                                 │
-│  Fastify 5.x REST API + SSE Streaming + JWT Auth + RBAC            │
+│                           API (Fastify 5.x)                         │
 ├─────────────────────────────────────────────────────────────────────┤
-│                     COMMANDER COACH ENGINE                         │
-│  ┌────────────┐ ┌──────────────┐ ┌──────────────┐                │
-│  │  Mission    │ │  Capability  │ │   Agent      │                │
-│  │  Coach     │ │  Gap Detector│ │   Doctor     │                │
-│  └────────────┘ └──────────────┘ └──────────────┘                │
+│                     COMMANDER (ORCHESTRATOR)                         │
+│  Commander delegates to:                                             │
+│  ┌────────────┐ ┌──────────────┐ ┌──────────────┐                  │
+│  │ Commander   │ │ Capability   │ │ Agent        │                  │
+│  │ CoachService│ │ GapDetector │ │ Doctor       │                  │
+│  └────────────┘ └──────────────┘ └──────────────┘                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│                    ORCHESTRATION LAYER                              │
-│  ┌───────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐   │
-│  │ Commander  │→│Planner │→│ Router │→│Worker  │→│ Verifier  │   │
-│  └───────────┘ └────────┘ └────────┘ └────────┘ └──────────┘   │
-│  ┌───────────┐ ┌────────┐ ┌────────┐                              │
-│  │ Guardrail │ │Approval│ │Replaner│  ←── JAK Shield at every node│
-│  └───────────┘ └────────┘ └────────┘                              │
-│  LangGraph StateGraph + Google ADK alternate path                 │
+│                    ORCHESTRATION (LangGraph StateGraph)              │
+│  Commander → Guardrail → Planner → Router → Worker → Verifier     │
+│  ← Approval ← Replanner                                            │
+│  ADK alternate path (JAK_ADK_MODE=1)                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                    AGENT GOVERNANCE OVERLAY                         │
+│  (Separate from JAK Shield — calls Shield and PolicyEngine)        │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌────────────────┐     │
+│  │ Agent Profile     │ │ Memory Scope     │ │ Autonomy      │     │
+│  │ Validation        │ │ Enforcement      │ │ Boundary      │     │
+│  └──────────────────┘ └──────────────────┘ └────────────────┘     │
+│  ┌──────────────────┐ ┌──────────────────┐                        │
+│  │ Role Boundary    │ │ Agent Forge      │                        │
+│  │ Enforcement      │ │ Safety Check     │                        │
+│  └──────────────────┘ └──────────────────┘                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                    JAK SHIELD (6 STAGES — UNCHANGED)                │
+│  1. Agent Firewall  2. Risk-Based Approvals  3. Secure Tool Perms  │
+│  4. Sandboxed Execution  5. Vulnerability Triage  6. Audit Layer   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                    COMPANY MEMORY BASE                              │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐              │
-│  │  Ingestion   │ │  Structured  │ │  Role-Based  │              │
-│  │  Pipelines   │ │  Store       │ │  Access      │              │
-│  └──────────────┘ └──────────────┘ └──────────────┘              │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐              │
-│  │  Vector      │ │  Entity      │ │  Learning    │              │
-│  │  Search      │ │  Extraction  │ │  Loop        │              │
-│  └──────────────┘ └──────────────┘ └──────────────┘              │
+│  Ingestion · Structured Store · Role-Based Access · Vector Search  │
+│  Entity Extraction · Learning Loop                                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│                    AGENT REGISTRY & FORGE                           │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐              │
-│  │  Agent       │ │  Ability     │ │  Agent       │              │
-│  │  Profile     │ │  Packs       │ │  Forge       │              │
-│  │  Registry    │ │              │ │  (Draft→Test)│              │
-│  └──────────────┘ └──────────────┘ └──────────────┘              │
-│  ┌──────────────┐ ┌──────────────┐                                │
-│  │  Autonomy    │ │  Agent       │                                │
-│  │  Policy      │ │  Evaluation  │                                │
-│  └──────────────┘ └──────────────┘                                │
-├─────────────────────────────────────────────────────────────────────┤
-│                    JAK SHIELD (6+ STAGE)                            │
-│  1. Agent Firewall  2. Risk-Based Approvals  3. Secure Tool Perms  │
-│  4. Sandboxed Execution  5. Vulnerability Triage  6. Audit Layer  │
-│  7. Agent Profile Validation  8. Memory Scope Enforcement           │
-│  9. Autonomy Boundary  10. Role Boundary Enforcement               │
+│                    AGENT REGISTRY & FORGE                            │
+│  Agent Profile Registry · Ability Packs · Agent Forge · Evaluation │
+│  Autonomy Policy · Skill Recommendations                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │                    DATA & INTEGRATIONS                              │
-│  PostgreSQL + pgvector │ Redis │ Supabase Storage │ MCP Connectors │
-│  Gmail │ CalDAV │ Slack │ GitHub │ Notion │ HubSpot │ Salesforce   │
-│  Playwright │ E2B │ Deepgram │ ElevenLabs │ OpenAI Realtime        │
+│  PostgreSQL + pgvector · Redis · Supabase · MCP Connectors          │
+│  Gemini + Google ADK (primary) · OpenAI (alternate)                │
 ├─────────────────────────────────────────────────────────────────────┤
 │                    DEPLOYMENT                                       │
-│  Cloud Run API (live) │ Cloud Run Worker (pending) │ Railway       │
-│  (rollback/fallback) │ Vercel (frontend, pending cutover)          │
-│  Gemini + Google ADK (primary) │ OpenAI (alternate)                │
+│  Cloud Run API (live) · Cloud Run Worker (pending) · Railway       │
+│  (rollback/fallback) · Vercel (frontend, pending cutover)           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -303,47 +190,58 @@
 User Goal
     │
     ▼
-Commander Coach Engine
-    ├── Mission Coach: Understand goal, enrich with company context
-    ├── Capability Gap Detector: Check agents/tools/memory/skills
-    │   ├── Found sufficient? → Route to existing agents
-    │   ├── Partial gap? → Combine agents + temporary specialist
-    │   ├── Missing capability? → Agent Forge draft
-    │   └── Unsafe/missing permission? → Reject with explanation
-    └── Agent Doctor: Review past performance, adjust coaching
+Commander (orchestrates, does NOT contain all logic)
+    ├── Delegates to CommanderCoachService
+    │   ├── Mission Coach: understand goal, enrich context
+    │   ├── Capability Judge: check existing agents/tools/memory
+    │   └── Agent Doctor: detect weak outputs, send corrections
+    │
+    ├── Delegates to CapabilityGapDetectorService
+    │   ├── Found sufficient? → route to existing agents
+    │   ├── Partial gap? → combine agents + temporary specialist
+    │   ├── Missing capability? → delegate to AgentForgeService
+    │   └── Unsafe/missing permission? → reject with explanation
+    │
+    └── Produces coaching notes in SwarmState
     │
     ▼
-JAK Shield Stage 7: Agent Profile Validation
-    ├── Verify agent profiles are approved
-    ├── Verify memory scopes match department
-    ├── Verify autonomy level permits action
-    └── Verify tool access matches ability pack
+Agent Governance Overlay (calls JAK Shield for security checks)
+    ├── Agent Profile Validation (approved? correct tools? correct scopes?)
+    ├── Memory Scope Enforcement (agent can only access allowed scopes)
+    ├── Autonomy Boundary (action within agent's autonomy level?)
+    └── Role Boundary Enforcement (agent stays within department)
     │
     ▼
-Planner → Router → Workers (existing flow)
+Planner → Router → Workers (existing flow, enhanced)
+    ├── Coaching notes injected into context
+    ├── Ability pack constraints applied to tool access
+    ├── Memory scopes applied to context injection
+    └── Autonomy level checked before each tool call
     │
-    ├── JAK Shield at every node (existing 6 stages + new stages)
-    ├── Approval gates for HIGH/CRITICAL risk
-    └── Commander coaching notes injected into context
+    ▼
+JAK Shield (6 stages — unchanged)
+    │
+    ▼
+Approval Gates (existing + new types)
     │
     ▼
 Verifier
     │
     ▼
-Commander Review
-    ├── Was the goal achieved?
-    ├── Was the output deep enough?
-    ├── Was company memory used properly?
-    ├── Were tools used effectively?
-    ├── Is there a capability gap that should be addressed?
-    └── Performance scores for each agent
+Commander Review (delegates to CommanderCoachService)
+    ├── Goal achieved?
+    ├── Output deep enough?
+    ├── Memory used properly?
+    ├── Tools used effectively?
+    ├── Capability gaps?
+    └── Performance scores per agent
     │
     ▼
-Learning Extraction
-    ├── Extract reusable facts → Company Memory Base
-    ├── Extract reusable workflow pattern → Skill Recommendation
-    ├── Identify agent improvement → Agent Upgrade Recommendation
-    └── Identify missing capability → Agent Forge Proposal
+Learning Extraction (delegates to LearningExtractorService)
+    ├── Extract facts → Company Memory Base
+    ├── Extract patterns → Skill Recommendation
+    ├── Identify agent improvements → Agent Upgrade Recommendation
+    └── Identify missing capabilities → Agent Forge Proposal
     │
     ▼
 Human Approval (for upgrades, new agents, autonomy changes)
@@ -352,102 +250,234 @@ Human Approval (for upgrades, new agents, autonomy changes)
 Output + Audit Evidence
 ```
 
-### 3.3 Input Ingestion Architecture
+### 3.3 Key Architecture Principle
 
-```
-Data Sources                    Ingestion Services                Memory Base
-─────────────                   ─────────────────                 ───────────
-Calls/Recordings ─→ CallTranscriptIngestionService ─→ CompanyMemoryItem
-Meeting Recordings ─→ MeetingIngestionService      ─→ CompanyMemoryItem
-Documents (PDF, DOCX) ─→ DocumentIngestionService   ─→ CompanyMemoryItem (existing)
-Websites ─→ WebsiteReviewIngestionService            ─→ CompanyMemoryItem
-Emails ─→ EmailIngestionService                      ─→ CompanyMemoryItem
-Slack/WhatsApp ─→ ConversationIngestionService       ─→ CompanyMemoryItem
-GitHub/Code ─→ CodeRepositoryIngestionService       ─→ CompanyMemoryItem
-CRM Data ─→ CRMIngestionService                     ─→ CompanyMemoryItem
-HR Records ─→ HRIngestionService                   ─→ CompanyMemoryItem
-Finance Docs ─→ FinanceIngestionService             ─→ CompanyMemoryItem
-Customer Feedback ─→ FeedbackIngestionService       ─→ CompanyMemoryItem
-Tasks/Decisions ─→ DecisionIngestionService         ─→ CompanyMemoryItem
-```
+**Commander remains an orchestrator, not a monolith.** Commander delegates to:
+- `CommanderCoachService` — goal understanding, plan assessment, output review
+- `CapabilityGapDetectorService` — gap detection and resolution
+- `AgentForgeService` — temporary agent creation
+- `AgentEvaluationService` — performance scoring
+- `LearningExtractorService` — learning extraction
 
-Each ingestion service:
-1. Receives raw input (file, URL, API response, transcript)
-2. Extracts text content
-3. Runs entity extraction (people, decisions, risks, obligations, owners, deadlines, facts)
-4. Classifies by memory type (people, project, decision, policy, technical, etc.)
-5. Assigns scope (tenant + department + role + sensitivity)
-6. Deduplicates against existing memories
-7. Stores in `CompanyMemoryItem` with confidence score
-8. Embeds for vector search
-9. Logs to `MemoryEvent` audit trail
+These are **separate services** that Commander calls, not logic baked into the Commander agent.
 
-### 3.4 Company Memory Base Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│              Company Memory Service              │
-│                                                  │
-│  ┌──────────────┐  ┌──────────────────────┐     │
-│  │   Query      │  │   Ingestion Pipeline  │     │
-│  │   Engine     │  │   (multiple sources)  │     │
-│  └──────┬───────┘  └──────────┬─────────────┘     │
-│         │                     │                   │
-│  ┌──────▼─────────────────────▼──────────┐       │
-│  │         Role-Based Access Control      │       │
-│  │  (department + role + sensitivity)     │       │
-│  └──────┬─────────────────────┬──────────┘       │
-│         │                     │                   │
-│  ┌──────▼──────┐  ┌──────────▼───────┐           │
-│  │  Structured │  │   Vector Store   │           │
-│  │  Store      │  │   (pgvector)     │           │
-│  │  (Prisma)   │  │                  │           │
-│  └──────┬──────┘  └──────────┬───────┘           │
-│         │                     │                   │
-│  ┌──────▼─────────────────────▼──────────┐       │
-│  │         Deduplication & Confidence     │       │
-│  │         Scoring Engine                 │       │
-│  └──────┬─────────────────────┬──────────┘       │
-│         │                     │                   │
-│  ┌──────▼──────┐  ┌──────────▼───────┐           │
-│  │  Approval   │  │   Audit Trail    │           │
-│  │  Workflow   │  │   (MemoryEvent)  │           │
-│  └─────────────┘  └──────────────────┘           │
-└─────────────────────────────────────────────────┘
-```
-
-### 3.5 Role-Based Memory Architecture
-
-```
-Memory Scopes:
-┌─────────────────────────────────────────────────┐
-│  Tenant Scope (all departments)                  │
-│  ├── Department Scope: HR                        │
-│  │   ├── Role Scope: HR Manager                  │
-│  │   └── Role Scope: HR Coordinator              │
-│  ├── Department Scope: Engineering                │
-│  │   ├── Role Scope: CTO                          │
-│  │   ├── Role Scope: Senior Engineer              │
-│  │   └── Role Scope: Junior Engineer              │
-│  ├── Department Scope: Marketing                  │
-│  │   ├── Role Scope: CMO                          │
-│  │   └── Role Scope: Marketing Manager            │
-│  ├── Department Scope: Finance                    │
-│  │   ├── Role Scope: CFO                          │
-│  │   └── Role Scope: Accountant                   │
-│  └── Department Scope: Legal                      │
-│       └── Role Scope: General Counsel             │
-│                                                    │
-│  Sensitivity Levels: PUBLIC, INTERNAL, CONFIDENTIAL│
-│  Approval Levels: AUTO, REVIEWER, ADMIN           │
-└─────────────────────────────────────────────────┘
-```
+Similarly, **Agent Governance Overlay** is a separate module that **calls** JAK Shield and `PolicyEngine`. It does not modify JAK Shield or add numbered stages to it.
 
 ---
 
 ## 4. Data Model / Schema Plan
 
-### 4.1 CompanyMemoryItem (extends existing `MemoryItem`)
+> **IMPORTANT: This section is conceptual only — a design reference for what tables and fields will be needed. It is NOT copy-paste Prisma migration code.** Actual migrations will use correct Prisma conventions (e.g., `@db.Text` not `@db_text`), proper relation syntax, and will be broken into safe, sequential migrations per phase.
+
+### Key Design Decisions
+
+1. **Polymorphic `scopeId`** — `scopeId` can reference a Department, Role, or Project. It will NOT use a direct Prisma `@relation` to Department. Instead, it will be a plain `String?` field with application-level resolution based on `scopeType`. This avoids polymorphic foreign-key issues.
+
+2. **Schema rollout** — Tables are added per phase, NOT in one big migration:
+   - Phase 1: `AgentProfile`, `AbilityPack`, `AgentToolPermission`, `AgentAutonomyPolicy`
+   - Phase 2: `Thread`
+   - Phase 3: `CompanyMemoryItem`, `MemorySource`, `MemoryScope`, `MemorySourceSyncRun`
+   - Phase 4: `RoleAccessPolicy`, `AgentMemoryPermission`
+   - Phase 7: `AgentForgeDraft`
+   - Phase 8: `AgentEvaluation`, `AgentLearning`, `SkillRecommendation`
+   - Phase 9: Approval type extensions (new `ApprovalType` enum values, not new tables)
+   - Phase 10: Autonomy policy enforcement (service-level, not schema)
+
+3. **New enums** are added incrementally with each phase migration, not all at once.
+
+### 4.1 AgentProfile
+
+```prisma
+// Conceptual — actual migration will use correct Prisma conventions
+model AgentProfile {
+  id                    String              @id @default(cuid())
+  tenantId              String              @map("tenant_id")
+  agentId               String?             @map("agent_id")         // Maps to AgentRole for static agents
+  displayName           String              @map("display_name")
+  department            String?             // Department name (plain String, not FK to avoid polymorphic issues)
+  role                  String?             // Role within department
+  purpose               String              // @db.Text in actual migration
+  systemPromptProfile   String?             @map("system_prompt_profile") // @db.Text
+  allowedTools          Json?               @map("allowed_tools")     // String[]
+  blockedTools          Json?               @map("blocked_tools")     // String[]
+  memoryScopes          Json?               @map("memory_scopes")     // MemoryScopeType[]
+  dataSources           Json?               @map("data_sources")      // String[]
+  abilityPackId         String?             @map("ability_pack_id")
+  approvalPolicy        ApprovalPolicyType  @default(REQUIRE_APPROVAL) @map("approval_policy")
+  autonomyLevel         AutonomyLevel       @default(L0) @map("autonomy_level")
+  riskLevel             RiskLevel           @default(MEDIUM) @map("risk_level")
+  outputContract        Json?               @map("output_contract")
+  status                AgentProfileStatus  @default(DRAFT)
+  version               Int                 @default(1)
+  createdBy             String?             @map("created_by")
+  createdFromWorkflowId String?             @map("created_from_workflow_id")
+  performanceScore      Float?              @map("performance_score")
+  lastReviewedAt        DateTime?           @map("last_reviewed_at")
+  evaluationCount       Int                 @default(0) @map("evaluation_count")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  // Relations added in their respective phase migrations
+  tenant                Tenant              @relation(fields: [tenantId], references: [id])
+  abilityPack           AbilityPack?        @relation(fields: [abilityPackId], references: [id])
+
+  @@unique([tenantId, displayName])
+  @@index([tenantId, status])
+  @@index([tenantId, department])
+  @@map("agent_profiles")
+}
+
+enum AgentProfileStatus {
+  TEMPORARY
+  DRAFT
+  SANDBOXED
+  APPROVED
+  DEPRECATED
+}
+
+enum ApprovalPolicyType {
+  AUTO_APPROVE
+  REQUIRE_REVIEW
+  REQUIRE_APPROVAL
+  REQUIRE_ADMIN_APPROVAL
+}
+
+enum AutonomyLevel {
+  L0  // Answer only
+  L1  // Draft only
+  L2  // Recommend action
+  L3  // Execute low-risk internal action
+  L4  // Execute with approval
+  L5  // Autonomous loop within strict policy and audit boundary
+}
+```
+
+### 4.2 AbilityPack
+
+```prisma
+model AbilityPack {
+  id                    String            @id @default(cuid())
+  tenantId              String            @map("tenant_id")
+  name                  String            // e.g., "HR Pack", "CTO Pack"
+  department            String?           // Plain String, not FK
+  description           String            // @db.Text
+  allowedTools          Json              @map("allowed_tools")     // String[]
+  blockedTools          Json?             @map("blocked_tools")     // String[]
+  memoryScopes          Json?             @map("memory_scopes")     // String[]
+  approvalRules         Json?             @map("approval_rules")
+  autonomyLevel         AutonomyLevel     @default(L1) @map("autonomy_level")
+  outputFormats         Json?             @map("output_formats")    // String[]
+  evaluationCriteria    Json?             @map("evaluation_criteria") // String[]
+  sensitiveDataBoundaries Json?           @map("sensitive_data_boundaries") // String[]
+  isDefault             Boolean           @default(false)
+  version               Int               @default(1)
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  tenant                Tenant            @relation(fields: [tenantId], references: [id])
+  agentProfiles         AgentProfile[]
+
+  @@unique([tenantId, name])
+  @@map("ability_packs")
+}
+```
+
+### 4.3 AgentAutonomyPolicy
+
+```prisma
+model AgentAutonomyPolicy {
+  id                    String            @id @default(cuid())
+  tenantId              String            @map("tenant_id")
+  agentProfileId        String            @map("agent_profile_id")
+  currentLevel          AutonomyLevel      @default(L0) @map("current_level")
+  requestedLevel        AutonomyLevel?    @map("requested_level")
+  upgradeJustification  String?           @map("upgrade_justification") // @db.Text
+  upgradeApprovedBy     String?           @map("upgrade_approved_by")
+  upgradeApprovedAt     DateTime?         @map("upgrade_approved_at")
+  allowedActions        Json?             @map("allowed_actions")
+  blockedActions        Json?             @map("blocked_actions")
+  maxConcurrentTasks    Int?              @default(1) @map("max_concurrent_tasks")
+  budgetCapCents        Int?              @map("budget_cap_cents")
+  expiresAt             DateTime?         @map("expires_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  tenant                Tenant            @relation(fields: [tenantId], references: [id])
+  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
+
+  @@unique([tenantId, agentProfileId])
+  @@map("agent_autonomy_policies")
+}
+```
+
+### 4.4 AgentToolPermission
+
+```prisma
+model AgentToolPermission {
+  id                    String            @id @default(cuid())
+  tenantId              String            @map("tenant_id")
+  agentProfileId        String            @map("agent_profile_id")
+  toolName              String            @map("tool_name")
+  permission            ToolPermission    @default(ALLOW)
+  riskLevelOverride     RiskLevel?        @map("risk_level_override")
+  grantedBy             String?           @map("granted_by")
+  grantedAt             DateTime?         @map("granted_at")
+  expiresAt             DateTime?         @map("expires_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+
+  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
+
+  @@unique([tenantId, agentProfileId, toolName])
+  @@map("agent_tool_permissions")
+}
+
+enum ToolPermission {
+  ALLOW
+  BLOCK
+  REQUIRE_APPROVAL
+}
+```
+
+### 4.5 Thread (Phase 2)
+
+```prisma
+model Thread {
+  id                    String            @id @default(cuid())
+  tenantId              String            @map("tenant_id")
+  userId                String            @map("user_id")
+  title                 String?
+  originalGoal          String            @map("original_goal") // @db.Text
+  selectedAgentIds      Json?             @map("selected_agent_ids")
+  memoryUsed             Json?             @map("memory_used")
+  toolsUsed              Json?             @map("tools_used")
+  approvalsRequested    Json?             @map("approvals_requested")
+  decisions             Json?             @map("decisions")
+  outputGenerated       String?           @map("output_generated") // @db.Text
+  verificationResult    Json?             @map("verification_result")
+  extractedLearnings    Json?             @map("extracted_learnings")
+  skillRecommendations  Json?             @map("skill_recommendations")
+  auditEvidence         Json?             @map("audit_evidence")
+  status                ThreadStatus      @default(ACTIVE)
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  tenant                Tenant            @relation(fields: [tenantId], references: [id])
+  user                  User              @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId])
+  @@map("threads")
+}
+
+enum ThreadStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+```
+
+### 4.6 CompanyMemoryItem (Phase 3)
+
+> Note: `scopeId` is a plain `String?`, NOT a foreign key. Application code resolves it based on `scopeType` — if scopeType is DEPARTMENT, scopeId is a department name; if ROLE, it's a role identifier; if PROJECT, it's a project ID. This avoids polymorphic FK issues in Prisma.
 
 ```prisma
 model CompanyMemoryItem {
@@ -456,11 +486,11 @@ model CompanyMemoryItem {
   sourceId          String?           @map("source_id")
   memoryType        MemoryType        @map("memory_type")
   scopeType         MemoryScopeType   @default(TENANT) @map("scope_type")
-  scopeId           String?           @map("scope_id")
+  scopeId           String?           @map("scope_id")  // Plain String — resolved by scopeType at application level
   sensitivity       SensitivityLevel  @default(INTERNAL)
   key               String
-  value             String            @db_text
-  summary           String?           @db_text
+  value             String            // @db.Text
+  summary           String?           // @db.Text
   entities          Json?
   confidence        Float             @default(0.7)
   sourceConfidence  Float?            @map("source_confidence")
@@ -475,8 +505,6 @@ model CompanyMemoryItem {
 
   tenant            Tenant            @relation(fields: [tenantId], references: [id])
   source            MemorySource?     @relation(fields: [sourceId], references: [id])
-  department        Department?       @relation(fields: [scopeId], references: [id])
-  events            MemoryEvent[]
 
   @@unique([tenantId, scopeType, scopeId, key])
   @@index([tenantId, memoryType])
@@ -515,837 +543,369 @@ enum SensitivityLevel {
 }
 ```
 
-### 4.2 MemorySource
-
-```prisma
-model MemorySource {
-  id                String            @id @default(cuid())
-  tenantId          String            @map("tenant_id")
-  sourceType        MemorySourceType  @map("source_type")
-  name              String
-  uri               String?
-  lastSyncedAt      DateTime?         @map("last_synced_at")
-  syncStatus        SyncStatus        @default(PENDING)
-  syncError         String?           @db_text @map("sync_error")
-  config            Json?
-  credentialsId     String?           @map("credentials_id")
-  autoSyncEnabled   Boolean           @default(false) @map("auto_sync_enabled")
-  syncIntervalMinutes Int?            @map("sync_interval_minutes")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  tenant            Tenant            @relation(fields: [tenantId], references: [id])
-  credentials       IntegrationCredential? @relation(fields: [credentialsId], references: [id])
-  memories          CompanyMemoryItem[]
-  syncRuns          MemorySourceSyncRun[]
-
-  @@index([tenantId, sourceType])
-  @@map("memory_sources")
-}
-
-enum MemorySourceType {
-  CALL
-  MEETING
-  DOCUMENT
-  WEBSITE
-  EMAIL
-  SLACK
-  WHATSAPP
-  GITHUB
-  CRM
-  HR_SYSTEM
-  FINANCE_SYSTEM
-  FEEDBACK
-  TASK
-  MANUAL
-}
-
-enum SyncStatus {
-  PENDING
-  SYNCING
-  COMPLETED
-  FAILED
-}
-```
-
-### 4.3 MemoryScope (access policy)
-
-```prisma
-model MemoryScope {
-  id                String            @id @default(cuid())
-  tenantId          String            @map("tenant_id")
-  name              String
-  scopeType         MemoryScopeType   @map("scope_type")
-  scopeId           String?           @map("scope_id")
-  sensitivity       SensitivityLevel  @default(INTERNAL)
-  allowedRoles      Json
-  writeRoles       Json
-  approvalRequired  Boolean           @default(false) @map("approval_required")
-  retentionDays    Int?              @map("retention_days")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  tenant            Tenant            @relation(fields: [tenantId], references: [id])
-
-  @@unique([tenantId, scopeType, scopeId])
-  @@map("memory_scopes")
-}
-```
-
-### 4.4 AgentProfile
-
-```prisma
-model AgentProfile {
-  id                    String              @id @default(cuid())
-  tenantId              String              @map("tenant_id")
-  agentId               String?             @map("agent_id")
-  displayName           String              @map("display_name")
-  department            String?
-  role                  String?
-  purpose               String              @db_text
-  systemPromptProfile   String?             @db_text @map("system_prompt_profile")
-  allowedTools          Json?               @map("allowed_tools")
-  blockedTools          Json?               @map("blocked_tools")
-  memoryScopes          Json?               @map("memory_scopes")
-  dataSources           Json?               @map("data_sources")
-  abilityPackId         String?             @map("ability_pack_id")
-  approvalPolicy        ApprovalPolicyType  @default(REQUIRE_APPROVAL) @map("approval_policy")
-  autonomyLevel         AutonomyLevel       @default(L0) @map("autonomy_level")
-  riskLevel             RiskLevel           @default(MEDIUM) @map("risk_level")
-  outputContract        Json?               @map("output_contract")
-  status                AgentProfileStatus  @default(DRAFT)
-  version               Int                 @default(1)
-  createdBy             String?             @map("created_by")
-  createdFromWorkflowId String?             @map("created_from_workflow_id")
-  performanceScore      Float?              @map("performance_score")
-  lastReviewedAt        DateTime?           @map("last_reviewed_at")
-  evaluationCount       Int                 @default(0) @map("evaluation_count")
-  createdAt             DateTime            @default(now()) @map("created_at")
-  updatedAt             DateTime            @updatedAt @map("updated_at")
-
-  tenant                Tenant              @relation(fields: [tenantId], references: [id])
-  abilityPack           AbilityPack?        @relation(fields: [abilityPackId], references: [id])
-  evaluations           AgentEvaluation[]
-  learnings             AgentLearning[]
-  forgeDrafts           AgentForgeDraft[]
-  threads               Thread[]
-  auditLogs             AuditLog[]
-
-  @@index([tenantId, status])
-  @@index([tenantId, department])
-  @@map("agent_profiles")
-}
-
-enum AgentProfileStatus {
-  TEMPORARY
-  DRAFT
-  SANDBOXED
-  APPROVED
-  DEPRECATED
-}
-
-enum ApprovalPolicyType {
-  AUTO_APPROVE
-  REQUIRE_REVIEW
-  REQUIRE_APPROVAL
-  REQUIRE_ADMIN_APPROVAL
-}
-
-enum AutonomyLevel {
-  L0
-  L1
-  L2
-  L3
-  L4
-  L5
-}
-```
-
-### 4.5 AgentAbilityPack
-
-```prisma
-model AbilityPack {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  name                  String
-  department            String?
-  description           String            @db_text
-  allowedTools          Json              @map("allowed_tools")
-  blockedTools          Json?             @map("blocked_tools")
-  memoryScopes          Json?             @map("memory_scopes")
-  approvalRules         Json?             @map("approval_rules")
-  autonomyLevel         AutonomyLevel     @default(L1) @map("autonomy_level")
-  outputFormats         Json?             @map("output_formats")
-  evaluationCriteria    Json?             @map("evaluation_criteria")
-  sensitiveDataBoundaries Json?           @map("sensitive_data_boundaries")
-  isDefault             Boolean           @default(false)
-  version               Int               @default(1)
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-  agentProfiles         AgentProfile[]
-
-  @@unique([tenantId, name])
-  @@map("ability_packs")
-}
-```
-
-### 4.6 AgentAutonomyPolicy
-
-```prisma
-model AgentAutonomyPolicy {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  agentProfileId        String            @map("agent_profile_id")
-  currentLevel          AutonomyLevel      @default(L0) @map("current_level")
-  requestedLevel        AutonomyLevel?    @map("requested_level")
-  upgradeJustification  String?           @db_text @map("upgrade_justification")
-  upgradeApprovedBy     String?           @map("upgrade_approved_by")
-  upgradeApprovedAt     DateTime?         @map("upgrade_approved_at")
-  allowedActions        Json?             @map("allowed_actions")
-  blockedActions        Json?             @map("blocked_actions")
-  maxConcurrentTasks    Int?              @default(1) @map("max_concurrent_tasks")
-  budgetCapCents        Int?              @map("budget_cap_cents")
-  expiresAt             DateTime?         @map("expires_at")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
-
-  @@unique([tenantId, agentProfileId])
-  @@map("agent_autonomy_policies")
-}
-```
-
-### 4.7 AgentToolPermission
-
-```prisma
-model AgentToolPermission {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  agentProfileId        String            @map("agent_profile_id")
-  toolName              String            @map("tool_name")
-  permission            ToolPermission    @default(ALLOW)
-  riskLevelOverride     RiskLevel?        @map("risk_level_override")
-  grantedBy             String?           @map("granted_by")
-  grantedAt             DateTime?         @map("granted_at")
-  expiresAt             DateTime?         @map("expires_at")
-  createdAt             DateTime          @default(now()) @map("created_at")
-
-  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
-
-  @@unique([tenantId, agentProfileId, toolName])
-  @@map("agent_tool_permissions")
-}
-
-enum ToolPermission {
-  ALLOW
-  BLOCK
-  REQUIRE_APPROVAL
-}
-```
-
-### 4.8 AgentMemoryPermission
-
-```prisma
-model AgentMemoryPermission {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  agentProfileId        String            @map("agent_profile_id")
-  memoryScopeType       MemoryScopeType   @map("memory_scope_type")
-  memoryScopeId         String?          @map("memory_scope_id")
-  memoryType            MemoryType?       @map("memory_type")
-  accessLevel           MemoryAccessLevel @default(READ)
-  grantedBy             String?           @map("granted_by")
-  grantedAt             DateTime?         @map("granted_at")
-  createdAt             DateTime          @default(now()) @map("created_at")
-
-  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
-
-  @@unique([tenantId, agentProfileId, memoryScopeType, memoryScopeId, memoryType])
-  @@map("agent_memory_permissions")
-}
-
-enum MemoryAccessLevel {
-  READ
-  WRITE
-  ADMIN
-}
-```
-
-### 4.9 AgentEvaluation
-
-```prisma
-model AgentEvaluation {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  agentProfileId        String            @map("agent_profile_id")
-  workflowId            String?           @map("workflow_id")
-  taskId                String?           @map("task_id")
-  qualityScore          Float?            @map("quality_score")
-  groundingScore        Float?            @map("grounding_score")
-  completenessScore     Float?            @map("completeness_score")
-  toolUseScore          Float?            @map("tool_use_score")
-  memoryUseScore        Float?            @map("memory_use_score")
-  safetyScore           Float?            @map("safety_score")
-  policyComplianceScore Float?            @map("policy_compliance_score")
-  costEfficiencyScore   Float?            @map("cost_efficiency_score")
-  speedScore            Float?            @map("speed_score")
-  overallScore          Float?            @map("overall_score")
-  feedback              String?           @db_text
-  weaknessPatterns      Json?             @map("weakness_patterns")
-  improvementSuggestions Json?            @map("improvement_suggestions")
-  evaluatedBy           String?           @map("evaluated_by")
-  createdAt              DateTime          @default(now()) @map("created_at")
-
-  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
-
-  @@index([tenantId, agentProfileId])
-  @@index([tenantId, workflowId])
-  @@map("agent_evaluations")
-}
-```
-
-### 4.10 AgentLearning
-
-```prisma
-model AgentLearning {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  agentProfileId        String            @map("agent_profile_id")
-  workflowId            String            @map("workflow_id")
-  learningType          LearningType      @map("learning_type")
-  content               String            @db_text
-  confidence            Float             @default(0.7)
-  status                LearningStatus    @default(EXTRACTED)
-  approvedBy            String?           @map("approved_by")
-  approvedAt            DateTime?         @map("approved_at")
-  appliedAt             DateTime?         @map("applied_at")
-  createdAt             DateTime          @default(now()) @map("created_at")
-
-  agentProfile          AgentProfile      @relation(fields: [agentProfileId], references: [id])
-
-  @@index([tenantId, agentProfileId])
-  @@index([tenantId, learningType])
-  @@map("agent_learnings")
-}
-
-enum LearningType {
-  FACT
-  PATTERN
-  SKILL_SUGGESTION
-  AGENT_UPGRADE
-  CAPABILITY_GAP
-}
-
-enum LearningStatus {
-  EXTRACTED
-  SUGGESTED
-  APPROVED
-  REJECTED
-}
-```
-
-### 4.11 AgentForgeDraft
-
-```prisma
-model AgentForgeDraft {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  name                  String
-  role                  String?
-  department            String?
-  purpose               String            @db_text
-  systemPromptProfile   String?           @db_text @map("system_prompt_profile")
-  memoryScopes          Json?             @map("memory_scopes")
-  allowedTools          Json?             @map("allowed_tools")
-  blockedTools          Json?             @map("blocked_tools")
-  riskLevel             RiskLevel         @default(MEDIUM) @map("risk_level")
-  approvalPolicy        ApprovalPolicyType @default(REQUIRE_APPROVAL) @map("approval_policy")
-  outputContract        Json?             @map("output_contract")
-  evaluationCriteria    Json?             @map("evaluation_criteria")
-  sandboxTestPlan       Json?             @map("sandbox_test_plan")
-  status                ForgeDraftStatus  @default(DRAFT)
-  createdBy             String?           @map("created_by")
-  createdFromWorkflowId String?           @map("created_from_workflow_id")
-  reviewedBy            String?           @map("reviewed_by")
-  reviewedAt            DateTime?         @map("reviewed_at")
-  approvedBy            String?           @map("approved_by")
-  approvedAt            DateTime?         @map("approved_at")
-  activatedProfileId    String?           @map("activated_profile_id")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, status])
-  @@map("agent_forge_drafts")
-}
-
-enum ForgeDraftStatus {
-  DRAFT
-  UNDER_REVIEW
-  SANDBOX_TESTING
-  APPROVED
-  ACTIVATED
-  REJECTED
-  EXPIRED
-}
-```
-
-### 4.12 Thread (new model for persistent task context)
-
-```prisma
-model Thread {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  userId                String            @map("user_id")
-  title                 String?
-  originalGoal          String            @db_text @map("original_goal")
-  selectedAgentIds      Json?             @map("selected_agent_ids")
-  memoryUsed             Json?             @map("memory_used")
-  toolsUsed              Json?             @map("tools_used")
-  approvalsRequested    Json?             @map("approvals_requested")
-  decisions             Json?             @map("decisions")
-  outputGenerated       String?           @db_text @map("output_generated")
-  verificationResult    Json?             @map("verification_result")
-  extractedLearnings    Json?             @map("extracted_learnings")
-  skillRecommendations  Json?             @map("skill_recommendations")
-  auditEvidence         Json?             @map("audit_evidence")
-  status                ThreadStatus      @default(ACTIVE)
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-  user                  User              @relation(fields: [userId], references: [id])
-
-  @@index([tenantId, userId])
-  @@map("threads")
-}
-
-enum ThreadStatus {
-  ACTIVE
-  COMPLETED
-  ARCHIVED
-}
-```
-
-### 4.14 SkillRecommendation
-
-```prisma
-model SkillRecommendation {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  threadId              String?           @map("thread_id")
-  agentProfileId        String?           @map("agent_profile_id")
-  name                  String
-  description           String            @db_text
-  allowedTools          Json?             @map("allowed_tools")
-  riskLevel             RiskLevel         @default(MEDIUM) @map("risk_level")
-  suggestedPrompt       String?           @db_text @map("suggested_prompt")
-  status                SkillRecStatus    @default(SUGGESTED)
-  approvedBy            String?           @map("approved_by")
-  approvedAt            DateTime?         @map("approved_at")
-  confidence            Float             @default(0.7)
-  sourceWorkflowId      String?           @map("source_workflow_id")
-  createdAt             DateTime          @default(now()) @map("created_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, status])
-  @@map("skill_recommendations")
-}
-
-enum SkillRecStatus {
-  SUGGESTED
-  APPROVED
-  ACTIVATED
-  REJECTED
-}
-```
-
-### 4.15 CapabilityGap
-
-```prisma
-model CapabilityGap {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  threadId              String?           @map("thread_id")
-  workflowId            String?           @map("workflow_id")
-  gapType               GapType           @map("gap_type")
-  description           String            @db_text
-  resolution            GapResolution    @map("resolution")
-  resolutionDetail      String?           @db_text @map("resolution_detail")
-  resolved              Boolean           @default(false)
-  forgeDraftId          String?           @map("forge_draft_id")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, gapType])
-  @@index([tenantId, resolved])
-  @@map("capability_gaps")
-}
-
-enum GapType {
-  MISSING_AGENT
-  MISSING_TOOL
-  MISSING_SKILL
-  MISSING_MEMORY
-  MISSING_INTEGRATION
-  MISSING_PERMISSION
-}
-
-enum GapResolution {
-  USE_EXISTING
-  COMBINE_AGENTS
-  CREATE_TEMPORARY
-  REQUEST_INTEGRATION
-  REQUEST_HUMAN
-  REJECT_UNSAFE
-}
-```
-
-### 4.16 RoleAccessPolicy
-
-```prisma
-model RoleAccessPolicy {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  department            String
-  role                  String
-  memoryScopeTypes      Json              @map("memory_scope_types")
-  memoryTypes           Json?             @map("memory_types")
-  maxAutonomyLevel      AutonomyLevel      @default(L2) @map("max_autonomy_level")
-  allowedToolCategories  Json?             @map("allowed_tool_categories")
-  blockedTools           Json?             @map("blocked_tools")
-  approvalRules         Json              @map("approval_rules")
-  sensitiveDataBoundaries Json?           @map("sensitive_data_boundaries")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-
-  tenant                Tenant            @relation(fields: [tenantId], references: [id])
-
-  @@unique([tenantId, department, role])
-  @@map("role_access_policies")
-}
-```
-
-### 4.17 MemorySourceSyncRun
-
-```prisma
-model MemorySourceSyncRun {
-  id                    String            @id @default(cuid())
-  tenantId              String            @map("tenant_id")
-  sourceId              String            @map("source_id")
-  status                SyncStatus        @default(PENDING)
-  itemsProcessed        Int               @default(0) @map("items_processed")
-  itemsIngested         Int               @default(0) @map("items_ingested")
-  itemsDeduplicated     Int               @default(0) @map("items_deduplicated")
-  itemsFailed           Int               @default(0) @map("items_failed")
-  errorMessage          String?           @db_text @map("error_message")
-  startedAt             DateTime?         @map("started_at")
-  completedAt           DateTime?         @map("completed_at")
-  createdAt             DateTime          @default(now()) @map("created_at")
-
-  source                MemorySource      @relation(fields: [sourceId], references: [id])
-
-  @@index([tenantId, sourceId])
-  @@map("memory_source_sync_runs")
-}
-```
+### 4.7–4.17 Remaining Models (Phase-scoped)
+
+The following models follow the same conceptual-only pattern and will be implemented in their respective phases with correct Prisma conventions:
+
+- **MemorySource** (Phase 3) — ingestion source tracking with `SyncStatus` enum
+- **MemoryScope** (Phase 4) — access policy definitions, `@@unique([tenantId, scopeType, scopeId])`
+- **MemorySourceSyncRun** (Phase 3) — sync run tracking
+- **AgentMemoryPermission** (Phase 4) — `MemoryAccessLevel` enum (READ, WRITE, ADMIN)
+- **AgentEvaluation** (Phase 8) — multi-dimensional scoring
+- **AgentLearning** (Phase 8) — `LearningType` and `LearningStatus` enums
+- **AgentForgeDraft** (Phase 7) — `ForgeDraftStatus` enum
+- **SkillRecommendation** (Phase 8) — `SkillRecStatus` enum
+- **CapabilityGap** (Phase 6) — `GapType` and `GapResolution` enums
+- **RoleAccessPolicy** (Phase 4) — `@@unique([tenantId, department, role])`
 
 ---
 
 ## 5. Backend Services Plan
 
-### 5.1 CompanyMemoryService
+All services are **separate modules** that Commander orchestrates. Commander does not contain service logic.
 
-**File:** `apps/api/src/services/company-brain/company-memory.service.ts`
-
-**Purpose:** Central service for storing, retrieving, querying, and managing structured company memories.
-
-**Methods:**
-- `store(item: CreateCompanyMemoryItemInput): Promise<CompanyMemoryItem>`
-- `retrieve(query: MemoryQueryInput): Promise<CompanyMemoryItem[]>` — Scoped by tenant + department + role + sensitivity
-- `search(query: string, scopes: MemoryScopeType[], limit: number): Promise<CompanyMemoryItem[]>` — Uses vector search
-- `deduplicate(items: CompanyMemoryItem[]): Promise<CompanyMemoryItem[]>` — Merge overlapping facts
-- `updateConfidence(id: string, confidence: number): Promise<void>`
-- `delete(id: string, requesterRole: string): Promise<void>` — Enforce scope + sensitivity
-- `getByType(type: MemoryType, scopes: MemoryScopeType[]): Promise<CompanyMemoryItem[]>`
-- `approve(id: string, approvedBy: string): Promise<CompanyMemoryItem>`
-- `reject(id: string, rejectedBy: string): Promise<CompanyMemoryItem>`
-
-**Depends on:** Prisma, PgVectorAdapter, existing MemoryApprovalService
-
-### 5.2 MemoryIngestionService
-
-**File:** `apps/api/src/services/company-brain/memory-ingestion.service.ts`
-
-**Purpose:** Orchestrates ingestion from various sources into the Company Memory Base.
-
-**Methods:**
-- `ingestFromSource(sourceId: string): Promise<MemorySourceSyncRun>`
-- `ingestText(text: string, source: MemorySourceType, metadata: IngestionMetadata): Promise<CompanyMemoryItem[]>`
-- `ingestFile(file: Buffer, mimeType: string, source: MemorySourceType, metadata: IngestionMetadata): Promise<CompanyMemoryItem[]>`
-- `ingestUrl(url: string, metadata: IngestionMetadata): Promise<CompanyMemoryItem[]>`
-- `runEntityExtraction(text: string, tenantId: string): Promise<ExtractedEntities>`
-- `classifyMemoryType(entities: ExtractedEntities): MemoryType`
-- `assignScope(entities: ExtractedEntities, source: MemorySourceType): { scopeType: MemoryScopeType, scopeId: string }`
-
-**Depends on:** CompanyMemoryService, EmbeddingService, DocumentIngestor
-
-### 5.3 CallTranscriptIngestionService
-
-**File:** `apps/api/src/services/ingestion/call-transcript-ingestion.service.ts`
-
-### 5.4 WebsiteReviewIngestionService
-
-**File:** `apps/api/src/services/ingestion/website-review-ingestion.service.ts`
-
-### 5.5 DocumentIngestionService (extends existing)
-
-**File:** `apps/api/src/services/ingestion/document-ingestion.service.ts`
-
-### 5.6 RoleMemoryAccessService
-
-**File:** `apps/api/src/services/company-brain/role-memory-access.service.ts`
-
-**Methods:**
-- `canAccess(userId: string, memoryItem: CompanyMemoryItem): Promise<boolean>`
-- `filterByScope(items: CompanyMemoryItem[], userId: string, department: string, role: string): Promise<CompanyMemoryItem[]>`
-- `getAccessibleScopes(userId: string): Promise<MemoryScopeType[]>`
-- `enforceScope(query: MemoryQueryInput, userId: string): Promise<MemoryQueryInput>`
-
-### 5.7 AgentProfileRegistryService
-
-**File:** `apps/api/src/services/agents/agent-profile-registry.service.ts`
-
-### 5.8 AbilityPackService
-
-**File:** `apps/api/src/services/agents/ability-pack.service.ts`
-
-### 5.9 CommanderCoachService
-
-**File:** `apps/api/src/services/swarm/commander-coach.service.ts`
-
-### 5.10 CapabilityGapDetectorService
-
-**File:** `apps/api/src/services/swarm/capability-gap-detector.service.ts`
-
-### 5.11 AgentForgeService
-
-**File:** `apps/api/src/services/agents/agent-forge.service.ts`
-
-### 5.12 AgentEvaluationService
-
-**File:** `apps/api/src/services/agents/agent-evaluation.service.ts`
-
-### 5.13 LearningExtractorService (extends existing MemoryExtractor)
-
-**File:** `apps/api/src/services/company-brain/learning-extractor.service.ts`
-
-### 5.14 SkillRecommendationService
-
-**File:** `apps/api/src/services/skills/skill-recommendation.service.ts`
-
-### 5.15 AutonomyPolicyService
-
-**File:** `apps/api/src/services/agents/autonomy-policy.service.ts`
-
-### 5.16 JAKShieldAgentPolicyService
-
-**File:** `packages/security/src/shield-gateway/agent-policy-gateway.ts`
+| # | Service | File Path | Phase |
+|---|---------|-----------|-------|
+| 1 | `AgentProfileRegistryService` | `apps/api/src/services/agents/agent-profile-registry.service.ts` | 1 |
+| 2 | `AbilityPackService` | `apps/api/src/services/agents/ability-pack.service.ts` | 1 |
+| 3 | `AutonomyPolicyService` | `apps/api/src/services/agents/autonomy-policy.service.ts` | 1 |
+| 4 | Thread CRUD | `apps/api/src/routes/threads.routes.ts` | 2 |
+| 5 | `CompanyMemoryService` | `apps/api/src/services/company-brain/company-memory.service.ts` | 3 |
+| 6 | `MemoryIngestionService` | `apps/api/src/services/company-brain/memory-ingestion.service.ts` | 3 |
+| 7 | `RoleMemoryAccessService` | `apps/api/src/services/company-brain/role-memory-access.service.ts` | 4 |
+| 8 | `CommanderCoachService` | `apps/api/src/services/swarm/commander-coach.service.ts` | 5 |
+| 9 | `CapabilityGapDetectorService` | `apps/api/src/services/swarm/capability-gap-detector.service.ts` | 6 |
+| 10 | `AgentForgeService` | `apps/api/src/services/agents/agent-forge.service.ts` | 7 |
+| 11 | `AgentEvaluationService` | `apps/api/src/services/agents/agent-evaluation.service.ts` | 8 |
+| 12 | `LearningExtractorService` | `apps/api/src/services/company-brain/learning-extractor.service.ts` | 8 |
+| 13 | `SkillRecommendationService` | `apps/api/src/services/skills/skill-recommendation.service.ts` | 8 |
+| 14 | Approval extensions | `apps/api/src/routes/approvals.routes.ts` (extend) | 9 |
+| 15 | `AgentGovernanceOverlay` | `packages/security/src/governance/agent-governance-overlay.ts` | 1 (foundational), extended in 4, 7, 10 |
+| 16 | Ingestion services | `apps/api/src/services/ingestion/` (call, website, email, etc.) | 3+ |
 
 ---
 
 ## 6. Frontend Plan
 
-### 6.1 `/threads/new` — Task Start Page
-
-### 6.2 Thread Workspace — `/threads/[id]`
-
-### 6.3 HyperAgent Fleet Page — `/agents`
-
-### 6.4 Agent Profile Page — `/agents/[id]`
-
-### 6.5 Agent Ability Editor — `/agents/[id]/abilities`
-
-### 6.6 Memory Base Page — `/memory`
-
-### 6.7 Memory Source Viewer — `/memory/sources`
-
-### 6.8 Role Access Control Page — `/admin/roles`
-
-### 6.9 Approvals Page — `/approvals` (extends existing)
-
-### 6.10 Learning History Page — `/learning`
-
-### 6.11 Skill Recommendations Page — `/skills/recommendations`
-
-### 6.12 Commander Coach Review Panel — `/workflows/[id]/coach`
-
-### 6.13 Agent Forge Draft Review Panel — `/agents/forge/[draftId]`
-
-*(Full component descriptions available in the original analysis — see sections 6.1–6.13 above)*
+| Phase | Page | Route |
+|-------|------|-------|
+| 1 | Agent Fleet | `/agents` |
+| 1 | Agent Profile | `/agents/[id]` |
+| 1 | Ability Pack Editor | `/admin/ability-packs` |
+| 2 | New Thread | `/threads/new` |
+| 2 | Thread Workspace | `/threads/[id]` |
+| 3 | Memory Base | `/memory` |
+| 3 | Memory Sources | `/memory/sources` |
+| 4 | Role Access Control | `/admin/roles` |
+| 5 | Commander Coach Review | `/workflows/[id]/coach` |
+| 7 | Agent Forge Draft | `/agents/forge/[draftId]` |
+| 8 | Learning History | `/learning` |
+| 8 | Skill Recommendations | `/skills/recommendations` |
+| 9 | Approvals (extended) | `/approvals` (new tabs) |
+| 10 | Agent Ability Editor | `/agents/[id]/abilities` |
 
 ---
 
 ## 7. Workflow Plan
 
-*(Full workflow flow documented in section 3.2 and section 7 of the original analysis)*
+Same as the original plan (Section 3.2 above), with these corrections:
+- Commander **orchestrates** services, doesn't contain logic
+- Agent Governance Overlay **calls** JAK Shield, doesn't add stages to it
+- JAK Shield remains 6 stages, unchanged
 
 ---
 
 ## 8. Safety and Permissions Plan
 
 ### 8.1 Least Privilege
+
 - New agents start at `TEMPORARY` status, `L0` autonomy, `REQUIRE_APPROVAL` policy
-- Temporary agents have no tool access by default
-- Temporary agents have no memory access by default
-- Ability packs define baseline of allowed tools and memory scopes
+- No tool access, no memory access by default
+- Ability packs define baseline — agents can only access what their pack allows
 - Autonomy upgrades require human approval with justification and audit logging
 
 ### 8.2 HR/CTO/CMO/Finance Memory Boundaries
+
 - `RoleAccessPolicy` defines which `MemoryScopeType` and `MemoryType` each department+role can access
-- Cross-department access requires explicit `MemoryAccessPermission` grant + approval gate + audit log
+- HR agents: HR memory scope, PEOPLE + POLICY types — cannot access FINANCE or SALES
+- CTO agents: TECHNICAL memory scope, PROJECT + TECHNICAL types — cannot access HR or FINANCE without approval
+- CMO agents: MARKETING memory scope, CUSTOMER + MARKETING types — cannot access HR, FINANCE, or LEGAL without approval
+- Finance agents: FINANCE memory scope, FINANCE type — cannot access HR, MARKETING, or TECHNICAL without approval
+- CEO/Chief of Staff: TENANT scope with CONFIDENTIAL items requiring individual approval
+- Cross-department access: explicit `MemoryAccessPermission` + approval gate + audit log
 
 ### 8.3 Approval Gates (extending existing)
+
 - Agent creation: `TENANT_ADMIN` approval before L3+ autonomy
 - Agent upgrade: Human approval required
 - Memory scope change: Department `REVIEWER` approval
 - Ability pack change: `TENANT_ADMIN` approval
 - External communication: Policy-based approval
-- Production deployment: `TENANT_ADMIN` approval always
-- Secret/credential operations: Always require approval
+- Production deployment: `TENANT_ADMIN` always
+- Secret/credential: Always requires approval
 
 ### 8.4 Destructive Action Controls
+
 - Agent Forge agents never get `DESTRUCTIVE` tool access
-- L0-L2 cannot execute destructive actions
-- L3 can execute low-risk internal destructive actions with approval
-- L4 can execute destructive actions with approval
-- L5 can execute within strict policy boundaries with audit evidence
+- L0-L2: cannot execute destructive actions
+- L3: low-risk internal destructive actions with approval
+- L4: destructive actions with approval
+- L5: within strict policy boundaries with audit evidence
 
-### 8.5 External Communication Controls
-- `EXTERNAL_POST` and `CREDENTIAL` categories always require approval
-- L0-L2 cannot send external communications
-- All external communications logged to `AuditLog`
+### 8.5 JAK Shield Review for Agent Changes
 
-### 8.6 Production Deployment Controls
-- No agent can deploy to production without `TENANT_ADMIN` approval
-- Cloud Run deployment actions classified as `DESTRUCTIVE`
-- Agent Forge agents never have deployment tool access
+**JAK Shield remains the 6-stage in-process pipeline. It is NOT extended.**
 
-### 8.7 Secret Management Controls
-- No agent can access secrets without `CREDENTIAL` tool permission AND `TENANT_ADMIN` approval
-- L0-L3 agents cannot access secrets
-- Secret rotation always requires explicit human approval
+Agent governance enforcement is a **separate Agent Governance Overlay** that:
+1. Calls JAK Shield's existing stages for security checks (injection, PII, offensive cyber, tool risk)
+2. Calls `PolicyEngine` for RBAC checks
+3. Validates agent profiles against `AgentProfileRegistry`
+4. Validates memory access against `RoleAccessPolicy`
+5. Validates autonomy levels against `AgentAutonomyPolicy`
+6. Validates role boundaries against department+role assignments
 
-### 8.8 Audit Logging (extending existing 40+ action types)
-- New actions: `AGENT_PROFILE_CREATED`, `AGENT_FORGE_DRAFT_CREATED`, `AUTONOMY_LEVEL_REQUESTED`, `AUTONOMY_LEVEL_APPROVED`, `MEMORY_SCOPE_GRANTED`, `ABILITY_PACK_ASSIGNED`, `CAPABILITY_GAP_DETECTED`, `LEARNING_EXTRACTED`, `MEMORY_ACCESS_VIOLATION`, `ROLE_BOUNDARY_VIOLATION`, `AUTONOMY_BOUNDARY_VIOLATION`, and 15+ more
+This overlay is called at the same points in the workflow where JAK Shield is called, but it is a separate module — `packages/security/src/governance/agent-governance-overlay.ts` — not a modification of JAK Shield.
 
-### 8.9 JAK Shield Review for Agent Changes
-- Stage 7: Agent Profile Validation
-- Stage 8: Memory Scope Enforcement
-- Stage 9: Autonomy Boundary
-- Stage 10: Role Boundary Enforcement
+### 8.6 No Silent High-Risk Autonomy
 
-### 8.10 No Silent High-Risk Autonomy
 - All agents start at L0
 - L0→L1: `REVIEWER` approval
 - L1→L2: `REVIEWER` approval
 - L2→L3: `TENANT_ADMIN` approval
-- L3→L4: `TENANT_ADMIN` approval + 30-day performance history
-- L4→L5: `TENANT_ADMIN` approval + 90-day performance history + explicit policy boundary definition
-- Every level change logged to `AuditLog`
+- L3→L4: `TENANT_ADMIN` + 30-day performance history
+- L4→L5: `TENANT_ADMIN` + 90-day performance history + explicit policy boundary
+- Every change logged to `AuditLog`
 
 ---
 
 ## 9. Implementation Phases
 
-| Phase | Goal | Timeline |
-|---|---|---|
-| **Phase 0** | Current repo audit and truth alignment | Week 1-2 |
-| **Phase 1** | Agent Profile Registry and Ability Packs | Week 3-5 |
-| **Phase 2** | Thread model and HyperAgent UI skeleton | Week 6-8 |
-| **Phase 3** | Company Memory Base | Week 9-12 |
-| **Phase 4** | Role-based memory permissions | Week 13-15 |
-| **Phase 5** | Commander Coach Engine | Week 16-18 |
-| **Phase 6** | Capability Gap Detector | Week 19-21 |
-| **Phase 7** | Agent Forge temporary agents | Week 22-25 |
-| **Phase 8** | Evaluation and learning loop | Week 26-29 |
-| **Phase 9** | Admin approvals for agent upgrades | Week 30-32 |
-| **Phase 10** | Deeper autonomous execution under policy | Week 33-38 |
-| **Phase 11** | Production hardening and Cloud Run Worker cutover | Week 39-44 |
+> Each phase is independently deployable. Existing functionality must continue working without opting in.
+
+### Phase 0: Current Repo Audit and Truth Alignment (Week 1-2)
+
+- Verify all 38 agents documented and match code
+- Verify all 122 tools classified and match ToolRegistry
+- Verify all Prisma models match running schema
+- Verify all API routes match frontend API client
+- Verify deployment truth (Cloud Run API live, Worker pending, Railway fallback)
+- Verify test suite passes (2,156 tests)
+- Document any discrepancies
+
+### Phase 1: Agent Profile Registry + Ability Packs + Role/Tool Permission Model (Week 3-5)
+
+**Scope: ONLY this. No Company Memory, no Agent Forge, no Commander Coach yet.**
+
+- Create `AgentProfile`, `AbilityPack`, `AgentToolPermission`, `AgentAutonomyPolicy` models (single migration)
+- Create `AgentProfileRegistryService`, `AbilityPackService`, `AutonomyPolicyService`
+- Create `AgentGovernanceOverlay` module (calls JAK Shield + PolicyEngine, does NOT modify them)
+- Seed default ability packs (HR, CTO, CMO, Finance, Legal, Ops, Support, Compliance)
+- Seed agent profiles for existing 38 agents
+- Create API routes for agent profiles and ability packs
+- Update `TenantToolRegistry` to respect ability pack boundaries
+- Update `PolicyEngine` to enforce role-based boundaries
+- Create frontend pages: `/agents`, `/agents/[id]`, `/admin/ability-packs`
+- Write unit tests for all new services
+- Write integration tests for ability pack enforcement
+- Write policy tests for role-based tool access
+
+**Files to inspect before Phase 1:**
+- `packages/security/src/rbac/policy-engine.ts` — understand current RBAC
+- `packages/security/src/rbac/roles.ts` — understand current role definitions
+- `packages/tools/src/registry/tenant-tool-registry.ts` — understand current tenant tool filtering
+- `packages/tools/src/registry/approval-policy.ts` — understand current approval policy
+- `packages/security/src/shield-gateway/local-shield-gateway.ts` — understand current Shield flow
+- `packages/security/src/shield-gateway/types.ts` — understand Shield interfaces
+- `packages/agents/src/base/base-agent.ts` — understand current agent context
+- `packages/agents/src/base/agent-context.ts` — understand current context passing
+- `packages/shared/src/types/agent.ts` — understand current AgentRole enum
+- `packages/db/prisma/schema.prisma` — understand current schema (50+ models)
+- `apps/api/src/plugins/auth.plugin.ts` — understand current auth middleware
+
+**Tests required for Phase 1:**
+- `AgentProfileRegistryService.test.ts` — CRUD, filtering, tool/memory scope resolution, status transitions
+- `AbilityPackService.test.ts` — CRUD, effective tools, effective memory scopes, effective approval rules
+- `AutonomyPolicyService.test.ts` — level checks, action permissions, upgrade workflows, boundary enforcement
+- `AgentGovernanceOverlay.test.ts` — profile validation, memory scope enforcement, autonomy boundary, role boundary
+- Policy tests for least privilege (new agent has no tools, no memory, L0 autonomy)
+- Policy tests for ability pack enforcement (HR pack restricts to HR tools and memory)
+- Integration tests for ability pack integration with TenantToolRegistry
+- Integration tests for role-based tool access enforcement
+
+**Risks specific to Phase 1:**
+1. **Ability pack conflicts with industry packs** — Industry packs already restrict tools. Ability packs must compose with, not override, industry pack restrictions. Mitigation: ability packs intersect with industry packs (take the more restrictive set).
+2. **Agent profile seeding for 38 existing agents** — Must correctly map each `AgentRole` to an `AgentProfile` with appropriate defaults. Mitigation: write a seed script with explicit mappings, test against existing workflows.
+3. **Autonomy level enforcement at runtime** — Checking autonomy level before every tool call could add latency. Mitigation: cache autonomy policies in memory, invalidate on change.
+4. **Backward compatibility** — Tenants that don't opt in to agent profiles should see zero change in behavior. Mitigation: feature flag (`agentProfilesEnabled`) per tenant, default `false`.
+
+### Phase 2: Thread Model and HyperAgent UI Skeleton (Week 6-8)
+
+- Create `Thread` model (single migration)
+- Create Thread API routes (CRUD, list, search)
+- Create `CapabilityGap` model (single migration, but table only — no service yet)
+- Create `/threads/new` page with goal input and agent selector
+- Create `/threads/[id]` page with thread timeline
+- Update `SwarmState` to include `threadId`, `capabilityGaps`, `coachingNotes` (optional fields)
+- Update `SwarmRunner` to create/update threads
+- Write tests for Thread CRUD and SwarmState with thread context
+
+### Phase 3: Company Memory Base (Week 9-12)
+
+- Create `CompanyMemoryItem`, `MemorySource`, `MemorySourceSyncRun` models (single migration)
+- Create `CompanyMemoryService`, `MemoryIngestionService`
+- Extend existing `DocumentIngestor` for entity extraction and memory classification
+- Create vector index migration for `CompanyMemoryItem`
+- Create API routes for memory CRUD, search, approval
+- Create `/memory` and `/memory/sources` pages
+- Update `MemoryQuery` to use `CompanyMemoryService`
+- Update `BaseAgent` to inject role-scoped memories
+- Write unit tests for memory services
+- Write integration tests for role-based memory access
+- Write policy tests for memory scope violations
+
+### Phase 4: Role-Based Memory Permissions (Week 13-15)
+
+- Create `MemoryScope`, `RoleAccessPolicy`, `AgentMemoryPermission` models (single migration)
+- Implement `RoleMemoryAccessService` (scope filtering at the service layer)
+- Implement Agent Governance Overlay: Memory Scope Enforcement
+- Update `CommanderAgent` to check memory scopes before context injection
+- Update `WorkerNode` to respect memory scopes
+- Create `/admin/roles` page for role access policy management
+- Write policy tests for cross-department memory access
+- Write integration tests for role-based memory enforcement
+
+### Phase 5: Commander Coach Engine (Week 16-18)
+
+- Create `CommanderCoachService` (separate from Commander agent)
+- Implement goal assessment, plan assessment, agent selection assessment, output assessment
+- Add `coachingNotes` field to SwarmState
+- Update `CommanderAgent` to delegate to `CommanderCoachService`
+- Update `VerifierNode` to use coaching context
+- Create `/workflows/[id]/coach` page
+- Write unit tests for coaching service
+- Write integration tests for Commander coaching flow
+
+### Phase 6: Capability Gap Detector (Week 19-21)
+
+- Create `CapabilityGapDetectorService` (separate from Commander)
+- Implement gap detection and resolution logic
+- Create `CapabilityGap` API routes
+- Update `CommanderAgent` to invoke gap detector before planning
+- Write unit tests for gap detection
+- Write integration tests for gap resolution
+
+### Phase 7: Agent Forge Temporary Agents (Week 22-25)
+
+- Create `AgentForgeDraft` model (single migration)
+- Create `AgentForgeService` (separate from Commander)
+- Implement draft generation, least privilege enforcement, sandbox testing, evaluation
+- Implement Agent Governance Overlay: Agent Profile Validation for Forge drafts
+- Create `/agents/forge/[draftId]` page
+- Update `RouterNode` to route to temporary agents
+- Write unit tests for forge service
+- Write sandbox tests for temporary agents
+
+### Phase 8: Evaluation and Learning Loop (Week 26-29)
+
+- Create `AgentEvaluation`, `AgentLearning`, `SkillRecommendation` models (single migration)
+- Create `AgentEvaluationService`, `LearningExtractorService`, `SkillRecommendationService`
+- Implement evaluation scoring, learning extraction, skill recommendation
+- Create `/learning` and `/skills/recommendations` pages
+- Update post-workflow flow to extract learnings
+- Write unit tests for evaluation scoring
+- Write integration tests for learning extraction
+
+### Phase 9: Admin Approvals for Agent Upgrades (Week 30-32)
+
+- Extend existing `ApprovalRequest` system with new `ApprovalType` enum values
+- Create approval workflows for agent creation, profile changes, autonomy upgrades, memory scope changes, ability pack changes, skill activation
+- Create role-based approval routing
+- Extend `/approvals` page with new tabs
+- Extend `AuditLogger` with new action types
+- Write policy tests for approval workflows
+
+### Phase 10: Deeper Autonomous Execution Under Policy (Week 33-38)
+
+- Implement L4 and L5 autonomy under strict policy boundaries
+- Implement `StandingOrder` integration with autonomy levels
+- Implement automatic autonomy downgrade on policy violations
+- Implement periodic autonomy review (30-day cycle)
+- Implement Agent Governance Overlay: Autonomy Boundary and Role Boundary Enforcement
+- Create `/agents/[id]/abilities` page
+- Write extensive policy tests for L4 and L5
+- Write safety tests for autonomy boundary violations
+- Write integration tests for autonomous loops
+
+### Phase 11: Production Hardening and Cloud Run Worker Cutover (Week 39-44)
+
+- Deploy Cloud Run Worker (currently pending)
+- Cutover Vercel `NEXT_PUBLIC_API_URL` to Cloud Run
+- Load testing for Company Memory Base
+- Load testing for Agent Profile Registry
+- Security audit for Agent Governance Overlay
+- Security audit for role-based memory access
+- Security audit for Agent Forge sandbox
+- Security audit for autonomy enforcement
+- Performance optimization for memory ingestion
+- Database migration to production
+- Monitoring and alerting for new services
+- Documentation updates
+- End-to-end testing across all new features
+- Beta testing with select tenants
 
 ---
 
 ## 10. Files Likely Affected
 
-### Packages
+### Phase 1 (Agent Profile Registry + Ability Packs)
 
-| Package | Files | Change |
-|---|---|---|
-| `packages/db/prisma/` | `schema.prisma` | Add all new models |
-| `packages/db/prisma/migrations/` | New migration files | Schema changes |
-| `packages/swarm/src/state/` | `swarm-state.ts` | Add coachingNotes, capabilityGaps, threadId |
-| `packages/swarm/src/graph/nodes/` | `commander-node.ts`, `worker-node.ts`, `verifier-node.ts` | Inject coaching notes, evaluate against agent profiles |
-| `packages/swarm/src/graph/` | `edges.ts` | Route through coaching and gap detection |
-| `packages/swarm/src/memory/` | `memory-extractor.ts`, `memory-query.ts` | Extend for CompanyMemoryItem, role-scoped queries |
-| `packages/swarm/src/workflow-runtime/` | `langgraph-graph-builder.ts` | Add coaching and gap detection nodes |
-| `packages/agents/src/roles/` | `commander.agent.ts` | Extend with coaching capabilities |
-| `packages/agents/src/base/` | `base-agent.ts`, `agent-context.ts` | Inject agent profile, memory scopes, ability packs |
-| `packages/agents/src/role-manifest.ts` | All | Extend with profile references |
-| `packages/security/src/rbac/` | `roles.ts`, `policy-engine.ts` | Add department-scoped roles |
-| `packages/security/src/shield-gateway/` | `local-shield-gateway.ts`, `types.ts` | Add Stages 7-10 |
-| `packages/security/src/guardrails/` | All | Extend for agent profile validation |
-| `packages/security/src/audit/` | `audit-log.ts` | Add new AuditAction types |
-| `packages/security/src/tool-risk/` | `risk-classifier.ts` | Add agent-related risk classification |
-| `packages/tools/src/registry/` | `tool-registry.ts`, `approval-policy.ts`, `tenant-tool-registry.ts` | Integrate with ability packs |
-| `packages/tools/src/adapters/memory/` | `db-memory.adapter.ts`, `vector-memory.adapter.ts` | Extend for CompanyMemoryItem |
-| `packages/shared/src/types/` | All type files | Add new types |
-| `packages/shared/src/schemas/` | All schema files | Add Zod schemas |
-| `packages/shared/src/constants/` | `agent-roles.ts` | Extend for dynamic agent roles |
-
-### Apps/API
-
-| Path | Change |
+| File | Change |
 |---|---|
-| `apps/api/src/services/company-brain/` | Add company-memory, memory-ingestion, role-memory-access, learning-extractor services |
-| `apps/api/src/services/agents/` | Add agent-profile-registry, ability-pack, agent-forge, agent-evaluation, autonomy-policy services |
-| `apps/api/src/services/swarm/` | Add commander-coach, capability-gap-detector services |
-| `apps/api/src/services/skills/` | Add skill-recommendation service |
-| `apps/api/src/routes/` | Add threads, agent-profiles, ability-packs, memory (extend), forge, evaluations, learning routes |
-| `apps/api/src/middleware/` | Add agent-profile, memory-scope, autonomy-level middleware |
-| `apps/api/src/plugins/` | Update swarm.plugin.ts |
-| `apps/api/src/coordination/` | Extend for Agent Forge sandbox coordination |
-
-### Apps/Web
-
-| Path | Change |
-|---|---|
-| `apps/web/src/app/(dashboard)/threads/` | New pages: new, [id] |
-| `apps/web/src/app/(dashboard)/agents/` | New pages: list, [id], [id]/abilities, forge/[draftId] |
-| `apps/web/src/app/(dashboard)/memory/` | New pages: list, sources, [id] |
-| `apps/web/src/app/(dashboard)/admin/roles/` | New page |
-| `apps/web/src/app/(dashboard)/learning/` | New page |
-| `apps/web/src/app/(dashboard)/skills/recommendations/` | New page |
-| `apps/web/src/app/(dashboard)/workflows/[id]/coach/` | New page |
-| `apps/web/src/components/agents/` | New components |
-| `apps/web/src/components/memory/` | New components |
-| `apps/web/src/components/threads/` | New components |
-| `apps/web/src/components/forge/` | New components |
+| `packages/db/prisma/schema.prisma` | Add `AgentProfile`, `AbilityPack`, `AgentToolPermission`, `AgentAutonomyPolicy` models + enums |
+| `packages/db/prisma/migrations/` | New migration for Phase 1 tables |
+| `packages/shared/src/types/agent.ts` | Add `AgentProfileStatus`, `ApprovalPolicyType`, `AutonomyLevel`, `ToolPermission` types |
+| `packages/shared/src/constants/agent-roles.ts` | No changes (existing roles stay, new TEMPORARY role added later in Phase 7) |
+| `packages/security/src/rbac/policy-engine.ts` | Add department-scoped role checks, ability pack enforcement |
+| `packages/security/src/rbac/roles.ts` | Add department-aware permission checks |
+| `packages/security/src/governance/` | New directory: `agent-governance-overlay.ts`, `types.ts` |
+| `packages/security/src/audit/audit-log.ts` | Add new `AuditAction` enum values |
+| `packages/tools/src/registry/tenant-tool-registry.ts` | Integrate ability pack tool filtering |
+| `packages/tools/src/registry/approval-policy.ts` | Integrate autonomy level checks |
+| `apps/api/src/services/agents/` | New: `agent-profile-registry.service.ts`, `ability-pack.service.ts`, `autonomy-policy.service.ts` |
+| `apps/api/src/routes/` | New: `agent-profiles.routes.ts`, `ability-packs.routes.ts` |
+| `apps/api/src/middleware/` | New: `agent-profile.middleware.ts` |
+| `apps/api/src/plugins/swarm.plugin.ts` | Wire new services |
+| `apps/web/src/app/(dashboard)/agents/` | New pages |
+| `apps/web/src/app/(dashboard)/admin/ability-packs/` | New page |
 | `apps/web/src/lib/api-client.ts` | Add new API endpoints |
-| `apps/web/src/store/` | Add thread-store, agent-profile-store |
+| `apps/web/src/store/` | New: `agent-profile-store.ts` |
+
+### Later Phases
+
+See original plan Section 10 for full file lists. Each phase adds files in its own service/route/component directories without modifying existing files (except for extending SwarmState with optional fields, extending AuditAction enum, and extending ApprovalRequest with new types).
 
 ---
 
 ## 11. Test Plan
 
-*(Full test plan available in section 11 of the original analysis — covering unit tests, integration tests, policy tests, JAK Shield tests, memory permission tests, agent profile tests, Agent Forge sandbox tests, Commander Coach tests, workflow end-to-end tests, and UI tests)*
+### Phase 1 Tests (Required Before Moving to Phase 2)
+
+| Test Suite | Purpose |
+|---|---|
+| `AgentProfileRegistryService.test.ts` | CRUD, filtering, tool/memory scope resolution, status transitions |
+| `AbilityPackService.test.ts` | CRUD, effective tools, effective memory scopes, effective approval rules |
+| `AutonomyPolicyService.test.ts` | Level checks, action permissions, upgrade workflows, boundary enforcement |
+| `AgentGovernanceOverlay.test.ts` | Profile validation, memory scope enforcement, autonomy boundary, role boundary |
+| `least-privilege.test.ts` | New agent has no tools by default, no memory access, L0 autonomy |
+| `ability-pack-enforcement.test.ts` | HR pack restricts to HR tools and HR memory |
+| `industry-pack-composition.test.ts` | Ability pack intersects with industry pack (more restrictive wins) |
+| `backward-compatibility.test.ts` | Tenants without agent profiles see zero change |
+| `integration/agent-profile-flow.test.ts` | Create profile → assign pack → verify tool access |
+| `integration/autonomy-enforcement.test.ts` | L0 agent → try execute → blocked → upgrade → try again |
+
+### Full Test Plan (All Phases)
+
+See original plan Section 11 for the complete test plan covering all 10 categories. Each phase adds its own test suites before moving to the next phase.
 
 ---
 
@@ -1353,52 +913,57 @@ model MemorySourceSyncRun {
 
 | # | Risk | Impact | Likelihood | Mitigation |
 |---|---|---|---|---|
-| 1 | Over-permissioned agents | Critical | Medium | Least privilege default. JAK Shield Stage 7 validates every agent profile. Audit every permission change. |
-| 2 | Memory leakage across departments | Critical | Medium | RoleMemoryAccessService enforces scope. JAK Shield Stage 8 validates. Cross-department access requires explicit permission + approval. |
-| 3 | HR/Finance data exposure | Critical | Medium | Sensitivity levels default to CONFIDENTIAL. RoleAccessPolicy restricts access. JAK Shield Stage 10 enforces role boundaries. |
-| 4 | Hallucinated memory | High | Medium | Memory confidence scoring (0.7 threshold). Source lineage tracking. Deduplication. Human approval for high-confidence items. |
-| 5 | Unsafe autonomy escalation | Critical | Low | All upgrades require human approval. L4/L5 require performance history. JAK Shield Stage 9 enforces. Automatic downgrade on violations. |
-| 6 | Prompt injection through documents/websites | High | Medium | Existing injection detection (Stage 1). Apply to all ingested content before memory storage. |
+| 1 | Over-permissioned agents | Critical | Medium | Least privilege default. Agent Governance Overlay validates every profile. Audit every permission change. |
+| 2 | Memory leakage across departments | Critical | Medium | RoleMemoryAccessService enforces scope. Agent Governance Overlay validates memory access. Cross-department access requires explicit permission + approval. |
+| 3 | HR/Finance data exposure | Critical | Medium | Sensitivity defaults to CONFIDENTIAL. RoleAccessPolicy restricts access. Agent Governance Overlay enforces role boundaries. |
+| 4 | Hallucinated memory | High | Medium | Confidence scoring (0.7 threshold). Source lineage tracking. Deduplication. Human approval. |
+| 5 | Unsafe autonomy escalation | Critical | Low | All upgrades require human approval. L4/L5 require performance history. Agent Governance Overlay enforces boundaries. Automatic downgrade on violations. |
+| 6 | Prompt injection through ingestion | High | Medium | Existing JAK Shield Stage 1 (injection detection) applies to all ingested content. Document sanitizer before entity extraction. |
 | 7 | Unapproved external actions | High | Medium | EXTERNAL_POST/CREDENTIAL categories always require approval. L0-L3 cannot send external comms. |
 | 8 | Agent sprawl | Medium | High | Temporary agents auto-expire. Permanent agents require TENANT_ADMIN approval. Capability Gap Detector checks before creating. |
 | 9 | Cost overrun | Medium | High | Existing credit billing and daily caps. Autonomy levels limit scope. L5 requires explicit budget caps. |
 | 10 | Stale learning | Medium | Medium | Memory confidence decays. expiresAt for retention. Drift detection. Human approval for recommendations. |
 | 11 | Audit gaps | High | Low | 40+ new audit action types. HMAC-signed evidence bundles. External auditor portal. |
-| 12 | Deployment confusion | Medium | High | Honest deployment truth. Cloud Run API live, Worker pending, Railway fallback. No GKE claims. Phase 11 handles hardening. |
+| 12 | Deployment confusion | Medium | High | Honest deployment truth. Cloud Run API live, Worker pending, Railway fallback. Phase 11 handles hardening. |
+| 13 | Ability pack conflicts with industry packs | Medium | Medium | Ability packs compose with industry packs by intersection (more restrictive wins). Test both overlap and conflict scenarios. |
+| 14 | Polymorphic scopeId bugs | High | Medium | scopeId is a plain String resolved at application level by scopeType. Never use Prisma @relation on scopeId. Test all scopeType+scopeId combinations. |
+| 15 | Big-bang migration failure | Critical | Low | Each phase has its own migration. Never add all tables at once. Test each migration independently. |
 
 ---
 
 ## 13. Final Recommendation
 
-**The best structure to build this without breaking the current repo:**
+### The Best Structure to Build Without Breaking the Current Repo
 
 1. **Extend, don't replace.** LangGraph orchestration, AgentRole system, ToolRegistry, JAK Shield, and MemoryExtractor all work well. Every new feature extends existing systems.
 
-2. **Add new models via Prisma migrations.** New tables, not modifications to existing ones. Existing data untouched.
+2. **JAK Shield stays 6-stage.** Agent governance, memory scope, autonomy, and role boundaries are a separate Agent Governance Overlay that *calls* JAK Shield and PolicyEngine. No new numbered stages.
 
-3. **Extend SwarmState with optional fields.** `coachingNotes`, `capabilityGaps`, `threadId`, `agentProfileIds` default to `undefined` or `[]`. Existing workflows unaffected.
+3. **Add new models via per-phase Prisma migrations.** Phase 1 creates only `AgentProfile`, `AbilityPack`, `AgentToolPermission`, `AgentAutonomyPolicy`. Each subsequent phase adds its own tables. Never add all tables at once.
 
-4. **Add new JAK Shield stages as a new module.** `agent-policy-gateway.ts` implements Stages 7-10 as a separate validation pass. Existing 6 stages untouched.
+4. **Treat schema section as conceptual.** The Prisma models in this document are design references, not copy-paste migration code. Actual migrations will use correct Prisma conventions (`@db.Text` not `@db_text`, proper relations, no polymorphic foreign keys on `scopeId`).
 
-5. **Use the existing approval system.** Extend `ApprovalRequest` with new `ApprovalType` values. Don't build a parallel system.
+5. **Extend SwarmState with optional fields.** `coachingNotes`, `capabilityGaps`, `threadId`, `agentProfileIds` default to `undefined` or `[]`. Existing workflows unaffected.
 
-6. **Build ingestion services as new modules.** `apps/api/src/services/ingestion/` directory. Each service independent.
+6. **Commander remains an orchestrator.** `CommanderCoachService`, `CapabilityGapDetectorService`, `AgentForgeService`, `AgentEvaluationService`, `LearningExtractorService` are separate services that Commander delegates to. Commander does not contain their logic.
 
-7. **Create Agent Forge as a new package-level module.** `packages/agents/src/forge/`. `AgentRole` enum gets `TEMPORARY` value. Existing agents untouched.
+7. **Use the existing approval system.** Extend `ApprovalRequest` with new `ApprovalType` values. Don't build a parallel system.
 
-8. **Extend the API with new route modules.** New files, not modifications to existing ones.
+8. **Build ingestion services as new modules.** `apps/api/src/services/ingestion/` directory. Each service independent.
 
-9. **Build frontend pages incrementally.** New routes under `apps/web/src/app/(dashboard)/`. New Zustand store slices. Existing pages untouched.
+9. **Build Agent Forge as a new module.** `packages/agents/src/forge/`. `AgentRole` gets `TEMPORARY` value. `agent-factory.ts` gets extended to handle temporary agents. Existing agents untouched.
 
-10. **Phase strictly.** Each phase independently deployable. Phase 1 ships without breaking anything.
+10. **Extend the API with new route modules.** New files, not modifications to existing ones.
 
-11. **Keep Gemini + Google ADK primary.** All new services use existing `ProviderRouter`. ADK remains alternate path.
+11. **Build frontend pages incrementally.** New routes under `apps/web/src/app/(dashboard)/`. New Zustand store slices.
 
-12. **Keep Railway as rollback/fallback.** Don't remove Railway. Don't claim full Cloud Run cutover.
+12. **Phase the work strictly.** Phase 1 (Agent Profile Registry + Ability Packs) ships without breaking anything. If a tenant doesn't opt in, workflows run exactly as they do today.
 
-13. **Test comprehensively before each phase ships.** 2,156 existing tests must continue passing. Add new tests per phase.
+13. **Keep Gemini + Google ADK as the primary Google-facing path.** All new services use existing `ProviderRouter`. ADK remains alternate path.
 
-**Key principle: Every new feature should be additive. If a tenant doesn't use agent profiles, ability packs, or coaching, their workflows run exactly as they do today.**
+14. **Keep Railway as rollback/fallback.** Don't remove Railway. Don't claim full Cloud Run cutover.
+
+15. **Start with the foundation.** Agent Profile Registry + Ability Packs + Role/Tool Permission Model. Everything else builds on top of this.
 
 ---
 
