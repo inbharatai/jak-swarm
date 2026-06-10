@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐝 JAKx
+# 🐝 JAK
 
 ### The Closed-Loop Company Operating Layer for Agent Work
 
@@ -17,7 +17,7 @@
 
 > 🏆 **Google for Startups AI Agents Challenge** — Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, uses **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, and integrates **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching — no code changes, no env-var swaps.
 
-**JAK Swarm turns scattered company context into approved agent work. JAK Shield makes that work safe.**
+**JAK turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
 Give it a goal in plain English. JAK decomposes, routes, executes, and verifies — in real time.
 
