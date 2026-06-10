@@ -445,3 +445,9 @@ Cloud Run is the primary deployment. Railway is the rollback/fallback path. Clou
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging
 - **staging-ready** — Railway deployment with test credentials (rollback/fallback)
 - **production** — Google Cloud Run (primary API), Railway Worker, managed PostgreSQL (Supabase), Railway Redis (public endpoint), observability stack
+
+---
+
+## Roadmap Direction
+
+JAK Swarm is evolving from a multi-agent workflow operator into a closed-loop Company OS. The architectural direction is documented in the root [`ARCHITECTURE.md`](../ARCHITECTURE.md#roadmap-company-os-evolution) and the full roadmap at [`docs/ROADMAP.md`](ROADMAP.md). The Company Operating Layer code ([`company-operating-layer.service.ts`](../../apps/api/src/services/company-brain/company-operating-layer.service.ts)) is the shipped foundation — artifacts, entities, drift findings, and agent-executable specs form the evidence graph that the Company OS layers will build on.

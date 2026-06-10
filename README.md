@@ -796,6 +796,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
 | [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Long-term vision, 5-layer Company OS evolution, honest scope boundaries |
+| [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md) | Complete next-evolution architecture plan — Company Memory, Agent Forge, Commander Coach, Ability Packs, Autonomy Ladder, role-based permissions, 12-phase implementation roadmap |
 
 ---
 
