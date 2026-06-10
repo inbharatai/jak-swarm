@@ -46,23 +46,27 @@ Older tagged releases receive fixes only if the vulnerability is rated Critical.
 - `packages/swarm` (orchestration)
 - `packages/tools` (tool registry + sandbox)
 - `packages/db` (Prisma schema + migrations)
+- `packages/security` (local guardrails, RBAC, audit logging, PII redaction, injection detection, tool risk classification, field encryption — note: this is local policy logic inside JAK Swarm, not JAK Shield itself)
 - Official Docker images and Render/Vercel deployment manifests
 - Official client SDK (`@jak-swarm/client`)
+- JAK Shield MCP gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) — the separate 10-stage security gateway
 
 **Out of scope:**
 
 - Third-party MCP servers we integrate with (report upstream)
 - User-contributed skills that haven't passed the sandbox review
-- Self-hosted deployments whose configuration deviates from documented defaults
 
 ## Known dual-use surfaces
 
 Some features intentionally expose high-privilege actions because that's the point of an agent platform. These are documented separately in [docs/SECURITY-NOTES.md](docs/SECURITY-NOTES.md) and have dedicated guardrails:
 
-- **`browser_evaluate_js`** — executes arbitrary JavaScript in a headless browser; gated behind `enableBrowserAutomation` tenant flag + approval.
-- **`code_execute`** — runs untrusted code in an E2B sandbox; time-bounded, network-restricted, process-isolated.
-- **Skill extension system** — user-submitted skills run in an isolated sandbox with a 30-second timeout before any human-review promotion.
+- **`browser_evaluate_js`** — executes arbitrary JavaScript in a headless browser; gated behind `enableBrowserAutomation` tenant flag + approval. High-risk browser actions will also be routed through JAK Shield MCP when the Agent Governance Overlay is implemented.
+- **`code_execute`** — runs untrusted code in an E2B sandbox; time-bounded, network-restricted, process-isolated. Destructive and shell actions will be routed through JAK Shield MCP when the Agent Governance Overlay is implemented.
+- **Skill extension system** — user-submitted skills run in an isolated sandbox with a 30-second timeout before any human-review promotion. Agent Forge output will require JAK Shield MCP validation and human approval when implemented.
 - **Webhook signature verification** — Slack, Paddle, and Supabase webhooks use HMAC-SHA256 with `crypto.timingSafeEqual` + 5-minute replay window.
+- **Agent Governance Overlay** (planned) — will enforce agent profiles, memory scopes, autonomy boundaries (Autonomy Ladder L0–L5), and role boundaries, calling JAK Shield MCP for signed security decisions on high-risk actions. Until implemented, local policy logic in `packages/security` provides guardrails.
+- **Ability Packs** (planned) — department-scoped tool, memory, and approval configurations. Until implemented, industry packs provide per-vertical policy overlays.
+- **Autonomy level escalation** (planned) — agents will operate on a ladder from L0 (answer only) to L5 (autonomous loop within strict policy). Until implemented, all agents operate at the same autonomy level with local policy enforcement.
 
 ## What we'll do
 

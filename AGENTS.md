@@ -41,6 +41,8 @@ JAK Swarm is a multi-agent autonomous platform where specialised agents collabor
 
 Every agent interaction is traced (`AgentTrace`), and every side-effecting action is subject to the Guardrail and, where warranted, the Approval Manager gate.
 
+> **Evolution note:** The current Guardrail agent is a stateless in-process policy checker with `ALLOW/WARN/BLOCK` verdicts. The planned Agent Governance Overlay will extend this with agent profiles, memory scopes, autonomy boundaries (Autonomy Ladder L0–L5), and calls to JAK Shield MCP for signed security decisions on high-risk actions (producing `allow/redact/requires_approval/block/rewrite` outcomes). The Commander will also evolve to orchestrate separate services (CommanderCoachService, CapabilityGapDetectorService, AgentEvaluationService) rather than containing all logic. See [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md) for details.
+
 ---
 
 ## Orchestrator Agents
@@ -239,6 +241,8 @@ Be precise and conservative. Partial completion must be flagged even if minor.
 
 **Purpose:**
 The Guardrail agent is the policy enforcement layer. It intercepts every plan before execution and every tool call result after execution, checking against tenant policy overlays, industry compliance rules, and global safety constraints. It is stateless and can veto any action.
+
+> **Note:** The Agent Governance Overlay (planned) will extend the Guardrail's role by enforcing agent profiles, memory scopes, autonomy boundaries, and role boundaries. It will call JAK Shield MCP for signed security decisions on high-risk actions, producing one of five outcomes: `allow`, `redact`, `requires_approval`, `block`, `rewrite`. Until then, the Guardrail uses local policy logic with `ALLOW`, `WARN`, `BLOCK` verdicts. See [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md) for the full plan.
 
 **System Instructions:**
 ```

@@ -28,7 +28,7 @@ A parallel Cloud Run deployment exists for the Google AI Agents Challenge. Both 
 | Piece | Where | What runs |
 |---|---|---|
 | `apps/api` | **Cloud Run** `jak-swarm-api` (public) | 2 GiB RAM, 2 CPU, min 1 instance. Port 4000. |
-| `apps/api/dist/worker-entry.js` | **Cloud Run** `jak-swarm-worker` (private) | 1 GiB RAM, 1 CPU, min 0 (scales to zero). Port 9464. |
+| `apps/api/dist/worker-entry.js` | **Cloud Run** `jak-swarm-worker` (private) | **Not yet deployed.** See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for setup instructions. Target: 1 GiB RAM, 1 CPU, min 0 (scales to zero). Port 9464. |
 | Redis | **Railway** (shared) | Same Railway Redis instance used by both deployments |
 | Postgres | **Supabase** (shared) | Same Supabase instance used by both deployments |
 | Secrets | **Google Secret Manager** | All sensitive env vars mounted as secrets |
@@ -267,7 +267,9 @@ groups:
 
 ---
 
-## Kubernetes Deployment
+## Kubernetes Deployment (Not Yet Deployed)
+
+> **Note:** JAK Swarm is not currently deployed on Kubernetes/GKE. The section below is a reference architecture for future scaling. Do not claim Kubernetes deployment is live. See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for deployment truth.
 
 ```yaml
 # k8s/deployment.yaml
@@ -346,6 +348,9 @@ pnpm seed:compliance               # seeds 182 controls (idempotent; 108 auto-ma
 ### Optional (enable features when set)
 | Variable | Feature |
 |---|---|
+| `JAK_SHIELD_MCP_URL` | JAK Shield MCP gateway URL (when set, routes high-risk actions through the 10-stage security pipeline). Defaults to local-only policy enforcement if unset. |
+| `JAK_SHIELD_MCP_ENABLED` | Set to `1` to enable JAK Shield MCP integration for signed security decisions. Defaults to `0` (local policy enforcement only). |
+| `JAK_SHIELD_MCP_API_KEY` | API key for JAK Shield MCP gateway (required if `JAK_SHIELD_MCP_ENABLED=1`). |
 | `REDIS_URL` | Session cache, rate limiting, voice |
 | `GEMINI_API_KEY` | Gemini LLM provider (required when `LLM_PROVIDER=gemini`) |
 | `LLM_PROVIDER` | `openai`, `gemini`, or `existing` (default) |

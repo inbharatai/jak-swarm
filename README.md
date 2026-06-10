@@ -39,7 +39,7 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 
 - **Evidence graph before agent action** — artifacts become graph entities; graph entities become drift findings; drift findings become agent-executable specs. This is the closed-loop Company OS foundation — intentionally citation-first, not chatbot memory. ([`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts))
 - **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator, emit lifecycle events, and feed the signed audit pack. ([`docs/team-and-trial.md`](docs/team-and-trial.md))
-- **JAK Shield as the trust layer** — every agent action runs through six defenses before it touches your code, browser, files, or business tools. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md))
+- **JAK Shield as the trust gateway** — high-risk agent actions are routed through a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with local policy enforcement inside Swarm. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) · [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md))
 - **Google ADK orchestration** — when `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) using `SequentialAgent` and `ParallelAgent` for multi-agent orchestration. Google Search Grounding provides real-time, citation-backed responses. ([`packages/adk/`](packages/adk/))
 - **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no third-party search API keys needed. API keys are required for OpenAI and Gemini — JAK does not bundle or provide free LLM API keys.
 - **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps protect both your data AND your budget.
@@ -159,9 +159,26 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data 
 
 ---
 
-## 🛡️ JAK Shield — The Trust Layer
+## 🛡️ JAK Shield — The Trust Gateway
 
-Before any agent touches your code, browser, files, email, GitHub, or business tools, JAK Shield runs every action through six defenses. Every claim below maps to a real file path and is locked by a CI test.
+JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with a **10-stage decision pipeline** that protects every real-world agent action. JAK Swarm calls JAK Shield MCP for signed security decisions on high-risk actions. Inside Swarm, `packages/security` provides local guardrails, RBAC, audit logging, and the Agent Governance Overlay that enforces agent profiles, memory scopes, and autonomy boundaries before routing to Shield.
+
+**JAK Shield 10-stage decision pipeline:**
+
+| Stage | What it does |
+|-------|-------------|
+| 1. Hard rules | Deterministic block/allow based on tenant policy |
+| 2. Injection v2 | 6 substages, 13+ language detection of prompt injection |
+| 3. Taint tracker | MinHash + n-gram fingerprinting for cross-prompt taint |
+| 4. Attack-chain detection | 20 patterns + data-flow analysis for multi-step attacks |
+| 5. PII v2 | 28 types (SSN, Aadhaar, IBAN, PAN, NRIC, CPF, CNPJ, etc.) + cryptographic checksums |
+| 6. Anomaly detection | EWMA + z-score per tenant/agent for behavioural drift |
+| 7. RBAC + threshold | Role, department, and autonomy-level gating |
+| 8. OpenAI classifier | Advisory-only second opinion (deterministic engine has final say) |
+| 9. HMAC signing | Cryptographic proof of every security decision |
+| 10. Output routing | `allow` · `redact` · `requires_approval` · `block` · `rewrite` |
+
+**Local policy enforcement inside JAK Swarm** (`packages/security`):
 
 | # | Defense | What it does | Code |
 |---|---------|-------------|------|
@@ -174,7 +191,7 @@ Before any agent touches your code, browser, files, email, GitHub, or business t
 
 **Safety boundary:** JAK Shield is built for defensive security, safe automation, permissioned workflows, and audit-ready agent execution. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation.
 
-Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Security policy: [`SECURITY.md`](SECURITY.md).
+Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Architecture plan: [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md). Security policy: [`SECURITY.md`](SECURITY.md).
 
 ---
 
@@ -578,7 +595,7 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 
 ## 🔭 Long-Term Vision
 
-JAK is evolving from a multi-agent workflow operator into an ever-learning Company OS that remembers company context, understands departmental roles, and safely completes approved work across the organisation.
+JAK is evolving from a multi-agent workflow operator into an ever-learning Company OS that remembers company context, understands departmental roles, and safely completes approved work across the organisation. JAK Shield is the MCP-native trust gateway that protects every real-world agent action.
 
 <details>
 <summary><b>Vision diagram and time horizons</b></summary>
@@ -600,9 +617,10 @@ flowchart TB
         R5["Finance"] & R6["Legal"] & R7["Ops"] & R8["Support"]
     end
 
-    subgraph PERMISSIONS["4. Permission + Shield Layer"]
+    subgraph PERMISSIONS["4. Permission + Governance Layer"]
         P1["RBAC"] & P2["Dept access"] & P3["Approval gates"]
-        P4["JAK Shield"] & P5["Audit evidence"]
+        P4["Agent Governance Overlay"] & P5["JAK Shield MCP"]
+        P6["Audit evidence"] & P7["Autonomy Ladder"]
     end
 
     subgraph EXECUTION["5. Autonomous Execution Layer"]
@@ -616,13 +634,13 @@ flowchart TB
 
 **Short term** — Company Memory Layer: transcripts, decisions, policies, people, projects extracted from existing connectors into a persistent, queryable evidence graph.
 
-**Medium term** — Role-Based Intelligence + Permission Shield: department-aware agents with RBAC-scoped context, approval gates per department, and JAK Shield enforcement at the role boundary.
+**Medium term** — Role-Based Intelligence + Permission Shield: department-aware agents with Ability Packs, Autonomy Ladder (L0–L5), Agent Governance Overlay enforcing profiles and scopes, and JAK Shield MCP for signed security decisions on high-risk actions.
 
 **Long term** — Autonomous Execution Layer: plan, assign, execute, verify, report, learn again — a closed loop where approved work completes across the organisation and the system improves from each cycle.
 
 </details>
 
-Full roadmap with implementation milestones and honest scope boundaries: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+Full roadmap with implementation milestones and honest scope boundaries: [`docs/ROADMAP.md`](docs/ROADMAP.md). Full architecture plan: [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md).
 
 ---
 
@@ -780,7 +798,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full system architecture, data model, error handling, scaling |
 | [`AGENTS.md`](AGENTS.md) | Every agent role: purpose, input/output contracts, handoff logic |
 | [`SECURITY.md`](SECURITY.md) | Vulnerability reporting, SLA, scope, cryptographic assumptions |
-| [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) | JAK Shield 6 defenses — full claim-to-code mapping |
+| [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) | Local policy defenses (claim-to-code mapping) — JAK Shield is a separate 10-stage MCP gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) |
 | [`docs/audit-compliance-agent-pack.md`](docs/audit-compliance-agent-pack.md) | Audit & Compliance product overview |
 | [`docs/audit-framework-library.md`](docs/audit-framework-library.md) | Per-framework + per-control reference (SOC 2, HIPAA, ISO 27001) |
 | [`docs/audit-api.md`](docs/audit-api.md) | Audit endpoint reference + error codes + SSE channel |
@@ -796,7 +814,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 | [`docs/agent-run-cockpit.md`](docs/agent-run-cockpit.md) | Cockpit audit event vocabulary |
 | [`docs/competitive-positioning.md`](docs/competitive-positioning.md) | Market positioning analysis |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Long-term vision, 5-layer Company OS evolution, honest scope boundaries |
-| [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md) | Complete next-evolution architecture plan — Company Memory, Agent Forge, Commander Coach, Ability Packs, Autonomy Ladder, role-based permissions, 12-phase implementation roadmap |
+| [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md) | Next-evolution architecture — JAK Shield MCP integration, Agent Governance Overlay, Company Memory, Agent Forge, Commander Coach, Ability Packs, Autonomy Ladder, 11-phase implementation roadmap |
 
 ---
 

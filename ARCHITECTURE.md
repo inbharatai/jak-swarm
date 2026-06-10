@@ -135,16 +135,22 @@ TypeScript enums and interfaces used across all packages:
 
 Prisma ORM with PostgreSQL. Schema covers tenants, users, workflows, tasks, traces, integrations, credentials, schedules, memory, skills, and the Audit & Compliance product surface (`ComplianceFramework`, `ComplianceControl`, `ControlEvidenceMapping`, `ManualEvidence`, `ScheduledAttestation`, `ControlAttestation`, `WorkflowArtifact`, `AuditRun`, `ControlTest`, `AuditException`, `AuditWorkpaper`).
 
-### `packages/security` -- JAK Shield (6-Stage Pipeline)
+### `packages/security` -- Local Policy Logic (JAK Swarm) + JAK Shield MCP Gateway
 
-- **Stage 1 — Agent Firewall**: 22 regex patterns for prompt injection + 6 offensive-cyber categories
-- **Stage 2 — Risk-Based Approvals**: 6-tier `ToolRiskLevel` lattice with payload hash binding
-- **Stage 3 — Secure Tool Permissions**: Per-tenant registry, role-gated installer, Standing Orders (tool whitelists propagated through SwarmState)
-- **Stage 4 — Sandboxed Execution**: Per-tenant browser sessions, URL allowlists, path-traversal guards, 500MB disk quotas
-- **Stage 5 — Defensive Vulnerability Triage**: Allows defensive security work, blocks offensive requests
-- **Stage 6 — Audit Evidence Layer**: HMAC-SHA256 signed bundles with per-tenant key derivation
+JAK Swarm has **two security layers**:
 
-For the full threat model, see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). The standalone JAK Shield MCP service is at https://github.com/inbharatai/jak-shield
+**1. Local policy logic** (`packages/security`): Guardrails, RBAC, injection detection, PII redaction, tool risk classification, audit logging, and the Agent Governance Overlay that enforces agent profiles, memory scopes, autonomy boundaries, and role boundaries. This code runs inside JAK Swarm. It is **not** JAK Shield — it is local policy enforcement.
+
+- **Agent Firewall**: 22 regex patterns for prompt injection + 6 offensive-cyber categories
+- **Risk-Based Approvals**: 6-tier `ToolRiskLevel` lattice with payload hash binding
+- **Secure Tool Permissions**: Per-tenant registry, role-gated installer, Standing Orders (tool whitelists propagated through SwarmState)
+- **Sandboxed Execution**: Per-tenant browser sessions, URL allowlists, path-traversal guards, 500MB disk quotas
+- **Defensive Vulnerability Triage**: Allows defensive security work, blocks offensive requests
+- **Audit Evidence Layer**: HMAC-SHA256 signed bundles with per-tenant key derivation
+
+**2. JAK Shield MCP** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)): A **separate MCP-native security gateway** with a 10-stage decision pipeline (hard rules, injection v2, taint tracker, attack-chain detection, PII v2, anomaly detection, RBAC + threshold, OpenAI classifier advisory, HMAC signing, output routing). JAK Swarm calls JAK Shield MCP for signed security decisions on high-risk actions. Decision outcomes: `allow`, `redact`, `requires_approval`, `block`, `rewrite`. If JAK Shield MCP is unavailable, all high-risk actions require approval (local policy still runs).
+
+For the local threat model, see [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). For the full evolution plan including Agent Governance Overlay and JAK Shield MCP integration, see [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md).
 
 ### `packages/verification` -- Output Verification
 
@@ -525,7 +531,8 @@ JAK Swarm is a beta closed-loop operating layer today. The architectural directi
 
 - **Company Operating Layer** ([`company-operating-layer.service.ts`](apps/api/src/services/company-brain/company-operating-layer.service.ts)): artifact ingestion, entity extraction, drift detection, and agent-executable spec generation. The evidence graph is tenant-scoped and citation-first.
 - **Company Brain** ([`company-profile.service.ts`](apps/api/src/services/company-brain/company-profile.service.ts)): LLM-extracted company profiles (industry, brand voice, competitors, goals) approved by the user, grounding every agent prompt.
-- **JAK Shield** (6-stage pipeline): Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer.
+- **Local policy logic** (`packages/security`): Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer. These are local guardrails inside JAK Swarm — **not** JAK Shield itself.
+- **JAK Shield MCP** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)): A separate 10-stage MCP-native security gateway that JAK Swarm calls for signed security decisions on high-risk actions.
 - **Role-based agents**: 38 specialist agents across Executive, Operations, Core, and Vibe Coding layers, each with domain-scoped prompts and tool allowlists.
 - **Industry Packs**: 13 vertical configurations with agent prompt supplements, policy overlays, and restricted tool lists.
 
@@ -535,8 +542,8 @@ JAK Swarm is a beta closed-loop operating layer today. The architectural directi
 |:------|:----------|:-------------------|
 | **Company Inputs** | Calls, meetings, docs, websites, emails, code, tasks, CRM, support flowing automatically into the evidence graph | Manual ingestion + 7 artifact sources. Full auto-sync is a product build item. |
 | **Company Memory** | Transcripts, decisions, policies, people, projects, risks, evidence as persistent, queryable context | `company-operating-layer.service.ts` implements artifact → entity → drift finding → spec pipeline. Cross-workflow recall via `persistLearning` / `recallLearnings`. Memory is session-scoped; cross-session grounding is evolving. |
-| **Role-Based Intelligence** | CEO, HR, CTO, CMO, Finance, Legal, Ops, Support agents with department-scoped context, RBAC, and approval gates | Agent roles exist. Department-scoped RBAC (5 roles) is tenant-scoped, not department-scoped. Per-department approval gates are a roadmap item. |
-| **Permission + Shield** | RBAC, department access, approval gates, JAK Shield enforcement at role boundary | JAK Shield 6-stage pipeline is shipped. Department-scoped Shield boundaries and per-department approval policies are evolving. |
+| **Role-Based Intelligence** | CEO, HR, CTO, CMO, Finance, Legal, Ops, Support agents with department-scoped context, Ability Packs, Autonomy Ladder (L0–L5), and approval gates | Agent roles exist. Department-scoped RBAC (5 roles) is tenant-scoped, not department-scoped. Ability Packs and Autonomy Ladder are roadmap items. |
+| **Permission + Governance** | Agent Governance Overlay enforcing agent profiles, memory scopes, and autonomy boundaries; JAK Shield MCP for signed security decisions on high-risk actions | Local policy logic in `packages/security` is shipped. JAK Shield MCP is a separate gateway. Agent Governance Overlay, Ability Packs, and Agent Profile Registry are roadmap items. |
 | **Autonomous Execution** | Plan, assign, execute, verify, report, learn again in a self-improving closed loop | Commander → Planner → Router → Worker → Verifier loop is shipped. Self-improving cycles and cross-workflow learning are evolving. |
 
-Full roadmap with milestones and honest scope: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+Full roadmap with milestones and honest scope: [`docs/ROADMAP.md`](docs/ROADMAP.md). Full architecture plan including JAK Shield MCP integration and Agent Governance Overlay: [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md).

@@ -6,7 +6,7 @@
 
 ## Product Sentence
 
-JAK is evolving from a multi-agent workflow operator into an ever-learning Company OS that remembers company context, understands departmental roles, and safely completes approved work across the organisation.
+JAK Swarm is the ever-learning Company OS. JAK Shield is the MCP-native trust gateway that protects every real-world agent action.
 
 ---
 
@@ -47,12 +47,14 @@ flowchart TB
         R8["Support"]
     end
 
-    subgraph PERMISSIONS["4. Permission + Shield Layer"]
+    subgraph PERMISSIONS["4. Permission + Governance Layer"]
         P1["RBAC"]
         P2["Department access"]
         P3["Approval gates"]
-        P4["JAK Shield"]
-        P5["Audit evidence"]
+        P4["Agent Governance Overlay"]
+        P5["JAK Shield MCP"]
+        P6["Audit evidence"]
+        P7["Autonomy Ladder"]
     end
 
     subgraph EXECUTION["5. Autonomous Execution Layer"]
@@ -88,22 +90,25 @@ flowchart TB
 - Cross-session grounding (memory that persists and improves across workflows)
 - Proactive drift detection (the system tells you what changed, not just answers when asked)
 
-### Medium Term — Role-Based Intelligence + Permission Shield
+### Medium Term — Role-Based Intelligence + Permission Governance
 
-**What:** Department-aware agent roles (CEO, HR, CTO, CMO, Finance, Legal, Ops, Support) with RBAC-scoped context, approval gates per department, and JAK Shield enforcement at the role boundary.
+**What:** Department-aware agent roles (CEO, HR, CTO, CMO, Finance, Legal, Ops, Support) with RBAC-scoped context, Ability Packs, Autonomy Ladder (L0–L5), Agent Governance Overlay enforcing agent profiles and memory scopes, and JAK Shield MCP for signed security decisions on high-risk actions.
 
 **Foundation shipped:**
 
 - 38 specialist agents across Executive, Operations, Core, and Vibe Coding layers, each with domain-scoped prompts and tool allowlists
 - 13 industry packs with agent prompt supplements, policy overlays, and restricted tool lists
-- JAK Shield 6-stage pipeline (Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer)
+- Local policy logic in `packages/security`: Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer (local guardrails inside JAK Swarm — **not** JAK Shield itself)
+- JAK Shield is a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
 - 5-role RBAC (`END_USER`, `REVIEWER`, `OPERATOR`, `TENANT_ADMIN`, `SYSTEM_ADMIN`)
 
 **Evolving toward:**
 
 - Department-scoped RBAC (HR agents see HR context only; Finance agents see Finance context only)
 - Per-department approval policies (Finance actions require Finance REVIEWER; Legal actions require Legal REVIEWER)
-- JAK Shield enforcement at the role boundary (department-isolated tool access)
+- Agent Governance Overlay calling JAK Shield MCP for signed security decisions
+- Ability Packs (department-scoped tool, memory, and approval configurations)
+- Autonomy Ladder (L0 answer-only → L5 autonomous loop within strict policy)
 
 ### Long Term — Autonomous Execution Layer
 
@@ -132,6 +137,9 @@ This section explicitly states what the roadmap does **not** claim:
 - **Auto-sync is a product build item.** Full connector auto-sync (all inputs flowing automatically into the evidence graph) does not exist today. The `company-operating-layer.service.ts` pipeline exists for manual ingestion.
 - **Department-scoped RBAC does not exist.** The current 5-role RBAC is tenant-scoped, not department-scoped. Adding department boundaries requires schema changes, migration, and UI work.
 - **Self-improving cycles are not built.** Agent memory (`persistLearning` / `recallLearnings`) persists facts across workflows. It does not yet adjust future plans without human re-specification.
+- **Agent Governance Overlay is not built.** The current Guardrail agent is a stateless in-process policy checker. The Agent Governance Overlay (agent profiles, memory scopes, autonomy boundaries, calling JAK Shield MCP for signed decisions) is a roadmap item. See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for the phased implementation plan.
+- **JAK Shield MCP integration is not yet wired.** JAK Shield is a separate 10-stage MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield). The `ShieldMcpClient` and `Agent Governance Overlay` that will call it are Phase 1 of the evolution plan. Today, security enforcement uses local policy logic in `packages/security`.
+- **Ability Packs and Autonomy Ladder are not built.** Department-scoped tool configurations and agent autonomy levels (L0–L5) are roadmap items.
 - **Third-party SOC 2 / HIPAA / ISO 27001 attestation has not happened.** The infrastructure is shipped (182 controls, 108 operationally backed). The certification audit has not.
 
 These boundaries mirror the "Honest boundary" subsection in the README and the "What Is Not Yet Enterprise-Ready" section in [`docs/beta-release.md`](beta-release.md).
@@ -143,4 +151,5 @@ These boundaries mirror the "Honest boundary" subsection in the README and the "
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — system architecture and data model
 - [`docs/beta-release.md`](beta-release.md) — beta scope and go/no-go checklist
 - [`docs/competitive-positioning.md`](competitive-positioning.md) — market positioning
-- [`docs/jak-shield-manifest.md`](jak-shield-manifest.md) — JAK Shield 6 defenses
+- [`docs/jak-shield-manifest.md`](jak-shield-manifest.md) — Local policy defenses (JAK Shield is a separate 10-stage MCP gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
+- [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) — Full next-evolution architecture including JAK Shield MCP integration and Agent Governance Overlay

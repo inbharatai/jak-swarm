@@ -85,13 +85,15 @@ the gated tool. That tool is registered in
 | Tool maturity labels | `ToolMaturity` union in `packages/shared/src/types/tool.ts` (and the CI-enforced `audit:tools` script) |
 | Tamper-evident audit trail | `bundle-signing.service.ts` uses `createHmac` (HMAC-SHA256) |
 | Self-hostable open-source core | `LICENSE` file (MIT) |
-| OpenAI-first runtime | `packages/agents/src/runtime/openai-runtime.ts` |
+| Gemini + OpenAI runtime | `packages/agents/src/runtime/gemini-runtime.ts` (primary) + `packages/agents/src/runtime/openai-runtime.ts` (alternate) |
 
 ## Section 7 — JAK Shield (the trust boundary section)
 
 Already locked by `tests/unit/landing/jak-shield-truth.test.ts`. Every
-one of the 6 feature cards carries a `data-evidence-path` HTML
-attribute pointing at a real file:
+one of the 6 local policy feature cards carries a `data-evidence-path` HTML
+attribute pointing at a real file in JAK Swarm. These are **local policy
+enforcement features** — not the JAK Shield MCP 10-stage pipeline, which is
+a separate service at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield).
 
 ```
 data-evidence-path="packages/security/src/guardrails/offensive-cyber-detector.ts"
@@ -144,6 +146,8 @@ claimed as shipped on the landing page:
 | First-party defensive-review agent | The Shield boundary blocks offensive requests; an actual "audit my repo" agent does not exist yet. JAK Shield card body says "supports defensive security work" — true (boundary allows it) but no purpose-built agent. |
 | Dedicated `/shield` dashboard tab | Shield state is currently visible at `/audit` + `/inbox`. Not yet a unified panel. |
 | Chain-hashed AuditLog rows | Bundles are HMAC-SHA256 signed; individual `AuditLog` rows are NOT yet chain-hashed (a SYSTEM_ADMIN with DB access could rewrite a row). |
+| JAK Shield MCP integration | JAK Shield is a separate 10-stage MCP-native gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)). The `ShieldMcpClient` and Agent Governance Overlay are planned (Phase 1 of the evolution plan). Today, security enforcement uses local policy logic in `packages/security`. |
+| Agent Governance Overlay | Agent profiles, memory scopes, autonomy boundaries (L0–L5), and Ability Packs are planned, not shipped. |
 
 ## How to re-run
 

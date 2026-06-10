@@ -10,6 +10,10 @@ This document exists so the marketing copy, pricing decisions, and roadmap prior
 
 These capabilities exist, are wired through production paths, and are demonstrable to an operator today.
 
+### 0. JAK Shield — MCP-native trust gateway
+
+JAK Shield is a **separate 10-stage MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) that protects every real-world agent action. It sits between AI agents and real tools, returning one of five signed decisions: `allow`, `redact`, `requires_approval`, `block`, `rewrite`. Inside JAK Swarm, `packages/security` provides local guardrails (injection detection, PII redaction, RBAC, audit logging) that run before and alongside JAK Shield MCP calls. The planned Agent Governance Overlay will enforce agent profiles, memory scopes, and autonomy boundaries (L0–L5) and route high-risk actions to JAK Shield MCP for signed security decisions.
+
 ### 1. Distributed coordination
 - Redis-backed workflow signal bus with pause / unpause / stop semantics across instances
 - `FOR UPDATE SKIP LOCKED` durable queue over Postgres; workers can be killed mid-run and another instance reclaims on next poll

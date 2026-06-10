@@ -17,9 +17,12 @@ Complete reference for environment variables, integration setup, and common issu
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (for storage) | — | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
 | `OPENAI_API_KEY` | Yes (one of OpenAI or Gemini) | — | OpenAI API key for GPT-5.5/5.4 execution |
 | `GEMINI_API_KEY` | Yes (one of OpenAI or Gemini) | — | Google Gemini API key for 2.5 Pro/Flash/Flash-Lite execution |
-| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. |
+| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. Gemini is the primary path for the Google AI Agents Challenge; OpenAI is the alternate supported path. |
+| `JAK_SHIELD_MCP_URL` | No | — | JAK Shield MCP gateway URL. When set, routes high-risk actions through the 10-stage security pipeline. Defaults to local-only policy enforcement if unset. |
+| `JAK_SHIELD_MCP_ENABLED` | No | `0` | Set to `1` to enable JAK Shield MCP integration for signed security decisions. Defaults to `0` (local policy enforcement only). |
+| `JAK_SHIELD_MCP_API_KEY` | No | — | API key for JAK Shield MCP gateway (required if `JAK_SHIELD_MCP_ENABLED=1`). |
 | `OPENAI_ORG_ID` | No | — | OpenAI organization ID |
-| `JAK_FIELD_ENCRYPTION_KEY` | No | — | 32 hex bytes for AES-256-GCM field encryption. Without it, workflow fields are stored cleartext (development default). |
+| `JAK_FIELD_ENCRYPTION_KEY` | No | — | 64-hex-character AES-256-GCM field encryption key (32 bytes / 256 bits). Without it, workflow fields are stored cleartext (development default). |
 | `JAK_DEV_AUTH_BYPASS` | No | — | Set to `1` to bypass auth in development |
 | `GMAIL_EMAIL` | No | — | Gmail address for real email adapter |
 | `GMAIL_APP_PASSWORD` | No | — | Gmail app password (not your account password) |

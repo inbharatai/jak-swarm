@@ -15,7 +15,7 @@ That rating means the core architecture is now credible enough for controlled be
 
 - Gemini-first model execution policy for the Google AI Agents Challenge (OpenAI available as alternate provider).
 - LangGraph-backed workflow runtime with Postgres checkpointing.
-- JAK Shield gateway seam around agent and route safety checks.
+- JAK Shield gateway — a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) that JAK Swarm calls for signed security decisions on high-risk actions. Local policy enforcement (injection detection, PII redaction, RBAC, audit logging) runs inside Swarm via `packages/security`.
 - Risk-tiered tool execution and human approval pause semantics.
 - Audit logs, traces, signed evidence bundles, and encrypted workflow fields.
 - Standing Orders UI/API flow with create, edit, disable, and delete coverage.
