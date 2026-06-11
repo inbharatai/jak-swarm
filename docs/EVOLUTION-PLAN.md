@@ -1,7 +1,7 @@
 # JAK Swarm — Evolution Plan: Company Operating System
 
 > **Planning document only. No code changes made.**
-> **Revised:** 2026-06-10 — v3: Corrected JAK Shield architecture per standalone MCP gateway, Agent Governance Overlay separation, schema sequencing, and Commander-as-orchestrator pattern.
+> **Revised:** 2026-06-11 — v4: Clarified phased approach for JAK Shield MCP integration. Phase 1-11A uses local policy logic. Phase 11B adds JAK Shield MCP integration.
 
 ---
 
@@ -34,24 +34,26 @@
 │  Company Memory · Threads · Agent Registry · Ability Packs   │
 │  Agent Forge · Learning Loop · Approvals UI · Dashboard       │
 │                                                              │
-│  Local policy logic:                                         │
+│  Local policy logic (Phase 1-11A):                            │
 │  - Agent Governance Overlay (profiles, scopes, autonomy,     │
 │    role boundaries)                                          │
 │  - RBAC (PolicyEngine)                                       │
 │  - ToolRegistry + approval policies                          │
 │  - Audit references and workflow evidence                    │
+│  - Agent Firewall (injection detection, offensive cyber)     │
+│  - PII detection and redaction                                │
+│  - Tool risk classification                                   │
 │                                                              │
-│  Calls JAK Shield MCP before:                                │
+│  JAK Shield MCP integration (Phase 11B+):                     │
+│  - High-risk actions routed through JAK Shield MCP            │
+│  - Shield MCP decisions stored in AuditLog                    │
+│  - If Shield MCP unavailable: fall back to local policy       │
+│                                                              │
+│  Calls JAK Shield MCP before (Phase 11B+):                   │
 │  - High-risk tool calls                                      │
 │  - External emails/messages                                  │
-│  - GitHub/code actions                                       │
-│  - Database actions                                          │
-│  - Filesystem/shell actions                                  │
-│  - Browser actions                                           │
-│  - API/webhook calls                                         │
 │  - Memory access requests                                    │
 │  - Cross-department access                                   │
-│  - New agent profile validation                              │
 │  - Agent Forge draft approval                                │
 │  - Autonomy upgrade requests                                 │
 │  - Credential/secret operations                               │
@@ -59,9 +61,9 @@
 │  - Destructive actions                                       │
 │                                                              │
 │  Stores JAK Shield MCP decisions in audit logs and links    │
-│  them to workflow/thread evidence.                            │
+│  them to workflow/thread evidence (Phase 11B+).              │
 └──────────────────┬──────────────────────────────────────────┘
-                   │ MCP calls
+                   │ MCP calls (Phase 11B+)
                    ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              JAK SHIELD (MCP-native trust gateway)            │
@@ -84,6 +86,11 @@
 │  Reusable by any MCP-compatible agent system                  │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Phased Approach:**
+- **Phase 1-11A:** All security enforcement uses local policy logic in `packages/security`. JAK Shield MCP exists as a separate product but is NOT called from JAK Swarm.
+- **Phase 11B:** Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures.
+- **If JAK Shield MCP unavailable (Phase 11B+):** Fall back to local policy + require approval for all high-risk actions.
 
 ---
 

@@ -92,13 +92,13 @@ flowchart TB
 
 ### Medium Term — Role-Based Intelligence + Permission Governance
 
-**What:** Department-aware agent roles (CEO, HR, CTO, CMO, Finance, Legal, Ops, Support) with RBAC-scoped context, Ability Packs, Autonomy Ladder (L0–L5), Agent Governance Overlay enforcing agent profiles and memory scopes, and JAK Shield MCP for signed security decisions on high-risk actions.
+**What:** Department-aware agent roles (CEO, HR, CTO, CMO, Finance, Legal, Ops, Support) with RBAC-scoped context, Ability Packs, Autonomy Ladder (L0–L4 with local policy; L5 deferred), Agent Governance Overlay enforcing agent profiles and memory scopes.
 
 **Foundation shipped:**
 
 - 38 specialist agents across Executive, Operations, Core, and Vibe Coding layers, each with domain-scoped prompts and tool allowlists
 - 13 industry packs with agent prompt supplements, policy overlays, and restricted tool lists
-- Local policy logic in `packages/security`: Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer (local guardrails inside JAK Swarm — **not** JAK Shield itself)
+- Local policy logic in `packages/security`: Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer
 - JAK Shield is a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
 - 5-role RBAC (`END_USER`, `REVIEWER`, `OPERATOR`, `TENANT_ADMIN`, `SYSTEM_ADMIN`)
 
@@ -106,9 +106,9 @@ flowchart TB
 
 - Department-scoped RBAC (HR agents see HR context only; Finance agents see Finance context only)
 - Per-department approval policies (Finance actions require Finance REVIEWER; Legal actions require Legal REVIEWER)
-- Agent Governance Overlay calling JAK Shield MCP for signed security decisions
+- Agent Governance Overlay enforcing profiles, scopes, and role boundaries (Phase 1-11A: local policy; Phase 11B+: JAK Shield MCP integration)
 - Ability Packs (department-scoped tool, memory, and approval configurations)
-- Autonomy Ladder (L0 answer-only → L5 autonomous loop within strict policy)
+- Autonomy Ladder (L0 answer-only → L4 execute with approval; L5 autonomous loop deferred to Phase 11B+)
 
 ### Long Term — Autonomous Execution Layer
 
@@ -126,6 +126,14 @@ flowchart TB
 - Self-improving cycles (the system learns from completed workflows and adjusts future plans without human re-specification)
 - Cross-workflow learning (insights from one department's work inform another)
 - Proactive task assignment (the system identifies work that needs doing, rather than waiting for a prompt)
+
+### JAK Shield MCP Integration Timeline
+
+**Phase 1-11A:** All security enforcement uses local policy logic in `packages/security`. JAK Shield MCP exists as a separate product at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield) but is NOT called from JAK Swarm.
+
+**Phase 11B:** Wire JAK Shield MCP for high-risk action validation. Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures.
+
+**Phase 11B+:** JAK Shield MCP provides additional security layer for high-risk actions. If JAK Shield MCP unavailable, fall back to local policy + require approval.
 
 ---
 

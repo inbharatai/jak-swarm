@@ -632,11 +632,15 @@ flowchart TB
     EXECUTION -->|"feedback loop"| MEMORY
 ```
 
-**Short term** — Company Memory Layer: transcripts, decisions, policies, people, projects extracted from existing connectors into a persistent, queryable evidence graph.
+**Short term (Phase 1-4)** — Foundation: Agent Profile Registry, Ability Packs, Thread Model, Company Memory Base, Role-Based Memory Permissions, Marketing OS backend. Security enforced by local policy logic in `packages/security`.
 
-**Medium term** — Role-Based Intelligence + Permission Shield: department-aware agents with Ability Packs, Autonomy Ladder (L0–L5), Agent Governance Overlay enforcing profiles and scopes, and JAK Shield MCP for signed security decisions on high-risk actions.
+**Medium term (Phase 5-10)** — Intelligence + Governance: Commander Coach, Capability Gap Detector, Agent Forge, Evaluation + Learning Loop, Autonomy Ladder (L0-L4 with local policy; L5 deferred). Agent Governance Overlay enforces profiles, scopes, and role boundaries using local policy.
 
-**Long term** — Autonomous Execution Layer: plan, assign, execute, verify, report, learn again — a closed loop where approved work completes across the organisation and the system improves from each cycle.
+**Long term (Phase 11A-11B)** — Production Hardening + JAK Shield MCP Integration:
+- Phase 11A: Production hardening, Cloud Run Worker cutover
+- Phase 11B: Wire JAK Shield MCP for high-risk action validation (separate MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
+
+**Architecture separation:** JAK Swarm (Company OS) and JAK Shield (MCP-native trust gateway) are separate products. JAK Shield is independently deployable and auditable. Phase 1-11A uses local policy logic in `packages/security`. Phase 11B+ adds JAK Shield MCP integration for high-risk actions.
 
 </details>
 
