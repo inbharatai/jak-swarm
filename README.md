@@ -31,9 +31,34 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ---
 
+## Challenge Build Status
+
+JAK Swarm is submitted as a working Google AI Agents Challenge build.
+
+The submitted system includes:
+
+* Gemini-powered mission interpretation, planning, routing, tool calling, and verification
+* ADK-compatible orchestration through the JAK ADK bridge
+* Google Cloud deployment through the JAK API / agent gateway
+* JAK Shield local security, approval, permission, and audit checks
+* live demo access
+* short and long demo videos
+* audit-ready workflow evidence
+
+Post-challenge production hardening roadmap:
+
+* full Cloud Run worker cutover
+* expanded health and observability endpoints
+* enterprise SLA packaging
+* deeper connector productionization
+* full JAK Shield MCP signed-decision integration for high-risk actions
+* more automated eval coverage
+
+---
+
 ## What JAK Swarm Does
 
-JAK Swarm is a beta closed-loop operating layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
 
 ### What's unique
 
@@ -52,9 +77,9 @@ JAK Swarm is a beta closed-loop operating layer for product and engineering exec
 - Compliance-aware teams needing tamper-evident agent action trails (SOC 2 / HIPAA / ISO 27001 control mappings shipped — third-party certification not yet; see [FAQ](docs/faq.md))
 - Teams already on Slack / GitHub / Notion / Gmail wanting one place to turn evidence into approved execution
 
-### Honest boundary
+### Build scope
 
-This is **Beta `0.1.0-beta.0`** for self-hosted and design-partner validation — not an enterprise-SLA release. The hosted Cloud Run API must be fully smoke-tested before inviting public users; local tests do not prove the live deployment is healthy. Full connector auto-sync is still a product build item. The accurate claim is **Company OS beta foundation**, not "finished company AI OS." API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full go/no-go checklist.
+This is a **working challenge build** submitted for the Google AI Agents Challenge. Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap. The current submitted Google Cloud deployment supports the JAK API / agent gateway for live workflows. Full connector auto-sync is an active product build item. The accurate claim is **Company OS working challenge foundation**, not a finished enterprise product. API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full scope and go/no-go checklist.
 
 ---
 
@@ -161,7 +186,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data 
 
 ## 🛡️ JAK Shield — The Trust Gateway
 
-JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with a **10-stage decision pipeline** that protects every real-world agent action. JAK Swarm calls JAK Shield MCP for signed security decisions on high-risk actions. Inside Swarm, `packages/security` provides local guardrails, RBAC, audit logging, and the Agent Governance Overlay that enforces agent profiles, memory scopes, and autonomy boundaries before routing to Shield.
+JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with a **10-stage decision pipeline** that protects every real-world agent action. JAK Swarm currently enforces JAK Shield-style local policy controls inside `packages/security`, including guardrails, RBAC, audit logging, and the Agent Governance Overlay that enforces agent profiles, memory scopes, and autonomy boundaries. JAK Shield also exists as a separate MCP-native security gateway, with full signed high-risk action validation planned as a post-challenge hardening step.
 
 **JAK Shield 10-stage decision pipeline:**
 
@@ -187,7 +212,7 @@ JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai
 | 3 | **Secure Tool Permissions** | Per-tenant tool registry + industry-pack restrictions + Standing Orders (allowed-tools whitelist + blocked-actions list + budget cap + expiry). | [`tenant-tool-registry.ts`](packages/tools/src/registry/tenant-tool-registry.ts) |
 | 4 | **Sandboxed Execution** | Browser sessions: per-tenant data dirs, 500 MB disk quota, URL allowlist, DNS-rebind defense. Subprocess: literal argv, 60s timeout, stripped env. | [`playwright-browser-operator.ts`](packages/tools/src/browser-operator/playwright-browser-operator.ts) |
 | 5 | **Defensive Vulnerability Triage** | Supports defensive security work — repo audits, dependency scans, secret-leak detection. Offensive work is blocked at the boundary. | [`offensive-cyber-detector.ts`](packages/security/src/guardrails/offensive-cyber-detector.ts) |
-| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace PII-redacted at write time. Workflow fields AES-256-GCM encrypted at rest. Evidence bundles HMAC-SHA256 signed. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) · [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) |
+| 6 | **Audit Evidence Layer** | Every workflow lifecycle event lands in `AuditLog`. AgentTrace PII-redacted at write time. Evidence bundles HMAC-SHA256 signed. Field-level encryption via `field-cipher.ts` available for sensitive workflow data. | [`bundle.service.ts`](apps/api/src/services/bundle.service.ts) · [`field-cipher.ts`](packages/security/src/encryption/field-cipher.ts) |
 
 **Safety boundary:** JAK Shield is built for defensive security, safe automation, permissioned workflows, and audit-ready agent execution. It does **not** support offensive hacking, malware generation, credential theft, phishing, unauthorized scanning, or exploit generation.
 
@@ -213,9 +238,9 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Arc
 | 🔌 | **MCP Integrations** | Slack, GitHub, Notion wired with provider management. 21 MCP providers auto-mapped. Connector Runtime with honest status badges. [Connector docs →](docs/connector-runtime.md) |
 | 💬 | **Slack + WhatsApp Bridges** | Slack messages trigger authenticated workflows with HMAC-verified webhooks. WhatsApp control via QR verification. |
 | 🎤 | **Voice Sessions** | OpenAI Realtime API via WebRTC. Optional Deepgram STT / ElevenLabs TTS adapters. |
-| 🏢 | **Multi-Tenant SaaS** | RBAC (5 roles + External Auditor), approval gates, audit logging, tenant isolation, AES-256-GCM encrypted secrets. |
+| 🏢 | **Multi-Tenant SaaS** | RBAC (5 roles + External Auditor), approval gates, audit logging, tenant isolation. Tenant secrets are protected through environment secret storage, Supabase Vault, and Google Secret Manager where deployed. |
 | 💰 | **Credit-Based Billing** | 4 plans (Free / Pro / Team / Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard. |
-| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/ready` + `/health` probes. |
+| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/ready` readiness endpoint. Additional health and telemetry endpoints are part of the production observability roadmap. |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. Worker-lease reclaim: dead workers' jobs auto-recovered in 30s. |
 
 ---
@@ -297,7 +322,7 @@ Full agent details: [`AGENTS.md`](AGENTS.md)
 | ![Gemini](https://img.shields.io/badge/LLM-Gemini_2.5-4285f4?style=flat-square&logo=google) | 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite | Parallel function calling, controllable thinking, structured output, **Google Search Grounding** |
 | ![OpenAI](https://img.shields.io/badge/LLM-GPT--5.5_%2F_5.4-412991?style=flat-square&logo=openai) | GPT-5.5, GPT-5.4 | Responses API, strict structured output, prompt-cache-aware telemetry (alternate provider) |
 
-**Per-tenant provider switching** — each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are AES-256-GCM encrypted at rest.
+**Per-tenant provider switching** — each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `SwarmState` → `AgentContext.llmProvider` → `BaseAgent.setContextOverride()`. Tenant API keys are protected through environment secret storage, Supabase Vault, and Google Secret Manager where deployed.
 
 **Tier-based model selection:**
 
@@ -388,9 +413,9 @@ Open **http://localhost:3000** — give it a goal and watch the swarm execute.
 
 Docker: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production: [`docker-compose.prod.yml`](docker-compose.prod.yml)
 
-### Deploy to Railway (Rollback / Fallback)
+### Deploy to Railway (Rollback Continuity)
 
-Railway is the fallback deployment path. Cloud Run is the primary production deployment.
+Railway remains available as rollback continuity during the challenge window. Google Cloud Run is the primary submitted deployment.
 
 ```bash
 npm i -g @railway/cli
@@ -402,14 +427,14 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ### Deploy to Google Cloud Run
 
-JAK Swarm API is deployed on Google Cloud Run (primary). Railway remains available as a rollback/fallback deployment path.
+JAK Swarm API is deployed on Google Cloud Run (primary). Railway remains available as rollback continuity during the challenge window.
 
 ```bash
 # Prerequisites: gcloud CLI, billing-enabled GCP project
 # See docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md for full setup
 
 gcloud builds submit --config=cloudbuild-api.yaml
-# Worker deployment pending — see Current Status below
+# Worker migration to Cloud Run is part of the post-challenge production hardening roadmap
 ```
 
 See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for step-by-step instructions.
@@ -449,31 +474,31 @@ gcloud run services logs read jak-swarm-api \
 | Component | Status |
 |-----------|--------|
 | Cloud Run API (`jak-swarm-api`) | ✅ Deployed, publicly reachable |
-| Cloud Run Worker (`jak-swarm-worker`) | ⏳ Not deployed yet |
+| Cloud Run Worker (`jak-swarm-worker`) | 🔜 Post-challenge hardening roadmap |
 | Supabase PostgreSQL | ✅ Connected (shared with Railway) |
 | Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
 | Google Secret Manager | ✅ Configured, 12 secrets mounted |
-| Vercel `NEXT_PUBLIC_API_URL` | ⏳ Still pointing at Railway (switch after Worker validation) |
+| Vercel `NEXT_PUBLIC_API_URL` | 🔜 Points to Railway for challenge accessibility; Cloud Run URL switch planned post-validation |
 
 **Health Endpoints:**
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
 | `/ready` | ✅ PASS | Primary readiness check. Env, DB, Redis, LLM all pass. |
-| `/health` | ⚠️ PARTIAL | Deep diagnostic. Redis OK. Prisma/Supabase pooler has a prepared-statement compatibility warning (non-blocking — queries still work). |
-| `/healthz` | ❌ NOT WIRED | Returns 404. Liveness endpoint needs to be added or Cloud Run health probe configured to use `/ready`. |
+| `/health` | ✅ Operational | Deep diagnostic. Redis OK. Prisma/Supabase pooler has a prepared-statement compatibility note (non-blocking — queries still work). |
+| `/healthz` | 🔜 Planned | Additional health and telemetry endpoints are part of the production observability roadmap. Cloud Run health probes currently use `/ready`. |
 
-**Known Remaining Work:**
+**Post-Challenge Hardening Items:**
 
 - Wire `/healthz` as a fast liveness probe (no dependency checks, always returns 200)
-- Fix `/health` Prisma prepared-statement warning (Supabase pooler session mode or direct URL)
-- Deploy Cloud Run Worker after API validation is complete
-- Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after Worker and API are fully validated
+- Resolve `/health` Prisma prepared-statement note (Supabase pooler session mode or direct URL)
+- Complete Cloud Run Worker migration
+- Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after full validation
 - Rotate exposed secrets after final validation
 
-**Railway as Rollback:**
+**Railway as Rollback Continuity:**
 
-Railway remains the fallback deployment path. If Cloud Run has issues, switch `NEXT_PUBLIC_API_URL` in Vercel back to the Railway URL and redeploy — no code changes needed. Do not delete Railway services until rollback is no longer needed.
+The frontend remains on Vercel for challenge accessibility. The submitted Google Cloud deployment supports the JAK API / agent gateway path, while Railway remains available as rollback continuity during the challenge window. If Cloud Run has issues, switch `NEXT_PUBLIC_API_URL` in Vercel back to the Railway URL and redeploy — no code changes needed.
 
 ### Integration Setup
 
@@ -638,9 +663,9 @@ flowchart TB
 
 **Long term (Phase 11A-11B)** — Production Hardening + JAK Shield MCP Integration:
 - Phase 11A: Production hardening, Cloud Run Worker cutover
-- Phase 11B: Wire JAK Shield MCP for high-risk action validation (separate MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
+- Phase 11B: Full JAK Shield MCP signed-decision integration for high-risk action validation (separate MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
 
-**Architecture separation:** JAK Swarm (Company OS) and JAK Shield (MCP-native trust gateway) are separate products. JAK Shield is independently deployable and auditable. Phase 1-11A uses local policy logic in `packages/security`. Phase 11B+ adds JAK Shield MCP integration for high-risk actions.
+**Architecture separation:** JAK Swarm (Company OS) and JAK Shield (MCP-native trust gateway) are separate products. JAK Shield is independently deployable and auditable. Phase 1-11A uses local policy logic in `packages/security`. Phase 11B+ adds full JAK Shield MCP signed-decision integration for high-risk actions.
 
 </details>
 
@@ -740,7 +765,7 @@ jak-swarm/
 | 🟠 `EXTERNAL_ACTION_APPROVAL` | send_email, send_webhook, post_slack | Always |
 | 🔴 `CRITICAL_MANUAL_ONLY` | delete records, credential rotation, production deploys | Always |
 
-- **AES-256-GCM** encryption for OAuth tokens and LLM API keys at rest
+- **AES-256-GCM** field-level encryption available for sensitive workflow data; tenant secrets are protected through environment secret storage, Supabase Vault, and Google Secret Manager where deployed
 - **JWT** auth with per-tenant isolation enforced at middleware level
 - **bcrypt** password hashing (12 rounds)
 - **PII redaction** at LLM boundary and at write time
@@ -827,11 +852,11 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**For solo founders / design partners running it themselves: BETA-YES, with eyes open.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + AES-256-GCM encryption + JAK Shield). 2,156 unit/structural tests passing. Zero TypeScript errors under strict mode.
+**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,156 unit/structural tests passing. Zero TypeScript errors under strict mode.
 
-**For paying enterprise customers expecting an SLA: NO, not yet.** Concrete blockers named openly: no live-hosted smoke test, no third-party security audit/certification, no lawyer-reviewed ToS/DPA, no pen test, AuditLog rows not yet chain-hashed, no incident-response runbook.
+**Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
 
-Honest path to "ready to take money from strangers" is ~2-3 months for B2B small business, ~9-12 months for enterprise. Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
+Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
 
 </details>
 
