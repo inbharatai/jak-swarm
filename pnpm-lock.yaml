@@ -29,6 +29,7 @@ overrides:
   libsignal: https://codeload.github.com/WhiskeySockets/libsignal-node/tar.gz/1c30d7d7e76a3b0aa120b04dc6a26f5a12dccf67
   tmp: '>=0.2.6'
   tar: '>=7.5.7'
+  '@grpc/grpc-js': '>=1.14.4'
 
 importers:
 
@@ -338,7 +339,7 @@ importers:
     dependencies:
       '@google/adk':
         specifier: ^1.2.0
-        version: 1.2.0(@cfworker/json-schema@4.1.1)(@grpc/grpc-js@1.14.3)(@mikro-orm/mariadb@6.6.14(@mikro-orm/core@6.6.14)(pg@8.20.0))(@mikro-orm/mssql@6.6.14(@azure/core-client@1.10.2)(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/mysql@6.6.14(@mikro-orm/core@6.6.14)(@types/node@22.19.15)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/postgresql@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5))(@mikro-orm/sqlite@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)
+        version: 1.2.0(@cfworker/json-schema@4.1.1)(@grpc/grpc-js@1.14.4)(@mikro-orm/mariadb@6.6.14(@mikro-orm/core@6.6.14)(pg@8.20.0))(@mikro-orm/mssql@6.6.14(@azure/core-client@1.10.2)(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/mysql@6.6.14(@mikro-orm/core@6.6.14)(@types/node@22.19.15)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/postgresql@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5))(@mikro-orm/sqlite@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)
       '@jak-swarm/agents':
         specifier: workspace:*
         version: link:../agents
@@ -789,7 +790,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@bufbuild/protobuf': ^2.10.2
-      '@grpc/grpc-js': ^1.11.0
+      '@grpc/grpc-js': '>=1.14.4'
       express: ^4.21.2 || ^5.1.0
     peerDependenciesMeta:
       '@bufbuild/protobuf':
@@ -1475,8 +1476,8 @@ packages:
     resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
     engines: {node: '>=18.0.0'}
 
-  '@grpc/grpc-js@1.14.3':
-    resolution: {integrity: sha512-Iq8QQQ/7X3Sac15oB6p0FmUg/klxQvXLeileoqrTRGJYLV+/9tubbr9ipz0GKHjmXVsgFPo/+W+2cA8eNcR+XA==}
+  '@grpc/grpc-js@1.14.4':
+    resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
     engines: {node: '>=12.10.0'}
 
   '@grpc/proto-loader@0.7.15':
@@ -8071,11 +8072,11 @@ packages:
 
 snapshots:
 
-  '@a2a-js/sdk@0.3.13(@grpc/grpc-js@1.14.3)(express@4.22.2)':
+  '@a2a-js/sdk@0.3.13(@grpc/grpc-js@1.14.4)(express@4.22.2)':
     dependencies:
       uuid: 11.1.1
     optionalDependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       express: 4.22.2
 
   '@adiwajshing/keyed-db@0.2.4': {}
@@ -8692,7 +8693,7 @@ snapshots:
   '@google-cloud/opentelemetry-cloud-trace-exporter@3.0.0(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)':
     dependencies:
       '@google-cloud/opentelemetry-resource-util': 3.0.0(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@grpc/proto-loader': 0.8.0
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
@@ -8756,9 +8757,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@google/adk@1.2.0(@cfworker/json-schema@4.1.1)(@grpc/grpc-js@1.14.3)(@mikro-orm/mariadb@6.6.14(@mikro-orm/core@6.6.14)(pg@8.20.0))(@mikro-orm/mssql@6.6.14(@azure/core-client@1.10.2)(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/mysql@6.6.14(@mikro-orm/core@6.6.14)(@types/node@22.19.15)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/postgresql@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5))(@mikro-orm/sqlite@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)':
+  '@google/adk@1.2.0(@cfworker/json-schema@4.1.1)(@grpc/grpc-js@1.14.4)(@mikro-orm/mariadb@6.6.14(@mikro-orm/core@6.6.14)(pg@8.20.0))(@mikro-orm/mssql@6.6.14(@azure/core-client@1.10.2)(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/mysql@6.6.14(@mikro-orm/core@6.6.14)(@types/node@22.19.15)(mariadb@3.4.5)(pg@8.20.0))(@mikro-orm/postgresql@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5))(@mikro-orm/sqlite@6.6.14(@mikro-orm/core@6.6.14)(mariadb@3.4.5)(pg@8.20.0))(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)':
     dependencies:
-      '@a2a-js/sdk': 0.3.13(@grpc/grpc-js@1.14.3)(express@4.22.2)
+      '@a2a-js/sdk': 0.3.13(@grpc/grpc-js@1.14.4)(express@4.22.2)
       '@google-cloud/opentelemetry-cloud-monitoring-exporter': 0.21.0(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)
       '@google-cloud/opentelemetry-cloud-trace-exporter': 3.0.0(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)
       '@google-cloud/storage': 7.19.0(encoding@0.1.13)
@@ -8816,7 +8817,7 @@ snapshots:
 
   '@google/generative-ai@0.24.1': {}
 
-  '@grpc/grpc-js@1.14.3':
+  '@grpc/grpc-js@1.14.4':
     dependencies:
       '@grpc/proto-loader': 0.8.0
       '@js-sdsl/ordered-map': 4.4.2
@@ -9683,7 +9684,7 @@ snapshots:
 
   '@opentelemetry/exporter-logs-otlp-grpc@0.217.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base': 0.217.0(@opentelemetry/api@1.9.1)
@@ -9722,7 +9723,7 @@ snapshots:
 
   '@opentelemetry/exporter-metrics-otlp-grpc@0.217.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/exporter-metrics-otlp-http': 0.217.0(@opentelemetry/api@1.9.1)
@@ -9770,7 +9771,7 @@ snapshots:
 
   '@opentelemetry/exporter-trace-otlp-grpc@0.217.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base': 0.217.0(@opentelemetry/api@1.9.1)
@@ -10386,7 +10387,7 @@ snapshots:
 
   '@opentelemetry/otlp-grpc-exporter-base@0.217.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base': 0.217.0(@opentelemetry/api@1.9.1)
@@ -10952,7 +10953,7 @@ snapshots:
 
   '@temporalio/client@1.15.0':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@temporalio/common': 1.15.0
       '@temporalio/proto': 1.15.0
       abort-controller: 3.0.0
@@ -10961,7 +10962,7 @@ snapshots:
 
   '@temporalio/client@1.16.0':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@temporalio/common': 1.16.0
       '@temporalio/proto': 1.16.0
       abort-controller: 3.0.0
@@ -10986,12 +10987,12 @@ snapshots:
 
   '@temporalio/core-bridge@1.15.0':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@temporalio/common': 1.15.0
 
   '@temporalio/core-bridge@1.16.0':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@temporalio/common': 1.16.0
 
   '@temporalio/nexus@1.15.0':
@@ -11039,7 +11040,7 @@ snapshots:
 
   '@temporalio/worker@1.15.0(tslib@2.8.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@swc/core': 1.15.21
       '@temporalio/activity': 1.15.0
       '@temporalio/client': 1.15.0
@@ -11070,7 +11071,7 @@ snapshots:
 
   '@temporalio/worker@1.16.0(tslib@2.8.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@swc/core': 1.15.21
       '@temporalio/activity': 1.16.0
       '@temporalio/client': 1.16.0
@@ -12658,7 +12659,7 @@ snapshots:
   dockerode@4.0.10:
     dependencies:
       '@balena/dockerignore': 1.0.2
-      '@grpc/grpc-js': 1.14.3
+      '@grpc/grpc-js': 1.14.4
       '@grpc/proto-loader': 0.7.15
       docker-modem: 5.0.7
       protobufjs: 8.2.0

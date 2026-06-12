@@ -75,7 +75,8 @@
       "@whiskeysockets/eslint-config": "https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838",
       "libsignal": "https://codeload.github.com/WhiskeySockets/libsignal-node/tar.gz/1c30d7d7e76a3b0aa120b04dc6a26f5a12dccf67",
       "tmp": ">=0.2.6",
-      "tar": ">=7.5.7"
+      "tar": ">=7.5.7",
+      "@grpc/grpc-js": ">=1.14.4"
     },
     "auditConfig": {
       "ignoreGhsas": [
