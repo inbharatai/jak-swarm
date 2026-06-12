@@ -473,7 +473,7 @@ gcloud run services logs read jak-swarm-api \
 
 | Component | Status |
 |-----------|--------|
-| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, publicly reachable |
+| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, accessible through the submitted demo path |
 | Cloud Run Worker (`jak-swarm-worker`) | 🔜 Post-challenge hardening roadmap |
 | Supabase PostgreSQL | ✅ Connected (shared with Railway) |
 | Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
@@ -494,7 +494,6 @@ gcloud run services logs read jak-swarm-api \
 - Resolve `/health` Prisma prepared-statement note (Supabase pooler session mode or direct URL)
 - Complete Cloud Run Worker migration
 - Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after full validation
-- Rotate exposed secrets after final validation
 
 **Railway as Rollback Continuity:**
 
