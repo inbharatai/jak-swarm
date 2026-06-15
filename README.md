@@ -7,7 +7,7 @@
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory)
-[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory)
+[![Connectors](https://img.shields.io/badge/Connectors-23-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory)
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
@@ -60,7 +60,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
-| Tests | Large blocking test suite across unit and integration coverage; README/test badge reports 2,156 passing tests | ✅ Verified |
+| Tests | 2,154 blocking CI tests (1,764 unit + 390 integration) + `check:truth` documentation validation = 2,156 total; badge shows blocking count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
@@ -789,6 +789,7 @@ jak-swarm/
 │   ├── adk/                      # 🆕 Google ADK orchestration (JAK_ADK_MODE=1)
 │   │   ├── bridge/              # JAK → ADK tool bridge (FunctionTool, GOOGLE_SEARCH)
 │   │   ├── agents/              # LlmAgent wrappers for Commander, Planner, Workers, Verifier
+│   │   ├── deploy/              # Agent Engine gateway (agent-engine-entry.ts, resource ID)
 │   │   ├── orchestration/       # SequentialAgent + ParallelAgent pipeline + Runner bridge
 │   │   └── types/               # Type augmentation for @google/adk v1.2.0
 │   ├── agents/                  # 38 agent implementations

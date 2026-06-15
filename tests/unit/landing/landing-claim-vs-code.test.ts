@@ -308,7 +308,7 @@ describe('Landing — top-line counts', () => {
     const readme = read('README.md');
     expect(readme).toMatch(/AI_Agents-38/);
     expect(readme).toMatch(/Classified_Tools-122/);
-    expect(readme).toMatch(/Connectors-22/);
+    expect(readme).toMatch(/Connectors-23/);
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
 
