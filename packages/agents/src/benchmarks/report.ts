@@ -40,8 +40,12 @@ export function renderMarkdownReport(
   lines.push('| Runtime | Pass | Fail | Quota-blocked | Real fails | p50 (ms) | p95 (ms) | Cost (USD) |');
   lines.push('|---|---:|---:|---:|---:|---:|---:|---:|');
   for (const [name, stats] of Object.entries(report.byRuntime)) {
-    const quotaBlocked = stats.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0;
-    const rateLimited = stats.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0;
+    const quotaBlocked =
+      (stats.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0) +
+      (stats.failuresByKind?.['GEMINI_QUOTA_EXHAUSTED'] ?? 0);
+    const rateLimited =
+      (stats.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0) +
+      (stats.failuresByKind?.['GEMINI_RATE_LIMITED'] ?? 0);
     const blocked = quotaBlocked + rateLimited;
     const realFails = stats.fail - blocked;
     lines.push(
@@ -54,12 +58,22 @@ export function renderMarkdownReport(
   const totalFail = Object.values(report.byRuntime).reduce((s, r) => s + r.fail, 0);
   const totalBlocked = Object.values(report.byRuntime).reduce((s, r) => {
     return s + (r.failuresByKind?.['OPENAI_QUOTA_EXHAUSTED'] ?? 0)
-             + (r.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0);
+             + (r.failuresByKind?.['OPENAI_RATE_LIMITED'] ?? 0)
+             + (r.failuresByKind?.['GEMINI_QUOTA_EXHAUSTED'] ?? 0)
+             + (r.failuresByKind?.['GEMINI_RATE_LIMITED'] ?? 0);
+  }, 0);
+  const totalSafetyBlocked = Object.values(report.byRuntime).reduce((s, r) => {
+    return s + (r.failuresByKind?.['GEMINI_SAFETY_BLOCKED'] ?? 0);
   }, 0);
   if (totalBlocked > 0 && totalBlocked === totalFail) {
-    lines.push(`> ⚠️ **All ${totalFail} failures were OpenAI quota / rate-limit issues, not model or runtime problems.** ` +
-      `The harness reached the OpenAI API and the API rejected the calls for billing reasons. ` +
-      `Top up the OpenAI account at platform.openai.com/billing and re-run.`);
+    lines.push(`> ⚠️ **All ${totalFail} failures were quota / rate-limit issues, not model or runtime problems.** ` +
+      `The harness reached the provider API and the API rejected the calls for billing or rate-limit reasons. ` +
+      `Top up the relevant account and re-run.`);
+    lines.push('');
+  }
+  if (totalSafetyBlocked > 0 && totalBlocked === 0) {
+    lines.push(`> ⚠️ **${totalSafetyBlocked} scenario(s) were blocked by Gemini safety filters, not model or runtime failures.** ` +
+      `These are not real failures — the model declined to generate content that triggered safety guardrails.`);
     lines.push('');
   }
 

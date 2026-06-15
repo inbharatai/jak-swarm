@@ -51,11 +51,9 @@ export interface BenchmarkScenario {
 
 /**
  * Honest classification of a benchmark failure. Distinguishes:
- *   - OPENAI_QUOTA_EXHAUSTED — billing/quota issue, not a model or runtime fault
- *   - OPENAI_RATE_LIMITED   — temporary rate limit, retry would likely work
- *   - OPENAI_AUTH_ERROR     — bad / missing key, operator error
- *   - OPENAI_SERVER_ERROR   — 5xx from OpenAI, infra issue
- *   - MODEL_NOT_FOUND       — model name unknown to OpenAI
+ *   - OPENAI_* — OpenAI-specific quota, rate, auth, and server errors
+ *   - GEMINI_* — Gemini-specific quota, rate, safety, auth, and server errors
+ *   - MODEL_NOT_FOUND       — model name unknown to provider
  *   - EXPECTATION_MISMATCH  — call succeeded but content didn't match
  *   - TOOL_CALL_MISMATCH    — call succeeded but expected tools weren't invoked
  *   - RUNTIME_ERROR         — anything else
@@ -68,6 +66,11 @@ export type BenchmarkFailureKind =
   | 'OPENAI_RATE_LIMITED'
   | 'OPENAI_AUTH_ERROR'
   | 'OPENAI_SERVER_ERROR'
+  | 'GEMINI_QUOTA_EXHAUSTED'
+  | 'GEMINI_RATE_LIMITED'
+  | 'GEMINI_SAFETY_BLOCKED'
+  | 'GEMINI_AUTH_ERROR'
+  | 'GEMINI_SERVER_ERROR'
   | 'MODEL_NOT_FOUND'
   | 'EXPECTATION_MISMATCH'
   | 'TOOL_CALL_MISMATCH'
@@ -110,8 +113,42 @@ export interface BenchmarkReport {
  * Translate a thrown error into a BenchmarkFailureKind. Re-uses the
  * provider-router's classifyProviderError so the same vocabulary is
  * applied everywhere.
+ *
+ * For Gemini errors, checks for known Gemini-specific patterns:
+ *   - 429 + RESOURCE_EXHAUSTED → GEMINI_QUOTA_EXHAUSTED
+ *   - 429 without RESOURCE_EXHAUSTED → GEMINI_RATE_LIMITED
+ *   - Safety blocks (finishReason: SAFETY / BLOCKLIST / PROHIBITED_CONTENT) → GEMINI_SAFETY_BLOCKED
+ *   - 401/403 → GEMINI_AUTH_ERROR
+ *   - 5xx → GEMINI_SERVER_ERROR
  */
 export function classifyBenchmarkFailure(err: unknown): BenchmarkFailureKind {
+  // Check for Gemini-specific error patterns first
+  if (err && typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    const message = typeof e.message === 'string' ? e.message : '';
+    const status = typeof e.status === 'string' ? e.status : '';
+    const statusCode = typeof e.status === 'number' ? e.status : (typeof e.code === 'number' ? e.code : 0);
+
+    // Gemini safety blocks
+    if (message.includes('SAFETY') || message.includes('BLOCKLIST') || message.includes('PROHIBITED_CONTENT') || message.includes('finish_reason: SAFETY')) {
+      return 'GEMINI_SAFETY_BLOCKED';
+    }
+
+    // Gemini quota / rate limits
+    if (statusCode === 429 || status === '429') {
+      if (message.includes('RESOURCE_EXHAUSTED') || message.includes('quota')) {
+        return 'GEMINI_QUOTA_EXHAUSTED';
+      }
+      return 'GEMINI_RATE_LIMITED';
+    }
+
+    // Gemini auth errors
+    if (statusCode === 401 || statusCode === 403 || status === '401' || status === '403') {
+      // Could be either provider — fall through to classifyProviderError
+    }
+  }
+
+  // Fall back to provider-router classification (handles OpenAI patterns)
   const kind = classifyProviderError(err);
   switch (kind) {
     case 'billing_error': return 'OPENAI_QUOTA_EXHAUSTED';
