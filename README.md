@@ -33,17 +33,73 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a working Google AI Agents Challenge build.
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,156 passing tests**.
 
 The submitted system includes:
 
-* Gemini-powered mission interpretation, planning, routing, tool calling, and verification
-* ADK-compatible orchestration through the JAK ADK bridge
-* Google Cloud deployment through the JAK API / agent gateway
-* JAK Shield local security, approval, permission, and audit checks
-* live demo access
-* short and long demo videos
-* audit-ready workflow evidence
+* **Gemini-powered** mission interpretation, planning, routing, tool calling, and verification
+* **Google ADK orchestration** through `@google/adk` (`SequentialAgent` + `ParallelAgent` pipeline, activated via `JAK_ADK_MODE=1`)
+* **Google Search Grounding** — free, citation-backed, built-in via `GOOGLE_SEARCH` ADK tool
+* **Google Cloud Run deployment** — live API gateway at `jak-swarm-api` in `asia-south1`
+* **JAK Shield** local security, approval, permission, and audit checks
+* **2,156 passing tests** (CI-enforced via `pnpm check:truth`)
+* Live demo access, short and long demo videos, audit-ready workflow evidence
+
+Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified submitted cloud runtime documented here is Cloud Run.
+
+### Judge Quick Scan
+
+| Requirement | Evidence in JAK | Status |
+|:------------|:----------------|:------:|
+| Gemini integration | `GeminiRuntime` adapter, `gemini-2.5-pro/flash/flash-lite`, tier-based model selection, per-tenant provider switching | ✅ |
+| Google ADK orchestration | `@google/adk` `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1` feature flag, `adk-pipeline.ts` + `adk-runner.ts` | ✅ |
+| Multi-agent collaboration | 38 agents (6 orchestrators + 32 workers), DAG-based routing, parallel execution, auto-repair loop | ✅ |
+| Google Cloud deployment | Cloud Run API live at `asia-south1`, Secret Manager, Cloud Build CI/CD | ✅ |
+| Grounding / RAG | `GOOGLE_SEARCH` ADK built-in tool, `googleSearch` grounding, optional Vertex AI Search datastore | ✅ |
+| Business use case | Company OS — evidence graph → drift detection → approved agent execution; 13 industry packs | ✅ |
+| Safety / security layer | JAK Shield 10-stage pipeline (local policy), RBAC, approval gates, audit logging, PII redaction, HMAC signing | ✅ |
+| Tests | 2,156 unit/structural tests passing, CI-enforced truth checks, 78/80 human-simulator checks | ✅ |
+| Live demo | Publicly accessible via submitted demo path + Cloud Run API | ✅ |
+| Agent Engine | Gateway code (`agent-engine-entry.ts`) + deploy script (`deploy-agent-engine.sh`) exist; no live `reasoningEngines/...` resource ID claimed in this README | ⚠️ |
+| Agent Simulation / Benchmarking | Benchmark harness + scenarios + CLI scripts built; no published result files with quantitative data | ⚠️ |
+| Agent Optimizer | No evidence in repo | ❌ |
+| Before/after optimization results | Benchmark and readiness framework exists, but headline official before/after Agent Optimizer results are not claimed in this README | ⚠️ |
+
+### Deployment Reality
+
+| Component | Status | Details |
+|:----------|:------:|:--------|
+| **Cloud Run API** (`jak-swarm-api`) | ✅ Live | Primary verified deployment — `asia-south1`, health endpoints `/ready` + `/health` passing |
+| **Frontend / demo** | ✅ Accessible | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
+| **Agent Engine** | ⚠️ Code-ready | `agent-engine-entry.ts` + `deploy-agent-engine.sh` are deployment-ready; this README claims no live Agent Engine resource unless an actual `reasoningEngines/...` ID is present |
+| **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
+| **Google Secret Manager** | ✅ Configured | 12 secrets mounted |
+| **Supabase PostgreSQL** | ✅ Connected | Shared across deployments |
+| **Redis** | ✅ Connected | Railway public endpoint (`rediss://`) |
+
+### Track 2 Optimization Story
+
+JAK's Track 2 story is demonstrated through **architecture-level optimization, safer workflow execution, extensibility, and test coverage** — not through a claimed official Agent Optimizer run.
+
+**What JAK demonstrates as optimization:**
+
+1. **LangGraph → Google ADK extension** — JAK's existing LangGraph system is extended with a Google ADK orchestration mode (`JAK_ADK_MODE=1`). When enabled, workflows route through `SequentialAgent` + `ParallelAgent` with zero changes to the LangGraph path. This is additive, provider-flexible architecture.
+
+2. **Gemini + Google Search Grounding** — Real-time, citation-backed responses via `GOOGLE_SEARCH` (free, ADK built-in). No third-party search API keys required. Grounded responses reduce hallucination risk at the source.
+
+3. **JAK Shield safety gating** — Every real-world agent action flows through a 10-stage decision pipeline with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. High-risk actions require explicit approval. Destructive actions are never auto-retried.
+
+4. **Better auditability and approval control** — Every workflow lifecycle event lands in `AuditLog`. Evidence bundles are HMAC-SHA256 signed. Approval gates bind to exact payload via SHA-256 hash. Per-tenant tool registries enforce standing orders.
+
+5. **Per-tenant provider switching** — Each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
+
+6. **Extensive tests** — 2,156 passing tests with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
+
+**What this README does not claim:**
+
+Benchmark and readiness framework exists, but headline official before/after Agent Optimizer results are not claimed in this README. The benchmark harness (`packages/agents/src/benchmarks/`) with scenario definitions, CLI runners, and CI workflow is ready to produce quantitative results in a future run.
+
+**Clear future improvement:** Official Agent Evaluator, Agent Simulation, and Agent Optimizer runs can be added post-submission to produce quantitative before/after metrics.
 
 Post-challenge production hardening roadmap:
 
@@ -52,7 +108,7 @@ Post-challenge production hardening roadmap:
 * enterprise SLA packaging
 * deeper connector productionization
 * full JAK Shield MCP signed-decision integration for high-risk actions
-* more automated eval coverage
+* official Agent Evaluator / Simulation / Optimizer quantitative runs
 
 ---
 
@@ -127,6 +183,10 @@ Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/
 | `LLM_PROVIDER=gemini` (no flags) | Existing GeminiRuntime, no grounding |
 | `LLM_PROVIDER=gemini` + `GEMINI_GOOGLE_SEARCH_GROUNDING=1` | GeminiRuntime with Google Search grounding |
 | `LLM_PROVIDER=gemini` + `JAK_ADK_MODE=1` | ADK orchestration with Gemini + grounding |
+
+### Layer 3: Agent Engine-Ready Gateway
+
+Agent Engine-ready gateway code is included in [`agent-engine-entry.ts`](packages/adk/src/deploy/agent-engine-entry.ts), with deployment helper script [`deploy-agent-engine.sh`](scripts/deploy-agent-engine.sh). The gateway agent uses `GOOGLE_SEARCH` for real-time grounding and delegates workflow execution to JAK's API. The verified submitted cloud runtime documented here is Cloud Run — this README does not claim a live Agent Engine resource unless an actual `reasoningEngines/...` ID is present.
 
 ---
 
