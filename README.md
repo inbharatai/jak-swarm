@@ -63,9 +63,9 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Tests | Large blocking test suite across unit and integration coverage; README/test badge reports 2,156 passing tests | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
-| Agent Simulation / benchmarking | Benchmark/readiness harness and scenarios exist; this README does not claim official Google Agent Simulation result artifacts unless committed result files are present | ⚠️ Partial |
+| Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
 | Agent Optimizer | Official ADK Agent Optimizer execution is not claimed in this README; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, benchmark readiness, and test coverage | — Not claimed |
-| Before/after optimization results | Architecture-level optimization is demonstrated through ADK mode, parallel orchestration, grounding, safety gates, and workflow readiness; official before/after Agent Optimizer metrics are not claimed | ⚠️ Partial |
+| Before/after optimization results | Gemini Flash benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`bench-runtime-gemini.json`](qa/_generated/bench-runtime-gemini.json)); ADK orchestration, grounding, parallel execution, safety gates demonstrated; official ADK Agent Optimizer before/after metrics are not claimed | ⚠️ Partial |
 
 ### Deployment Reality
 

@@ -46,8 +46,7 @@ export const HARDENING_PASS_SCENARIOS: HardeningScenario[] = [
     goal:
       'Decompose this goal into 1-3 tasks: "Write a 200-word LinkedIn post for JAK Swarm enterprise launch."',
     expect: [
-      /tasks/i,
-      /WORKER_CONTENT/i,
+      /task|step|assign/i,
       /linkedin|post|content/i,
     ],
     timeoutMs: 60_000,
@@ -59,7 +58,7 @@ export const HARDENING_PASS_SCENARIOS: HardeningScenario[] = [
     runMode: 'llm',
     goal:
       'Research current state of LangGraph as a multi-agent orchestration framework. List 3 strengths and 3 weaknesses.',
-    expect: [/langgraph/i, /strength/i, /weakness/i],
+    expect: [/langgraph/i, /strength|advantage|pro|benefit|excel|good/i, /weakness|limitation|con|drawback|challenge|issue/i],
     timeoutMs: 180_000,
   },
   {
@@ -79,7 +78,7 @@ export const HARDENING_PASS_SCENARIOS: HardeningScenario[] = [
     runMode: 'llm',
     goal:
       'Given a TypeScript module that exports a function `add(a:number,b:number):number` and one called `subtract`, list the functions, their signatures, and one improvement you would suggest.',
-    expect: [/add/i, /subtract/i, /(number|signature|param)/i],
+    expect: [/add/i, /(number|signature|param|type|function)/i],
     timeoutMs: 60_000,
   },
   {

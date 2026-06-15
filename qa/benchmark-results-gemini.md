@@ -1,22 +1,22 @@
-# Benchmark results — hardening-pass — gemini — 2026-06-15T11:47:57.036Z
+# Benchmark results — hardening-pass — gemini — 2026-06-15T11:54:02.277Z
 
-Generated at: `2026-06-15T11:47:57.035Z`  
+Generated at: `2026-06-15T11:54:02.277Z`  
 Scenarios run: **4**
 
 ## Per-runtime summary
 
 | Runtime | Pass | Fail | Quota-blocked | Real fails | p50 (ms) | p95 (ms) | Cost (USD) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| gemini-flash | 2 | 2 | 0 | 2 | 6633 | 10005 | $0.0000 |
+| gemini-flash | 4 | 0 | 0 | 0 | 7614 | 8977 | $0.0000 |
 
 ## Per-scenario results
 
 | Scenario | Runtime | Status | Kind | Latency (ms) | Tool calls (matched/observed) | Reason |
 |---|---|:---:|---|---:|---:|---|
-| planning-simple | gemini-flash | ❌ | EXPECTATION_MISMATCH | 10005 | 0/0 | expectations missed: WORKER_CONTENT |
-| research-task | gemini-flash | ❌ | EXPECTATION_MISMATCH | 6633 | 0/0 | expectations missed: strength, weakness |
-| cmo-linkedin-post | gemini-flash | ✅ |  | 6352 | 0/0 |  |
-| vibecoder-inspect | gemini-flash | ✅ |  | 6155 | 0/0 |  |
+| planning-simple | gemini-flash | ✅ |  | 5854 | 0/0 |  |
+| research-task | gemini-flash | ✅ |  | 7614 | 0/0 |  |
+| cmo-linkedin-post | gemini-flash | ✅ |  | 8977 | 0/0 |  |
+| vibecoder-inspect | gemini-flash | ✅ |  | 6053 | 0/0 |  |
 
 ## Integration scenarios — deferred (require full stack)
 

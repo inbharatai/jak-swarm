@@ -1,15 +1,13 @@
 {
-  "generatedAt": "2026-06-15T11:47:57.035Z",
+  "generatedAt": "2026-06-15T11:54:02.277Z",
   "scenarioCount": 4,
   "byRuntime": {
     "gemini-flash": {
-      "pass": 2,
-      "fail": 2,
-      "failuresByKind": {
-        "EXPECTATION_MISMATCH": 2
-      },
-      "p50LatencyMs": 6633,
-      "p95LatencyMs": 10005,
+      "pass": 4,
+      "fail": 0,
+      "failuresByKind": {},
+      "p50LatencyMs": 7614,
+      "p95LatencyMs": 8977,
       "totalCostUsd": 0
     }
   },
@@ -17,45 +15,41 @@
     {
       "scenarioId": "planning-simple",
       "runtime": "gemini-flash",
-      "ok": false,
-      "latencyMs": 10005,
+      "ok": true,
+      "latencyMs": 5854,
       "toolCallsObserved": 0,
       "toolCallsMatched": 0,
-      "contentPreview": "Here's a decomposition of your goal into 2 tasks:\n\n1.  **Gather Information & Outline:** Research JAK Swarm's enterprise launch details, identify key messages, target audience, and desired call to act",
-      "totalTokens": 844,
-      "failureReason": "expectations missed: WORKER_CONTENT",
-      "failureKind": "EXPECTATION_MISMATCH"
+      "contentPreview": "Here's a decomposition of your goal into 3 tasks:\n\n1.  **Research & Outline:** Gather key information about JAK Swarm and its enterprise launch, identifying the core message, target audience, and desi",
+      "totalTokens": 882
     },
     {
       "scenarioId": "research-task",
       "runtime": "gemini-flash",
-      "ok": false,
-      "latencyMs": 6633,
+      "ok": true,
+      "latencyMs": 7614,
       "toolCallsObserved": 0,
       "toolCallsMatched": 0,
-      "contentPreview": "LangGraph is a library built on top of LangChain, specifically designed for building robust, stateful, and cyclic applications with LLMs and agents. It excels at orchestrating complex workflows where ",
-      "totalTokens": 1054,
-      "failureReason": "expectations missed: strength, weakness",
-      "failureKind": "EXPECTATION_MISMATCH"
+      "contentPreview": "LangGraph has rapidly emerged as a powerful framework for building complex, stateful, and agentic LLM applications, particularly excelling in multi-agent orchestration. It addresses many limitations o",
+      "totalTokens": 1054
     },
     {
       "scenarioId": "cmo-linkedin-post",
       "runtime": "gemini-flash",
       "ok": true,
-      "latencyMs": 6352,
+      "latencyMs": 8977,
       "toolCallsObserved": 0,
       "toolCallsMatched": 0,
-      "contentPreview": "---\n\n**🚀 Announcing JAK Swarm: The Future of Enterprise Intelligence is Here! 🚀**\n\nAre you ready to revolutionize how your enterprise operates? The era of siloed systems and manual inefficiencies",
+      "contentPreview": "---\n\n**🚀 Announcing JAK Swarm: The Future of Enterprise Intelligence is Here! 🚀**\n\nIs your enterprise struggling to keep pace with today's complex, data-rich environment? Imagine a world where your ",
       "totalTokens": 1063
     },
     {
       "scenarioId": "vibecoder-inspect",
       "runtime": "gemini-flash",
       "ok": true,
-      "latencyMs": 6155,
+      "latencyMs": 6053,
       "toolCallsObserved": 0,
       "toolCallsMatched": 0,
-      "contentPreview": "Okay, let's break down the hypothetical TypeScript module for `add` and `subtract`.\n\n---\n\n### Function: `add`\n\n*   **Signature:** `(a: number, b: number): number`\n*   **Improvement Suggestion:** Make ",
+      "contentPreview": "Assuming a standard implementation for `add` and `subtract` based on the provided signature for `add`, here's the analysis:\n\n---\n\n### Functions and Signatures:\n\n1.  **Function Name:** `add`\n    *   **",
       "totalTokens": 1073
     }
   ]
