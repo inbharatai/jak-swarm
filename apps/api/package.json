@@ -22,8 +22,8 @@
     "@fastify/rate-limit": "^10.2.2",
     "@fastify/swagger": "^9.2.0",
     "@fastify/swagger-ui": "^5.2.1",
-    "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/adk": "workspace:*",
+    "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/db": "workspace:*",
     "@jak-swarm/industry-packs": "workspace:*",
     "@jak-swarm/security": "workspace:*",
@@ -62,7 +62,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/pdfkit": "^0.17.6",
     "pino-pretty": "^13.1.3",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
