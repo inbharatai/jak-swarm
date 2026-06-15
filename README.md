@@ -45,7 +45,7 @@ The submitted system includes:
 * **2,154 blocking CI tests** (1,764 unit + 390 integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
-Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified submitted cloud runtime documented here is Cloud Run.
+Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified public deployment documented here is Cloud Run. A live Agent Engine resource should only be claimed when an actual `projects/.../locations/.../reasoningEngines/...` ID is available.
 
 ### Challenge Evidence Snapshot
 
@@ -59,12 +59,12 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Google Cloud deployment | Verified Cloud Run API deployment in `asia-south1`; Cloud Run deployment docs and Google Cloud deployment path included | ✅ Verified |
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
-| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed decision / HMAC-ready security path | ✅ Verified |
+| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
 | Tests | Large blocking test suite across unit and integration coverage; README/test badge reports 2,156 passing tests | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Agent Engine-ready gateway code exists in `packages/adk/src/deploy/agent-engine-entry.ts`, with helper script `scripts/deploy-agent-engine.sh`; this README does not claim a live `reasoningEngines/...` resource unless one is produced | ⚠️ Code-ready |
 | Agent Simulation / benchmarking | Benchmark/readiness harness and scenarios exist; this README does not claim official Google Agent Simulation result artifacts unless committed result files are present | ⚠️ Partial |
-| Agent Optimizer | Official ADK Agent Optimizer run is not claimed; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, and benchmark readiness | — Not claimed |
+| Agent Optimizer | Official ADK Agent Optimizer execution is not claimed in this README; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, benchmark readiness, and test coverage | — Not claimed |
 | Before/after optimization results | Architecture-level optimization is demonstrated through ADK mode, parallel orchestration, grounding, safety gates, and workflow readiness; official before/after Agent Optimizer metrics are not claimed | ⚠️ Partial |
 
 ### Deployment Reality
@@ -83,7 +83,7 @@ Optional Agent Engine gateway path:
 Vertex AI Agent Engine → JAK Agent Engine gateway → Cloud Run API → JAK workflows
 ```
 
-This keeps the existing demo and production path safe while showing that JAK is aligned with Agent Engine deployment requirements.
+This keeps the existing demo and production path safe. It does not replace the submitted demo path or the verified Cloud Run backend.
 
 | Component | Status | Details |
 |:----------|:------:|:--------|
@@ -97,27 +97,21 @@ This keeps the existing demo and production path safe while showing that JAK is 
 
 ### Track 2 Optimization Story
 
-JAK's Track 2 story is demonstrated through **architecture-level optimization, safer workflow execution, extensibility, and test coverage** — not through a claimed official Agent Optimizer run.
+JAK's optimization story is not a single prompt tweak. It is an architecture-level shift from a broad workflow system into a Google-aligned multi-agent execution layer:
 
-**What JAK demonstrates as optimization:**
+1. **ADK mode routes workflows through `SequentialAgent` and `ParallelAgent`** — when `JAK_ADK_MODE=1`, JAK's existing LangGraph system is extended with Google ADK orchestration. Workflows route through `SequentialAgent` + `ParallelAgent` with zero changes to the LangGraph path. This is additive, provider-flexible architecture.
 
-1. **LangGraph → Google ADK extension** — JAK's existing LangGraph system is extended with a Google ADK orchestration mode (`JAK_ADK_MODE=1`). When enabled, workflows route through `SequentialAgent` + `ParallelAgent` with zero changes to the LangGraph path. This is additive, provider-flexible architecture.
+2. **Gemini grounding improves factual reliability before and during agent execution** — real-time, citation-backed responses via `GOOGLE_SEARCH` (built-in with included quota, ADK native). No third-party search API keys required. Grounded responses reduce hallucination risk at the source.
 
-2. **Gemini + Google Search Grounding** — Real-time, citation-backed responses via `GOOGLE_SEARCH` (built-in with included quota, ADK native). No third-party search API keys required. Grounded responses reduce hallucination risk at the source.
+3. **Parallel worker orchestration allows specialist agents to collaborate** — instead of forcing one agent to do everything, 38 specialist agents execute in parallel, each with domain-scoped tools and context. The Verifier agent quality-checks output before delivery.
 
-3. **JAK Shield safety gating** — Every real-world agent action flows through a 10-stage decision pipeline with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. High-risk actions require explicit approval. Destructive actions are never auto-retried.
+4. **JAK Shield-style policy controls, approval gates, RBAC, and audit logging reduce unsafe automation risk** — every real-world agent action flows through a 10-stage decision pipeline with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. High-risk actions require explicit approval. Destructive actions are never auto-retried.
 
-4. **Better auditability and approval control** — Every workflow lifecycle event lands in `AuditLog`. Evidence bundles are HMAC-SHA256 signed. Approval gates bind to exact payload via SHA-256 hash. Per-tenant tool registries enforce standing orders.
+5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
-5. **Per-tenant provider switching** — Each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
+6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
-6. **Extensive tests** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
-
-**What this README does not claim:**
-
-Benchmark and readiness framework exists, but headline official before/after Agent Optimizer results are not claimed in this README. The benchmark harness (`packages/agents/src/benchmarks/`) with scenario definitions, CLI runners, and CI workflow is ready to produce quantitative results in a future run.
-
-**Clear future improvement:** Official Agent Evaluator, Agent Simulation, and Agent Optimizer runs can be added post-submission to produce quantitative before/after metrics.
+Official ADK Agent Optimizer execution is not claimed unless committed artifacts are present. JAK's current public optimization evidence is the ADK orchestration layer, grounded execution path, safety gates, test coverage, and readiness framework.
 
 Post-challenge production hardening roadmap:
 
