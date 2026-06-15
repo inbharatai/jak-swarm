@@ -45,7 +45,7 @@ The submitted system includes:
 * **2,154 blocking CI tests** (1,764 unit + 390 integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
-Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified public deployment documented here is Cloud Run. A live Agent Engine resource should only be claimed when an actual `projects/.../locations/.../reasoningEngines/...` ID is available.
+Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
 
 ### Challenge Evidence Snapshot
 
@@ -62,14 +62,14 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
 | Tests | Large blocking test suite across unit and integration coverage; README/test badge reports 2,156 passing tests | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
-| Agent Engine | Agent Engine-ready gateway code exists in `packages/adk/src/deploy/agent-engine-entry.ts`, with helper script `scripts/deploy-agent-engine.sh`; this README does not claim a live `reasoningEngines/...` resource unless one is produced | ⚠️ Code-ready |
+| Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark/readiness harness and scenarios exist; this README does not claim official Google Agent Simulation result artifacts unless committed result files are present | ⚠️ Partial |
 | Agent Optimizer | Official ADK Agent Optimizer execution is not claimed in this README; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, benchmark readiness, and test coverage | — Not claimed |
 | Before/after optimization results | Architecture-level optimization is demonstrated through ADK mode, parallel orchestration, grounding, safety gates, and workflow readiness; official before/after Agent Optimizer metrics are not claimed | ⚠️ Partial |
 
 ### Deployment Reality
 
-JAK's verified public Google Cloud deployment is the Cloud Run API. The Agent Engine gateway code is included and deployment-ready as a separate gateway path, but the README should only claim a live Agent Engine deployment after an actual `projects/.../locations/.../reasoningEngines/...` resource ID exists.
+JAK's verified public Google Cloud deployment is the Cloud Run API. A live Agent Engine gateway is also deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (`asia-south1`).
 
 Current verified deployment path:
 
@@ -89,7 +89,7 @@ This keeps the existing demo and production path safe. It does not replace the s
 |:----------|:------:|:--------|
 | **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary verified deployment — `asia-south1`, health endpoints `/ready` + `/health` passing |
 | **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
-| **Agent Engine** | ⚠️ Code-ready | `agent-engine-entry.ts` + `deploy-agent-engine.sh` are deployment-ready; this README claims no live Agent Engine resource unless an actual `reasoningEngines/...` ID is present |
+| **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; `agent-engine-entry.ts` + `deploy-agent-engine.sh` / `.ts` / `.py` + `agent-engine-resource.ts` |
 | **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
 | **Google Secret Manager** | ✅ Configured | 12 secrets mounted |
 | **Supabase PostgreSQL** | ✅ Connected | Shared across deployments |
@@ -105,7 +105,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 3. **Parallel worker orchestration allows specialist agents to collaborate** — instead of forcing one agent to do everything, 38 specialist agents execute in parallel, each with domain-scoped tools and context. The Verifier agent quality-checks output before delivery.
 
-4. **JAK Shield-style policy controls, approval gates, RBAC, and audit logging reduce unsafe automation risk** — every real-world agent action flows through a 10-stage decision pipeline with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. High-risk actions require explicit approval. Destructive actions are never auto-retried.
+4. **JAK Shield-style policy controls, approval gates, RBAC, and audit logging reduce unsafe automation risk** — every real-world agent action flows through 6 local policy stages (Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer) with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. The external JAK Shield MCP adds 4 additional stages for signed high-risk decisions. High-risk actions require explicit approval. Destructive actions are never auto-retried.
 
 5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
@@ -196,9 +196,9 @@ Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/
 | `LLM_PROVIDER=gemini` + `GEMINI_GOOGLE_SEARCH_GROUNDING=1` | GeminiRuntime with Google Search grounding |
 | `LLM_PROVIDER=gemini` + `JAK_ADK_MODE=1` | ADK orchestration with Gemini + grounding |
 
-### Layer 3: Agent Engine-Ready Gateway
+### Layer 3: Agent Engine Gateway
 
-Agent Engine-ready gateway code is included in [`agent-engine-entry.ts`](packages/adk/src/deploy/agent-engine-entry.ts), with deployment helper script [`deploy-agent-engine.sh`](scripts/deploy-agent-engine.sh). The gateway agent uses `GOOGLE_SEARCH` for real-time grounding and delegates workflow execution to JAK's API. The verified submitted cloud runtime documented here is Cloud Run — this README does not claim a live Agent Engine resource unless an actual `reasoningEngines/...` ID is present.
+Agent Engine gateway code in [`agent-engine-entry.ts`](packages/adk/src/deploy/agent-engine-entry.ts), with deployment scripts [`deploy-agent-engine.sh`](scripts/deploy-agent-engine.sh), [`deploy-agent-engine.ts`](scripts/deploy-agent-engine.ts), and [`deploy-agent-engine-python.py`](scripts/deploy-agent-engine-python.py). The live Agent Engine resource is `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (stored in [`agent-engine-resource.ts`](packages/adk/src/deploy/agent-engine-resource.ts)). The gateway agent uses `GOOGLE_SEARCH` for real-time grounding and delegates workflow execution to JAK's Cloud Run API. Cloud Run remains the primary verified deployment; Agent Engine is an additional gateway path.
 
 ---
 

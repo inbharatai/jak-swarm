@@ -12,7 +12,7 @@ Teams increasingly want AI agents to execute real business goals: research compe
 
 JAK Swarm is a multi-agent operating layer that converts a human goal into a secure, dependency-aware execution plan. A **Commander** interprets the goal, a **Planner** creates a task DAG, a **Router** assigns work to specialist agents, **JAK Shield** validates safety and permissions, worker agents execute with real tools, and a **Verifier** checks the output against the original intent.
 
-The system supports **Gemini as a first-class runtime**, allowing agents to use Gemini 2.5 Pro, Flash, and Flash-Lite depending on task complexity. It also supports **Google ADK (Agent Development Kit)** for native Agent Engine deployment on Vertex AI.
+The system supports **Gemini as a first-class runtime**, allowing agents to use Gemini 2.5 Pro, Flash, and Flash-Lite depending on task complexity. It also supports **Google ADK (Agent Development Kit)** for native Agent Engine deployment on Vertex AI (live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`).
 
 ---
 
@@ -21,7 +21,7 @@ The system supports **Gemini as a first-class runtime**, allowing agents to use 
 - **38 specialist agents** across orchestration, executive, coding, operations, and core workflow layers
 - **122 classified tools** mapped through a risk-based execution model (READ_ONLY → CRITICAL_MANUAL_ONLY)
 - **Gemini-powered agent runtime** using `FunctionDeclaration[]` for tool calling, `responseSchema` for structured output, safety filtering, and controllable reasoning tiers
-- **Google ADK integration** — standalone `@jak-swarm/adk` package bridges JAK's 122 tools into ADK `FunctionTool` instances, wraps agents as ADK `LlmAgent` nodes, and deploys `SequentialAgent` / `ParallelAgent` pipelines to Agent Engine on Vertex AI
+- **Google ADK integration** — standalone `@jak-swarm/adk` package bridges JAK's 122 tools into ADK `FunctionTool` instances, wraps agents as ADK `LlmAgent` nodes, and deploys `SequentialAgent` / `ParallelAgent` pipelines to Agent Engine on Vertex AI (live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`)
 - **Dependency-aware task planning** using LangGraph workflows with PostgreSQL checkpoints for durable execution
 - **Live per-tenant provider switching** — each organization can choose between OpenAI and Gemini from the Settings UI without changing environment variables, redeploying, or editing code. The choice persists in tenant memory and `BaseAgent.setContextOverride()` routes subsequent agent calls through the selected provider at runtime
 - **JAK Shield security layer** — 6-stage pipeline: Agent Firewall (injection + offensive-cyber detection), Risk-Based Approvals (6-tier tool risk lattice), Secure Tool Permissions (per-tenant registry, role-gated installer), Sandboxed Execution (per-tenant browser sessions, URL allowlists, path-traversal guards), Defensive Vulnerability Triage (boundary between offensive and defensive security work), Audit Evidence Layer (HMAC-SHA256 signed bundles, timing-safe verification)
@@ -63,7 +63,7 @@ The `@jak-swarm/adk` package provides a first-class bridge between JAK Swarm and
 - **Agent Wrappers** (`jak-adk-agents.ts`): Creates ADK `LlmAgent` instances for Commander, Planner, Workers, Verifier, and Synthesis roles. Model selection mirrors JAK's tier routing: Gemini Pro for Commander/Verifier, Flash for workers
 - **Orchestration Pipeline** (`adk-pipeline.ts`): Builds `SequentialAgent` pipeline: Commander → Planner → `ParallelAgent(workers)` → Synthesis → Verifier. Also provides `buildSimpleAdkPipeline()` for single-agent tasks and `buildDynamicAdkPipeline()` for plan-driven worker creation
 - **Runner Bridge** (`adk-runner.ts`): `runWithAdk()` creates an ADK `Runner` + `InMemorySessionService`, runs the pipeline, collects events, and converts results to `Partial<SwarmState>` compatible with JAK's persistence/SSE infrastructure
-- **Agent Engine Deployment** (`agent-engine-entry.ts`): Creates standalone ADK agents deployable to Google Cloud's Agent Engine (Vertex AI) — a `createJakGatewayAgent()` for full workflow orchestration and `createJakDirectAgent()` for single-turn tasks. Both use `GOOGLE_SEARCH` for real-time grounding and call back to JAK's Railway API for tool execution
+- **Agent Engine Deployment** (`agent-engine-entry.ts`): Creates standalone ADK agents deployed to Google Cloud's Agent Engine (Vertex AI) at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` — a `createJakGatewayAgent()` for full workflow orchestration and `createJakDirectAgent()` for single-turn tasks. Both use `GOOGLE_SEARCH` for real-time grounding and call back to JAK's Cloud Run API for tool execution
 
 ADK mode is activated via `JAK_ADK_MODE=1`. The `@google/adk` SDK is lazy-loaded — only imported when ADK mode is enabled, keeping the default path lightweight.
 
@@ -73,7 +73,7 @@ ADK mode is activated via `JAK_ADK_MODE=1`. The `@google/adk` SDK is lazy-loaded
 
 - **Gemini 2.5 Pro / Flash / Flash-Lite** for agent reasoning and tool execution
 - **Google Generative AI SDK** (`@google/generative-ai`) for direct Gemini API calls
-- **Google Agent Development Kit** (`@google/adk`) for Agent Engine deployment
+- **Google Agent Development Kit** (`@google/adk`) for Agent Engine deployment (live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`)
 - **LangGraph** for multi-step workflow orchestration
 - **LangChain** for agent abstractions
 - **PostgreSQL / Supabase** for tenant configuration, checkpoints, audit logs, and traces
@@ -161,7 +161,7 @@ We route different agents across Gemini tiers:
 
 All 122 tools run through the same `FunctionDeclaration[]` interface regardless of tier.
 
-Beyond direct Gemini API calls, we also integrate with **Google ADK** (`@google/adk`). The `@jak-swarm/adk` package bridges JAK's tool registry into ADK `FunctionTool` instances, wraps agents as ADK `LlmAgent` nodes, and builds `SequentialAgent` → `ParallelAgent(workers)` → `Verifier` pipelines deployable to **Agent Engine on Vertex AI**. Two Agent Engine entry points exist: `createJakGatewayAgent()` for full workflow orchestration and `createJakDirectAgent()` for single-turn tasks, both using `GOOGLE_SEARCH` for real-time grounding.
+Beyond direct Gemini API calls, we also integrate with **Google ADK** (`@google/adk`). The `@jak-swarm/adk` package bridges JAK's tool registry into ADK `FunctionTool` instances, wraps agents as ADK `LlmAgent` nodes, and builds `SequentialAgent` → `ParallelAgent(workers)` → `Verifier` pipelines deployed to **Agent Engine on Vertex AI** at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`. Two Agent Engine entry points exist: `createJakGatewayAgent()` for full workflow orchestration and `createJakDirectAgent()` for single-turn tasks, both using `GOOGLE_SEARCH` for real-time grounding.
 
 **What is currently missing:** a native multi-turn tool execution loop in the Gemini SDK.
 
