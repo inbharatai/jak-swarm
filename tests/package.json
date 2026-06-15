@@ -28,13 +28,13 @@
     "@langchain/core": "^1.1.46",
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint": "^1.0.2",
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "^1.61.0",
     "@temporalio/client": "^1.11.6",
     "@temporalio/testing": "^1.11.6",
     "@temporalio/worker": "^1.11.6",
     "@temporalio/workflow": "^1.11.6",
     "@types/node": "^22.10.7",
-    "@vitest/coverage-v8": "2.1.9",
+    "@vitest/coverage-v8": "4.1.9",
     "cheerio": "^1.0.0",
     "exceljs": "^4.4.0",
     "mammoth": "^1.8.0",
@@ -43,6 +43,6 @@
     "testcontainers": "^10.13.0",
     "tsx": "^4.22.4",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
