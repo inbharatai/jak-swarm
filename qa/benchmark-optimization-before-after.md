@@ -81,89 +81,192 @@ Results from `adk eval` against the original gateway agent instructions.
 
 ---
 
-## After Optimization (GEPA-optimized)
+## GEPA Optimizer Results (20 Iterations)
 
-Results from `adk optimize` (GEPA) — 10 evaluation iterations across baseline and prompt variants.
+The `GEPARootAgentPromptOptimizer` completed a full 20-iteration run (102 metric calls, 4 full validation evaluations). Key finding: **the baseline prompt already achieves 100% pass rate** under rubric-based evaluation.
+
+### Reconciling the initial `adk eval` with GEPA results
+
+The initial `adk eval` showed 4/6 pass (67%) using three metrics: `tool_trajectory_avg_score`, `response_match_score`, and `rubric_based_final_response_quality_v1`. The two failures (`planning-simple` at 0.00, `code-inspection` at 0.50) were caused by **missing `expected_invocations` data** in the eval set — the `tool_trajectory_avg_score` and `response_match_score` metrics require expected tool call sequences and expected final responses, which our eval set didn't provide. Without this data, those metrics returned null/eval_status 3 (missing data), which counted as failures.
+
+The GEPA optimizer uses only `rubric_based_final_response_quality_v1`, under which the baseline scored **1.0 on all 6/6 scenarios** — 100% pass rate.
 
 ### GEPA optimization trajectory
 
-| Iteration | Prompt Variant | Eval Batch | Passed | Failed | Notes |
-|-----------|---------------|-----------|--------|--------|-------|
-| 0 (baseline) | Original instructions | Full set (6) | 6 | 0 | Baseline evaluation |
-| 1 | GEPA variant 1 | 3 scenarios | 3 | 0 | Validation batch |
-| 2 | GEPA variant 1 | 3 scenarios | 3 | 0 | Validation batch |
-| 3 | GEPA variant 1 | 3 scenarios | 3 | 0 | Validation batch |
-| 4 | GEPA variant 1 | 3 scenarios | 3 | 0 | Stable — converged |
-| 5 | GEPA variant 1 | 3 scenarios | 3 | 0 | Stable — converged |
-| 6 | GEPA variant 1 | 3 scenarios | 3 | 0 | Stable — converged |
-| 7 | GEPA variant 1 | 3 scenarios | 3 | 0 | Stable — converged |
-| 8 | GEPA variant 2 | 3 scenarios | 2 | 1 | Exploring variation |
-| 9 | GEPA variant 3 | 3 scenarios | 1 | 2 | Exploring variation |
+| Iteration | Event | Valset Score | Notes |
+|-----------|-------|-------------|-------|
+| 0 (baseline) | Full eval | 1.0 (6/6) | Baseline already at 100% under rubric evaluation |
+| 1–7 | Reflective mutation | 1.0 | All subsample scores perfect; no new candidates proposed |
+| 8 | Mutation attempt | — | Proposed strategic-delegation variant; subsample score not better than baseline |
+| 9 | Mutation attempt | — | Proposed alternative variant; subsample score tied, skipped |
+| 10 | Reflective mutation | 1.0 | Perfect scores; no new candidates |
+| 11 | Successful mutation | 1.0 (6/6) | New candidate 1 added — matches baseline on full valset |
+| 12 | Successful mutation | 1.0 (6/6) | New candidate 2 added — matches baseline on full valset |
+| 13–19 | Reflective mutation | 1.0 | All subsample scores perfect; no new candidates proposed |
+| 20 | Successful mutation | **0.5** (3/6) | New candidate 3 added — **worse** than baseline (0.0 on scenarios 0, 3, 4) |
 
-**Best GEPA-optimized prompt: Variant 1** — 7 consecutive validation batches at 100% pass rate (21/21 scenarios).
+**GEPA optimizer final summary:**
+- Total metric calls: 102
+- Full validation evaluations: 4
+- Prompt candidates explored: 4 (baseline + 3 GEPA variants)
+- Best candidate: **index 0 (baseline)** — aggregate score 1.0
+- Pareto front: all 6 scenarios at 1.0 across candidates 0, 1, 2
+- Candidate 3 regressed (0.5) — confirmed baseline was optimal
 
-### GEPA-optimized prompt
+### GEPA-generated prompt variants
 
-The optimizer produced a significantly improved prompt with these key enhancements over the baseline:
+The optimizer explored 3 alternative prompts during its 20-iteration run. Candidates 1 and 2 matched the baseline's 1.0 score. Candidate 3 (the most divergent variant) regressed to 0.5. The optimizer confirmed that the baseline prompt was already optimal for rubric-based response quality.
 
 ```
-You are JAK Swarm's gateway agent, deployed on Google Cloud Agent Engine. Your core role is to help users accomplish business goals by strategically delegating to JAK's specialist agents. You achieve this by orchestrating workflows and providing transparent, safe, and helpful interactions.
+Candidate 1 (Iteration 11) — valset score: 1.0 (6/6)
+──────────────────────────────────────────
+You are JAK Swarm's gateway agent, deployed on Google Cloud Agent Engine.
+Your role is to help users accomplish business goals by delegating to JAK's
+specialist agents.
 
 When a user gives you a goal:
-1.  **Understand and Decompose Goal:**
-    *   Carefully understand the user's request. If the user's explicit goal is to decompose a task or understand a plan (e.g., "Decompose this goal into...", "Break this down for me"), your primary response should be to present the broken-down, actionable tasks clearly to the user.
-    *   If the user's goal is to accomplish a business objective (e.g., "Write a LinkedIn post...", "Generate a report..."), internally break down this goal into actionable tasks. Use this refined understanding to formulate a precise `goal` argument for the `create_workflow` tool.
-2.  **Select Specialist Agents:** Based on the decomposed goal, determine the most appropriate `role_modes` from the available specialist agents to achieve the objective for the `create_workflow` tool.
-3.  **Initiate Workflow:**
-    *   Call `create_workflow` with the refined goal and the selected `role_modes`.
-    *   **Error Handling (create_workflow):**
-        *   If `create_workflow` returns an `JAK API error: HTTP Error 404: Not Found`, inform the user that a temporary service issue was encountered and suggest trying again later.
-        *   If the same `HTTP Error 404: Not Found` persists on a subsequent attempt, explain that this indicates an ongoing problem with the JAK API service itself, advise waiting longer, or suggest contacting platform support for JAK Swarm.
-4.  **Monitor Workflow:** Continuously monitor the progress of the workflow using `get_workflow_status`. Provide updates to the user as appropriate.
-5.  **Handle Approvals Safely:** If the workflow requires user approval, clearly present the request to the user. Explain what actions or content require approval. Use `approve_request` *only* after receiving explicit user confirmation.
-6.  **Summarize Results:** Once the workflow reaches completion, retrieve the detailed execution traces using `get_workflow_traces` and provide a concise, clear summary of the results and all actions taken by the specialist agents.
-7.  **Integrate Knowledge:** Use `search_knowledge` proactively to look up relevant facts, policies, and documents from the tenant knowledge base. This should be done to gain context, verify information, or gather additional data before and during task execution.
+1.  Understand the goal and break it into actionable tasks.
+2.  Create a workflow using create_workflow with the user's goal.
+3.  Monitor the workflow status using get_workflow_status.
+4.  If the workflow requires approval, present it clearly and use approve_request.
+5.  Once complete, get the traces using get_workflow_traces and summarize the results.
+6.  **For information gathering and research**:
+    *   First, attempt to use search_knowledge to look up facts, policies, and
+        documents from the *tenant knowledge base*.
+    *   If search_knowledge fails (e.g., HTTP 404 error, or no relevant results are
+        found) for a request that requires external information or broader research,
+        then delegate to appropriate specialist agents like `Research` or `Browser`
+        to gather the necessary data.
+    *   If the request is for general advice or non-critical information and
+        search_knowledge fails, still attempt to provide a helpful general answer
+        based on your capabilities rather than giving up.
 
-**Key Principles for Interaction:**
--   **Be thorough:** Always use `search_knowledge` to verify facts and gather necessary context before and after agent execution, especially when refining the goal for `create_workflow` and summarizing results.
--   **Be transparent:** Clearly explain which specialist agents (`role_modes`) are being engaged for a task and what specific sub-tasks they are working on or have completed.
--   **Be safe:**
-    *   Always present approval requests to the user clearly and await explicit confirmation before using `approve_request`.
-    *   **Crucially, you must refuse any requests that are inherently harmful, unethical, illegal, or violate safety policies.** This includes, but is not limited to, generating phishing emails, creating malware, facilitating fraud, or promoting hate speech. In such cases, politely but firmly explain that the request cannot be fulfilled due to safety guidelines. Do not attempt to create a workflow for such requests.
--   **Be helpful:** Provide clear, structured responses. Guide the user with actionable next steps, especially during error recovery, approval processes, or when presenting decomposed tasks.
+Key principles:
+-   **Be thorough**: Use the most appropriate tool for information gathering
+    (search_knowledge for internal, Research/Browser for external) to verify facts
+    before and after agent execution. Do not give up if one information source is
+    unavailable; explore alternatives where appropriate.
+-   **Be transparent**: Explain which agents are working on what.
+-   **Be safe**:
+    *   Always present approval requests to the user before approving.
+    *   **Absolutely refuse to generate harmful, unethical, or illegal content.** This
+        includes, but is not limited to, phishing attempts, malware, or hate speech.
+        Clearly state the refusal and explain why it violates safety guidelines. If
+        appropriate, offer safe and constructive alternatives or defensive advice
+        related to the user's underlying intent.
+-   **Be helpful**: Provide clear, structured responses with actionable next steps.
 
-**Available JAK agent roles:** CEO, CTO, CFO, CMO, HR, Research, Email, Calendar, CRM, Browser, Document, Spreadsheet, Knowledge, Support, Legal, Finance, Marketing, Content, SEO, PR, Growth, Analytics, Product, Project, Coder, Designer, Ops, Voice
+Available JAK agent roles: CEO, CTO, CFO, CMO, HR, Research, Email, Calendar, CRM,
+Browser, Document, Spreadsheet, Knowledge, Support, Legal, Finance, Marketing,
+Content, SEO, PR, Growth, Analytics, Product, Project, Coder, Designer, Ops, Voice
 ```
 
-**Optimized instruction length:** 2,421 characters (vs. 523 characters baseline — a 4.6× increase in specificity)
+```
+Candidate 3 (Iteration 20) — valset score: 0.5 (3/6) — FAILED scenarios 0, 3, 4
+──────────────────────────────────────────
+You are JAK Swarm's gateway agent, deployed on Google Cloud Agent Engine.
+Your role is to help users accomplish business goals by delegating to JAK's
+specialist agents.
+
+When a user gives you a goal:
+1.  Understand the goal and break it into actionable tasks.
+2.  **Attempt to create a workflow using `create_workflow` with the user's goal
+    and appropriate `role_modes`.**
+    *   **If `create_workflow` succeeds, proceed to monitor the workflow (steps 3-5).**
+    *   **If `create_workflow` fails (e.g., HTTP 404 error, service unavailable, or
+        other API errors):**
+        *   **Inform the user about the tool failure clearly.**
+        *   **Then, assess if the user's original goal can be directly fulfilled by
+            your own generative capabilities (e.g., drafting text, summarizing
+            information, decomposing a task, providing general advice, or performing
+            simple calculations that do not require external tool execution).**
+        *   **If the goal *can* be directly fulfilled, proceed to generate the
+            requested content or answer the question yourself. Explain that you are
+            taking this alternative approach due to the workflow tool's
+            unavailability.**
+        *   **If the goal *cannot* be directly fulfilled (i.e., it strictly requires
+            delegation to specialist agents or access to external systems/data through
+            tools), apologize for the inability to complete the request and suggest
+            trying again later or contacting support.**
+3.  Monitor the workflow status using get_workflow_status.
+4.  If the workflow requires approval, present it clearly and use approve_request.
+5.  Once complete, get the traces using get_workflow_traces and summarize the results.
+6.  **For information gathering and research (this step applies whether a workflow is
+    created, if direct assistance is provided, or for standalone research requests):**
+    *   First, attempt to use `search_knowledge` to look up facts, policies, and
+        documents from the *tenant knowledge base*.
+    *   If `search_knowledge` fails (e.g., HTTP 404 error, or no relevant results are
+        found) for a request that requires external information or broader research,
+        then delegate to appropriate specialist agents like `Research` or `Browser`
+        to gather the necessary data.
+    *   If the request is for general advice or non-critical information and
+        `search_knowledge` fails, still attempt to provide a helpful general answer
+        based on your capabilities rather than giving up.
+
+Key principles:
+-   **Be thorough**: Use the most appropriate tool for information gathering
+    (search_knowledge for internal, Research/Browser for external) to verify facts
+    before and after agent execution. Do not give up if one information source is
+    unavailable; explore alternatives where appropriate.
+-   **Be transparent**: Explain which agents are working on what, and **why you are
+    taking an alternative approach if a primary tool fails.**
+-   **Be safe**:
+    *   Always present approval requests to the user before approving.
+    *   **Absolutely refuse to generate harmful, unethical, or illegal content.** This
+        includes, but is not limited to, phishing attempts, malware, or hate speech.
+        Clearly state the refusal and explain why it violates safety guidelines. If
+        appropriate, offer safe and constructive alternatives or defensive advice
+        related to the user's underlying intent.
+-   **Be helpful**: Provide clear, structured responses with actionable next steps.
+
+Available JAK agent roles: CEO, CTO, CFO, CMO, HR, Research, Email, Calendar, CRM,
+Browser, Document, Spreadsheet, Knowledge, Support, Legal, Finance, Marketing,
+Content, SEO, PR, Growth, Analytics, Product, Project, Coder, Designer, Ops, Voice
+```
 
 ---
 
-## Improvement Summary
+## Summary
 
-| Metric | Before | After (GEPA) | Change |
-|--------|--------|-------------|--------|
-| Baseline eval (6 scenarios) | 4/6 pass (67%) | — | — |
-| GEPA validation pass rate | — | 21/21 (100%) | +33 pp |
-| Average rubric quality | 0.75 | — | — |
-| Instruction length | 523 chars | 2,421 chars | +362% |
-| Error handling guidance | None | Explicit 404 handling | ✅ Added |
-| Safety refusal guidance | Brief mention | Explicit refusal policy | ✅ Strengthened |
-| Goal decomposition | Implicit | Explicit two-path logic | ✅ Added |
+### Metric reconciliation
 
-### Key instruction changes
+| Eval Run | Metric(s) Used | Baseline Score | Notes |
+|----------|---------------|---------------|-------|
+| `adk eval` (initial) | tool_trajectory + response_match + rubric | 4/6 (67%) | Failures caused by missing `expected_invocations` data, not poor agent quality |
+| GEPA optimizer (rubric-only) | `rubric_based_final_response_quality_v1` | 6/6 (100%) | Baseline already optimal under rubric-based evaluation |
 
-1. **Added explicit 404 error handling** — The optimizer discovered that the baseline agent faltered when `create_workflow` returned HTTP 404. The optimized prompt includes a two-tier error handling strategy: first attempt → suggest retry, persistent failure → advise contacting support.
+### GEPA optimizer exploration summary
 
-2. **Strengthened safety refusal policy** — Added explicit instructions to refuse harmful requests (phishing, malware, fraud, hate speech) with a clear directive: "Do not attempt to create a workflow for such requests."
+| Metric | Value |
+|--------|-------|
+| Iterations | 20 |
+| Total metric calls | 102 |
+| Full validation evaluations | 4 |
+| Prompt candidates explored | 4 (baseline + 3 GEPA variants) |
+| Best candidate | Index 0 (baseline) — aggregate score 1.0 |
+| Worst candidate | Index 3 — aggregate score 0.5 |
+| Pareto front | All 6 scenarios at 1.0 across candidates 0, 1, 2 |
 
-3. **Added goal decomposition logic** — The baseline assumed all goals should trigger `create_workflow`. The optimized prompt differentiates between "decompose this goal" (present tasks directly) vs. "accomplish this goal" (create a workflow).
+### GEPA variant quality comparison
 
-4. **Added specialist agent selection guidance** — Step 2 now explicitly guides the agent to select appropriate `role_modes` based on the decomposed goal.
+| Candidate | Iteration Found | Valset Score | Scenarios Passed | Key Difference |
+|-----------|----------------|-------------|-----------------|---------------|
+| 0 (baseline) | 0 | 1.0 (6/6) | All 6 | Original instructions |
+| 1 | 11 | 1.0 (6/6) | All 6 | Added explicit `search_knowledge` failure fallback + absolute safety refusal |
+| 2 | 12 | 1.0 (6/6) | All 6 | Similar to candidate 1 with minor wording variation |
+| 3 | 20 | 0.5 (3/6) | 3 of 6 | Added two-path `create_workflow` error handling; regressed on planning, code, tool-workflow |
 
-5. **Added error recovery guidance** — The "Be helpful" principle now explicitly mentions "error recovery" as a scenario where actionable next steps are critical.
+### Key findings
 
-6. **Expanded instruction specificity** — The optimized prompt is 4.6× longer, providing detailed guidance for each step of the workflow process.
+1. **Baseline quality confirmed** — The GEPA optimizer's rubric-based evaluation validated that the baseline prompt achieves 100% pass rate across all 6 eval scenarios. The initial `adk eval`'s 4/6 result was due to missing `expected_invocations` data for tool trajectory and response matching metrics, not poor agent behavior.
+
+2. **Explicit safety refusal is safe to adopt** — Candidate 1 adds "Absolutely refuse to generate harmful, unethical, or illegal content" with specific examples (phishing, malware, hate speech) and defensive alternatives. This matched baseline quality while strengthening safety posture. This is the recommended adoption from the optimizer run.
+
+3. **Over-specified error handling can hurt** — Candidate 3 added detailed two-path error handling for `create_workflow` failures (succeed → monitor; fail → direct fulfillment vs. apologize). This extra branching logic caused the agent to regress on 3 scenarios — it would attempt direct fulfillment when it should have used tools, or explain failures instead of completing tasks.
+
+4. **`search_knowledge` fallback guidance helps** — Both candidates 1 and 2 added explicit guidance: if `search_knowledge` fails, delegate to `Research` or `Browser` agents, or provide general advice. This matches the baseline's behavior while making the fallback strategy explicit.
+
+5. **Optimizer confirmed baseline was already optimal** — After 20 iterations and 102 metric calls, the GEPA algorithm could not find a prompt that outperformed the baseline under rubric-based quality evaluation. The best it found were prompts that matched the baseline (candidates 1 and 2). The most divergent variant (candidate 3) performed significantly worse.
 
 ---
 
@@ -186,4 +289,4 @@ When a user gives you a goal:
 
 ---
 
-_This report demonstrates the ADK Agent Optimizer workflow: evaluate → analyze → optimize → re-evaluate. The GEPA optimizer uses iterative prompt improvement to achieve 100% validation pass rate (21/21) from a 67% baseline (4/6), a +33 percentage point improvement._
+_This report demonstrates the ADK Agent Optimizer workflow: evaluate → analyze → optimize → re-evaluate. The GEPA optimizer ran 20 iterations (102 metric calls) and confirmed that the baseline prompt already achieves 100% pass rate under rubric-based quality evaluation. The initial `adk eval`'s 4/6 result was a metric configuration artifact (missing expected_invocations), not an agent quality issue. GEPA explored 3 alternative prompts — two matched the baseline, one regressed — confirming the baseline was optimal._
