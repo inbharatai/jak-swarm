@@ -52,7 +52,7 @@
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
     "overrides": {
-      "protobufjs": "8.2.0",
+      "protobufjs": ">=8.4.1",
       "langsmith": "0.7.1",
       "music-metadata": ">=11.12.3",
       "@fastify/static": "9.1.1",
@@ -71,10 +71,11 @@
       "nodemailer": "8.0.7",
       "postcss": "8.5.14",
       "uuid": "11.1.1",
-      "ws": "8.20.1",
+      "ws": ">=8.21.0",
+      "form-data": ">=4.0.6",
       "@whiskeysockets/eslint-config": "https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838",
       "libsignal": "https://codeload.github.com/WhiskeySockets/libsignal-node/tar.gz/1c30d7d7e76a3b0aa120b04dc6a26f5a12dccf67",
-      "tmp": ">=0.2.6",
+      "tmp": ">=0.2.7",
       "tar": ">=7.5.7",
       "@grpc/grpc-js": ">=1.14.4"
     },
@@ -83,7 +84,9 @@
         "GHSA-hm7r-c7qw-ghp6",
         "GHSA-mvf2-f6gm-w987",
         "GHSA-rp9m-7r4c-75qg",
-        "GHSA-r6q2-hw4h-h46w"
+        "GHSA-r6q2-hw4h-h46w",
+        "GHSA-hmw2-7cc7-3qxx",
+        "GHSA-3qcw-2rhx-2726"
       ]
     }
   }

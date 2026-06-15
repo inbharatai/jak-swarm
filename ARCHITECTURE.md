@@ -428,9 +428,9 @@ As of 2026-06-15, JAK Swarm has two verified deployment paths:
 - Service: `jak-swarm-api`
 - Region: `asia-south1`
 - URL: `https://jak-swarm-api-565531938617.asia-south1.run.app`
-- `/ready`: passing
-- `/health`: partial due to non-blocking Prisma/Supabase pooler prepared-statement warning
-- `/healthz`: not wired yet
+- `/ready`: ⚠️ intermittently 503 due to Prisma/Supabase pooler prepared-statement error; returns 200 when DB check succeeds
+- `/health`: ⚠️ reports `degraded` when DB check fails (prepared-statement error with Supabase pooler)
+- `/healthz`: not wired yet (liveness probe, always 200 when wired)
 
 **Additional — Vertex AI Agent Engine Gateway:**
 - Resource ID: `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`
