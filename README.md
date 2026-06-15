@@ -33,7 +33,7 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,156 passing tests**.
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,154 blocking CI tests**.
 
 The submitted system includes:
 
