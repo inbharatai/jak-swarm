@@ -88,6 +88,7 @@ Core principles:
 │   │  • OpenAI runtime: GPT-5.5 / GPT-5.4 tier routing            │  │
 │   │  • Gemini runtime: Gemini 2.5 Pro / Flash / Flash-Lite       │  │
 │   │  • Google ADK: LlmAgent, SequentialAgent, ParallelAgent     │  │
+│   │  • Vertex AI Agent Engine gateway (live deployment)          │  │
 │   │  • Role-aware tier selection (Tier 1–3)                     │  │
 │   │  • ToolRegistry — resolves tool names to implementations    │  │
 │   │  • Memory injection via <memory> tags                       │  │
@@ -203,7 +204,7 @@ The SwarmGraph analyzes the dependency graph via `getReadyTasks()` and dispatche
 Workflow state (the full `SwarmState` object) is persisted to PostgreSQL via `PostgresCheckpointSaver` after every node completes. The QueueWorker provides job-level durability: if the process crashes, ACTIVE jobs are recovered on restart — classified as replay-safe, replay-unsafe, or requiring manual intervention.
 
 **Per-tenant provider switching:**
-Each organization can choose between OpenAI and Gemini from the Settings UI. The choice persists in `TenantMemory` and `BaseAgent.setContextOverride()` routes subsequent agent calls through the selected provider at runtime. No environment variables, no redeployment, no code changes.
+Each organization can choose between OpenAI and Gemini from the Settings UI. The choice persists in `TenantMemory` and `BaseAgent.setContextOverride()` routes subsequent agent calls through the selected provider at runtime. Configured from the dashboard — no redeployment needed.
 
 ---
 
@@ -395,6 +396,16 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
             │  (public endpoint│ │ (pgvector, tenants,
             │   rediss://)    │ │  workflows, traces)
             └─────────────────┘ └─────────────────┘
+                     ▲
+                     │ (Agent Engine delegates to Cloud Run API)
+            ┌────────┴────────┐
+            │  Vertex AI      │
+            │  Agent Engine   │
+            │  jak-swarm-     │
+            │  gateway        │
+            │  asia-south1     │
+            │  GOOGLE_SEARCH   │
+            └─────────────────┘
 ```
 
 **Why two deployments:**
@@ -439,7 +450,9 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
 
 Cloud Run is the primary deployment. Railway is the rollback/fallback path. Cloud Run connects to Railway Redis via its **public endpoint** (not `.railway.internal` private DNS, which is unreachable from outside Railway). Traffic switches to Cloud Run by changing `NEXT_PUBLIC_API_URL` in Vercel and redeploying. Rollback is switching the URL back to Railway. See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for full setup instructions.
 
-**Current status:** API deployed at `https://jak-swarm-api-565531938617.asia-south1.run.app`; Worker not yet deployed. `/ready` ✅ PASS (all checks). `/health` ⚠️ PARTIAL (Redis OK, Prisma prepared-statement warning with Supabase pooler — non-blocking). `/healthz` ❌ NOT WIRED (returns 404).
+**Current status:**
+- API deployed at `https://jak-swarm-api-565531938617.asia-south1.run.app`; Worker not yet deployed. `/ready` ✅ PASS (all checks). `/health` ⚠️ PARTIAL (Redis OK, Prisma prepared-statement warning with Supabase pooler — non-blocking). `/healthz` ❌ NOT WIRED (returns 404).
+- Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (asia-south1). Gateway agent uses GOOGLE_SEARCH for grounding and delegates workflow execution to JAK's Cloud Run API. Deployment scripts: `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, `scripts/deploy-agent-engine-python.py`. Resource file: `packages/adk/src/deploy/agent-engine-resource.ts`.
 
 ### Environment Tiers
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging

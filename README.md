@@ -15,7 +15,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-> 🏆 **Google for Startups AI Agents Challenge** — Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, uses **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, and integrates **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching — no code changes, no env-var swaps.
+> 🏆 **Google for Startups AI Agents Challenge** — Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, deployed on **Vertex AI Agent Engine**, uses **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, and integrates **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching configured from the Settings UI.
 
 **JAK turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 

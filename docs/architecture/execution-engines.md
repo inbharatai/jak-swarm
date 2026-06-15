@@ -31,6 +31,27 @@ JAK Swarm supports two LLM providers (OpenAI and Gemini) selected via `LLM_PROVI
 | `JAK_EXECUTION_ENGINE` | Deprecated. Must be unset or left at default in API config. |
 | `JAK_WORKFLOW_RUNTIME` | Deprecated. Must be unset or `langgraph` in API config. |
 | `JAK_OPENAI_RUNTIME_AGENTS` | Deprecated diagnostic/backcompat allowlist. It no longer limits OpenAI usage. |
+| `JAK_ADK_MODE` | Optional. `1` enables Google ADK orchestration (SequentialAgent + ParallelAgent pipeline). Falls back to LangGraph on ADK error. |
+| `GEMINI_GOOGLE_SEARCH_GROUNDING` | Optional. `1` enables Google Search grounding in Gemini runtime. |
+| `GEMINI_VERTEX_AI_SEARCH_DATASTORE` | Optional. Vertex AI Search datastore path for Gemini grounding. |
+| `OPENAI_WEB_SEARCH` | Optional. `1` enables `web_search_preview` for OpenAI runtime. |
+
+## Agent Engine Gateway
+
+JAK Swarm has a live Agent Engine gateway deployed on Vertex AI:
+
+- **Resource ID**: `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`
+- **Display name**: `jak-swarm-gateway`
+- **Region**: `asia-south1`
+- **Model**: gemini-2.5-flash with GOOGLE_SEARCH grounding
+- **Pattern**: Agent Engine → JAK Cloud Run API → JAK workflows
+
+The gateway agent (`packages/adk/src/deploy/agent-engine-entry.ts`) uses `@google/adk` with the `GOOGLE_SEARCH` tool for real-time grounding. It delegates workflow execution to JAK's Cloud Run API at `https://jak-swarm-api-565531938617.asia-south1.run.app`.
+
+**Deployment scripts**: `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, `scripts/deploy-agent-engine-python.py`
+**Resource file**: `packages/adk/src/deploy/agent-engine-resource.ts`
+
+Cloud Run remains the primary verified deployment. Agent Engine is an additional gateway path.
 
 Providers not yet integrated (Anthropic, DeepSeek, Ollama, OpenRouter) must not be configured as runtime keys. Gemini and OpenAI are the two supported providers.
 
@@ -42,7 +63,7 @@ Providers not yet integrated (Anthropic, DeepSeek, Ollama, OpenRouter) must not 
 - Approval pauses use LangGraph interrupt/resume semantics and must not be bypassed by generic unpause/resume commands.
 - High-risk actions must move through `ApprovalRequest` records and preserve audit evidence before execution continues.
 - Legacy pricing/model rows, if present, are only for historical trace accounting and are not a runtime fallback path.
-- Switching providers requires only changing `LLM_PROVIDER` env var and redeploying — no code changes, no DB migrations.
+- Switching providers requires only changing `LLM_PROVIDER` env var and redeploying — no DB migrations needed.
 
 ## Rollback
 
