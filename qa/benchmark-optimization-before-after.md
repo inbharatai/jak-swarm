@@ -30,7 +30,7 @@ The JAK Swarm gateway agent (`JAKSwarmGateway`) was evaluated and optimized usin
 | Evaluator model | `gemini-2.5-flash` |
 | User simulator model | `gemini-2.5-flash` |
 
-> **Note:** The `google_search` built-in tool is excluded from the eval module because the ADK evaluator's LlmBackedUserSimulator cannot combine built-in grounding tools with FunctionTool declarations in the same Gemini API request. Google Search grounding is verified separately via the live Agent Engine deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`.
+> **Note:** The `google_search` built-in tool is excluded from the eval module because the ADK evaluator's LlmBackedUserSimulator cannot combine built-in grounding tools with FunctionTool declarations in the same Gemini API request. Google Search grounding is verified separately via the live Agent Engine deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`.
 
 ### Eval criteria
 
