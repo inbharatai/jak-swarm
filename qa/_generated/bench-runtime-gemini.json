@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-06-15T11:47:57.035Z",
+  "scenarioCount": 4,
+  "byRuntime": {
+    "gemini-flash": {
+      "pass": 2,
+      "fail": 2,
+      "failuresByKind": {
+        "EXPECTATION_MISMATCH": 2
+      },
+      "p50LatencyMs": 6633,
+      "p95LatencyMs": 10005,
+      "totalCostUsd": 0
+    }
+  },
+  "scenarios": [
+    {
+      "scenarioId": "planning-simple",
+      "runtime": "gemini-flash",
+      "ok": false,
+      "latencyMs": 10005,
+      "toolCallsObserved": 0,
+      "toolCallsMatched": 0,
+      "contentPreview": "Here's a decomposition of your goal into 2 tasks:\n\n1.  **Gather Information & Outline:** Research JAK Swarm's enterprise launch details, identify key messages, target audience, and desired call to act",
+      "totalTokens": 844,
+      "failureReason": "expectations missed: WORKER_CONTENT",
+      "failureKind": "EXPECTATION_MISMATCH"
+    },
+    {
+      "scenarioId": "research-task",
+      "runtime": "gemini-flash",
+      "ok": false,
+      "latencyMs": 6633,
+      "toolCallsObserved": 0,
+      "toolCallsMatched": 0,
+      "contentPreview": "LangGraph is a library built on top of LangChain, specifically designed for building robust, stateful, and cyclic applications with LLMs and agents. It excels at orchestrating complex workflows where ",
+      "totalTokens": 1054,
+      "failureReason": "expectations missed: strength, weakness",
+      "failureKind": "EXPECTATION_MISMATCH"
+    },
+    {
+      "scenarioId": "cmo-linkedin-post",
+      "runtime": "gemini-flash",
+      "ok": true,
+      "latencyMs": 6352,
+      "toolCallsObserved": 0,
+      "toolCallsMatched": 0,
+      "contentPreview": "---\n\n**🚀 Announcing JAK Swarm: The Future of Enterprise Intelligence is Here! 🚀**\n\nAre you ready to revolutionize how your enterprise operates? The era of siloed systems and manual inefficiencies",
+      "totalTokens": 1063
+    },
+    {
+      "scenarioId": "vibecoder-inspect",
+      "runtime": "gemini-flash",
+      "ok": true,
+      "latencyMs": 6155,
+      "toolCallsObserved": 0,
+      "toolCallsMatched": 0,
+      "contentPreview": "Okay, let's break down the hypothetical TypeScript module for `add` and `subtract`.\n\n---\n\n### Function: `add`\n\n*   **Signature:** `(a: number, b: number): number`\n*   **Improvement Suggestion:** Make ",
+      "totalTokens": 1073
+    }
+  ]
+}
