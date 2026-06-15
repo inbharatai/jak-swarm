@@ -44,7 +44,7 @@ const resourceFilePath = resolve(repoRoot, 'packages/adk/src/deploy/agent-engine
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const GCP_PROJECT_ID = process.env['GCP_PROJECT_ID'] ?? '';
-const GCP_REGION = process.env['GCP_REGION'] ?? 'us-central1';
+const GCP_REGION = process.env['GCP_REGION'] ?? 'asia-south1';
 const JAK_API_URL = process.env['JAK_API_URL'] ?? '';
 const JAK_API_KEY = process.env['JAK_API_KEY'] ?? '';
 const GEMINI_API_KEY = process.env['GEMINI_API_KEY'] ?? '';

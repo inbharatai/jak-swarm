@@ -31,7 +31,7 @@ from datetime import datetime
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 GCP_PROJECT_ID = os.environ.get('GCP_PROJECT_ID', 'crafty-haiku-498807-v8')
-GCP_REGION = os.environ.get('GCP_REGION', 'us-central1')
+GCP_REGION = os.environ.get('GCP_REGION', 'asia-south1')
 JAK_API_URL = os.environ.get('JAK_API_URL', '')
 JAK_API_KEY = os.environ.get('JAK_API_KEY', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')

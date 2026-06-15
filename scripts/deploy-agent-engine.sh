@@ -30,7 +30,7 @@ set -euo pipefail
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 GCP_PROJECT_ID="${GCP_PROJECT_ID:?Please set GCP_PROJECT_ID}"
-GCP_REGION="${GCP_REGION:-us-central1}"
+GCP_REGION="${GCP_REGION:-asia-south1}"
 JAK_API_URL="${JAK_API_URL:?Please set JAK_API_URL}"
 JAK_API_KEY="${JAK_API_KEY:?Please set JAK_API_KEY}"
 DISPLAY_NAME="${AGENT_DISPLAY_NAME:-jak-swarm-gateway}"
