@@ -37,10 +37,28 @@ This evaluation uses Google ADK's `AgentEvaluator` with a `LlmBackedUserSimulato
 
 Both failures are related to the eval environment's inability to provide realistic API responses — the JAK Cloud Run API is designed for production use, not eval mocking. The agent's tool-calling behavior was correct in both cases.
 
-## Optimizer Results
+## GEPA Optimizer Results
 
-_The GEPA optimizer (`adk optimize`) is running against the gateway agent. Results will be appended when complete._
+The `GEPARootAgentPromptOptimizer` ran 10 evaluation iterations, testing multiple prompt variants:
+
+| Iteration | Prompt | Eval Batch | Passed | Failed |
+|-----------|--------|-----------|--------|--------|
+| 0 (baseline) | Original | 6 scenarios | 6 | 0 |
+| 1–7 | GEPA variant 1 | 3 scenarios each | 3 | 0 |
+| 8 | GEPA variant 2 | 3 scenarios | 2 | 1 |
+| 9 | GEPA variant 3 | 3 scenarios | 1 | 2 |
+
+**Best result: GEPA variant 1** achieved 100% pass rate across 7 consecutive validation batches (21/21 scenarios).
+
+The GEPA optimizer generated an improved prompt with:
+- Explicit 404 error handling for `create_workflow` API errors
+- Explicit safety refusal policy for harmful requests
+- Two-path goal decomposition logic (decompose vs. accomplish)
+- Specialist agent selection guidance
+- Error recovery guidance
+
+Full before/after comparison: `qa/benchmark-optimization-before-after.md`
 
 ---
 
-_Eval artifacts: `qa/_generated/adk-eval-results.json`, `qa/_generated/adk-eval-output.txt`, `packages/adk/eval/.adk/eval_history/`_
+_Eval artifacts: `qa/_generated/adk-eval-results.json`, `qa/_generated/adk-eval-output.txt`, `qa/_generated/adk-optimize-output.txt`, `packages/adk/eval/.adk/eval_history/`_

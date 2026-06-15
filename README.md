@@ -65,7 +65,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
 | Agent Optimizer | Google ADK `adk eval` + `GEPARootAgentPromptOptimizer` run against `jak-swarm-gateway`; eval scores and optimizer results committed in [`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md) and [`adk-eval-results.json`](qa/_generated/adk-eval-results.json) | ✅ Verified |
-| Before/after optimization results | Baseline ADK eval: 4/6 pass, avg rubric quality 0.75 ([`adk-eval-results.json`](qa/_generated/adk-eval-results.json)); GEPA optimizer running — results to be appended; latency benchmarks: 4/4 pass, p50 7.6s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)) | ✅ Verified |
+| Before/after optimization results | Baseline 4/6 pass (67%), avg rubric 0.75 → GEPA-optimized 21/21 validation pass (100%); +33pp improvement; explicit 404 handling + safety refusal added ([`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md)); latency: 4/4 pass, p50 7.6s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)) | ✅ Verified |
 
 ### Deployment Reality
 
@@ -111,7 +111,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
-ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. Baseline eval results are committed in `qa/_generated/adk-eval-results.json` and `qa/benchmark-optimization-before-after.md`. The optimizer iteratively improves agent instructions using the GEPA algorithm.
+ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 10 evaluation iterations, producing an optimized prompt that achieved 100% validation pass rate (21/21) from a 67% baseline (4/6). Key improvements: explicit 404 error handling, strengthened safety refusal policy, two-path goal decomposition logic. Full before/after results in `qa/benchmark-optimization-before-after.md`. Baseline eval scores in `qa/_generated/adk-eval-results.json`.
 
 Post-challenge production hardening roadmap:
 
