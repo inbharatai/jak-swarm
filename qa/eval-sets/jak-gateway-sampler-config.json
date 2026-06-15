@@ -33,5 +33,6 @@
     }
   },
   "app_name": "eval",
-  "train_eval_set": "jak_gateway_eval_v1"
+  "train_eval_set": "jak_gateway_eval_v1",
+  "validation_eval_set": "jak_gateway_val_v1"
 }

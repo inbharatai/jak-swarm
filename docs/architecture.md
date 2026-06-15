@@ -452,7 +452,7 @@ Cloud Run is the primary deployment. Railway is the rollback/fallback path. Clou
 
 **Current status:**
 - API deployed at `https://jak-swarm-api-565531938617.asia-south1.run.app`; Worker not yet deployed. `/ready` ✅ PASS (all checks). `/health` ⚠️ PARTIAL (Redis OK, Prisma prepared-statement warning with Supabase pooler — non-blocking). `/healthz` ❌ NOT WIRED (returns 404).
-- Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (asia-south1). Gateway agent uses GOOGLE_SEARCH for grounding and delegates workflow execution to JAK's Cloud Run API. Deployment scripts: `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, `scripts/deploy-agent-engine-python.py`. Resource file: `packages/adk/src/deploy/agent-engine-resource.ts`.
+- Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (asia-south1). Gateway agent uses GOOGLE_SEARCH for grounding and 5 FunctionTool wrappers (create_workflow, get_workflow_status, get_workflow_traces, search_knowledge, approve_request) that call the JAK Cloud Run API at /workflows, /memory, /approvals. Deployment scripts: `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, `scripts/deploy-agent-engine-python.py`. Resource file: `packages/adk/src/deploy/agent-engine-resource.ts`.
 
 ### Environment Tiers
 - **development** — local `pnpm dev`, Docker Compose, hot-reload, verbose logging

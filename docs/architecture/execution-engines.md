@@ -40,7 +40,7 @@ JAK Swarm supports two LLM providers (OpenAI and Gemini) selected via `LLM_PROVI
 
 JAK Swarm has a live Agent Engine gateway deployed on Vertex AI:
 
-- **Resource ID**: `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`
+- **Resource ID**: `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`
 - **Display name**: `jak-swarm-gateway`
 - **Region**: `asia-south1`
 - **Model**: gemini-2.5-flash with GOOGLE_SEARCH grounding

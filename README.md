@@ -45,7 +45,7 @@ The submitted system includes:
 * **2,154 blocking CI tests** (1,764 unit + 390 integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
-Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
+Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
 
 ### Challenge Evidence Snapshot
 
@@ -62,14 +62,14 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
 | Tests | 2,154 blocking CI tests (1,764 unit + 390 integration) + `check:truth` documentation validation = 2,156 total; badge shows blocking count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
-| Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
+| Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
-| Agent Optimizer | Google ADK `adk eval` + `GEPARootAgentPromptOptimizer` run against `jak-swarm-gateway`; eval scores and optimizer results committed in [`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md) and [`adk-eval-results.json`](qa/_generated/adk-eval-results.json) | ✅ Verified |
-| Before/after optimization results | GEPA optimizer (20 iterations, 102 metric calls) confirmed baseline at 100% rubric pass rate (6/6); initial `adk eval` showed 4/6 due to missing `expected_invocations` data; explored 3 variants — best matched baseline, worst regressed to 0.5 ([`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md)); latency: 4/4 pass, p50 7.6s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)) | ✅ Verified |
+| Agent Optimizer | Google ADK `adk eval` + `GEPARootAgentPromptOptimizer` run against `jak-swarm-gateway`; corrected eval: 6/6 training + 4/4 held-out validation; GEPA Candidate 1 prompt adopted in deployed Agent Engine; results in [`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md) and [`adk-eval-results.json`](qa/_generated/adk-eval-results.json) | ✅ Verified |
+| Before/after optimization results | Initial eval 4/6 was caused by broken API paths (`/api/` prefix); corrected eval: 6/6 training, 4/4 held-out validation; GEPA optimizer (20 iters, 102 calls) found baseline optimal on training set; Candidate 1 (safety refusal + search_knowledge fallback) adopted; original run had train/val overlap, now fixed ([`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md)); latency: 4/4 pass, p50 7.6s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)) | ✅ Verified |
 
 ### Deployment Reality
 
-JAK's verified public Google Cloud deployment is the Cloud Run API. A live Agent Engine gateway is also deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (`asia-south1`).
+JAK's verified public Google Cloud deployment is the Cloud Run API. A live Agent Engine gateway is also deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (`asia-south1`) with 6 tools (google_search + 5 FunctionTool wrappers) and the GEPA-optimized Candidate 1 prompt.
 
 Current verified deployment path:
 
@@ -89,7 +89,7 @@ This keeps the existing demo and production path safe. It does not replace the s
 |:----------|:------:|:--------|
 | **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary verified deployment — `asia-south1`, health endpoints `/ready` + `/health` passing |
 | **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
-| **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; `agent-engine-entry.ts` + `deploy-agent-engine.sh` / `.ts` / `.py` + `agent-engine-resource.ts` |
+| **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`; 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt; `agent-engine-entry.ts` + `deploy-agent-engine-python.py` + `agent-engine-resource.ts` |
 | **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
 | **Google Secret Manager** | ✅ Configured | 12 secrets mounted |
 | **Supabase PostgreSQL** | ✅ Connected | Shared across deployments |
@@ -111,7 +111,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
-ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 20 evaluation iterations (102 metric calls), confirming the baseline prompt already achieves 100% rubric pass rate (6/6). The initial `adk eval` showed 4/6 due to missing `expected_invocations` data for tool trajectory and response matching metrics. GEPA explored 3 alternative prompt variants — two matched the baseline, one regressed (0.5) due to over-specified error handling branching. Full results in `qa/benchmark-optimization-before-after.md`. Baseline eval scores in `qa/_generated/adk-eval-results.json`.
+ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 20 evaluation iterations (102 metric calls) on the training set, finding the baseline prompt achieves 100% rubric pass rate (6/6). The initial `adk eval` showed 4/6 due to broken API paths (`/api/` prefix instead of production `/workflows`), not poor agent quality. After fixing paths, corrected eval: 6/6 training + 4/4 held-out validation. GEPA explored 3 alternative prompt variants — Candidate 1 (explicit safety refusal + search_knowledge fallback) matched baseline quality and has been adopted in the deployed Agent Engine. The original optimizer run had train/val overlap (same 6 scenarios for both); a separate validation set has been added. Full results in `qa/benchmark-optimization-before-after.md`.
 
 Post-challenge production hardening roadmap:
 
@@ -198,7 +198,7 @@ Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/
 
 ### Layer 3: Agent Engine Gateway
 
-Agent Engine gateway code in [`agent-engine-entry.ts`](packages/adk/src/deploy/agent-engine-entry.ts), with deployment scripts [`deploy-agent-engine.sh`](scripts/deploy-agent-engine.sh), [`deploy-agent-engine.ts`](scripts/deploy-agent-engine.ts), and [`deploy-agent-engine-python.py`](scripts/deploy-agent-engine-python.py). The live Agent Engine resource is `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` (stored in [`agent-engine-resource.ts`](packages/adk/src/deploy/agent-engine-resource.ts)). The gateway agent uses `GOOGLE_SEARCH` for real-time grounding and delegates workflow execution to JAK's Cloud Run API. Cloud Run remains the primary verified deployment; Agent Engine is an additional gateway path.
+Agent Engine gateway code in [`agent-engine-entry.ts`](packages/adk/src/deploy/agent-engine-entry.ts), with deployment scripts [`deploy-agent-engine.sh`](scripts/deploy-agent-engine.sh), [`deploy-agent-engine.ts`](scripts/deploy-agent-engine.ts), and [`deploy-agent-engine-python.py`](scripts/deploy-agent-engine-python.py). The live Agent Engine resource is `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (stored in [`agent-engine-resource.ts`](packages/adk/src/deploy/agent-engine-resource.ts)). The gateway agent uses `GOOGLE_SEARCH` for real-time grounding and delegates workflow execution to JAK's Cloud Run API. Cloud Run remains the primary verified deployment; Agent Engine is an additional gateway path.
 
 ---
 

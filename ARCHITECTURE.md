@@ -101,7 +101,7 @@ When `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`
 - **adk-runner.ts**: Bridges ADK output back to JAK's SwarmState shape
 - **deploy/agent-engine-entry.ts**: Agent Engine gateway entry point — creates a gateway agent that uses GOOGLE_SEARCH for grounding and delegates workflow execution to JAK's Cloud Run API
 - **deploy/agent.ts**: ADK deploy shim (`root_agent` export required by `npx @google/adk deploy agent_engine`)
-- **deploy/agent-engine-resource.ts**: Auto-generated file with live resource ID `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`
+- **deploy/agent-engine-resource.ts**: Auto-generated file with live resource ID `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`
 
 When ADK is not enabled, the existing LangGraph path runs unchanged. ADK is an additive layer — the Gemini + ADK orchestration pipeline runs alongside the existing LangGraph pipeline without modifying it.
 
@@ -433,7 +433,7 @@ As of 2026-06-15, JAK Swarm has two verified deployment paths:
 - `/healthz`: not wired yet
 
 **Additional — Vertex AI Agent Engine Gateway:**
-- Resource ID: `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`
+- Resource ID: `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`
 - Display name: `jak-swarm-gateway`
 - Region: `asia-south1`
 - Model: gemini-2.5-flash with GOOGLE_SEARCH grounding
@@ -450,7 +450,7 @@ Railway remains the rollback/fallback path. Cloud Run Worker and Vercel API cuto
 JAK Swarm runs as two services: an API server (Fastify, port 4000) and a queue worker (`worker-entry.js`, port 9464). Both share the same codebase; the `WORKFLOW_WORKER_MODE` env var selects the role.
 
 - **Google Cloud Run (current primary API)**: `jak-swarm-api` is deployed in `asia-south1` and publicly reachable. It runs the Fastify API / agent gateway.
-- **Vertex AI Agent Engine (additional gateway)**: A live Agent Engine resource (`projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`) deployed via `vertexai.agent_engines.create()`. The gateway agent uses GOOGLE_SEARCH for grounding and delegates workflow execution to JAK's Cloud Run API. This is an additional entry point — it does not replace the Cloud Run API.
+- **Vertex AI Agent Engine (additional gateway)**: A live Agent Engine resource (`projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`) deployed via `vertexai.agent_engines.create()`. The gateway agent uses GOOGLE_SEARCH for grounding and 5 FunctionTool wrappers (create_workflow, get_workflow_status, get_workflow_traces, search_knowledge, approve_request) that call the JAK Cloud Run API at /workflows, /memory, /approvals. This is an additional entry point — it does not replace the Cloud Run API.
 - **Railway (rollback/fallback)**: Railway API + Worker remain available as the fallback path until Cloud Run Worker and Vercel cutover are fully validated.
 - **Cloud Run Worker (pending)**: A standalone Cloud Run worker is not yet deployed. Do not claim Cloud Run Worker is live.
 - **Vercel Frontend**: Still points to Railway until `NEXT_PUBLIC_API_URL` is intentionally switched after worker validation.

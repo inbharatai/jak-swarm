@@ -100,7 +100,7 @@
 |---|---|
 | Cloud Run API | ✅ Live |
 | Cloud Run Worker | ⏳ Not deployed yet |
-| Agent Engine gateway | ✅ Live at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` |
+| Agent Engine gateway | ✅ Live at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` |
 | Railway | Rollback/fallback |
 | Vercel `NEXT_PUBLIC_API_URL` | ⏳ Pending cutover from Railway |
 | GKE | Not deployed. Not claimed. |
@@ -127,7 +127,7 @@
 | **Replanner** | `replanner-node.ts` | Stays. |
 | **SwarmState** | 35+ fields, LangGraph `SwarmStateAnnotation` | Will gain optional fields. Existing workflows unaffected. |
 | **LangGraph Orchestration** | `LangGraphRuntime`, `PostgresCheckpointSaver`, 8-node `StateGraph` | Stays as primary. ADK remains alternate path. |
-| **Google ADK Integration** | `packages/adk/` with Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336` | Remains primary Google-facing path. Agent Engine gateway uses GOOGLE_SEARCH for grounding and delegates to Cloud Run API. |
+| **Google ADK Integration** | `packages/adk/` with Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` | Remains primary Google-facing path. Agent Engine gateway uses GOOGLE_SEARCH for grounding and delegates to Cloud Run API. |
 | **Gemini/OpenAI Runtime** | `GeminiRuntime`, `OpenAIRuntime` | Stays. |
 | **ToolRegistry** | 122 tools, `DefaultApprovalPolicy`, `TenantToolRegistry` | Will be extended with ability pack boundaries. |
 | **38 Agents** | 6 orchestrators + 8 executive + 5 vibe-coding + 8 operations + 11 core workers | Foundation. Will grow with temporary agents from Agent Forge. |

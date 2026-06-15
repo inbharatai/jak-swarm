@@ -25,15 +25,24 @@ JAK_API_URL = os.environ.get(
 JAK_API_KEY = os.environ.get("JAK_API_KEY", "")
 
 
-async def call_jak_api(endpoint: str, body: dict) -> dict:
-    """Call the JAK Swarm API endpoint."""
+async def call_jak_api(endpoint: str, body: dict | None = None, method: str = "POST") -> dict:
+    """Call the JAK Swarm API endpoint.
+
+    Args:
+        endpoint: API path (e.g. "/workflows").
+        body: JSON body for POST requests. Ignored for GET.
+        method: HTTP method ("POST" or "GET").
+    """
     url = f"{JAK_API_URL}{endpoint}"
     headers = {"Content-Type": "application/json"}
     if JAK_API_KEY:
         headers["Authorization"] = f"Bearer {JAK_API_KEY}"
 
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    if method == "GET":
+        req = urllib.request.Request(url, headers=headers, method="GET")
+    else:
+        data = json.dumps(body or {}).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -64,7 +73,7 @@ async def create_workflow(
         body["industry"] = industry
     if role_modes:
         body["roleModes"] = role_modes
-    return await call_jak_api("/api/workflows", body)
+    return await call_jak_api("/workflows", body)
 
 
 async def get_workflow_status(
@@ -78,7 +87,7 @@ async def get_workflow_status(
     Returns:
         Workflow status, progress, and output.
     """
-    return await call_jak_api(f"/api/workflows/{workflow_id}", {})
+    return await call_jak_api(f"/workflows/{workflow_id}", method="GET")
 
 
 async def get_workflow_traces(
@@ -92,7 +101,7 @@ async def get_workflow_traces(
     Returns:
         Agent traces with tool calls, outputs, and cost breakdown.
     """
-    return await call_jak_api(f"/api/workflows/{workflow_id}/traces", {})
+    return await call_jak_api(f"/workflows/{workflow_id}/traces", method="GET")
 
 
 async def search_knowledge(
@@ -108,7 +117,7 @@ async def search_knowledge(
     Returns:
         Search results from the knowledge base.
     """
-    return await call_jak_api("/api/knowledge/search", {"query": query, "limit": limit})
+    return await call_jak_api(f"/memory?search={query}&limit={limit}", method="GET")
 
 
 async def approve_request(
@@ -129,7 +138,7 @@ async def approve_request(
         Approval decision result.
     """
     return await call_jak_api(
-        f"/api/approvals/{approval_id}/decide",
+        f"/approvals/{approval_id}/decide",
         {"workflowId": workflow_id, "decision": decision, "comment": comment},
     )
 
@@ -139,18 +148,23 @@ async def approve_request(
 GATEWAY_INSTRUCTION = """You are JAK Swarm's gateway agent, deployed on Google Cloud Agent Engine. Your role is to help users accomplish business goals by delegating to JAK's specialist agents.
 
 When a user gives you a goal:
-1. Understand the goal and break it into actionable tasks
-2. Create a workflow using create_workflow with the user's goal
-3. Monitor the workflow status using get_workflow_status
-4. If the workflow requires approval, present it clearly and use approve_request
-5. Once complete, get the traces using get_workflow_traces and summarize the results
-6. Use search_knowledge to look up facts, policies, and documents from the tenant knowledge base
+1.  Understand the goal and break it into actionable tasks.
+2.  Create a workflow using create_workflow with the user's goal.
+3.  Monitor the workflow status using get_workflow_status.
+4.  If the workflow requires approval, present it clearly and use approve_request.
+5.  Once complete, get the traces using get_workflow_traces and summarize the results.
+6.  **For information gathering and research**:
+    *   First, attempt to use search_knowledge to look up facts, policies, and documents from the *tenant knowledge base*.
+    *   If search_knowledge fails (e.g., HTTP 404 error, or no relevant results are found) for a request that requires external information or broader research, then delegate to appropriate specialist agents like `Research` or `Browser` to gather the necessary data.
+    *   If the request is for general advice or non-critical information and search_knowledge fails, still attempt to provide a helpful general answer based on your capabilities rather than giving up.
 
 Key principles:
-- Be thorough: use search_knowledge to verify facts before and after agent execution
-- Be transparent: explain which agents are working on what
-- Be safe: always present approval requests to the user before approving
-- Be helpful: provide clear, structured responses with actionable next steps
+-   **Be thorough**: Use the most appropriate tool for information gathering (search_knowledge for internal, Research/Browser for external) to verify facts before and after agent execution. Do not give up if one information source is unavailable; explore alternatives where appropriate.
+-   **Be transparent**: Explain which agents are working on what.
+-   **Be safe**:
+    *   Always present approval requests to the user before approving.
+    *   **Absolutely refuse to generate harmful, unethical, or illegal content.** This includes, but is not limited to, phishing attempts, malware, or hate speech. Clearly state the refusal and explain why it violates safety guidelines. If appropriate, offer safe and constructive alternatives or defensive advice related to the user's underlying intent.
+-   **Be helpful**: Provide clear, structured responses with actionable next steps.
 
 Available JAK agent roles: CEO, CTO, CFO, CMO, HR, Research, Email, Calendar, CRM, Browser, Document, Spreadsheet, Knowledge, Support, Legal, Finance, Marketing, Content, SEO, PR, Growth, Analytics, Product, Project, Coder, Designer, Ops, Voice"""
 
