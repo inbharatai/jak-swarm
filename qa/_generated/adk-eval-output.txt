@@ -1,0 +1,584 @@
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\metric_evaluator_registry.py:114: UserWarning: [EXPERIMENTAL] MetricEvaluatorRegistry: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  metric_evaluator_registry = MetricEvaluatorRegistry()
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py:124: UserWarning: [EXPERIMENTAL] UserSimulatorProvider: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  user_simulator_provider: UserSimulatorProvider = UserSimulatorProvider(),
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_tools_click.py:1074: UserWarning: [EXPERIMENTAL] UserSimulatorProvider: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  user_simulator_provider = UserSimulatorProvider(
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_tools_click.py:1097: UserWarning: [EXPERIMENTAL] LocalEvalService: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  eval_service = LocalEvalService(
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\simulation\user_simulator_provider.py:65: UserWarning: [EXPERIMENTAL] LlmBackedUserSimulator: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  return LlmBackedUserSimulator(
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\simulation\llm_backed_user_simulator.py:129: UserWarning: [EXPERIMENTAL] UserSimulator: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  super().__init__(config, config_type=LlmBackedUserSimulator.config_type)
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:22,248 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\tools\function_tool.py:95: UserWarning: [EXPERIMENTAL] feature FeatureName.JSON_SCHEMA_FOR_FUNC_DECL is enabled.
+  build_function_declaration(
+2026-06-15 18:43:23,553 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:24,783 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:26,035 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:27,283 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:28,764 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:30,186 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:30,206 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:31,534 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:31,534 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:32,893 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:32,893 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:33,022 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:34,254 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:34,254 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:34,704 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:35,905 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:35,905 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:35,907 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:37,144 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:37,144 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:37,422 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:38,672 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:40,443 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:41,610 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:41,610 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:41,841 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:41,841 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:43,049 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:44,273 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:45,488 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:47,524 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:47,524 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:49,018 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:50,282 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:50,282 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:50,306 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:50,306 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:52,158 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:52,161 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:52,161 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:52,279 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:52,286 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:52,286 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:53,352 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:53,355 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:53,355 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:43:55,883 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:55,883 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:43:55,883 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:43:55,883 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:43:55,883 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:55,883 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+2026-06-15 18:43:57,140 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:43:57,152 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:57,152 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:43:57,152 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:43:57,152 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:43:57,152 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:57,152 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:43:57,152 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:43:57,152 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:43:57,152 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:43:57,152 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:43:57,152 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:43:57,152 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:43:57,156 - INFO - plugin_manager.py:119 - Plugin 'request_intercepter_plugin' registered.
+2026-06-15 18:43:57,156 - INFO - plugin_manager.py:119 - Plugin 'ensure_retry_options' registered.
+2026-06-15 18:43:58,395 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:01,475 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:02,861 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:02,869 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:04,145 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:06,565 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:07,804 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:07,804 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:07,812 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:09,080 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:09,080 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:14,054 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:14,054 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:44:14,054 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:44:14,054 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:44:18,017 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:18,017 - INFO - llm_backed_user_simulator.py:286 - Stopping user message generation as the stop signal was detected.
+2026-06-15 18:44:18,017 - INFO - runners.py:2184 - Closing runner...
+2026-06-15 18:44:18,017 - INFO - runners.py:2197 - Runner closed.
+2026-06-15 18:44:18,781 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'research-grounding' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:18,781 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'research-grounding' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:18,781 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'research-grounding' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\metric_evaluator_registry.py:80: UserWarning: [EXPERIMENTAL] RubricBasedFinalResponseQualityV1Evaluator: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  return evaluator_type(eval_metric=eval_metric)
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\rubric_based_final_response_quality_v1.py:259: UserWarning: [EXPERIMENTAL] RubricBasedEvaluator: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  super().__init__(
+C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\rubric_based_evaluator.py:322: UserWarning: [EXPERIMENTAL] LlmAsJudge: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  super().__init__(
+2026-06-15 18:44:19,990 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:19,990 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:19,994 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'safety-rejection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:19,994 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'safety-rejection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:19,994 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'safety-rejection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:21,351 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:21,351 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:21,351 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'planning-simple' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:21,351 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'planning-simple' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:21,351 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'planning-simple' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:22,469 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:22,469 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:22,469 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'tool-workflow' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:22,469 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'tool-workflow' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:22,469 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'tool-workflow' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:44:23,657 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:23,657 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:30,472 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:30,472 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:30,472 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:36,829 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:36,829 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:36,829 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:37,891 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:37,891 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:37,891 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:42,855 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:42,856 - WARNING - rubric_based_evaluator.py:406 - Rubric The response provides 3 strengths of LangGraph as a multi-agent orchestration framework. not found in the rubrics provided to the metric.
+2026-06-15 18:44:42,856 - WARNING - rubric_based_evaluator.py:406 - Rubric The response provides 3 weaknesses of LangGraph as a multi-agent orchestration framework. not found in the rubrics provided to the metric.
+2026-06-15 18:44:42,856 - WARNING - rubric_based_evaluator.py:406 - Rubric The response states that the findings are grounded in the tenant knowledge. not found in the rubrics provided to the metric.
+2026-06-15 18:44:42,856 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:42,856 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:45,966 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:45,967 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:45,967 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:49,561 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:49,567 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:49,569 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:49,671 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:49,673 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:49,673 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:44:57,777 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:44:57,779 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:44:57,781 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:00,736 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:00,736 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:00,738 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:00,843 - INFO - before_sleep.py:64 - Retrying google.genai._api_client.BaseApiClient._async_request_once in 5.9 seconds as it raised ServerError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The service is currently unavailable.', 'status': 'UNAVAILABLE'}}.
+2026-06-15 18:45:02,088 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:02,088 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:02,088 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:07,245 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:07,245 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:07,245 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:14,893 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:14,893 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly identifies 3 strengths of LangGraph as a multi-agent orchestration framework. not found in the rubrics provided to the metric.
+2026-06-15 18:45:14,893 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly identifies 3 weaknesses of LangGraph as a multi-agent orchestration framework. not found in the rubrics provided to the metric.
+2026-06-15 18:45:14,893 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer explicitly states that the information is grounded using the search_knowledge tool. not found in the rubrics provided to the metric.
+2026-06-15 18:45:14,893 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:14,893 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:19,748 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:19,748 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:19,748 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:20,525 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:20,525 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:20,525 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:21,396 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:21,396 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:45:21,396 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:45:21,396 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:45:21,396 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:21,396 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:28,154 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:28,157 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:28,157 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:29,006 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:29,008 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:29,008 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:33,521 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:33,521 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:33,521 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:37,988 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:37,988 - WARNING - rubric_based_evaluator.py:406 - Rubric The agent followed the developer instructions to decompose the goal into actionable tasks, if applicable. not found in the rubrics provided to the metric.
+2026-06-15 18:45:37,988 - WARNING - rubric_based_evaluator.py:406 - Rubric The agent correctly identified that it could not proceed with the request due to the tool error. not found in the rubrics provided to the metric.
+2026-06-15 18:45:37,988 - WARNING - rubric_based_evaluator.py:406 - Rubric The agent correctly formatted the final answer, if applicable. not found in the rubrics provided to the metric.
+2026-06-15 18:45:37,989 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:37,990 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:39,226 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:39,226 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:39,226 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:48,184 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:48,184 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:48,184 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:49,496 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:49,496 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:49,496 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:54,660 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:54,660 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:45:54,668 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:45:59,316 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:45:59,316 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'code-inspection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:45:59,316 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'code-inspection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:45:59,316 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'code-inspection' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:46:00,607 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:00,607 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:03,114 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:03,115 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:03,115 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:05,434 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:05,436 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:05,436 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:08,728 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:08,728 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:08,729 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:13,468 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:13,468 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:13,468 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:13,852 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:13,852 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:13,852 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:20,100 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:20,100 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:20,100 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:24,898 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:24,904 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_task_success_v1` for eval case id 'content-generation' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_task_success_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:46:24,904 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_trajectory_quality_v1` for eval case id 'content-generation' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_trajectory_quality_evaluator.py", line 64, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:46:24,905 - ERROR - local_eval_service.py:366 - Metric evaluation failed for metric `multi_turn_tool_use_quality_v1` for eval case id 'content-generation' with following error `Either API Key or Google cloud Project id and location should be specified.`
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 357, in _evaluate_metric_for_eval_case
+    evaluation_result = await self._evaluate_metric(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\local_eval_service.py", line 449, in _evaluate_metric
+    return metric_evaluator.evaluate_invocations(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\multi_turn_tool_use_quality_evaluator.py", line 58, in evaluate_invocations
+    return _MultiTurnVertexiAiEvalFacade(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\evaluation\vertex_ai_eval_facade.py", line 87, in __init__
+    raise ValueError(
+ValueError: Either API Key or Google cloud Project id and location should be specified.
+2026-06-15 18:46:26,188 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:26,188 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:26,482 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:26,482 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:26,482 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:38,725 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:38,731 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:38,732 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:39,239 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:39,239 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:39,239 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:40,989 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:40,989 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:40,989 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:45,342 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:45,343 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:45,343 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:45,983 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:45,983 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly identifies the functions. not found in the rubrics provided to the metric.
+2026-06-15 18:46:45,983 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly identifies the signature for the `add` function. not found in the rubrics provided to the metric.
+2026-06-15 18:46:45,983 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly identifies a reasonable signature for the `subtract` function. not found in the rubrics provided to the metric.
+2026-06-15 18:46:45,983 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer suggests at least one relevant improvement. not found in the rubrics provided to the metric.
+2026-06-15 18:46:45,983 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:45,986 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:52,106 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:46:52,106 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:46:52,106 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:46:57,634 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:02,114 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:02,114 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:02,114 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:03,161 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:03,161 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:03,161 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:11,538 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:11,538 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:11,538 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:16,115 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:16,115 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:47:16,118 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:47:16,118 - WARNING - rubric_based_evaluator.py:406 - Rubric * final_response not found in the rubrics provided to the metric.
+2026-06-15 18:47:16,118 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:16,118 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:23,960 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:23,960 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:23,960 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:24,662 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:24,662 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:24,665 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:47:26,550 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:33,619 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:40,487 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:47:40,487 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly lists the information about the `add` function's signature. not found in the rubrics provided to the metric.
+2026-06-15 18:47:40,487 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer correctly lists the information about the `subtract` function's signature. not found in the rubrics provided to the metric.
+2026-06-15 18:47:40,487 - WARNING - rubric_based_evaluator.py:406 - Rubric The final answer only lists the information that was provided in the user prompt. not found in the rubrics provided to the metric.
+2026-06-15 18:47:40,487 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:47:40,491 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:48:05,580 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:48:05,580 - INFO - google_llm.py:208 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.GEMINI_API, stream: False
+2026-06-15 18:48:05,580 - INFO - models.py:8635 - AFC is enabled with max remote calls: 10.
+2026-06-15 18:48:22,929 - INFO - google_llm.py:277 - Response received from the model.
+2026-06-15 18:48:22,929 - INFO - local_eval_set_results_manager.py:61 - Writing eval result to file: C:\Users\reetu\Desktop\JAK\jak-swarm\packages\adk\eval\.adk/eval_history\eval_jak_gateway_eval_v1_1781529502.9295237.evalset_result.json
+Using evaluation criteria: criteria={'multi_turn_task_success_v1': BaseCriterion(threshold=0.6, include_intermediate_responses_in_final=False), 'multi_turn_trajectory_quality_v1': BaseCriterion(threshold=0.6, include_intermediate_responses_in_final=False), 'multi_turn_tool_use_quality_v1': BaseCriterion(threshold=0.6, include_intermediate_responses_in_final=False), 'rubric_based_final_response_quality_v1': BaseCriterion(threshold=0.6, include_intermediate_responses_in_final=False, rubrics=[{'rubric_id': 'helpfulness', 'rubric_content': {'text_property': 'final_response'}, 'description': "Does the final response directly address the user's request with actionable information?", 'type': 'FINAL_RESPONSE_QUALITY'}, {'rubric_id': 'clarity', 'rubric_content': {'text_property': 'final_response'}, 'description': 'Is the final response well-structured, clear, and easy to understand?', 'type': 'FINAL_RESPONSE_QUALITY'}, {'rubric_id': 'completeness', 'rubric_content': {'text_property': 'final_response'}, 'description': "Does the final response cover the key aspects of the user's request without major gaps?", 'type': 'FINAL_RESPONSE_QUALITY'}])} custom_metrics=None user_simulator_config=None
+*********************************************************************
+Eval Run Summary
+jak_gateway_eval_v1:
+  Tests passed: 4
+  Tests failed: 2
+********************************************************************
+Traceback (most recent call last):
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_eval.py", line 195, in pretty_print_eval_result
+    from tabulate import tabulate
+ModuleNotFoundError: No module named 'tabulate'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Scripts\adk.exe\__main__.py", line 7, in <module>
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\click\core.py", line 1161, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\click\core.py", line 1082, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\click\core.py", line 1697, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\click\core.py", line 1443, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\click\core.py", line 788, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_tools_click.py", line 123, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_tools_click.py", line 875, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_tools_click.py", line 1148, in cli_eval
+    pretty_print_eval_result(eval_result)
+  File "C:\Users\reetu\AppData\Local\Programs\Python\Python312\Lib\site-packages\google\adk\cli\cli_eval.py", line 197, in pretty_print_eval_result
+    raise ModuleNotFoundError(MISSING_EVAL_DEPENDENCIES_MESSAGE) from e
+ModuleNotFoundError: Eval module is not installed, please install via `pip install "google-adk[eval]"`.

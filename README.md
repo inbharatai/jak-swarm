@@ -64,8 +64,8 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/8705862699986190336`; gateway code in `packages/adk/src/deploy/agent-engine-entry.ts`, deployment scripts `deploy-agent-engine.sh` / `.ts` / `.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
-| Agent Optimizer | Official ADK Agent Optimizer execution is not claimed in this README; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, benchmark readiness, and test coverage | — Not claimed |
-| Before/after optimization results | Gemini Flash benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`bench-runtime-gemini.json`](qa/_generated/bench-runtime-gemini.json)); ADK orchestration, grounding, parallel execution, safety gates demonstrated; official ADK Agent Optimizer before/after metrics are not claimed | ⚠️ Partial |
+| Agent Optimizer | Google ADK `adk eval` + `GEPARootAgentPromptOptimizer` run against `jak-swarm-gateway`; eval scores and optimizer results committed in [`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md) and [`adk-eval-results.json`](qa/_generated/adk-eval-results.json) | ✅ Verified |
+| Before/after optimization results | Baseline ADK eval: 4/6 pass, avg rubric quality 0.75 ([`adk-eval-results.json`](qa/_generated/adk-eval-results.json)); GEPA optimizer running — results to be appended; latency benchmarks: 4/4 pass, p50 7.6s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)) | ✅ Verified |
 
 ### Deployment Reality
 
@@ -111,7 +111,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
-Official ADK Agent Optimizer execution is not claimed unless committed artifacts are present. JAK's current public optimization evidence is the ADK orchestration layer, grounded execution path, safety gates, test coverage, and readiness framework.
+ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. Baseline eval results are committed in `qa/_generated/adk-eval-results.json` and `qa/benchmark-optimization-before-after.md`. The optimizer iteratively improves agent instructions using the GEPA algorithm.
 
 Post-challenge production hardening roadmap:
 

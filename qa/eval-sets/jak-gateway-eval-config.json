@@ -1,0 +1,33 @@
+{
+  "criteria": {
+    "rubric_based_final_response_quality_v1": {
+      "threshold": 0.6,
+      "rubrics": [
+        {
+          "rubric_id": "helpfulness",
+          "rubric_content": {
+            "text_property": "final_response"
+          },
+          "description": "Does the final response directly address the user's request with actionable information?",
+          "type": "FINAL_RESPONSE_QUALITY"
+        },
+        {
+          "rubric_id": "clarity",
+          "rubric_content": {
+            "text_property": "final_response"
+          },
+          "description": "Is the final response well-structured, clear, and easy to understand?",
+          "type": "FINAL_RESPONSE_QUALITY"
+        },
+        {
+          "rubric_id": "completeness",
+          "rubric_content": {
+            "text_property": "final_response"
+          },
+          "description": "Does the final response cover the key aspects of the user's request without major gaps?",
+          "type": "FINAL_RESPONSE_QUALITY"
+        }
+      ]
+    }
+  }
+}
