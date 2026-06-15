@@ -98,8 +98,8 @@ flowchart TB
 
 - 38 specialist agents across Executive, Operations, Core, and Vibe Coding layers, each with domain-scoped prompts and tool allowlists
 - 13 industry packs with agent prompt supplements, policy overlays, and restricted tool lists
-- Local policy logic in `packages/security`: Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer
-- JAK Shield is a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
+- Local policy logic in `packages/security`: Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer — **all 6 defenses are wired and enforced on every agent action today**
+- JAK Shield is a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) — the MCP call to this external service is Phase 11B; local policy enforcement is active now
 - 5-role RBAC (`END_USER`, `REVIEWER`, `OPERATOR`, `TENANT_ADMIN`, `SYSTEM_ADMIN`)
 
 **Evolving toward:**
@@ -129,7 +129,7 @@ flowchart TB
 
 ### JAK Shield MCP Integration Timeline
 
-**Phase 1-11A:** All security enforcement uses local policy logic in `packages/security`. JAK Shield MCP exists as a separate product at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield) but is NOT called from JAK Swarm.
+**Phase 1-11A:** All security enforcement uses local policy logic in `packages/security` — Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, and Audit Evidence Layer are all wired and active. JAK Shield MCP exists as a separate 10-stage product at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield); the MCP call from JAK Swarm to that external service is not yet wired (Phase 11B).
 
 **Phase 11B:** Wire JAK Shield MCP for high-risk action validation. Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures.
 
@@ -146,7 +146,7 @@ This section explicitly states what the roadmap does **not** claim:
 - **Department-scoped RBAC does not exist.** The current 5-role RBAC is tenant-scoped, not department-scoped. Adding department boundaries requires schema changes, migration, and UI work.
 - **Self-improving cycles are not built.** Agent memory (`persistLearning` / `recallLearnings`) persists facts across workflows. It does not yet adjust future plans without human re-specification.
 - **Agent Governance Overlay is not built.** The current Guardrail agent is a stateless in-process policy checker. The Agent Governance Overlay (agent profiles, memory scopes, autonomy boundaries, calling JAK Shield MCP for signed decisions) is a roadmap item. See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for the phased implementation plan.
-- **JAK Shield MCP integration is not yet wired.** JAK Shield is a separate 10-stage MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield). The `ShieldMcpClient` and `Agent Governance Overlay` that will call it are Phase 1 of the evolution plan. Today, security enforcement uses local policy logic in `packages/security`.
+- **JAK Shield MCP integration is not yet wired.** JAK Shield is a separate 10-stage MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield). The `ShieldMcpClient` and `Agent Governance Overlay` that will call it are Phase 11B of the evolution plan. **Today, JAK Swarm's 6 local policy defenses in `packages/security` are fully wired and enforced on every agent action** — what is NOT wired is the MCP call to the external JAK Shield service for signed high-risk decisions.
 - **Ability Packs and Autonomy Ladder are not built.** Department-scoped tool configurations and agent autonomy levels (L0–L5) are roadmap items.
 - **Third-party SOC 2 / HIPAA / ISO 27001 attestation has not happened.** The infrastructure is shipped (182 controls, 108 operationally backed). The certification audit has not.
 

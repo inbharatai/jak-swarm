@@ -11,7 +11,7 @@
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-2156_passing-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2154_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -39,10 +39,10 @@ The submitted system includes:
 
 * **Gemini-powered** mission interpretation, planning, routing, tool calling, and verification
 * **Google ADK orchestration** through `@google/adk` (`SequentialAgent` + `ParallelAgent` pipeline, activated via `JAK_ADK_MODE=1`)
-* **Google Search Grounding** — free, citation-backed, built-in via `GOOGLE_SEARCH` ADK tool
+* **Google Search Grounding** — built-in with included quota, citation-backed via `GOOGLE_SEARCH` ADK tool
 * **Google Cloud Run deployment** — live API gateway at `jak-swarm-api` in `asia-south1`
 * **JAK Shield** local security, approval, permission, and audit checks
-* **2,156 passing tests** (CI-enforced via `pnpm check:truth`)
+* **2,154 blocking CI tests** (1,764 unit + 390 integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
 Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified submitted cloud runtime documented here is Cloud Run.
@@ -58,7 +58,7 @@ Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-en
 | Grounding / RAG | `GOOGLE_SEARCH` ADK built-in tool, `googleSearch` grounding, optional Vertex AI Search datastore | ✅ |
 | Business use case | Company OS — evidence graph → drift detection → approved agent execution; 13 industry packs | ✅ |
 | Safety / security layer | JAK Shield 10-stage pipeline (local policy), RBAC, approval gates, audit logging, PII redaction, HMAC signing | ✅ |
-| Tests | 2,156 unit/structural tests passing, CI-enforced truth checks, 78/80 human-simulator checks | ✅ |
+| Tests | 1,764 unit + 390 integration = 2,154 blocking CI tests; full local suite reports 2,156; `check:truth` validates documentation claims | ✅ |
 | Live demo | Publicly accessible via submitted demo path + Cloud Run API | ✅ |
 | Agent Engine | Gateway code (`agent-engine-entry.ts`) + deploy script (`deploy-agent-engine.sh`) exist; no live `reasoningEngines/...` resource ID claimed in this README | ⚠️ |
 | Agent Simulation / Benchmarking | Benchmark harness + scenarios + CLI scripts built; no published result files with quantitative data | ⚠️ |
@@ -85,7 +85,7 @@ JAK's Track 2 story is demonstrated through **architecture-level optimization, s
 
 1. **LangGraph → Google ADK extension** — JAK's existing LangGraph system is extended with a Google ADK orchestration mode (`JAK_ADK_MODE=1`). When enabled, workflows route through `SequentialAgent` + `ParallelAgent` with zero changes to the LangGraph path. This is additive, provider-flexible architecture.
 
-2. **Gemini + Google Search Grounding** — Real-time, citation-backed responses via `GOOGLE_SEARCH` (free, ADK built-in). No third-party search API keys required. Grounded responses reduce hallucination risk at the source.
+2. **Gemini + Google Search Grounding** — Real-time, citation-backed responses via `GOOGLE_SEARCH` (built-in with included quota, ADK native). No third-party search API keys required. Grounded responses reduce hallucination risk at the source.
 
 3. **JAK Shield safety gating** — Every real-world agent action flows through a 10-stage decision pipeline with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. High-risk actions require explicit approval. Destructive actions are never auto-retried.
 
@@ -93,7 +93,7 @@ JAK's Track 2 story is demonstrated through **architecture-level optimization, s
 
 5. **Per-tenant provider switching** — Each tenant chooses Gemini or OpenAI from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
-6. **Extensive tests** — 2,156 passing tests with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
+6. **Extensive tests** — 2,154 blocking CI tests (1,764 unit + 390 integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
 **What this README does not claim:**
 
@@ -122,7 +122,7 @@ JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and e
 - **One task graph for AI agents AND humans** — the CEO writes a prompt; the planner routes some steps to specialist agents (Research, CMO, CTO) and others to teammates ("@anita to sign the contract"). Both flow through the same orchestrator, emit lifecycle events, and feed the signed audit pack. ([`docs/team-and-trial.md`](docs/team-and-trial.md))
 - **JAK Shield as the trust gateway** — high-risk agent actions are routed through a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with local policy enforcement inside Swarm. ([`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) · [`docs/EVOLUTION-PLAN.md`](docs/EVOLUTION-PLAN.md))
 - **Google ADK orchestration** — when `JAK_ADK_MODE=1`, workflows route through Google's Agent Development Kit (`@google/adk`) using `SequentialAgent` and `ParallelAgent` for multi-agent orchestration. Google Search Grounding provides real-time, citation-backed responses. ([`packages/adk/`](packages/adk/))
-- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (free, built-in, citation-backed). OpenAI uses `web_search_preview` (free, native). No Serper, no Tavily, no third-party search API keys needed. API keys are required for OpenAI and Gemini — JAK does not bundle or provide free LLM API keys.
+- **Provider-native search without paid APIs** — Gemini uses `GOOGLE_SEARCH` (built-in with included quota, citation-backed). OpenAI uses `web_search_preview` (built-in with included quota, native). No Serper, no Tavily, no third-party search API keys needed. API keys are required for OpenAI and Gemini — JAK does not bundle or provide free LLM API keys.
 - **30-day free trial with daily budget caps** — sign up at `/trial` with just an email. No credit card. Four daily caps protect both your data AND your budget.
 - **Integrate, don't rebuild** — JAK is the cockpit for your existing stack. Gmail, Google Calendar, Slack, GitHub, Notion, browser automation, and MCP surfaces exist in code.
 
@@ -171,7 +171,7 @@ SequentialAgent(root)
   └── VerifierAgent            (quality assurance)
 ```
 
-**Provider-native search**: Gemini agents use `GOOGLE_SEARCH` (ADK built-in, free). OpenAI agents use `web_search_preview` (hosted tool, free).
+**Provider-native search**: Gemini agents use `GOOGLE_SEARCH` (ADK built-in, included quota). OpenAI agents use `web_search_preview` (hosted tool, included quota).
 
 Key files: [`packages/adk/`](packages/adk/) — [`jak-tool-bridge.ts`](packages/adk/src/bridge/jak-tool-bridge.ts) · [`jak-adk-agents.ts`](packages/adk/src/agents/jak-adk-agents.ts) · [`adk-pipeline.ts`](packages/adk/src/orchestration/adk-pipeline.ts) · [`adk-runner.ts`](packages/adk/src/orchestration/adk-runner.ts)
 
@@ -292,7 +292,7 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Arc
 | 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). [Inventory →](#-tool-inventory) |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. [Details →](docs/vibe-coding.md) |
 | 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-5.5/5.4) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
-| 🔍 | **Provider-Native Search** | Google Search Grounding (free, citation-backed) for Gemini. `web_search_preview` (free, native) for OpenAI. No Serper, no Tavily, no external search API keys required. |
+| 🔍 | **Provider-Native Search** | Google Search Grounding (built-in with included quota, citation-backed) for Gemini. `web_search_preview` (built-in with included quota, native) for OpenAI. No Serper, no Tavily, no external search API keys required. |
 | 🧬 | **ADK Orchestration** | Google Agent Development Kit (`@google/adk`) for multi-agent orchestration. `SequentialAgent` + `ParallelAgent` pipeline mirrors JAK's DAG. Activated via `JAK_ADK_MODE=1`. |
 | 🧠 | **Memory System** | LLM-powered fact extraction, token-budgeted retrieval injected via `<memory>` tags. Server-side conversation threads with full history injection into LangGraph state. |
 | 🔌 | **MCP Integrations** | Slack, GitHub, Notion wired with provider management. 21 MCP providers auto-mapped. Connector Runtime with honest status badges. [Connector docs →](docs/connector-runtime.md) |
@@ -396,8 +396,8 @@ Full agent details: [`AGENTS.md`](AGENTS.md)
 
 | Provider | Search Method | Cost | Citations |
 |:--------:|:-------------:|:----:|:---------:|
-| Gemini | `GOOGLE_SEARCH` (ADK built-in) or `googleSearch` grounding | Free | ✅ URLs + snippets |
-| OpenAI | `web_search_preview` hosted tool | Free | ✅ Source URLs |
+| Gemini | `GOOGLE_SEARCH` (ADK built-in) or `googleSearch` grounding | Included quota | ✅ URLs + snippets |
+| OpenAI | `web_search_preview` hosted tool | Included quota | ✅ Source URLs |
 
 ---
 
@@ -747,8 +747,8 @@ Full roadmap with implementation milestones and honest scope boundaries: [`docs/
 | **ADK Orchestration** | @google/adk (SequentialAgent + ParallelAgent) |
 | **LLM — OpenAI** | GPT-5.5 / GPT-5.4 — Responses API, json_schema strict mode |
 | **LLM — Gemini** | Gemini 2.5 Pro / Flash / Flash-Lite — parallel function calling, responseSchema, Google Search Grounding |
-| **Search — Gemini** | GOOGLE_SEARCH (ADK built-in) / googleSearch grounding — free, citation-backed |
-| **Search — OpenAI** | web_search_preview hosted tool — free, native |
+| **Search — Gemini** | GOOGLE_SEARCH (ADK built-in) / googleSearch grounding — included quota, citation-backed |
+| **Search — OpenAI** | web_search_preview hosted tool — included quota, native |
 | **Browser Automation** | Playwright |
 | **Email** | imapflow (IMAP) + nodemailer (SMTP) |
 | **Calendar** | tsdav (CalDAV) |
@@ -838,7 +838,7 @@ Full security policy: [`SECURITY.md`](SECURITY.md)
 ## 🛠️ Development
 
 ```bash
-pnpm test                  # Run all tests (2156 passing)
+pnpm test                  # Run all tests (2154 blocking CI)
 pnpm typecheck             # Type checking (strict mode, zero errors)
 pnpm lint                  # Lint
 pnpm check:truth           # Verify tool classifications + landing claims
@@ -911,7 +911,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,156 unit/structural tests passing. Zero TypeScript errors under strict mode.
+**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,154 blocking CI tests (1,764 unit + 390 integration). Zero TypeScript errors under strict mode.
 
 **Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
 
@@ -936,14 +936,14 @@ Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
 <details>
 <summary><b>What is Google ADK orchestration?</b></summary>
 
-Google's Agent Development Kit (`@google/adk`) provides `SequentialAgent`, `ParallelAgent`, and `LlmAgent` primitives for building multi-agent workflows. When `JAK_ADK_MODE=1`, JAK routes workflows through ADK's orchestration instead of LangGraph. The output shape is identical (SwarmState) so persistence, SSE, and approval flows work unchanged. ADK's built-in `GOOGLE_SEARCH` tool provides free, citation-backed web search for Gemini agents.
+Google's Agent Development Kit (`@google/adk`) provides `SequentialAgent`, `ParallelAgent`, and `LlmAgent` primitives for building multi-agent workflows. When `JAK_ADK_MODE=1`, JAK routes workflows through ADK's orchestration instead of LangGraph. The output shape is identical (SwarmState) so persistence, SSE, and approval flows work unchanged. ADK's built-in `GOOGLE_SEARCH` tool provides citation-backed web search for Gemini agents (included quota; see [Gemini pricing](https://ai.google.dev/pricing) for limits beyond the allowance).
 
 </details>
 
 <details>
 <summary><b>Do I need Serper or Tavily for web search?</b></summary>
 
-**No.** When `GEMINI_GOOGLE_SEARCH_GROUNDING=1`, Gemini agents use Google Search Grounding (free, built-in). When `OPENAI_WEB_SEARCH=1`, OpenAI agents use `web_search_preview` (free, native). Both provide real-time web search without any external search API keys. If neither flag is set, JAK falls back to its built-in `web_search` tool (which can optionally use Serper for enhanced results).
+**No.** When `GEMINI_GOOGLE_SEARCH_GROUNDING=1`, Gemini agents use Google Search Grounding (built-in with included quota). When `OPENAI_WEB_SEARCH=1`, OpenAI agents use `web_search_preview` (built-in with included quota). Both provide real-time web search without any external search API keys. If neither flag is set, JAK falls back to its built-in `web_search` tool (which can optionally use Serper for enhanced results).
 
 </details>
 
