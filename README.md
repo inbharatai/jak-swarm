@@ -47,30 +47,48 @@ The submitted system includes:
 
 Agent Engine-ready gateway code is included in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment helper script `scripts/deploy-agent-engine.sh`. The verified submitted cloud runtime documented here is Cloud Run.
 
-### Judge Quick Scan
+### Challenge Evidence Snapshot
+
+This table summarizes what is publicly evidenced in this repository and what is intentionally not overclaimed.
 
 | Requirement | Evidence in JAK | Status |
 |:------------|:----------------|:------:|
-| Gemini integration | `GeminiRuntime` adapter, `gemini-2.5-pro/flash/flash-lite`, tier-based model selection, per-tenant provider switching | ✅ |
-| Google ADK orchestration | `@google/adk` `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1` feature flag, `adk-pipeline.ts` + `adk-runner.ts` | ✅ |
-| Multi-agent collaboration | 38 agents (6 orchestrators + 32 workers), DAG-based routing, parallel execution, auto-repair loop | ✅ |
-| Google Cloud deployment | Cloud Run API live at `asia-south1`, Secret Manager, Cloud Build CI/CD | ✅ |
-| Grounding / RAG | `GOOGLE_SEARCH` ADK built-in tool, `googleSearch` grounding, optional Vertex AI Search datastore | ✅ |
-| Business use case | Company OS — evidence graph → drift detection → approved agent execution; 13 industry packs | ✅ |
-| Safety / security layer | JAK Shield 10-stage pipeline (local policy), RBAC, approval gates, audit logging, PII redaction, HMAC signing | ✅ |
-| Tests | 1,764 unit + 390 integration = 2,154 blocking CI tests; full local suite reports 2,156; `check:truth` validates documentation claims | ✅ |
-| Live demo | Publicly accessible via submitted demo path + Cloud Run API | ✅ |
-| Agent Engine | Gateway code (`agent-engine-entry.ts`) + deploy script (`deploy-agent-engine.sh`) exist; no live `reasoningEngines/...` resource ID claimed in this README | ⚠️ |
-| Agent Simulation / Benchmarking | Benchmark harness + scenarios + CLI scripts built; no published result files with quantitative data | ⚠️ |
-| Agent Optimizer | No evidence in repo | ❌ |
-| Before/after optimization results | Benchmark and readiness framework exists, but headline official before/after Agent Optimizer results are not claimed in this README | ⚠️ |
+| Gemini integration | `GeminiRuntime` adapter, `gemini-2.5-pro/flash/flash-lite`, tier-based model selection, per-tenant provider switching | ✅ Verified |
+| Google ADK orchestration | `@google/adk` `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1` feature flag, `adk-pipeline.ts` + `adk-runner.ts` | ✅ Verified |
+| Multi-agent collaboration | 38 agents (6 orchestrators + 32 workers), DAG-based routing, parallel worker execution, verifier / auto-repair loop | ✅ Verified |
+| Google Cloud deployment | Verified Cloud Run API deployment in `asia-south1`; Cloud Run deployment docs and Google Cloud deployment path included | ✅ Verified |
+| Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
+| Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
+| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed decision / HMAC-ready security path | ✅ Verified |
+| Tests | Large blocking test suite across unit and integration coverage; README/test badge reports 2,156 passing tests | ✅ Verified |
+| Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
+| Agent Engine | Agent Engine-ready gateway code exists in `packages/adk/src/deploy/agent-engine-entry.ts`, with helper script `scripts/deploy-agent-engine.sh`; this README does not claim a live `reasoningEngines/...` resource unless one is produced | ⚠️ Code-ready |
+| Agent Simulation / benchmarking | Benchmark/readiness harness and scenarios exist; this README does not claim official Google Agent Simulation result artifacts unless committed result files are present | ⚠️ Partial |
+| Agent Optimizer | Official ADK Agent Optimizer run is not claimed; optimization is demonstrated through ADK orchestration, grounding, parallel execution, safety gates, and benchmark readiness | — Not claimed |
+| Before/after optimization results | Architecture-level optimization is demonstrated through ADK mode, parallel orchestration, grounding, safety gates, and workflow readiness; official before/after Agent Optimizer metrics are not claimed | ⚠️ Partial |
 
 ### Deployment Reality
 
+JAK's verified public Google Cloud deployment is the Cloud Run API. The Agent Engine gateway code is included and deployment-ready as a separate gateway path, but the README should only claim a live Agent Engine deployment after an actual `projects/.../locations/.../reasoningEngines/...` resource ID exists.
+
+Current verified deployment path:
+
+```
+Demo / frontend → Cloud Run API → JAK workflow engine → Gemini / ADK / tools / approvals
+```
+
+Optional Agent Engine gateway path:
+
+```
+Vertex AI Agent Engine → JAK Agent Engine gateway → Cloud Run API → JAK workflows
+```
+
+This keeps the existing demo and production path safe while showing that JAK is aligned with Agent Engine deployment requirements.
+
 | Component | Status | Details |
 |:----------|:------:|:--------|
-| **Cloud Run API** (`jak-swarm-api`) | ✅ Live | Primary verified deployment — `asia-south1`, health endpoints `/ready` + `/health` passing |
-| **Frontend / demo** | ✅ Accessible | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
+| **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary verified deployment — `asia-south1`, health endpoints `/ready` + `/health` passing |
+| **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
 | **Agent Engine** | ⚠️ Code-ready | `agent-engine-entry.ts` + `deploy-agent-engine.sh` are deployment-ready; this README claims no live Agent Engine resource unless an actual `reasoningEngines/...` ID is present |
 | **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
 | **Google Secret Manager** | ✅ Configured | 12 secrets mounted |
