@@ -386,7 +386,7 @@ async function buildApp() {
     // Database
     const dbStart = Date.now();
     try {
-      await fastify.db.$queryRaw`SELECT 1`;
+      await fastify.db.$queryRawUnsafe('SELECT 1');
       checks.database = { status: 'ok', latencyMs: Date.now() - dbStart };
     } catch (e) {
       checks.database = { status: 'error', latencyMs: Date.now() - dbStart, error: e instanceof Error ? e.message : String(e) };

@@ -87,7 +87,7 @@ This keeps the existing demo and production path safe. It does not replace the s
 
 | Component | Status | Details |
 |:----------|:------:|:--------|
-| **Cloud Run API** (`jak-swarm-api`) | ⚠️ Verified (degraded) | Primary deployment — `asia-south1`; `/ready` and `/health` intermittently report 503 due to Prisma/Supabase pooler prepared-statement error; `/healthz` liveness not yet wired |
+| **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary deployment — `asia-south1`; `/ready` and `/health` passing (fixed Prisma pooler compatibility); `/healthz` not yet wired |
 | **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
 | **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`; 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt; `agent-engine-entry.ts` + `deploy-agent-engine-python.py` + `agent-engine-resource.ts` |
 | **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
@@ -545,7 +545,7 @@ gcloud run services logs read jak-swarm-api \
 
 | Component | Status |
 |-----------|--------|
-| Cloud Run API (`jak-swarm-api`) | ⚠️ Deployed (degraded) | `/ready` and `/health` intermittently 503 due to Prisma/Supabase pooler prepared-statement error |
+| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, accessible through the submitted demo path |
 | Cloud Run Worker (`jak-swarm-worker`) | 🔜 Post-challenge hardening roadmap |
 | Supabase PostgreSQL | ✅ Connected (shared with Railway) |
 | Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
@@ -556,8 +556,8 @@ gcloud run services logs read jak-swarm-api \
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
-| `/ready` | ⚠️ Flaky | Readiness check. Env, Redis, LLM pass; DB check intermittently fails due to Prisma/Supabase pooler prepared-statement error. Returns 503 when DB check fails, 200 when it succeeds. |
-| `/health` | ⚠️ Degraded | Deep diagnostic. Redis OK. DB check returns `prepared statement does not exist` error with Supabase pooler — non-blocking for most queries, but causes health check to report `degraded`. |
+| `/ready` | ✅ PASS | Readiness check. Env, DB, Redis, LLM all pass. Uses `$queryRawUnsafe` for Supabase pooler compatibility. |
+| `/health` | ✅ PASS | Deep diagnostic. Uses `$queryRawUnsafe` for Supabase pooler compatibility. |
 | `/healthz` | 🔜 Planned | Liveness probe (always 200). Not yet wired in Cloud Run. Part of the production observability roadmap. |
 
 **Post-Challenge Hardening Items:**

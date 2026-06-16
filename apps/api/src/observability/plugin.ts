@@ -126,7 +126,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     // Database check
     try {
       const dbStart = Date.now();
-      await (fastify as any).db.$queryRaw`SELECT 1`;
+      await (fastify as any).db.$queryRawUnsafe('SELECT 1');
       const dbLatency = Date.now() - dbStart;
       checks['database'] = { status: 'ok', latencyMs: dbLatency };
       metrics.healthCheckDuration.observe({ dependency: 'db' }, dbLatency / 1000);

@@ -160,7 +160,7 @@ export async function validateConfigOnBoot(fastify: FastifyInstance): Promise<vo
   // -----------------------------------------------------------------------
   try {
     const dbStart = Date.now();
-    await fastify.db.$queryRaw`SELECT 1`;
+    await fastify.db.$queryRawUnsafe('SELECT 1');
     const latency = Date.now() - dbStart;
     results.push({
       name: 'DATABASE',
