@@ -562,8 +562,6 @@ gcloud run services logs read jak-swarm-api \
 
 **Post-Challenge Hardening Items:**
 
-- Wire `/healthz` as a fast liveness probe (no dependency checks, always returns 200)
-- Resolve `/health` Prisma prepared-statement note (Supabase pooler session mode or direct URL)
 - Complete Cloud Run Worker migration
 - Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after full validation
 
