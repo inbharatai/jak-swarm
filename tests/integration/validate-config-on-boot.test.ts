@@ -77,6 +77,7 @@ function createFastifyStub() {
   return {
     db: {
       $queryRaw: vi.fn(async () => [{ ok: 1 }]),
+      $queryRawUnsafe: vi.fn(async () => [{ ok: 1 }]),
     },
     redis: {
       ping: vi.fn(async () => 'PONG'),
