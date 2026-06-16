@@ -5,9 +5,9 @@
 ### The Closed-Loop Company Operating Layer for Agent Work
 
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
-[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster)
-[![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory)
-[![Connectors](https://img.shields.io/badge/Connectors-23-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory)
+[![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster--38-agents)
+[![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory-122-registered)
+[![Connectors](https://img.shields.io/badge/Connectors-23-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory-122-registered)
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
@@ -69,7 +69,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 
 ### Deployment Reality
 
-JAK's verified public Google Cloud deployment is the Cloud Run API. A live Agent Engine gateway is also deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (`asia-south1`) with 6 tools (google_search + 5 FunctionTool wrappers) and the GEPA Candidate 1 prompt (safety-strengthened variant that matches baseline quality while adding explicit refusal and search_knowledge fallback).
+JAK's verified public Google Cloud deployment is the Cloud Run API (requires auth for health endpoints; public demo at [jakswarm.com](https://jakswarm.com)). A live Agent Engine gateway is also deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (`asia-south1`) with 6 tools (google_search + 5 FunctionTool wrappers) and the GEPA Candidate 1 prompt (safety-strengthened variant that matches baseline quality while adding explicit refusal and search_knowledge fallback).
 
 Current verified deployment path:
 
@@ -87,7 +87,7 @@ This keeps the existing demo and production path safe. It does not replace the s
 
 | Component | Status | Details |
 |:----------|:------:|:--------|
-| **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary deployment — `asia-south1`; `/ready` and `/health` passing (fixed Prisma pooler compatibility); `/healthz` not yet wired |
+| **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary deployment — `asia-south1`; health endpoints implemented (`/ready`, `/health`, `/healthz`) and passing internally; require auth on public Cloud Run |
 | **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
 | **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`; 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt; `agent-engine-entry.ts` + `deploy-agent-engine-python.py` + `agent-engine-resource.ts` |
 | **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
@@ -126,7 +126,7 @@ Post-challenge production hardening roadmap:
 
 ## What JAK Swarm Does
 
-JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors**.
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **23 connectors**.
 
 ### What's unique
 
@@ -296,12 +296,12 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Arc
 
 | | Feature | Description |
 |---|---------|-------------|
-| 🤖 | **38 AI Agents** | 6 orchestrators + 32 specialist workers across Executive, Operations, Core, and Vibe Coding layers. [Full roster →](#-agent-roster) |
+| 🤖 | **38 AI Agents** | 6 orchestrators + 32 specialist workers across Executive, Operations, Core, and Vibe Coding layers. [Full roster →](#-agent-roster--38-agents) |
 | 🧠 | **Company Brain** | Per-tenant profile (industry, brand voice, competitors, goals) LLM-extracted from documents → user approves → grounds every agent prompt. Refuses unapproved profiles. UI at `/company`. |
 | 🎯 | **Intent Vocabulary + Templates** | 18 named CompanyOSIntents constrained at the LLM layer via strict Zod schema. 6 system-seeded WorkflowTemplates provide pre-tuned decompositions. |
 | 💬 | **Follow-up NL Parser** | Rule-based parser maps short chat inputs to workflow actions: approve, reject, continue, pause, resume, cancel, show graph/cost/failed, "what is the CMO doing?" |
 | 🛡️ | **Audit & Compliance Pack** | SOC 2 Type 2 (63) + HIPAA (37) + ISO 27001 (82) = 182 controls seeded. 108 operationally backed, 74 require reviewer attestation. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed evidence packs, External Auditor Portal. [Full details →](docs/audit-compliance-agent-pack.md) |
-| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). [Inventory →](#-tool-inventory) |
+| 🔧 | **122 Classified Tools** | Every tool carries an honest CI-enforced maturity label (`real` / `heuristic` / `llm_passthrough` / `config_dependent` / `experimental`). [Inventory →](#-tool-inventory-122-registered) |
 | ⚡ | **Vibe Coding Builder** | Describe an app → Architect → Generate → 3-layer build check → Debug loop (≤3 retries) → Deploy. [Details →](docs/vibe-coding.md) |
 | 🧠 | **Agent-first Runtime** | All work routes through specialist agents with tier-based model execution. Both **OpenAI** (GPT-5.5/5.4) and **Gemini** (2.5 Pro/Flash/Flash-Lite) with per-tenant switching. |
 | 🔍 | **Provider-Native Search** | Google Search Grounding (built-in with included quota, citation-backed) for Gemini. `web_search_preview` (built-in with included quota, native) for OpenAI. No Serper, no Tavily, no external search API keys required. |
@@ -556,9 +556,9 @@ gcloud run services logs read jak-swarm-api \
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
-| `/ready` | ✅ PASS | Readiness check. Env, DB, Redis, LLM all pass. Uses `$queryRawUnsafe` for Supabase pooler compatibility. |
-| `/health` | ✅ PASS | Deep diagnostic. Uses `$queryRawUnsafe` for Supabase pooler compatibility. |
-| `/healthz` | 🔜 Planned | Liveness probe (always 200). Not yet wired in Cloud Run. Part of the production observability roadmap. |
+| `/ready` | ✅ Implemented | Readiness check. Env, DB, Redis, LLM. Uses `$queryRawUnsafe` for Supabase pooler compatibility. Requires auth on public Cloud Run. |
+| `/health` | ✅ Implemented | Deep diagnostic. Uses `$queryRawUnsafe` for Supabase pooler compatibility. Requires auth on public Cloud Run. |
+| `/healthz` | ✅ Implemented | Liveness probe (always 200, no dependency checks). Requires auth on public Cloud Run. |
 
 **Post-Challenge Hardening Items:**
 
@@ -635,6 +635,7 @@ The frontend remains on Vercel for challenge accessibility. The submitted Google
 | 📊 **Analytics** | Usage metrics, cost tracking, agent performance charts |
 | ⏰ **Schedules** | Cron-based recurring workflow management |
 | 🔌 **Integrations** | MCP provider connections |
+| 🔗 **Connectors** | Connector status and management |
 | 🧠 **Knowledge** | Memory store — facts, preferences, policies |
 | ⚙️ **Settings** | LLM provider config, approval thresholds |
 | 👑 **Admin** | Tenant management, users, API keys, tool toggles |
@@ -679,7 +680,7 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **122** | 50+ | Custom | ~10 |
-| Built-in UI | **26 pages** | — | LangSmith | IDE |
+| Built-in UI | **27 pages** | — | LangSmith | IDE |
 | **Gemini + OpenAI** (per-tenant) | ✅ | ❌ | ❌ | ❌ |
 | **Google ADK orchestration** | ✅ | ❌ | ❌ | ❌ |
 | **Google Search Grounding** | ✅ | ❌ | ❌ | ❌ |
@@ -754,7 +755,7 @@ Full roadmap with implementation milestones and honest scope boundaries: [`docs/
 | **Frontend** | Next.js 16, React 19, Tailwind CSS |
 | **DAG Visualization** | React Flow |
 | **Database** | PostgreSQL + Prisma ORM + pgvector |
-| **Auth** | Supabase (email/password + OAuth) + NextAuth |
+| **Auth** | Supabase (email/password + magic link) + JWT + API keys |
 | **Durable Workflows** | LangGraph StateGraph + PostgresCheckpointSaver |
 | **ADK Orchestration** | @google/adk (SequentialAgent + ParallelAgent) |
 | **LLM — OpenAI** | GPT-5.5 / GPT-5.4 — Responses API, json_schema strict mode |

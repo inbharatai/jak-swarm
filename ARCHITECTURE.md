@@ -132,7 +132,7 @@ The Agent Engine gateway is deployed live on Vertex AI. Cloud Run remains the pr
 
 TypeScript enums and interfaces used across all packages:
 
-- `AgentRole` (38 agent roles + `WAITING_APPROVAL`), `AgentStatus`, `AgentHandoff`, `ToolCall`, `AgentTrace`
+- `AgentRole` (38 agent roles), `AgentStatus`, `AgentHandoff`, `ToolCall`, `AgentTrace`
 - `ToolCategory` (11 categories), `ToolRiskLevel` (6 tiers: `READ_ONLY`, `DRAFT_ONLY`, `SANDBOX_EDIT`, `LOCAL_EXEC_ALLOWLIST`, `EXTERNAL_ACTION_APPROVAL`, `CRITICAL_MANUAL_ONLY`), `ToolMetadata`, `ToolResult`
 - `WorkflowStatus`, `TaskStatus`, `RiskLevel`, `WorkflowTask`, `WorkflowPlan`, `ApprovalRequest`
 
@@ -428,9 +428,9 @@ As of 2026-06-15, JAK Swarm has two verified deployment paths:
 - Service: `jak-swarm-api`
 - Region: `asia-south1`
 - URL: `https://jak-swarm-api-565531938617.asia-south1.run.app`
-- `/ready`: ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility)
-- `/health`: ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility)
-- `/healthz`: not wired yet (liveness probe, always 200 when wired)
+- `/ready`: ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility; requires auth on public Cloud Run)
+- `/health`: ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility; requires auth on public Cloud Run)
+- `/healthz`: ✅ wired (liveness probe, always 200; requires auth on public Cloud Run)
 
 **Additional — Vertex AI Agent Engine Gateway:**
 - Resource ID: `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`

@@ -304,7 +304,7 @@ Industry packs customise the swarm's behaviour for specific verticals. A pack is
 ### Authentication
 - **Web app users:** JWT signed by Fastify auth plugin (HS256 with `AUTH_SECRET`)
 - **API consumers:** HMAC-SHA256 API keys scoped to tenant + permission set
-- **Supabase Auth:** Email/password, magic link, Google OAuth for user registration
+- **Supabase Auth:** Email/password + magic link for user registration. Google OAuth is available for integration authorization (Gmail, Calendar, Drive), not user authentication.
 
 ### Authorisation
 - Every API request passes through `tenantIsolationMiddleware`
@@ -451,7 +451,7 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
 Cloud Run is the primary deployment. Railway is the rollback/fallback path. Cloud Run connects to Railway Redis via its **public endpoint** (not `.railway.internal` private DNS, which is unreachable from outside Railway). Traffic switches to Cloud Run by changing `NEXT_PUBLIC_API_URL` in Vercel and redeploying. Rollback is switching the URL back to Railway. See `docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md` for full setup instructions.
 
 **Current status:**
-- API deployed at `https://jak-swarm-api-565531938617.asia-south1.run.app`; Worker not yet deployed. `/ready` ✅ PASS (all checks). `/health` ✅ PASS (uses `$queryRawUnsafe` for Supabase pooler compatibility). `/healthz` 🔜 NOT YET WIRED (liveness probe, always 200 when wired).
+- API deployed at `https://jak-swarm-api-565531938617.asia-south1.run.app`; Worker not yet deployed. `/ready` ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility; requires auth on public Cloud Run). `/health` ✅ passing (uses `$queryRawUnsafe` for Supabase pooler compatibility; requires auth on public Cloud Run). `/healthz` ✅ wired (liveness probe, always 200; requires auth on public Cloud Run).
 - Agent Engine gateway deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` (asia-south1). Gateway agent uses GOOGLE_SEARCH for grounding and 5 FunctionTool wrappers (create_workflow, get_workflow_status, get_workflow_traces, search_knowledge, approve_request) that call the JAK Cloud Run API at /workflows, /memory, /approvals. Deployment scripts: `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, `scripts/deploy-agent-engine-python.py`. Resource file: `packages/adk/src/deploy/agent-engine-resource.ts`.
 
 ### Environment Tiers
