@@ -1224,6 +1224,19 @@ export class SwarmExecutionService extends EventEmitter {
               taskCount: Array.isArray(plan?.tasks) ? plan!.tasks!.length : 0,
               timestamp: nowIso,
             }, tenantId, userId);
+            // Persist the plan so workflow-stream.routes.ts can replay plan_created
+            // to reconnecting clients (it reads workflow.planJson, which was
+            // previously never written). Fire-and-forget; non-fatal — the onAgentActivity
+            // callback is synchronous, so we cannot await here.
+            (this.db.workflow.update as any)({
+              where: { id: workflowId },
+              data: { planJson: plan ?? (ev['plan'] as unknown) },
+            }).catch((persistErr: unknown) => {
+              this.log.warn(
+                { workflowId, err: persistErr instanceof Error ? persistErr.message : String(persistErr) },
+                '[Swarm] planJson persist failed (non-fatal)',
+              );
+            });
           } else if (t === 'worker_started') {
             this.emitLifecycle({
               type: 'step_started',

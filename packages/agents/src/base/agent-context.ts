@@ -149,7 +149,13 @@ export type AgentActivityEvent =
       /** Hash of the proposed input for ApprovalRequest payload binding. */
       proposedDataHash?: string;
       timestamp: string;
-    };
+    }
+  // Cockpit-critical plan / worker lifecycle. These were referenced by the
+  // SSE bridge translator and the cockpit UI but never declared here, so no
+  // emitter could produce them. Declaring them makes the existing pipeline live.
+  | { type: 'plan_created'; planId: string; plan: { goal?: string; tasks: unknown[] }; timestamp: string }
+  | { type: 'worker_started'; taskId: string; taskName?: string; agentRole: string; timestamp: string }
+  | { type: 'worker_completed'; taskId: string; taskName?: string; agentRole: string; success: boolean; durationMs: number; error?: string; timestamp: string };
 
 /**
  * Callback the runtime can wire to route activity events to the client

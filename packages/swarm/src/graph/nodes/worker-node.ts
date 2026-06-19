@@ -56,6 +56,20 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
   // because SwarmState cannot carry Function values (persistence).
   const onActivity = getActivityEmitter(state.workflowId);
 
+  // Bracket the task with worker_started / worker_completed so the cockpit
+  // can render per-task IN_PROGRESS -> COMPLETED. These ride the same activity
+  // side-channel the SSE bridge already forwards (onAgentActivity).
+  const workerStartedAt = Date.now();
+  if (onActivity) {
+    onActivity({
+      type: 'worker_started',
+      taskId: task.id,
+      ...(task.name ? { taskName: task.name } : {}),
+      agentRole: task.agentRole,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const context = new AgentContext({
     tenantId: state.tenantId,
     userId: state.userId,
@@ -271,6 +285,21 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
         ),
       }
     : state.plan;
+
+  if (onActivity) {
+    onActivity({
+      type: 'worker_completed',
+      taskId: task.id,
+      ...(task.name ? { taskName: task.name } : {}),
+      agentRole: task.agentRole,
+      success: !taskFailed,
+      durationMs: Date.now() - workerStartedAt,
+      ...(taskFailed
+        ? { error: String((output as Record<string, unknown>)['error'] ?? 'Worker failed') }
+        : {}),
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   return {
     taskResults: { [task.id]: output },
