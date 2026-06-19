@@ -987,6 +987,15 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
     return sendJson(req, res, 201, ok(workflow));
   }
 
+  // ── MOCK-ONLY FALLBACK ──────────────────────────────────────────────
+  // This branch runs ONLY when Docker/Testcontainers is unavailable. The
+  // plan_created / worker_started / worker_completed events below are FABRICATED
+  // by this mock — they are NOT produced by the real SwarmRunner. The real
+  // engine emission of these events is pinned by
+  // tests/unit/swarm/cockpit-events-emission.test.ts. Each event carries
+  // source: 'mock' so consumers can distinguish mock output from the real
+  // SSE stream. Do NOT treat a green Playwright run against this mock as
+  // proof of real-engine event emission.
   if (method === 'GET' && /^\/workflows\/[^/]+\/stream$/.test(pathname)) {
     const workflowId = pathname.split('/')[2] ?? 'wf_local_demo_001';
     const workflow = mockWorkflows.get(workflowId) ?? {
@@ -1013,6 +1022,7 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
     });
 
     sendSseEvent(res, {
+      source: 'mock',
       type: 'plan_created',
       workflowId,
       plan: {
@@ -1024,6 +1034,7 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
 
     for (const task of tasks) {
       sendSseEvent(res, {
+        source: 'mock',
         type: 'worker_started',
         workflowId,
         taskId: task.id,
@@ -1032,6 +1043,7 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
       });
       await sleep(120);
       sendSseEvent(res, {
+        source: 'mock',
         type: 'worker_completed',
         workflowId,
         taskId: task.id,
@@ -1044,6 +1056,7 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
     }
 
     sendSseEvent(res, {
+      source: 'mock',
       type: 'cost_updated',
       workflowId,
       costUsd: 0,
@@ -1057,7 +1070,7 @@ async function handleMockApi(req: IncomingMessage, res: ServerResponse) {
     workflow.updatedAt = nowIso();
     mockWorkflows.set(workflowId, workflow);
     await sleep(80);
-    sendSseEvent(res, { type: 'completed', workflowId });
+    sendSseEvent(res, { source: 'mock', type: 'completed', workflowId });
     return res.end();
   }
 
@@ -1109,6 +1122,7 @@ async function startMockApi(error: unknown) {
   console.warn('[e2e-api-stack] Testcontainers/Docker is unavailable.');
   console.warn('[e2e-api-stack] Starting deterministic local mock API instead.');
   console.warn('[e2e-api-stack] Set E2E_ALLOW_MOCK_API=0 to require the real Postgres/API stack.');
+  console.warn('[e2e-api-stack] NOTE: workflow SSE events (plan_created/worker_started/worker_completed) are FABRICATED by this mock, not emitted by the real engine. Real-engine emission is unit-pinned by tests/unit/swarm/cockpit-events-emission.test.ts.');
   console.warn('[e2e-api-stack] Original startup error:', error);
 
   mockApiServer = createServer((req, res) => {

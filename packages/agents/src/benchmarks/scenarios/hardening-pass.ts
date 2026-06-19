@@ -119,7 +119,10 @@ export const HARDENING_PASS_SCENARIOS: HardeningScenario[] = [
     integrationNote:
       'Requires browser + SSE listener. Verify by running a multi-step workflow and confirming each of the ' +
       'documented event types arrives in DevTools Network → EventSource: started, plan_created, worker_started, ' +
-      'tool_called, tool_completed, cost_updated, worker_completed, completed.',
+      'tool_called, tool_completed, cost_updated, worker_completed, completed. ' +
+      'Engine-level emission of plan_created/worker_started/worker_completed is pinned by ' +
+      'tests/unit/swarm/cockpit-events-emission.test.ts (real planner-node + worker-node, no mock); this ' +
+      'integration scenario covers the remaining browser + SSE-route wiring.',
     goal: '(integration scenario — see runMode)',
   },
   {
