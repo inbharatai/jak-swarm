@@ -76,6 +76,26 @@ const workflowStreamRoutes: FastifyPluginAsync = async (fastify) => {
       const handler = (event: unknown) => sendEvent(event);
       fastify.swarm.on(`workflow:${workflowId}`, handler);
 
+      // TOCTOU race fix: a workflow can transition to terminal in the
+      // window between the initial `findFirst` (line ~28) and the listener
+      // attach just above — an event fired in that window has no listener
+      // and is lost, so the client would hang on heartbeats forever waiting
+      // for a terminal event it already missed. Re-query AFTER attaching
+      // so a terminal transition in that window is caught and the stream
+      // closes. (Mid-run events in the same tiny window can still be lost,
+      // but plan_created is replayed from planJson above and the durable
+      // GET /workflows/:id path is the fallback source of truth.) See
+      // audit 2026-07-05.
+      const latest = await fastify.db.workflow.findFirst({
+        where: { id: workflowId, tenantId },
+      });
+      if (latest && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(latest.status)) {
+        sendEvent({ type: latest.status.toLowerCase(), workflowId });
+        fastify.swarm.removeListener(`workflow:${workflowId}`, handler);
+        reply.raw.end();
+        return;
+      }
+
       // Heartbeat every 15s to keep connection alive
       const heartbeat = setInterval(() => {
         try { reply.raw.write(`: heartbeat\n\n`); } catch { clearInterval(heartbeat); }

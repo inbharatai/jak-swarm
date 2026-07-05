@@ -31,7 +31,9 @@ tools layer without a dedicated UI tile.
 | SendGrid | placeholder | UI tile only | Outbound email ships via Gmail IMAP/SMTP, not SendGrid. |
 | Discord | placeholder | UI tile only | No runtime adapter wired. |
 
-### Infrastructure / MCP adapters (shown in `INTEGRATIONS_INFRA`)
+### Infrastructure / MCP adapters and search backends
+
+The first 9 rows below are the infrastructure adapters surfaced as UI tiles (`INTEGRATIONS_INFRA`). The 3 search backends (Serper, Tavily, DuckDuckGo) are `web_search` runtime options, not UI tiles — they're listed here for completeness and are excluded from the 9-adapter `INTEGRATIONS_INFRA` count in the summary.
 
 | Integration | Maturity | Runtime Path | Notes |
 |---|---|---|---|

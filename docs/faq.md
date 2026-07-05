@@ -236,7 +236,7 @@ Yes. Vision-capable models process images via `analyzeImage()`. PDFs go through 
 
 ### Is the Audit & Compliance pack production-ready?
 
-The pack is functionally complete and end-to-end tested ([`tests/integration/audit-run-e2e.test.ts`](../tests/integration/audit-run-e2e.test.ts) — 11 assertions covering create → plan → test → workpaper → approve → signed pack → signature verify, all green). To bring it into production:
+The pack is functionally complete and end-to-end tested ([`tests/integration/audit-run-e2e.test.ts`](../tests/integration/audit-run-e2e.test.ts) — 40 assertions across one scenario covering create → plan → test → workpaper → approve → signed pack → signature verify, all green). To bring it into production:
 
 1. Apply migration 15 (audit-run schema) against the production DB: `pnpm db:migrate:deploy`
 2. Verify `EVIDENCE_SIGNING_SECRET` is set (required for HMAC final-pack signing — `openssl rand -base64 48`)

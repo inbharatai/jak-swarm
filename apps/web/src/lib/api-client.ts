@@ -670,13 +670,6 @@ export const documentApi = {
 
 export const voiceApi = {
   /**
-   * Alias for createSession — used by the VoiceInput hook.
-   * @deprecated use createSession
-   */
-  getSessionConfig: (options?: { language?: string; voice?: string; workflowId?: string }) =>
-    apiClient.post<unknown>('/voice/sessions', options ?? {}),
-
-  /**
    * POST /voice/sessions — create a voice session.
    * Returns { sessionId, webRtcConfig, expiresInSeconds }
    */

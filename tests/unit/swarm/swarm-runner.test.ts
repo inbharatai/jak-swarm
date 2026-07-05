@@ -7,7 +7,7 @@
  *
  * NOTE: imports use the built dist via the @jak-swarm/* aliases in vitest.config.ts.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SwarmRunner } from '@jak-swarm/swarm';
 import { WorkflowStatus } from '@jak-swarm/shared';
 
@@ -33,6 +33,27 @@ describe('SwarmRunner', () => {
     expect(result.startedAt).toBeInstanceOf(Date);
     expect(result.completedAt).toBeInstanceOf(Date);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('runWithTimeout clears its setTimeout when the promise resolves first (no 20-min timer leak)', async () => {
+    // Audit 2026-07-05: runWithTimeout previously did Promise.race without
+    // clearTimeout, so every successful workflow left a pending 20-min
+    // setTimeout holding a closure. Verify the fix by counting fake timers
+    // before/after — the timeout timer must be cleared once the raced
+    // promise resolves. The method is private; reach it via the instance.
+    vi.useFakeTimers();
+    try {
+      const before = vi.getTimerCount();
+      const r = runner as unknown as {
+        runWithTimeout<T>(p: Promise<T>, ms: number, id: string): Promise<T>;
+      };
+      const result = await r.runWithTimeout(Promise.resolve('done'), 20 * 60 * 1000, 'wf_leak_test');
+      expect(result).toBe('done');
+      // The timeout timer must have been cleared in the finally block.
+      expect(vi.getTimerCount()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('produces a terminal status (not PENDING or PLANNING)', async () => {

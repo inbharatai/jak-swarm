@@ -99,6 +99,30 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 const UNKNOWN_MODEL_WARNED = new Set<string>();
 
 /**
+ * Find the longest prefix-matching pricing row for a model ID.
+ *
+ * OpenAI returns *dated* model IDs in `completion.model` (e.g.
+ * `gpt-4o-mini-2024-07-18`, `gpt-5.4-mini-2024-07-18`). A naive
+ * `Object.entries(...).find(([k]) => model.startsWith(k))` returns the
+ * first insertion-order match, and the parent family (`gpt-4o`, `gpt-5.4`)
+ * is inserted BEFORE its `-mini`/`-nano` variants — so a dated mini ID
+ * silently matched the parent's row and was overcharged 16.7x (gpt-4o) /
+ * 10x (gpt-5.4) / 5x (gpt-4.1). Longest-prefix match picks the most
+ * specific row that actually applies. See audit 2026-07-05.
+ */
+function longestPrefixPricing(model: string): ModelPricing | undefined {
+  let best: ModelPricing | undefined;
+  let bestLen = -1;
+  for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
+    if (model.startsWith(key) && key.length > bestLen) {
+      best = pricing;
+      bestLen = key.length;
+    }
+  }
+  return best;
+}
+
+/**
  * Calculate the USD cost for a given model and token counts.
  * Uses prefix matching for known historical model families, then zero cost if
  * unknown - but logs a one-time warning per unknown model so operators
@@ -119,9 +143,7 @@ export function calculateCost(
   cachedTokens: number = 0,
 ): number {
   const exactMatch = MODEL_PRICING[model];
-  const prefixMatch = !exactMatch
-    ? Object.entries(MODEL_PRICING).find(([k]) => model.startsWith(k))?.[1]
-    : undefined;
+  const prefixMatch = !exactMatch ? longestPrefixPricing(model) : undefined;
   const pricing = exactMatch ?? prefixMatch ?? { inputPer1M: 0, outputPer1M: 0 };
 
   // Warn once per process per unknown model so the silent-$0 bug can't
@@ -161,7 +183,7 @@ export function calculateCost(
 export function getModelPricing(model: string): ModelPricing {
   return (
     MODEL_PRICING[model] ??
-    Object.entries(MODEL_PRICING).find(([k]) => model.startsWith(k))?.[1] ??
+    longestPrefixPricing(model) ??
     { inputPer1M: 0, outputPer1M: 0 }
   );
 }

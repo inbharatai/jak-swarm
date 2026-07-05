@@ -146,4 +146,28 @@ describe('Agent Execution — Behavioral', () => {
     expect(cost).toBeCloseTo(0.00005, 6);
     expect(cost).toBeGreaterThanOrEqual(0);
   });
+
+  it('calculateCost uses longest-prefix match so dated mini/nano IDs are not overcharged', async () => {
+    // OpenAI returns *dated* model IDs in `completion.model` (e.g.
+    // `gpt-4o-mini-2024-07-18`). The naive first-startsWith match hit the
+    // parent family row (`gpt-4o` $2.50/1M) before the `-mini` row
+    // ($0.15/1M) — a 16.7x overcharge. Longest-prefix match picks the
+    // most specific row. Audit 2026-07-05.
+    const { calculateCost, getModelPricing } = await import('@jak-swarm/shared');
+
+    const miniDated = calculateCost('gpt-4o-mini-2024-07-18', 1_000_000, 0);
+    const miniExact = calculateCost('gpt-4o-mini', 1_000_000, 0);
+    expect(miniDated).toBeCloseTo(miniExact, 6);
+    expect(miniDated).toBeCloseTo(0.15, 6);
+    // Must NOT have matched the parent `gpt-4o` row ($2.50).
+    expect(miniDated).toBeLessThan(1);
+
+    // gpt-5.4-mini dated variant — 10x overcharge if the naive match won.
+    const dated54 = calculateCost('gpt-5.4-mini-2024-07-18', 1_000_000, 0);
+    expect(dated54).toBeCloseTo(0.50, 6);
+
+    // getModelPricing shares the longest-prefix logic.
+    expect(getModelPricing('gpt-4o-mini-2024-07-18').inputPer1M).toBeCloseTo(0.15, 6);
+    expect(getModelPricing('gpt-4.1-nano-2025-08-07').inputPer1M).toBeCloseTo(0.10, 6);
+  });
 });

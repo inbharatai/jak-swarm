@@ -1602,7 +1602,16 @@ export class SwarmExecutionService extends EventEmitter {
         try {
           const actualCostUsd = result.traces.reduce((sum: number, t: { costUsd?: number }) =>
             sum + (typeof t.costUsd === 'number' ? t.costUsd : 0), 0);
-          const actualCredits = Math.max(1, Math.ceil(actualCostUsd * 100));
+          // Honest ledger: 0 credits for a $0 run. The previous
+          // `Math.max(1, ...)` floor charged 1 credit even for free/local
+          // workflows that cost $0 actual — a silent fake charge
+          // contradicting the "record actual usage" comment. A real LLM
+          // workflow always has tokens>0 so this only affects genuinely
+          // $0 runs (all-local model, zero-token, free tier). If a
+          // minimum-per-run charge is wanted as anti-abuse policy, it
+          // should be an explicit named constant, not a silent floor
+          // here. See audit 2026-07-05.
+          const actualCredits = Math.ceil(actualCostUsd * 100);
           const totalTokens = result.traces.reduce((sum: number, t: { tokenUsage?: { totalTokens?: number } }) =>
             sum + (t.tokenUsage?.totalTokens ?? 0), 0);
 
@@ -1847,14 +1856,11 @@ export class SwarmExecutionService extends EventEmitter {
         'CANCELLED',
         `Rejected by ${reviewedBy}${comment ? `: ${comment}` : ''}`,
       );
-      // Emit SSE event so connected clients clear the spinner on
-      // approval rejection. Without this, the frontend never receives
-      // a 'cancelled' event type and the spinner stays forever.
-      this.emit(`workflow:${workflowId}`, {
-        type: 'cancelled',
-        workflowId,
-        reason: `Rejected by ${reviewedBy}${comment ? `: ${comment}` : ''}`,
-      });
+      // NOTE: `emitLifecycle({type:'cancelled',...})` above is the single
+      // source of the SSE 'cancelled' event — it forwards to the
+      // `workflow:${id}` channel (see emitLifecycle at the top of this
+      // file). A bare `this.emit(...)` here was a duplicate that caused
+      // the cockpit to process 'cancelled' twice. Removed 2026-07-05.
       return;
     }
 
@@ -1927,15 +1933,11 @@ export class SwarmExecutionService extends EventEmitter {
         timestamp: new Date().toISOString(),
       }, params.tenantId, params.cancelledBy);
     }
-    // Also emit an SSE event so connected clients clear the spinner.
-    // Without this, the frontend's onMessage handler never receives
-    // a 'cancelled' event, and the spinner stays forever until the
-    // polling fallback catches it.
-    this.emit(`workflow:${params.workflowId}`, {
-      type: 'cancelled',
-      workflowId: params.workflowId,
-      reason: params.reason,
-    });
+    // NOTE: `emitLifecycle({type:'cancelled',...})` above is the single
+    // source of the SSE 'cancelled' event (it forwards to the
+    // `workflow:${id}` channel). The bare `this.emit(...)` that was here
+    // duplicated it and caused the cockpit to process 'cancelled' twice.
+    // Removed 2026-07-05.
   }
 
   /** Pause a running workflow (it will pause between nodes). */

@@ -268,7 +268,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   // Fetch realtime API config if available
   useEffect(() => {
     voiceApi
-      .getSessionConfig()
+      .createSession()
       .then((config: unknown) => {
         if (config) {
           setProvider('realtime-api');

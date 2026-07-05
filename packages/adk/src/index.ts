@@ -24,7 +24,6 @@ export {
   jsonSchemaToZod,
   jakToolToAdkFunctionTool,
   jakToolsToAdkFunctionTools,
-  getSearchToolsForProvider,
   buildAdkToolsArray,
 } from './bridge/jak-tool-bridge.js';
 
@@ -42,14 +41,12 @@ export {
 export {
   buildAdkPipeline,
   buildSimpleAdkPipeline,
-  buildDynamicAdkPipeline,
   type AdkPipelineConfig,
 } from './orchestration/adk-pipeline.js';
 
 // Runner bridge
 export {
   runWithAdk,
-  isAdkModeEnabled,
   type AdkRunResult,
 } from './orchestration/adk-runner.js';
 

@@ -1590,13 +1590,16 @@ export function registerBuiltinTools(): void {
         // Use OpenAI vision to analyze
         const apiKey = process.env['OPENAI_API_KEY'];
         if (!apiKey) {
+          // Honest failure — the tool's contract is "analyze the page with
+          // OpenAI vision" and that did not happen. Returning success:true
+          // with a canned `analysis` string would be a fake-success dummy
+          // (the cockpit would render a green ✓ for an analysis that never
+          // ran). Match the DALL-E tool's missing-key contract below.
+          // `requiredEnvVars` is metadata-only (not enforced at runtime —
+          // see audit 2026-07-05), so this branch IS reachable in prod.
           return {
-            success: true,
-            data: {
-              screenshot: base64.slice(0, 100) + '...(truncated)',
-              analysis: 'Vision analysis unavailable (no OPENAI_API_KEY). Screenshot captured as base64.',
-              screenshotBase64: base64,
-            },
+            success: false,
+            error: 'OPENAI_API_KEY not set. Required for vision analysis. Screenshot was captured but not analyzed.',
           };
         }
 
@@ -2104,12 +2107,20 @@ export function registerBuiltinTools(): void {
 
         const apiKey = process.env['OPENAI_API_KEY'];
         if (!apiKey) {
+          // Raw-text extraction genuinely succeeded, so success:true is
+          // honest — but the LLM analysis did NOT run. Previously this
+          // returned a canned `analysis` string paired with success:true,
+          // which the model could mistake for a real analysis (fake-success
+          // dummy). Drop the canned analysis; mark it null + a clear note
+          // so the model reads the raw text and knows analysis was skipped.
           return {
             success: true,
             data: {
               text: data.text.slice(0, 5000),
               pages: data.numpages,
-              analysis: 'LLM analysis unavailable (no OPENAI_API_KEY). Raw text extracted.',
+              analysis: null,
+              analysisSkipped: true,
+              analysisNote: 'OPENAI_API_KEY not set — LLM analysis skipped. Raw text extracted.',
             },
           };
         }

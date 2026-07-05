@@ -183,7 +183,7 @@ Five tenant-scoped services that drive a full audit engagement end-to-end:
 - **`WorkpaperService`** -- Renders per-control PDFs via existing `exportPdf` (pdfkit) and persists as `WorkflowArtifact` with `approvalState='REQUIRES_APPROVAL'`. Lazy-creates one backing `Workflow` row per `AuditRun`.
 - **`FinalAuditPackService`** -- Hard gate: `FinalPackGateError` if any workpaper is unapproved. Bundles workpapers + control matrix CSV + exceptions JSON + executive summary PDF + HMAC-SHA256 signature via existing `bundle-signing.service`.
 
-Routes: `apps/api/src/routes/audit-runs.routes.ts` (14 endpoints, REVIEWER+ on writes). UI: `apps/web/src/app/(dashboard)/audit/runs/`. End-to-end test: `tests/integration/audit-run-e2e.test.ts` (11 assertions, all green).
+Routes: `apps/api/src/routes/audit-runs.routes.ts` (15 endpoints, REVIEWER+ on writes). UI: `apps/web/src/app/(dashboard)/audit/runs/`. End-to-end test: `tests/integration/audit-run-e2e.test.ts` (40 assertions across 1 scenario, all green).
 
 ### `packages/workflows` -- Temporal Integration (Optional)
 

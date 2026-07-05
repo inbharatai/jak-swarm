@@ -42,10 +42,10 @@ That rating means the core architecture is now credible enough for controlled be
 - `pnpm --filter @jak-swarm/shared typecheck`
 - `pnpm --filter @jak-swarm/db typecheck`
 - `pnpm --filter @jak-swarm/swarm exec tsc --noEmit`
-- `pnpm --filter @jak-swarm/tests test`: 2154 blocking CI (1,764 unit + 390 integration), 101 skipped, 54 todo; full local suite reports 2,156 including `check:truth` documentation validation.
+- `pnpm --filter @jak-swarm/tests test`: 2200+ blocking CI (unit + integration), 101 skipped locally (integration tests run in CI with Postgres), 54 todo; full local suite reports 2,160+ including `check:truth` documentation validation. Badge uses a floor count so it stays honest without drifting on every test addition.
 - `PWHEADLESS=1 E2E_START_API=1 pnpm --filter @jak-swarm/tests run test:e2e -- standing-orders.spec.ts --project=chromium-desktop`: 3 passed.
 - `PWHEADLESS=1 pnpm --filter @jak-swarm/tests run test:e2e -- human-qa-landing.spec.ts --project=chromium-desktop`: passed.
-- `PWHEADLESS=1 pnpm --filter @jak-swarm/tests run test:e2e -- human-qa-dashboard.spec.ts --project=chromium-desktop`: 10 dashboard pages passed in the earlier local sweep.
+- `PWHEADLESS=1 pnpm --filter @jak-swarm/tests run test:e2e -- human-qa-dashboard.spec.ts --project=chromium-desktop`: 31 dashboard `page.tsx` routes exist under `apps/web/src/app/(dashboard)/`; the local Playwright sweep covers the core flows. (An earlier sweep covered 10 — the dashboard has since grown to 31 routes.)
 
 ## Hosted Beta Go/No-Go Checklist
 

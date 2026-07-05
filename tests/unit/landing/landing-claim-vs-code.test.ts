@@ -308,7 +308,7 @@ describe('Landing — top-line counts', () => {
     const readme = read('README.md');
     expect(readme).toMatch(/AI_Agents-38/);
     expect(readme).toMatch(/Classified_Tools-122/);
-    expect(readme).toMatch(/Connectors-23/);
+    expect(readme).toMatch(/Connectors-22/);
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
 
@@ -318,11 +318,11 @@ describe('Landing — top-line counts', () => {
     const page = read('apps/web/src/app/page.tsx');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
     expect(readme).toContain('working challenge build');
-    expect(readme).toMatch(/Tests-2154_blocking_CI/);
+    expect(readme).toMatch(/Tests-\d{4,}(?:%2B|\+)?_blocking_CI/);
     expect(page).toContain('Beta 0.1.0-beta.0');
     expect(page).toContain('Controlled beta');
     expect(beta).toContain('Status: beta release candidate');
-    expect(beta).toContain('2154 blocking CI');
+    expect(beta).toMatch(/\d{4,}\+? blocking CI/);
     expect(beta).toMatch(/not an enterprise-SLA release/i);
   });
 });

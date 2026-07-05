@@ -547,14 +547,24 @@ export class SwarmRunner {
     timeoutMs: number,
     workflowId: string,
   ): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Workflow ${workflowId} timed out after ${timeoutMs}ms`)),
-          timeoutMs,
-        ),
-      ),
-    ]);
+    // Capture the timer so it can be cleared when the workflow promise
+    // settles first. Without this, every successful workflow leaves a
+    // pending 20-minute setTimeout holding a closure over `workflowId` +
+    // `reject` — in a long-lived worker this accumulates hundreds of
+    // orphan timers. See audit 2026-07-05.
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`Workflow ${workflowId} timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 }
