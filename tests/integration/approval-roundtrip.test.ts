@@ -1,34 +1,43 @@
 /**
- * Approval round-trip lifecycle test.
+ * Approval round-trip lifecycle test — calls the REAL
+ * SwarmExecutionService.emitLifecycle (constructed with a stub Prisma +
+ * stub logger) instead of a copied harness.
  *
- * Exercises the SwarmExecutionService lifecycle emitter for the three
- * critical approval-decision paths (APPROVED, REJECTED, DEFERRED) with
- * a stubbed Prisma + a stubbed runner. We don't need a live LLM here —
- * the test is about event correctness, audit trail, and lifecycle
- * sequencing. End-to-end execution against a live OpenAI key is the
- * job of the bench harness + the manual integration recipe documented
- * in qa/benchmark-results-openai-first.md scenario 10.
+ * Item 15 of the post-audit follow-ups: the prior version mirrored
+ * `emitLifecycle` in a local `makeHarness()` function. That was a mock-as-
+ * prod pattern — if the production action map drifted, the test would
+ * still pass against the stale copy. This version constructs the real
+ * service so the action-map + SSE + audit wiring is exercised against the
+ * production code path. The stubs are limited to:
+ *   - `db.auditLog.create` (captured: AuditLogger writes here)
+ *   - a Proxy no-op for any other db property the eager constructors touch
+ *   - a silent FastifyBaseLogger
  *
- * What this test PROVES:
- *   1. APPROVED decision emits `approval_granted` THEN `resumed` THEN
- *      either `completed` or `failed` lifecycle events in that order.
- *   2. REJECTED decision emits `approval_rejected` THEN `cancelled`.
- *   3. DEFERRED is a no-op (no lifecycle events fired).
- *   4. Each lifecycle event ALSO produces an SSE event on the
- *      `workflow:${workflowId}` channel.
- *   5. Audit log entries are created for each lifecycle transition.
+ * What this test PROVES (against the real emitLifecycle):
+ *   1. APPROVED decision emits `approval_granted` THEN `resumed` SSE events
+ *      AND writes APPROVAL_GRANTED + WORKFLOW_RESUMED audit rows.
+ *   2. REJECTED decision emits `approval_rejected` THEN `cancelled` SSE
+ *      events AND writes APPROVAL_REJECTED + WORKFLOW_CANCELLED audit rows.
+ *   3. Every SSE event carries `kind: 'lifecycle'`.
+ *   4. The full canonical lifecycle ordering produces the expected SSE +
+ *      audit sequences.
  *
  * What this test does NOT prove:
  *   - That the SwarmRunner actually pauses on a real high-risk task
- *     (requires a live LLM and is documented as the manual integration
- *     recipe for scenario 5).
+ *     (requires a live LLM; documented as the manual integration recipe
+ *     in qa/benchmark-results-openai-first.md scenario 10).
+ *   - DEFERRED is a no-op at the resumeAfterApproval layer (it returns
+ *     early before calling emitLifecycle) — asserted trivially.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EventEmitter } from 'node:events';
+import type { PrismaClient } from '@jak-swarm/db';
+import type { FastifyBaseLogger } from 'fastify';
 
-// Use a relative import — vitest aliases @jak-swarm/* to source paths.
-// Importing the actual class would pull in the full Fastify dep graph,
-// so we test the emitLifecycle wiring via a focused harness.
+// Relative import — vitest aliases @jak-swarm/* to source paths, but
+// apps/api is NOT aliased. The real service pulls the LangGraph runtime +
+// PostgresCheckpointSaver at construction (no I/O — both constructors only
+// store the db reference), so a stub Prisma is enough to reach emitLifecycle.
+import { SwarmExecutionService } from '../../apps/api/src/services/swarm-execution.service.js';
 
 interface CapturedEvent {
   channel: string;
@@ -42,158 +51,153 @@ interface CapturedAudit {
   details: Record<string, unknown>;
 }
 
+function silentLogger(): FastifyBaseLogger {
+  return {
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+    trace: () => {},
+    fatal: () => {},
+    child: () => silentLogger(),
+    level: 'info',
+  } as unknown as FastifyBaseLogger;
+}
+
 /**
- * Build a minimal harness that mirrors SwarmExecutionService.emitLifecycle
- * exactly. If this test breaks because the production code's emitLifecycle
- * shape changed, the test must be updated to match — that's the safety
- * contract the test enforces.
+ * Stub Prisma: `auditLog.create` is a captured spy (the only db method
+ * emitLifecycle touches, via AuditLogger.log). Every other property access
+ * returns a no-op async function so the eager SwarmExecutionService
+ * constructors (SwarmRunner / LangGraphRuntime / WorkflowService /
+ * QueueWorker / DbWorkflowStateStore — all of which only STORE the db
+ * reference at construction) don't throw on property access.
  */
-function makeHarness() {
-  const emitter = new EventEmitter();
-  const events: CapturedEvent[] = [];
-  const audits: CapturedAudit[] = [];
-
-  emitter.on('any', (data: unknown) => {
-    if (data && typeof data === 'object' && 'channel' in data) {
-      events.push(data as CapturedEvent);
-    }
-  });
-
-  function emit(channel: string, ev: Record<string, unknown>) {
-    events.push({ channel, event: ev });
-  }
-
-  // Mirror the AuditLogger.log signature
-  function audit(input: { action: string; resource: string; resourceId?: string; details: Record<string, unknown> }) {
+function makeStubPrisma(audits: CapturedAudit[]) {
+  const auditCreate = vi.fn(async (args: { data: Record<string, unknown> }) => {
     audits.push({
-      action: input.action,
-      resource: input.resource,
-      ...(input.resourceId !== undefined ? { resourceId: input.resourceId } : {}),
-      details: input.details,
+      action: args.data['action'] as string,
+      resource: args.data['resource'] as string,
+      ...(args.data['resourceId'] !== undefined ? { resourceId: args.data['resourceId'] as string } : {}),
+      details: args.data['details'] as Record<string, unknown>,
     });
-  }
+    return {};
+  });
+  const auditLog = { create: auditCreate };
+  // Proxy returns `auditLog` for the `auditLog` property and a no-op async
+  // fn for anything else, recursively.
+  const stub = new Proxy(
+    { auditLog },
+    {
+      get(target, prop, receiver) {
+        if (prop === 'auditLog') return target.auditLog;
+        if (prop === 'then' || prop === 'catch' || prop === 'finally') return undefined; // not a thenable
+        // Return a function for any method access; if called, resolves to null.
+        return () => Promise.resolve(null);
+      },
+    },
+  );
+  return { prisma: stub as unknown as PrismaClient, auditCreate };
+}
 
-  // The actual emitLifecycle from production — copied verbatim shape so
-  // this test breaks if the production action map drifts.
-  function emitLifecycle(ev: Record<string, unknown> & { type: string; workflowId: string }) {
-    emit(`workflow:${ev.workflowId}`, { ...ev, kind: 'lifecycle' });
-    const actionMap: Record<string, string> = {
-      created: 'WORKFLOW_CREATED',
-      planned: 'WORKFLOW_PLANNED',
-      started: 'WORKFLOW_STARTED',
-      step_started: 'WORKFLOW_STEP_STARTED',
-      step_completed: 'WORKFLOW_STEP_COMPLETED',
-      step_failed: 'WORKFLOW_STEP_FAILED',
-      approval_required: 'APPROVAL_REQUESTED',
-      approval_granted: 'APPROVAL_GRANTED',
-      approval_rejected: 'APPROVAL_REJECTED',
-      resumed: 'WORKFLOW_RESUMED',
-      cancelled: 'WORKFLOW_CANCELLED',
-      completed: 'WORKFLOW_COMPLETED',
-      failed: 'WORKFLOW_FAILED',
-    };
-    const action = actionMap[ev.type];
-    if (action) {
-      audit({
-        action,
-        resource: 'workflow',
-        resourceId: ev.workflowId,
-        details: ev as Record<string, unknown>,
-      });
-    }
-  }
+function makeService() {
+  const audits: CapturedAudit[] = [];
+  const { prisma } = makeStubPrisma(audits);
+  const svc = new SwarmExecutionService(prisma, silentLogger());
+  const events: CapturedEvent[] = [];
 
-  return { events, audits, emit, emitLifecycle, emitter };
+  // The service IS an EventEmitter — listen on the canonical SSE channel
+  // for the workflow under test. emitLifecycle calls `this.emit('workflow:<id>', {...})`.
+  let listeningChannel: string | null = null;
+  const listener = (ev: Record<string, unknown>) => {
+    events.push({ channel: listeningChannel!, event: ev });
+  };
+  const listen = (workflowId: string) => {
+    listeningChannel = `workflow:${workflowId}`;
+    svc.on(listeningChannel, listener);
+  };
+  const stop = () => {
+    if (listeningChannel) svc.off(listeningChannel, listener);
+  };
+  // Flush the fire-and-forget audit.log promises.
+  const flushAudits = async () => {
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setTimeout(r, 0));
+  };
+  // Bind emitLifecycle so `this` is the service when we invoke it as a
+  // detached function reference (it reads this.emit + this.audit).
+  const emit = (
+    svc as unknown as { emitLifecycle: (ev: never, t: string, u?: string) => void }
+  ).emitLifecycle.bind(svc) as (ev: Record<string, unknown> & { type: string; workflowId: string }, t: string, u?: string) => void;
+  return { svc, events, audits, listen, stop, flushAudits, emit };
 }
 
 beforeEach(() => {
   vi.useRealTimers();
 });
 
-describe('approval round-trip lifecycle events', () => {
+describe('approval round-trip lifecycle events (real SwarmExecutionService.emitLifecycle)', () => {
   describe('APPROVED decision', () => {
-    it('emits approval_granted then resumed events', () => {
-      const harness = makeHarness();
+    it('emits approval_granted then resumed SSE + audit rows', async () => {
+      const harness = makeService();
       const workflowId = 'wf-test-approve';
       const tenantId = 'tenant-a';
       const reviewedBy = 'user-reviewer';
       const approvalId = 'apr-123';
+      harness.listen(workflowId);
 
-      // Mirror SwarmExecutionService.resumeAfterApproval(APPROVED) lifecycle.
-      harness.emitLifecycle({
-        type: 'approval_granted',
-        workflowId,
-        approvalId,
-        reviewedBy,
-        timestamp: new Date().toISOString(),
-      });
-      harness.emitLifecycle({
-        type: 'resumed',
-        workflowId,
-        reason: 'approval',
-        timestamp: new Date().toISOString(),
-      });
+      const emit = harness.emit;
 
-      // SSE channel order must be approval_granted → resumed
+      emit({ type: 'approval_granted', workflowId, approvalId, reviewedBy, timestamp: new Date().toISOString() }, tenantId, reviewedBy);
+      emit({ type: 'resumed', workflowId, reason: 'approval', timestamp: new Date().toISOString() }, tenantId, reviewedBy);
+      await harness.flushAudits();
+      harness.stop();
+
       const sseTypes = harness.events.map((e) => e.event['type']);
       expect(sseTypes).toEqual(['approval_granted', 'resumed']);
 
-      // Audit log must record both
       const auditActions = harness.audits.map((a) => a.action);
       expect(auditActions).toEqual(['APPROVAL_GRANTED', 'WORKFLOW_RESUMED']);
 
-      // Resource is the workflow, with the workflowId as resourceId
       expect(harness.audits[0]?.resource).toBe('workflow');
       expect(harness.audits[0]?.resourceId).toBe(workflowId);
-
-      // Reviewer is captured in details
       expect(harness.audits[0]?.details['reviewedBy']).toBe(reviewedBy);
       expect(harness.audits[0]?.details['approvalId']).toBe(approvalId);
     });
 
-    it('every SSE event carries kind="lifecycle"', () => {
-      const harness = makeHarness();
-      harness.emitLifecycle({
-        type: 'approval_granted',
-        workflowId: 'wf-1',
-        approvalId: 'a',
-        reviewedBy: 'u',
-        timestamp: new Date().toISOString(),
-      });
+    it('every SSE event carries kind="lifecycle"', async () => {
+      const harness = makeService();
+      const workflowId = 'wf-1';
+      harness.listen(workflowId);
+
+      const emit = harness.emit;
+      emit({ type: 'approval_granted', workflowId, approvalId: 'a', reviewedBy: 'u', timestamp: new Date().toISOString() }, 't', 'u');
+      await harness.flushAudits();
+      harness.stop();
       expect(harness.events.every((e) => e.event['kind'] === 'lifecycle')).toBe(true);
     });
   });
 
   describe('REJECTED decision', () => {
-    it('emits approval_rejected then cancelled events', () => {
-      const harness = makeHarness();
+    it('emits approval_rejected then cancelled SSE + audit rows', async () => {
+      const harness = makeService();
       const workflowId = 'wf-test-reject';
+      const tenantId = 'tenant-b';
       const reviewedBy = 'user-reviewer';
       const approvalId = 'apr-456';
+      harness.listen(workflowId);
 
-      harness.emitLifecycle({
-        type: 'approval_rejected',
-        workflowId,
-        approvalId,
-        reviewedBy,
-        reason: 'risk too high',
-        timestamp: new Date().toISOString(),
-      });
-      harness.emitLifecycle({
-        type: 'cancelled',
-        workflowId,
-        reason: `Rejected by ${reviewedBy}`,
-        cancelledBy: reviewedBy,
-        timestamp: new Date().toISOString(),
-      });
+      const emit = harness.emit;
+
+      emit({ type: 'approval_rejected', workflowId, approvalId, reviewedBy, reason: 'risk too high', timestamp: new Date().toISOString() }, tenantId, reviewedBy);
+      emit({ type: 'cancelled', workflowId, reason: `Rejected by ${reviewedBy}`, cancelledBy: reviewedBy, timestamp: new Date().toISOString() }, tenantId, reviewedBy);
+      await harness.flushAudits();
+      harness.stop();
 
       const sseTypes = harness.events.map((e) => e.event['type']);
       expect(sseTypes).toEqual(['approval_rejected', 'cancelled']);
 
       const auditActions = harness.audits.map((a) => a.action);
       expect(auditActions).toEqual(['APPROVAL_REJECTED', 'WORKFLOW_CANCELLED']);
-
-      // Rejection reason is preserved in audit
       expect(harness.audits[0]?.details['reason']).toBe('risk too high');
       expect(harness.audits[1]?.details['cancelledBy']).toBe(reviewedBy);
     });
@@ -201,30 +205,43 @@ describe('approval round-trip lifecycle events', () => {
 
   describe('DEFERRED decision', () => {
     it('emits no lifecycle events (workflow stays paused)', () => {
-      const harness = makeHarness();
-      // DEFERRED is intentionally a no-op — verify no event leakage.
-      // (The production code's resumeAfterApproval returns early on DEFERRED
-      //  WITHOUT calling emitLifecycle.)
+      // DEFERRED is a no-op at the resumeAfterApproval layer — it returns
+      // early WITHOUT calling emitLifecycle. The real emitLifecycle, if it
+      // WERE called with a deferred-ish type not in the action map, would
+      // still emit the SSE event but write no audit row (actionMap has no
+      // entry). Here we simply assert the no-op contract: zero events
+      // unless we explicitly call emitLifecycle.
+      const harness = makeService();
+      const workflowId = 'wf-defer';
+      harness.listen(workflowId);
       expect(harness.events.length).toBe(0);
       expect(harness.audits.length).toBe(0);
+      harness.stop();
     });
   });
 
   describe('full lifecycle ordering for an APPROVED → completed run', () => {
-    it('emits the canonical sequence: created, started, planned, step_started, step_completed, approval_required, approval_granted, resumed, completed', () => {
-      const harness = makeHarness();
+    it('emits the canonical SSE + audit sequence', async () => {
+      const harness = makeService();
       const workflowId = 'wf-full';
       const tenantId = 't';
+      const userId = 'u';
+      harness.listen(workflowId);
 
-      harness.emitLifecycle({ type: 'created', workflowId, tenantId, userId: 'u', goal: 'g', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'started', workflowId, runtime: 'swarmgraph', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'planned', workflowId, planId: 'p', taskCount: 1, timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'step_started', workflowId, stepId: 't1', agentRole: 'WORKER_EMAIL', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'approval_required', workflowId, approvalId: 'a1', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'approval_granted', workflowId, approvalId: 'a1', reviewedBy: 'u', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'resumed', workflowId, reason: 'approval', timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'step_completed', workflowId, stepId: 't1', agentRole: 'WORKER_EMAIL', durationMs: 100, timestamp: new Date().toISOString() });
-      harness.emitLifecycle({ type: 'completed', workflowId, finalStatus: 'COMPLETED' as never, durationMs: 1000, timestamp: new Date().toISOString() });
+      const emit = harness.emit;
+      const ts = () => new Date().toISOString();
+
+      emit({ type: 'created', workflowId, tenantId, userId, goal: 'g', timestamp: ts() }, tenantId, userId);
+      emit({ type: 'started', workflowId, runtime: 'langgraph', timestamp: ts() }, tenantId, userId);
+      emit({ type: 'planned', workflowId, planId: 'p', taskCount: 1, timestamp: ts() }, tenantId, userId);
+      emit({ type: 'step_started', workflowId, stepId: 't1', agentRole: 'WORKER_EMAIL', timestamp: ts() }, tenantId, userId);
+      emit({ type: 'approval_required', workflowId, approvalId: 'a1', timestamp: ts() }, tenantId, userId);
+      emit({ type: 'approval_granted', workflowId, approvalId: 'a1', reviewedBy: userId, timestamp: ts() }, tenantId, userId);
+      emit({ type: 'resumed', workflowId, reason: 'approval', timestamp: ts() }, tenantId, userId);
+      emit({ type: 'step_completed', workflowId, stepId: 't1', agentRole: 'WORKER_EMAIL', durationMs: 100, timestamp: ts() }, tenantId, userId);
+      emit({ type: 'completed', workflowId, finalStatus: 'COMPLETED', durationMs: 1000, timestamp: ts() }, tenantId, userId);
+      await harness.flushAudits();
+      harness.stop();
 
       const sseTypes = harness.events.map((e) => e.event['type']);
       expect(sseTypes).toEqual([
@@ -251,6 +268,31 @@ describe('approval round-trip lifecycle events', () => {
         'WORKFLOW_STEP_COMPLETED',
         'WORKFLOW_COMPLETED',
       ]);
+    });
+  });
+
+  describe('audit-failure resilience', () => {
+    it('does not throw when the audit write rejects (fire-and-forget)', async () => {
+      const harness = makeService();
+      const workflowId = 'wf-audit-err';
+      harness.listen(workflowId);
+      // Force auditLog.create to reject — emitLifecycle must swallow it
+      // (void audit.log(...).catch(...)) and the SSE event must still fire.
+      const auditCreate = (harness.svc as unknown as { audit: { db: { auditLog: { create: unknown } } } })
+        .audit.db.auditLog.create as ReturnType<typeof vi.fn>;
+      auditCreate.mockRejectedValueOnce(new Error('db down'));
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+
+      const emit = harness.emit;
+      expect(() => emit({ type: 'completed', workflowId, finalStatus: 'COMPLETED', timestamp: new Date().toISOString() }, 't', 'u')).not.toThrow();
+      await harness.flushAudits();
+      harness.stop();
+      // SSE event still emitted.
+      expect(harness.events.map((e) => e.event['type'])).toEqual(['completed']);
+      // No audit row captured (the rejection prevented the push).
+      expect(harness.audits).toHaveLength(0);
+      errSpy.mockRestore();
     });
   });
 });
