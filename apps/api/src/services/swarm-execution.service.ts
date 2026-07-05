@@ -953,9 +953,12 @@ export class SwarmExecutionService extends EventEmitter {
       const nowIso = new Date().toISOString();
       this.emitLifecycle({ type: 'created', workflowId, tenantId, userId, goal, timestamp: nowIso }, tenantId, userId);
       this.emitLifecycle({ type: 'started', workflowId, runtime: this.workflowRuntime.name, timestamp: nowIso }, tenantId, userId);
-      // Keep the legacy 'started' SSE event for the old cockpit code that
-      // doesn't yet read the lifecycle envelope.
-      this.emit(`workflow:${workflowId}`, { type: 'started', workflowId, timestamp: nowIso });
+      // NOTE: emitLifecycle is the single source of truth for the 'started'
+      // SSE event (it emits {type:'started', kind:'lifecycle'} on this same
+      // workflow:${workflowId} channel). A bare duplicate emit was removed
+      // here — the SSE bridge forwards every event on the channel with no
+      // `kind` filter, so the duplicate was delivered twice and the cockpit
+      // had no 'started' handler anyway (dead + doubled).
 
       // Publish to supervisor bus for cross-cutting coordination
       supervisorBus.publish('workflow:started', {
@@ -1495,8 +1498,10 @@ export class SwarmExecutionService extends EventEmitter {
           durationMs: result.durationMs,
           timestamp: new Date().toISOString(),
         }, tenantId, userId);
-        // Keep legacy SSE event for older cockpit code.
-        this.emit(`workflow:${workflowId}`, { type: 'completed', workflowId, status: dbStatus, timestamp: new Date().toISOString() });
+        // NOTE: emitLifecycle already emits {type:'completed', kind:'lifecycle'}
+        // on workflow:${workflowId}; the SSE bridge forwards every event on
+        // the channel unfiltered, so a bare duplicate emit here was delivered
+        // twice (the cockpit's 'completed' handler ran on both). Removed.
 
         // ── CEO Super-Orchestrator post-flight (final-hardening Gap A) ──
         // When CEO mode was detected during pre-flight, generate the
@@ -1532,7 +1537,9 @@ export class SwarmExecutionService extends EventEmitter {
           durationMs: result.durationMs,
           timestamp: new Date().toISOString(),
         }, tenantId, userId);
-        this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: errorMessage, timestamp: new Date().toISOString() });
+        // NOTE: emitLifecycle already emits {type:'failed', kind:'lifecycle'}
+        // on workflow:${workflowId}; the bare duplicate emit was removed
+        // (same double-delivery reason as the 'completed' branch above).
       } else if (dbStatus === 'PAUSED') {
         // Hardening pass: previously the SSE stream went silent when the
         // approval-node halted the workflow — the cockpit never saw a

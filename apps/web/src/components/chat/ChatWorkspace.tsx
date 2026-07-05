@@ -390,6 +390,7 @@ export function ChatWorkspace() {
                 case 'mock_provider': icon = 'ⓘ'; honestyTag = ' — mock data'; break;
                 case 'not_configured': icon = '⚙'; honestyTag = ' — not connected'; break;
                 case 'blocked_requires_config': icon = '⛔'; honestyTag = ' — blocked (requires config)'; break;
+                case 'disabled_by_policy': icon = '🚫'; honestyTag = ' — disabled by policy (not available for this account)'; break;
                 case 'failed': icon = '✗'; break;
               }
             } else {

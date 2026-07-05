@@ -238,6 +238,13 @@ export type ToolOutcome =
    * with `context.approvalId` after the user decides.
    */
   | 'approval_required'
+  /**
+   * The tool is blocked by tenant policy (e.g. browser automation not enabled,
+   * required provider not connected, or admin/industry-pack disabled it). Distinct
+   * from 'not_configured' (missing credentials) so the cockpit can render a
+   * 'disabled by policy' badge instead of a generic failure.
+   */
+  | 'disabled_by_policy'
   | 'failed';
 
 export interface ToolResult<T = unknown> {

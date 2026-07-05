@@ -137,7 +137,6 @@ export class ToolExecutionService {
     // Lazy-import tool registries to avoid circular dep at module load time
     const { getTenantToolRegistry } = await import('@jak-swarm/tools');
 
-    const declaredToolNames = new Set(tools.map((t) => t.function.name));
     const tenantToolRegistry = getTenantToolRegistry(
       context.tenantId ?? '',
       context.connectedProviders,
@@ -151,6 +150,45 @@ export class ToolExecutionService {
         allowedToolNames: context.allowedToolNames,
       },
     );
+
+    // Phase 2.3 — only offer the LLM the tools this tenant can actually run.
+    // Without this, browser_* / unconnected-provider tools appear in the
+    // manifest and the model calls them, producing a string of 'not available
+    // for tenant' failures.
+    const availableTools = tools.filter((t) => tenantToolRegistry.has(t.function.name));
+    const availableToolNames = new Set(availableTools.map((t) => t.function.name));
+
+    // declaredToolNames is the FULL set of tools this agent declared for the
+    // run — NOT the tenant-available subset. The three-way gate below
+    // (line ~369) relies on the distinction:
+    //   - tool NOT in declaredToolNames          → '_toolNotAllowed'  (agent allowlist violation)
+    //   - tool in declaredToolNames AND tenant-ok → execute             (success / approval / failed)
+    //   - tool in declaredToolNames AND tenant-blocked → 'disabled_by_policy' (tenant gate)
+    // If declaredToolNames were narrowed to availableToolNames (an easy
+    // mistake), the third branch would become unreachable and every
+    // tenant-policy-blocked tool would be silently downgraded to a generic
+    // 'failed' with outcome 'failed' — defeating the cockpit's
+    // 'disabled by policy' badge (Phase 2.5). Keep these two sets separate.
+    const declaredToolNames = new Set(tools.map((t) => t.function.name));
+
+    // Phase 2.4 — if tenant policy removed tools the agent declared, tell the
+    // LLM up front (once) so it doesn't waste calls discovering the gate
+    // per-tool. The notice stays factual: it lists exactly what was removed
+    // and what remains. It does NOT hardcode tool-name examples (a removed
+    // set may not include browser_* and an available set may not include
+    // web_fetch) — asserting such examples could state falsehoods for a
+    // given tenant.
+    if (availableTools.length < tools.length) {
+      const removed = tools.map((t) => t.function.name).filter((n) => !availableToolNames.has(n));
+      conversation.push({
+        role: 'system' as const,
+        content:
+          'Some tools are not available for this account and have been removed from your tool list: ' +
+          removed.join(', ') +
+          '. Do not attempt them. Use only the tools still available to you: ' +
+          [...availableToolNames].join(', ') + '.',
+      });
+    }
 
     const toolExecContext: ToolExecutionContext = {
       tenantId: context.tenantId ?? '',
@@ -171,7 +209,7 @@ export class ToolExecutionService {
       const llmInput = redactor ? redactor.redactMessages(conversation) : conversation;
       const completion = await this.llmCallService.callLLM(
         llmInput,
-        tools.length > 0 ? tools : undefined,
+        availableTools.length > 0 ? availableTools : undefined,
         { maxTokens: options?.maxTokens, temperature: options?.temperature },
       );
 
@@ -349,7 +387,7 @@ export class ToolExecutionService {
         try {
           if (!declaredToolNames.has(toolName)) {
             resultStr = JSON.stringify({
-              error: `Tool '${toolName}' is not allowed for this agent run. Allowed tools: ${[...declaredToolNames].join(', ')}`,
+              error: `Tool '${toolName}' is not allowed for this agent run. Allowed tools: ${[...availableToolNames].join(', ')}`,
               _toolNotAllowed: true,
             });
             toolError = `Tool '${toolName}' is outside agent allowlist`;
@@ -419,9 +457,10 @@ export class ToolExecutionService {
           } else {
             // Tool not available for tenant policy/integrations — return helpful error
             resultStr = JSON.stringify({
-              error: `Tool '${toolName}' is not available for this tenant or current policy constraints. Allowed tools: ${[...declaredToolNames].join(', ')}.`,
+              error: `Tool '${toolName}' is not available for this tenant or current policy constraints. Available tools: ${[...declaredToolNames].join(', ')}.`,
               _toolNotFound: true,
             });
+            toolOutcome = 'disabled_by_policy';
             toolError = `Tool '${toolName}' not available for tenant`;
           }
         } catch (toolExecErr) {
