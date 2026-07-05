@@ -188,29 +188,3 @@ export function createJakGatewayAgent(): LlmAgent {
     outputKey: 'gateway_output',
   });
 }
-
-/**
- * Create a simpler single-turn agent for Agent Engine that processes
- * goals directly without workflow management. Uses GOOGLE_SEARCH for
- * grounding and the JAK API for tool execution.
- */
-export function createJakDirectAgent(): LlmAgent {
-  return new LlmAgent({
-    name: 'JAKSwarmDirect',
-    model: 'gemini-2.5-flash',
-    description: 'JAK Swarm direct execution agent with Google Search grounding. Processes goals in a single turn with real-time search.',
-    instruction: `You are a JAK Swarm agent with Google Search grounding. Answer the user's question or accomplish their goal using:
-1. Google Search for real-time, citation-backed information
-2. JAK's workflow API for complex multi-agent tasks
-3. Knowledge base search (search_knowledge) for company-specific information
-
-Always cite your sources. Be thorough and accurate. Refuse harmful or unethical requests.`,
-    tools: [
-      GOOGLE_SEARCH,
-      createWorkflowTool,
-      getWorkflowStatusTool,
-      searchKnowledgeTool,
-    ],
-    outputKey: 'direct_output',
-  });
-}

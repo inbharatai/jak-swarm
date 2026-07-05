@@ -20,7 +20,6 @@ export type { BrowserExecutionPlan, BrowserActionShape, BrowserActionRisk, Inten
 export { buildBrowserExecutionPlan } from './graph/nodes/worker-node.js';
 export { verifierNode } from './graph/nodes/verifier-node.js';
 export { approvalNode } from './graph/nodes/approval-node.js';
-export { replannerNode } from './graph/nodes/replanner-node.js';
 export { validatorNode } from './graph/nodes/validator-node.js';
 export type { ValidationWarning, ValidationResult } from './graph/nodes/validator-node.js';
 

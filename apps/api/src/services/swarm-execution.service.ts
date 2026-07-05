@@ -925,7 +925,15 @@ export class SwarmExecutionService extends EventEmitter {
         'FAILED',
         'Goal rejected: potential prompt injection detected.',
       );
-      this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: 'Goal rejected: potential prompt injection detected.', timestamp: new Date().toISOString() });
+      // emitLifecycle (not a bare emit) so the cockpit SSE gets kind:'lifecycle'
+      // AND a WORKFLOW_FAILED audit row is written. The prior bare emit was
+      // double-processed by the frontend (which dispatches on ev.type with no
+      // kind filter) AND wrote no audit row — a tamper-evident-trail gap.
+      this.emitLifecycle(
+        { type: 'failed', workflowId, error: 'Goal rejected: potential prompt injection detected.', timestamp: new Date().toISOString() },
+        tenantId,
+        userId,
+      );
       return;
     }
 
@@ -1099,9 +1107,16 @@ export class SwarmExecutionService extends EventEmitter {
               userId,
               workflowId,
               runId: `adk_${workflowId}`,
+              // Thread the tenant's connected integrations so the ADK tool
+              // bridge builds a tenant-scoped registry with correct provider
+              // gating (mirrors the LangGraph path's AgentContext.connectedProviders).
+              connectedProviders,
             },
             workerRoles: params.roleModes?.length ? params.roleModes : undefined,
-            googleSearchGrounding: process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() === '1' || true,
+            // Google Search grounding is ON by default in ADK mode; opt out
+            // via GEMINI_GOOGLE_SEARCH_GROUNDING=0. The prior `=== '1' || true`
+            // always evaluated true, making the env var dead.
+            googleSearchGrounding: process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() !== '0',
             openaiWebSearch: process.env['OPENAI_WEB_SEARCH']?.trim() === '1',
           });
 
@@ -1644,7 +1659,15 @@ export class SwarmExecutionService extends EventEmitter {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.log.error({ workflowId, err: message }, '[Swarm] Execution threw unexpected error');
-      this.emit(`workflow:${workflowId}`, { type: 'failed', workflowId, error: message, timestamp: new Date().toISOString() });
+      // emitLifecycle writes the WORKFLOW_FAILED audit row (the bare emit
+      // previously only hit SSE, leaving the durable audit trail blind to
+      // unexpected-exception failures) and tags the SSE event with
+      // kind:'lifecycle' so the frontend dedupes correctly.
+      this.emitLifecycle(
+        { type: 'failed', workflowId, error: message, timestamp: new Date().toISOString() },
+        tenantId,
+        userId,
+      );
       try {
         await this.workflowService.updateWorkflowStatus(workflowId, 'FAILED', message);
       } catch (dbErr) {

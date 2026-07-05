@@ -18,8 +18,7 @@
 
 // Tool bridge
 export {
-  setJakExecutionContext,
-  clearJakExecutionContext,
+  withJakExecutionContext,
   getJakExecutionContext,
   jsonSchemaToZod,
   jakToolToAdkFunctionTool,
@@ -53,5 +52,4 @@ export {
 // Agent Engine deployment (Layer 3 — bonus)
 export {
   createJakGatewayAgent,
-  createJakDirectAgent,
 } from './deploy/agent-engine-entry.js';

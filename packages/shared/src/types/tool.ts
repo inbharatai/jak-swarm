@@ -194,6 +194,14 @@ export interface ToolExecutionContext {
   approvalId?: string;
   idempotencyKey?: string;
   allowedDomains?: string[];
+  /**
+   * MCP/provider integrations the tenant has connected. Used by the ADK
+   * tool bridge to build a tenant-scoped registry with the correct
+   * provider gating (the LangGraph path receives this via AgentContext
+   * instead). Optional — when omitted, provider-tagged tools are gated
+   * out by the tenant registry's empty allowedProviders set.
+   */
+  connectedProviders?: string[];
   db?: Record<string, unknown>;
   /**
    * Coarse plan tier for gating paid external services. Populated from the

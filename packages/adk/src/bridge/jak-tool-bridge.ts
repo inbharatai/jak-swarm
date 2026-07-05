@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { FunctionTool, GOOGLE_SEARCH } from '@google/adk';
 import type { ToolMetadata, ToolExecutionContext } from '@jak-swarm/shared';
 import { getTenantToolRegistry } from '@jak-swarm/tools';
@@ -19,27 +20,31 @@ import { getTenantToolRegistry } from '@jak-swarm/tools';
 // ─── Context thread ────────────────────────────────────────────────────────
 // ADK FunctionTool.execute receives (input, tool_context) but JAK's
 // ToolRegistry.execute needs a full ToolExecutionContext. We thread it
-// through a module-level side channel (set before each workflow run)
-// because ADK's Context object doesn't carry JAK-specific fields.
+// via AsyncLocalStorage so concurrent ADK runs on the stateless Fastify
+// API each see their OWN context. The prior implementation used a
+// module-level mutable singleton (`let currentExecutionContext`) that was
+// `set` on entry and `clear`ed in a finally — a CRITICAL concurrency bug:
+// two interleaved ADK runs (different tenants) would read each other's
+// context (cross-tenant data leakage) or `undefined`, and the first-
+// finishing run's `clear` would wipe the context out from under the
+// still-running one. AsyncLocalStorage propagates per-async-chain across
+// awaits, which is exactly the guarantee the ADK `Runner.runAsync`
+// `for await` loop needs.
 
-let currentExecutionContext: ToolExecutionContext | undefined;
+const executionContextAls = new AsyncLocalStorage<ToolExecutionContext>();
 
 /**
- * Set the JAK execution context for the current ADK run.
- * Called by the ADK runner bridge before invoking the agent pipeline.
+ * Run `fn` with `ctx` as the JAK execution context for any ADK tool
+ * callback invoked synchronously or across awaits within `fn`. Replaces
+ * the prior set/clear module-global (which was a concurrency bug).
  */
-export function setJakExecutionContext(ctx: ToolExecutionContext): void {
-  currentExecutionContext = ctx;
-}
-
-/** Clear the JAK execution context after a run completes. */
-export function clearJakExecutionContext(): void {
-  currentExecutionContext = undefined;
+export function withJakExecutionContext<T>(ctx: ToolExecutionContext, fn: () => T): T {
+  return executionContextAls.run(ctx, fn);
 }
 
 /** Get the current JAK execution context (internal use by bridge). */
 export function getJakExecutionContext(): ToolExecutionContext | undefined {
-  return currentExecutionContext;
+  return executionContextAls.getStore();
 }
 
 // ─── JSON Schema → Zod converter ────────────────────────────────────────────
@@ -148,7 +153,14 @@ export function jakToolToAdkFunctionTool(metadata: ToolMetadata): FunctionTool {
       try {
         const tenantRegistry = getTenantToolRegistry(
           ctx.tenantId,
-          [], // connectedProviders — tenant registry already has them cached
+          // Thread the tenant's connected providers so provider-tagged tools
+          // are gated correctly. The prior `[]` relied on a shared cached
+          // entry having been mutated by a prior caller — a race that broke
+          // under concurrency and wiped providers for other callers. With
+          // composite-key caching, `[]` would deterministically gate out
+          // every provider tool for this tenant; passing the real list is
+          // the honest fix.
+          ctx.connectedProviders ?? [],
         );
         const result = await tenantRegistry.execute(metadata.name, input, ctx);
 
@@ -182,34 +194,6 @@ export function jakToolsToAdkFunctionTools(tools: ToolMetadata[]): FunctionTool[
 // ─── Search tool factory ───────────────────────────────────────────────────
 // Provider-native search: GOOGLE_SEARCH for Gemini, JAK web_search for OpenAI.
 // This is the "universal search" strategy — each provider gets its best native option.
-
-/**
- * Get the appropriate search tool(s) for the given provider.
- * - Gemini: Returns ADK's GOOGLE_SEARCH built-in tool (free, no API keys needed)
- * - OpenAI: Returns a JAK web_search FunctionTool bridge (uses existing registry)
- * - Both: Real-time web access without paid Serper/Tavily keys
- */
-export function getSearchToolsForProvider(
-  provider: 'gemini' | 'openai',
-  jakTools?: ToolMetadata[],
-): FunctionTool[] {
-  if (provider === 'gemini') {
-    // GOOGLE_SEARCH is ADK's built-in — no FunctionTool wrapper needed.
-    // It's passed directly in the LlmAgent's tools array.
-    // Return empty here; the caller adds GOOGLE_SEARCH directly.
-    return [];
-  }
-
-  // OpenAI: use JAK's web_search tool via FunctionTool bridge
-  if (jakTools) {
-    const webSearch = jakTools.find(t => t.name === 'web_search');
-    if (webSearch) {
-      return [jakToolToAdkFunctionTool(webSearch)];
-    }
-  }
-
-  return [];
-}
 
 /**
  * Get the full tools array for an ADK LlmAgent, including:

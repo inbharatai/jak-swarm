@@ -59,11 +59,11 @@ All 122 tools run through the same `FunctionDeclaration[]` interface regardless 
 
 The `@jak-swarm/adk` package provides a first-class bridge between JAK Swarm and Google's Agent Development Kit:
 
-- **Tool Bridge** (`jak-tool-bridge.ts`): Converts JAK's `ToolRegistry` tools to ADK `FunctionTool` instances using `jsonSchemaToZod()` for parameter conversion, with a module-level side channel (`setJakExecutionContext` / `clearJakExecutionContext`) to thread JAK's `ToolExecutionContext` through ADK tool calls
+- **Tool Bridge** (`jak-tool-bridge.ts`): Converts JAK's `ToolRegistry` tools to ADK `FunctionTool` instances using `jsonSchemaToZod()` for parameter conversion, with `withJakExecutionContext()` threading JAK's `ToolExecutionContext` via `AsyncLocalStorage` so concurrent ADK runs each see their own context (per-tenant isolation on the stateless API)
 - **Agent Wrappers** (`jak-adk-agents.ts`): Creates ADK `LlmAgent` instances for Commander, Planner, Workers, Verifier, and Synthesis roles. Model selection mirrors JAK's tier routing: Gemini Pro for Commander/Verifier, Flash for workers
-- **Orchestration Pipeline** (`adk-pipeline.ts`): Builds `SequentialAgent` pipeline: Commander → Planner → `ParallelAgent(workers)` → Synthesis → Verifier. Also provides `buildSimpleAdkPipeline()` for single-agent tasks and `buildDynamicAdkPipeline()` for plan-driven worker creation
+- **Orchestration Pipeline** (`adk-pipeline.ts`): Builds `SequentialAgent` pipeline: Commander → Planner → `ParallelAgent(workers)` → Synthesis → Verifier. Also provides `buildSimpleAdkPipeline()` for single-agent tasks
 - **Runner Bridge** (`adk-runner.ts`): `runWithAdk()` creates an ADK `Runner` + `InMemorySessionService`, runs the pipeline, collects events, and converts results to `Partial<SwarmState>` compatible with JAK's persistence/SSE infrastructure
-- **Agent Engine Deployment** (`agent-engine-entry.ts`): Creates standalone ADK agents deployed to Google Cloud's Agent Engine (Vertex AI) at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` — a `createJakGatewayAgent()` for full workflow orchestration and `createJakDirectAgent()` for single-turn tasks. Both use `GOOGLE_SEARCH` for real-time grounding and 5 `FunctionTool` wrappers that call back to JAK's Cloud Run API at `/workflows`, `/memory`, `/approvals`
+- **Agent Engine Deployment** (`agent-engine-entry.ts`): Creates a standalone ADK agent deployed to Google Cloud's Agent Engine (Vertex AI) at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` — `createJakGatewayAgent()` for full workflow orchestration. It uses `GOOGLE_SEARCH` for real-time grounding and 5 `FunctionTool` wrappers that call back to JAK's Cloud Run API at `/workflows`, `/memory`, `/approvals`
 
 ADK mode is activated via `JAK_ADK_MODE=1`. The `@google/adk` SDK is lazy-loaded — only imported when ADK mode is enabled, keeping the default path lightweight.
 

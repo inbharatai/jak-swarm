@@ -8,7 +8,7 @@
 
 ### Tagline (58 chars)
 ```
-38 AI agents that run your company autonomously
+38 AI agents that run your company's workflows — autonomous for read-only work, human approval on every high-risk action
 ```
 
 ### Description (258 chars)
@@ -71,7 +71,7 @@ The human-in-the-loop approval UI. A pending approval card shows: the workflow t
 
 **Tweet 1 — The Hook**
 ```
-I built an open-source platform with 38 AI agents that runs your company autonomously.
+I built an open-source platform with 38 AI agents that runs your company's workflows — autonomous for read-only work, paused for human sign-off on anything consequential.
 
 Not a demo. Not a framework. A production-grade system with:
 • 122 classified tools
@@ -279,13 +279,13 @@ What approaches have others taken for the "safety vs capability" tradeoff in aut
 
 ### r/SideProject — Builder Story
 
-**Title:** I spent months building a 38-agent AI platform that runs business operations autonomously — launching today on Product Hunt
+**Title:** I spent months building a 38-agent AI platform that runs business operations with human-in-the-loop approval on sensitive actions — launching today on Product Hunt
 
 **Body:**
 
 Hey r/SideProject — launching something today that I've been heads-down building for months.
 
-**What it is:** JAK Swarm — an open-source platform with 38 AI agents that can autonomously handle business workflows: emails, calendar scheduling, CRM updates, document creation, web research, customer support triage, and more.
+**What it is:** JAK Swarm — an open-source platform with 38 AI agents that can handle business workflows with human approval on sensitive actions: emails, calendar scheduling, CRM updates, document creation, web research, customer support triage, and more.
 
 **Why I built it:** I kept hitting the same wall. I'd try to use AI to automate something at work, and it would either be a toy (great demo, breaks on anything real) or a black box I didn't trust. I wanted a system I could point at a goal like "follow up with all leads who haven't responded in 7 days, personalise each email with their last interaction, log the activity in the CRM" and have it just... work. Reliably. Without me babysitting it.
 
@@ -352,7 +352,7 @@ I wanted to pitch a story that I think fits your audience well.
 
 Most multi-agent coverage has focused on *frameworks* — CrewAI, LangGraph, AutoGen. These are excellent tools for developers who want to build their own agents. JAK Swarm is a different category: a production-ready *platform* where the agents are already built, the tools are already integrated, and the safety layer (a Guardrail agent + human approval gates) is baked in.
 
-The key innovation is the trust model. Before any consequential action — sending an email, updating a CRM record, submitting a form — the platform creates a human-readable approval request and pauses until a person signs off. This is configurable per business type and per industry. It's what makes "autonomous AI" safe enough to actually run unsupervised on production data.
+The key innovation is the trust model. Before any consequential action — sending an email, updating a CRM record, submitting a form — the platform creates a human-readable approval request and pauses until a person signs off. This is configurable per business type and per industry. It's what makes autonomous agents safe enough to actually run on production data: autonomous for read-only work, paused for human sign-off on anything consequential.
 
 **The numbers that might interest your readers:**
 - 38 agents across two tiers (orchestrators + workers)

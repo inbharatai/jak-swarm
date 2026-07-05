@@ -95,19 +95,3 @@ export function buildSimpleAdkPipeline(config: AdkPipelineConfig): LlmAgent {
     includeSearch: true,
   });
 }
-
-/**
- * Build the pipeline dynamically based on the workflow plan.
- * After the Commander produces a mission brief and the Planner
- * decomposes it, this function creates worker agents for each
- * unique role in the plan.
- */
-export function buildDynamicAdkPipeline(
-  config: AdkPipelineConfig,
-  planRoles: string[],
-): SequentialAgent {
-  return buildAdkPipeline({
-    ...config,
-    workerRoles: planRoles,
-  });
-}

@@ -52,13 +52,13 @@ import { workerNode } from '../graph/nodes/worker-node.js';
 import { verifierNode } from '../graph/nodes/verifier-node.js';
 import { approvalNode } from '../graph/nodes/approval-node.js';
 import { validatorNode } from '../graph/nodes/validator-node.js';
-// NOTE: replannerNode is NOT in the LangGraph StateGraph. In SwarmGraph
-// it was invoked from an external auto-repair loop AFTER the main DAG
-// completed with partial failures, not via in-graph edges. The
-// LangGraphRuntime mirrors this: the main DAG covers commander → ... →
-// validator, and SwarmExecutionService can invoke the replannerNode
-// directly post-completion when state.failedTaskIds is non-empty.
-// (Sprint 2.5 / A.3 deferred follow-up: wire replan as a side-channel.)
+// NOTE: a `replannerNode` previously existed in SwarmGraph for an external
+// auto-repair loop AFTER the main DAG completed with partial failures.
+// It was never wired into this LangGraph StateGraph and never invoked by
+// SwarmExecutionService (the claimed post-completion invocation never
+// existed in code), so it was dead and has been removed. If auto-repair
+// is needed, implement it as a real in-graph node or an explicit
+// post-completion service call — do not reintroduce dead plumbing.
 import {
   afterCommander,
   afterPlanner,

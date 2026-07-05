@@ -16,7 +16,7 @@ import { Runner, InMemorySessionService } from '@google/adk';
 import { WorkflowStatus, AgentRole } from '@jak-swarm/shared';
 import type { ToolMetadata, ToolExecutionContext } from '@jak-swarm/shared';
 import { buildAdkPipeline, buildSimpleAdkPipeline, type AdkPipelineConfig } from './adk-pipeline.js';
-import { setJakExecutionContext, clearJakExecutionContext } from '../bridge/jak-tool-bridge.js';
+import { withJakExecutionContext } from '../bridge/jak-tool-bridge.js';
 import type { SwarmState } from '@jak-swarm/swarm';
 
 // ─── ADK run result ─────────────────────────────────────────────────────────
@@ -75,17 +75,20 @@ export async function runWithAdk(params: {
     openaiWebSearch,
   } = params;
 
-  // 1. Set the JAK execution context for tool bridge callbacks
-  setJakExecutionContext(toolContext);
-
-  try {
+  // Thread the JAK execution context via AsyncLocalStorage so concurrent
+  // ADK runs each see their own context. The whole run body executes
+  // inside this scope; tool-bridge callbacks read it via getJakExecutionContext().
+  return withJakExecutionContext(toolContext, async () => {
     // 2. Build the ADK pipeline
     const pipelineConfig: AdkPipelineConfig = {
       provider,
       jakToolMetadata,
       workerRoles: workerRoles ?? ['CEO'],
       allowedToolNames,
-      includeSearch: googleSearchGrounding || openaiWebSearch || true, // Search on by default in ADK mode
+      // Search is on by default in ADK mode; either flag opts in, and
+      // googleSearchGrounding defaults true (opt out via env = '0').
+      // The prior `|| true` made this always true and the env var dead.
+      includeSearch: Boolean(googleSearchGrounding) || Boolean(openaiWebSearch),
     };
 
     const pipeline = workerRoles && workerRoles.length > 1
@@ -190,15 +193,5 @@ export async function runWithAdk(params: {
       success: !hasError,
       error: errorMessage,
     };
-  } finally {
-    // Always clear the execution context
-    clearJakExecutionContext();
-  }
-}
-
-/**
- * Check if ADK mode is enabled via environment variable.
- */
-export function isAdkModeEnabled(): boolean {
-  return process.env['JAK_ADK_MODE']?.trim() === '1';
+  });
 }

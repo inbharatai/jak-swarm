@@ -183,22 +183,50 @@ export class TenantToolRegistry {
 
 /**
  * Factory: create or retrieve a tenant-scoped tool registry.
- * Caches instances per tenantId so multiple agents in the same workflow share one.
+ *
+ * Caches instances by a composite key of (tenantId + connectedProviders +
+ * options) so that the SAME config reuses one instance (perf) while
+ * DIFFERENT configs get separate instances (correctness). The prior
+ * implementation keyed by tenantId alone and MUTATED the cached instance
+ * on every cache hit via `updateProviders`/`updateOptions` — a clobber
+ * bug: concurrent or interleaved callers (different workflows for the
+ * same tenant with different StandingOrders, or the ADK bridge passing
+ * `connectedProviders: []`) overwrote each other's provider set and
+ * options on the shared instance. The ADK bridge's `[]` call would wipe
+ * providers for every other caller using the same tenant. Composite-key
+ * caching makes each (tenant, config) pair immutable after construction,
+ * so no caller can clobber another.
  */
 const tenantRegistries = new Map<string, TenantToolRegistry>();
+
+function registryCacheKey(
+  tenantId: string,
+  connectedProviders: string[],
+  options?: TenantToolRegistryOptions,
+): string {
+  const providersKey = [...connectedProviders].map((p) => p.toLowerCase()).sort().join(',');
+  let optionsKey = 'none';
+  if (options) {
+    optionsKey = JSON.stringify({
+      b: options.browserAutomationEnabled ?? false,
+      r: [...(options.restrictedCategories ?? [])].sort(),
+      d: [...(options.disabledToolNames ?? [])].sort(),
+      a: options.allowedToolNames ? [...options.allowedToolNames].sort() : null,
+    });
+  }
+  return `${tenantId}::${providersKey}::${optionsKey}`;
+}
 
 export function getTenantToolRegistry(
   tenantId: string,
   connectedProviders: string[],
   options?: TenantToolRegistryOptions,
 ): TenantToolRegistry {
-  let registry = tenantRegistries.get(tenantId);
+  const key = registryCacheKey(tenantId, connectedProviders, options);
+  let registry = tenantRegistries.get(key);
   if (!registry) {
     registry = new TenantToolRegistry(tenantId, connectedProviders, options);
-    tenantRegistries.set(tenantId, registry);
-  } else {
-    registry.updateProviders(connectedProviders);
-    if (options) registry.updateOptions(options);
+    tenantRegistries.set(key, registry);
   }
   return registry;
 }

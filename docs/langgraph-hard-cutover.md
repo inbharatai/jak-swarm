@@ -157,7 +157,6 @@ const g = new StateGraph(SwarmStateAnnotation, JakConfigAnnotation)
   .addNode('verifier',  wrapNode('verifier',  verifierNode))
   .addNode('approval',  wrapNode('approval',  approvalNode))
   .addNode('validator', wrapNode('validator', validatorNode))
-  .addNode('replanner', wrapNode('replanner', replannerNode))
 
   .addEdge(START, 'commander')
   .addConditionalEdges('commander', afterCommanderEdge, {
