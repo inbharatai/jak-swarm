@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { RunDetailDrawer } from './RunDetailDrawer';
-import type { Workflow, AgentTraceRecord } from '@/types';
+import type { Workflow, AgentTraceRecord, WorkflowPlan } from '@/types';
 import type { WorkflowTimeline } from '@/lib/api-client';
 
 // WorkflowDAG is a heavy @xyflow/react component loaded via next/dynamic;
@@ -78,7 +78,7 @@ describe('RunDetailDrawer', () => {
       <RunDetailDrawer
         workflow={workflow}
         isLoading={false}
-        plan={{ steps: [{ id: 's1' }] } as unknown as Workflow['plan']}
+        plan={{ steps: [{ id: 's1' }] } as unknown as WorkflowPlan}
         timeline={timeline}
         traces={traces}
       />,
