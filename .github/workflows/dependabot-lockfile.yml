@@ -1,0 +1,70 @@
+# Regenerate pnpm-lock.yaml on Dependabot PRs so Vercel preview deploys pass.
+#
+# Why this exists:
+#   This repo carries 27 `pnpm.overrides` in the root package.json. When
+#   Dependabot bumps a dependency on its branch, it edits package.json but
+#   does NOT regenerate the lockfile's overrides-snapshot, so Vercel's
+#   `pnpm install --frozen-lockfile` fails with ERR_PNPM_LOCKFILE_CONFIG_MISMATCH
+#   on every Dependabot PR. Main itself is healthy; only the PR branches break.
+#
+# What this does:
+#   On every Dependabot pull_request, check out the PR branch, run
+#   `pnpm install --no-frozen-lockfile` to rebuild the lockfile against the
+#   bumped package.json (overrides snapshot included), and commit the
+#   regenerated pnpm-lock.yaml back to the PR branch. Vercel then re-deploys
+#   the preview against a lockfile that matches package.json.
+#
+# Scope: Dependabot PRs only (github.actor == 'dependabot[bot]'). Does not
+# touch main, does not run on human PRs (those are expected to commit their
+# own lockfile). The default GITHUB_TOKEN has push rights to Dependabot
+# branches; Dependabot tolerates the extra commit and will not reset it.
+name: Dependabot lockfile regen
+
+on:
+  pull_request:
+    branches: [main]
+
+# Only one regen per PR at a time; cancel superseded runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regen-lockfile:
+    name: Regenerate pnpm-lock.yaml
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Dependabot PRs only. Human-authored PRs are responsible for committing
+    # their own lockfile changes; running this on them would create noise.
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # Persist credentials so git-auto-commit can push back to the branch.
+          persist-credentials: true
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Regenerate lockfile
+        # --no-frozen-lockfile lets pnpm rewrite pnpm-lock.yaml to match the
+        # bumped package.json, including the overrides snapshot that Vercel's
+        # frozen install validates against.
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit regenerated lockfile back to the PR
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(deps): regenerate pnpm-lock.yaml for Vercel frozen-install parity"
+          file_pattern: pnpm-lock.yaml
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
