@@ -17,7 +17,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from '../../../apps/api/node_modules/fastify/fastify.js';
-import jwtPlugin from '../../../apps/api/node_modules/@fastify/jwt/jwt.js';
+import jwtPlugin from '../../../apps/api/node_modules/@fastify/jwt/index.js';
 import rateLimit from '../../../apps/api/node_modules/@fastify/rate-limit/index.js';
 import fp from '../../../apps/api/node_modules/fastify-plugin/plugin.js';
 
