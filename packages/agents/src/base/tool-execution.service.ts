@@ -7,6 +7,7 @@ import type { LLMCallService } from './llm-call.service.js';
 import type { PromptBuilder } from './prompt-builder.service.js';
 import type { LLMRuntime } from '../runtime/index.js';
 import type { ToolLoopResult } from './base-agent.js';
+import { ToolApprovalRequiredError } from './tool-approval-error.js';
 
 /** Loop detection: fingerprint → count */
 type ToolCallFingerprints = Map<string, number>;
@@ -422,23 +423,45 @@ export class ToolExecutionService {
                 inputSummary,
                 timestamp: toolStartedAt.toISOString(),
               });
-              resultStr = JSON.stringify({
-                _approvalRequired: true,
+              // Record the tool call for tracing BEFORE throwing so the
+              // trace shows the blocked attempt + its outcome (the
+              // allToolCalls array is what the worker node persists).
+              const toolCompletedAt = new Date();
+              allToolCalls.push({
+                toolName,
+                input: parsedArgs,
+                output: { _approvalRequired: true, toolName, category, reason },
+                startedAt: toolStartedAt,
+                completedAt: toolCompletedAt,
+                durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
+                error: `approval_required: ${reason}`,
+              });
+              context.emitActivity({
+                type: 'tool_completed',
+                agentRole: this.role,
+                toolName,
+                success: false,
+                outcome: 'approval_required',
+                durationMs: toolCompletedAt.getTime() - toolStartedAt.getTime(),
+                outputSummary: JSON.stringify({ _approvalRequired: true, toolName, category, reason }).slice(0, 500),
+                error: `approval_required: ${reason}`,
+                timestamp: toolCompletedAt.toISOString(),
+              });
+              // Item 10 — STOP the tool loop cleanly. The prior behavior
+              // handed the LLM a fake "wait for the user to decide" message
+              // and continued the loop, burning iterations on a tool that
+              // would never run until a human decides. Throwing a structured
+              // error halts the loop, propagates up to the worker node
+              // (which marks the task AWAITING_APPROVAL), and surfaces the
+              // approval context without re-deriving it from the activity
+              // log. See ToolApprovalRequiredError for the full rationale +
+              // the deferred pause/resume scope.
+              throw new ToolApprovalRequiredError({
                 toolName,
                 category,
                 reason,
-                message:
-                  `Tool '${toolName}' requires user approval before it can run. ` +
-                  `An approval request has been created — wait for the user to decide. ` +
-                  `Do not retry this tool without an approvalId.`,
+                inputSummary,
               });
-              // Mark this iteration as paused-by-approval. The agent
-              // sees the result and should NOT keep calling the same
-              // tool — the loop-detection guard will also catch a
-              // pathological retry.
-              toolError = `approval_required: ${reason}`;
-              // Skip the regular success/failure branches below by
-              // jumping past the response-handling block.
             } else if (result.success) {
               const data = result.data as Record<string, unknown> | string | undefined;
               // Detect mock/demo data — inform the agent honestly
@@ -464,6 +487,15 @@ export class ToolExecutionService {
             toolError = `Tool '${toolName}' not available for tenant`;
           }
         } catch (toolExecErr) {
+          // A per-tool approval gate firing is NOT a recoverable tool crash —
+          // it is an intentional, structured control-flow signal that must
+          // escape this per-tool try/catch (which would otherwise normalize
+          // it back into a fake error message and continue the LLM tool loop,
+          // defeating the gate). Re-throw so it propagates up to the worker
+          // node, which marks the task AWAITING_APPROVAL.
+          if (toolExecErr instanceof ToolApprovalRequiredError) {
+            throw toolExecErr;
+          }
           // ── Tool Error Normalization (DeerFlow ToolErrorHandlingMiddleware) ──
           // Convert exceptions to recoverable error messages instead of crashing.
           // The agent can decide to retry, use an alternative tool, or give up.

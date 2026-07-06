@@ -4,6 +4,7 @@ export type { AgentActivityEvent, AgentActivityEmitter } from './base/agent-cont
 export type { AgentContextParams } from './base/agent-context.js';
 export { BaseAgent, extractFirstJsonBlob } from './base/base-agent.js';
 export type { ToolLoopResult, MemoryProvider, CompanyContextProvider, ReflectionMode, ReflectAndCorrectOptions } from './base/base-agent.js';
+export { ToolApprovalRequiredError } from './base/tool-approval-error.js';
 
 // Multi-agent coordination (Sprint 3 — full-fledged JAK)
 export {

@@ -1,5 +1,5 @@
 import { WorkflowStatus, TaskStatus } from '@jak-swarm/shared';
-import { AgentContext, getReflectionMode } from '@jak-swarm/agents';
+import { AgentContext, getReflectionMode, ToolApprovalRequiredError } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-breaker.js';
@@ -100,6 +100,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
 
   let output: unknown;
   let taskFailed = false;
+  let awaitingApproval = false;
 
   try {
     const agent = createWorkerAgent(task.agentRole);
@@ -167,7 +168,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       const onLifecycle = getLifecycleEmitter(state.workflowId);
       const MAX_REPAIR_LOOPS = 4; // belt-and-braces ceiling on retry attempts
       let priorAttempts = 0;
-      let attemptOutcome: 'success' | 'circuit_open' | 'thrown' = 'success';
+      let attemptOutcome: 'success' | 'circuit_open' | 'thrown' | 'approval_required' = 'success';
       let lastError: Error | undefined;
 
       for (let loop = 0; loop < MAX_REPAIR_LOOPS; loop += 1) {
@@ -184,6 +185,21 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
           }
           break;
         } catch (err) {
+          // Item 10 — a per-tool approval gate firing is NOT a retryable
+          // failure. The agent's tool-execution loop threw
+          // ToolApprovalRequiredError after emitting the
+          // tool_approval_required activity (which persists an
+          // ApprovalRequest row + fires the canonical lifecycle event).
+          // Retrying would re-run the tool loop and re-block on the same
+          // gate. Stop immediately with an honest 'approval_required'
+          // outcome so the post-loop block marks the task
+          // AWAITING_APPROVAL and the workflow state reflects "blocked on
+          // human approval" instead of generic FAILED.
+          if (err instanceof ToolApprovalRequiredError) {
+            attemptOutcome = 'approval_required';
+            lastError = err;
+            break;
+          }
           lastError = err instanceof Error ? err : new Error(String(err));
           if (err instanceof CircuitOpenError || lastError.message.includes('circuit breaker')) {
             attemptOutcome = 'circuit_open';
@@ -224,7 +240,29 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
         }
       }
 
-      if (attemptOutcome !== 'success' && lastError) {
+      if (attemptOutcome === 'approval_required' && lastError) {
+        // Item 10 — honest "blocked on approval" state. The task is NOT
+        // failed (the agent did its job by surfacing the gate); it is
+        // AWAITING_APPROVAL pending a human decision in the cockpit
+        // inbox. We carry the structured approval context through the
+        // task output + workflow error so the verifier / API layer /
+        // cockpit can surface exactly which tool was blocked and why,
+        // without re-deriving it from the activity log. The workflow
+        // status is set to AWAITING_APPROVAL below (NOT VERIFYING) so
+        // the graph honestly reports it is paused, not "verifying a
+        // failure".
+        const approvalErr = lastError as ToolApprovalRequiredError;
+        taskFailed = false;
+        awaitingApproval = true;
+        output = {
+          awaitingApproval: true,
+          toolName: approvalErr.toolName,
+          category: approvalErr.category,
+          reason: approvalErr.reason,
+          inputSummary: approvalErr.inputSummary,
+          taskId: task.id,
+        };
+      } else if (attemptOutcome !== 'success' && lastError) {
         taskFailed = true;
         output = {
           error: attemptOutcome === 'circuit_open'
@@ -235,8 +273,9 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       }
 
       // Self-correction: agent reviews its own output before the verifier sees it.
-      // Catches obvious errors early, reducing verifier retry loops.
-      if (!taskFailed && output && typeof output === 'object') {
+      // Catches obvious errors early, reducing verifier retry loops. Skipped when
+      // the task is blocked on approval — there is no agent output to correct.
+      if (!taskFailed && !awaitingApproval && output && typeof output === 'object') {
         try {
           const outputStr = JSON.stringify(output);
           const { corrected, wasChanged } = await agent.reflectAndCorrect(
@@ -275,11 +314,17 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
           t.id === task.id
             ? {
                 ...t,
-                status: taskFailed ? TaskStatus.FAILED : TaskStatus.COMPLETED,
-                completedAt: new Date(),
-                error: taskFailed
-                  ? String((output as Record<string, unknown>)['error'] ?? 'Unknown worker error')
-                  : undefined,
+                status: awaitingApproval
+                  ? TaskStatus.AWAITING_APPROVAL
+                  : taskFailed
+                    ? TaskStatus.FAILED
+                    : TaskStatus.COMPLETED,
+                completedAt: awaitingApproval ? undefined : new Date(),
+                error: awaitingApproval
+                  ? `Tool approval required: ${String((output as Record<string, unknown>)['reason'] ?? 'unknown tool')}`
+                  : taskFailed
+                    ? String((output as Record<string, unknown>)['error'] ?? 'Unknown worker error')
+                    : undefined,
               }
             : t,
         ),
@@ -292,11 +337,13 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       taskId: task.id,
       ...(task.name ? { taskName: task.name } : {}),
       agentRole: task.agentRole,
-      success: !taskFailed,
+      success: !taskFailed && !awaitingApproval,
       durationMs: Date.now() - workerStartedAt,
-      ...(taskFailed
-        ? { error: String((output as Record<string, unknown>)['error'] ?? 'Worker failed') }
-        : {}),
+      ...(awaitingApproval
+        ? { awaitingApproval: true, toolName: String((output as Record<string, unknown>)['toolName'] ?? '') }
+        : taskFailed
+          ? { error: String((output as Record<string, unknown>)['error'] ?? 'Worker failed') }
+          : {}),
       timestamp: new Date().toISOString(),
     });
   }
@@ -306,10 +353,15 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     outputs: [output],
     plan: updatedPlan,
     traces,
-    // Hand off to verifier even on failure — verifier decides retry vs pass-through.
-    status: WorkflowStatus.VERIFYING,
-    error: taskFailed
-      ? String((output as Record<string, unknown>)['error'] ?? 'Worker failed')
-      : undefined,
+    // Item 10 — when a per-tool approval gate fired, honestly report the
+    // workflow as AWAITING_APPROVAL (paused on human review) instead of
+    // VERIFYING. The verifier edge still runs, but the workflow status
+    // reflects the true blocked state so the cockpit / API can surface it.
+    status: awaitingApproval ? WorkflowStatus.AWAITING_APPROVAL : WorkflowStatus.VERIFYING,
+    error: awaitingApproval
+      ? `Tool approval required: ${String((output as Record<string, unknown>)['reason'] ?? 'unknown tool')}`
+      : taskFailed
+        ? String((output as Record<string, unknown>)['error'] ?? 'Worker failed')
+        : undefined,
   };
 }
