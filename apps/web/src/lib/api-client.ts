@@ -572,11 +572,97 @@ export interface CostBreakdown {
   byModel: Record<string, { tokens: number; costUsd: number; calls: number }>;
 }
 
+// ─── Phase C honest analytics aggregation types ───────────────────────────
+export interface ToolAggregation {
+  toolName: string;
+  count: number;
+  successCount: number;
+  failCount: number;
+  successRate: number;
+  avgDurationMs: number;
+  p50DurationMs: number;
+  p95DurationMs: number;
+}
+export interface ToolsReport {
+  tenantId: string;
+  period: { from: string; to: string };
+  tracesExamined: number;
+  tracesWithoutTools: number;
+  totalToolCalls: number;
+  tools: ToolAggregation[];
+}
+export interface RoutingReport {
+  period: { from: string; to: string };
+  total: number;
+  fallbackRate: number;
+  avgScore: number;
+  byModel: Record<string, number>;
+  byProvider: Record<string, number>;
+  byTaskType: Record<string, number>;
+  topReasons: { reason: string; count: number }[];
+  tenantScoped: boolean;
+}
+export interface ApprovalsDecisionsReport {
+  tenantId: string;
+  period: { from: string; to: string };
+  total: number;
+  totals: Record<string, number>;
+  byAgentRole: Record<string, number>;
+  byRiskLevel: Record<string, number>;
+  autoApproved: number;
+  humanApproved: number;
+  autoApprovalRate: number;
+}
+export interface IntentAggregation {
+  intent: string;
+  count: number;
+  avgConfidence: number;
+  clarificationRate: number;
+}
+export interface IntentsReport {
+  tenantId: string;
+  period: { from: string; to: string };
+  total: number;
+  clarificationRate: number;
+  intents: IntentAggregation[];
+  urgencyDistribution: Record<number, number>;
+  topRiskIndicators: { indicator: string; count: number }[];
+}
+export interface LatencyReport {
+  tenantId: string;
+  period: { from: string; to: string };
+  samples: number;
+  avgMs: number;
+  p50Ms: number;
+  p90Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  byProvider: {
+    provider: string;
+    count: number;
+    avgMs: number;
+    p50Ms: number;
+    p90Ms: number;
+    p95Ms: number;
+    p99Ms: number;
+  }[];
+}
+
 export const analyticsApi = {
   /** GET /analytics/cost — last-30-day cost breakdown for the KpiBar
    *  "Cost Today" gauge (honest: this is the 30d sum, not literally today;
    *  the label reflects the window). */
   cost: () => apiDataFetch<CostBreakdown>('/analytics/cost'),
+  /** GET /analytics/tools — per-tool success + duration aggregation. */
+  tools: () => apiDataFetch<ToolsReport>('/analytics/tools'),
+  /** GET /analytics/routing — SYSTEM_ADMIN only (RoutingLog not tenant-scoped). */
+  routing: () => apiDataFetch<RoutingReport>('/analytics/routing'),
+  /** GET /analytics/approvals/decisions — ApprovalAuditLog totals + autoApprovalRate. */
+  approvalDecisions: () => apiDataFetch<ApprovalsDecisionsReport>('/analytics/approvals/decisions'),
+  /** GET /analytics/intents — IntentRecord byIntent + urgency + riskIndicators. */
+  intents: () => apiDataFetch<IntentsReport>('/analytics/intents'),
+  /** GET /analytics/latency — UsageLedger.latencyMs p50/p90/p95/p99. */
+  latency: () => apiDataFetch<LatencyReport>('/analytics/latency'),
 };
 
 export const memoryApi = {

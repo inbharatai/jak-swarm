@@ -19,6 +19,17 @@ const AnalyticsCharts = dynamic(() => import('./AnalyticsCharts'), {
   ),
 });
 
+// Phase C — honest analytics aggregation charts (tools/approvals/intents/
+// latency/routing). Same dynamic ssr:false split so recharts stays chunked.
+const HonestAnalyticsCharts = dynamic(() => import('./HonestAnalyticsCharts'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-40 text-muted-foreground text-xs">
+      Loading analytics…
+    </div>
+  ),
+});
+
 type Period = '7d' | '30d' | '90d';
 
 interface AnalyticsSummary {
@@ -77,6 +88,9 @@ export default function AnalyticsModule() {
 
       {/* Cost-by-provider + cost-by-agent recharts charts (dynamic ssr:false). */}
       <AnalyticsCharts summary={summary} />
+
+      {/* Phase C — honest aggregation charts (tools/approvals/intents/latency/routing). */}
+      <HonestAnalyticsCharts />
     </div>
   );
 }

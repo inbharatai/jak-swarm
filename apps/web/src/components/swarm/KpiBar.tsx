@@ -19,7 +19,7 @@
 import useSWR from 'swr';
 import { cn } from '@/lib/cn';
 import { useWorkflows } from '@/hooks/useWorkflow';
-import { type CostBreakdown } from '@/lib/api-client';
+import { type CostBreakdown, type ToolsReport, type ApprovalsDecisionsReport, analyticsApi } from '@/lib/api-client';
 import { dataFetcher } from '@/lib/api-client';
 import { StatusDot } from '@/components/ui';
 
@@ -97,6 +97,30 @@ export function KpiBar() {
   const queueAdminLocked = !!queueErr && !queue;
   const queueDepth = queue ? queue.queued + queue.active : null;
 
+  // Phase C — Tool Success (aggregated across AgentTrace.toolCallsJson) +
+  // Auto-Approval Rate (ApprovalAuditLog). Both tenant-scoped, honest "—"
+  // when there are no samples (no fake 100%).
+  const { data: tools } = useSWR<ToolsReport>('analytics/tools', () => analyticsApi.tools(), {
+    refreshInterval: POLL_MS,
+    revalidateOnFocus: false,
+  });
+  const totalCalls = tools?.totalToolCalls ?? 0;
+  const toolSuccessRate =
+    totalCalls > 0
+      ? Math.round(
+          ((tools?.tools.reduce((s, t) => s + t.successCount, 0) ?? 0) / totalCalls) * 100,
+        )
+      : null;
+
+  const { data: approvals } = useSWR<ApprovalsDecisionsReport>(
+    'analytics/approvals',
+    () => analyticsApi.approvalDecisions(),
+    { refreshInterval: POLL_MS, revalidateOnFocus: false },
+  );
+  const approvalTotal = approvals?.total ?? 0;
+  const autoApprovalRate =
+    approvalTotal > 0 ? Math.round(((approvals?.autoApproved ?? 0) / approvalTotal) * 100) : null;
+
   return (
     <div className="flex flex-wrap gap-2">
       <KpiCell
@@ -111,6 +135,18 @@ export function KpiBar() {
         value={successRate === null ? '—' : `${successRate}%`}
         sub={denom > 0 ? `${completedN}/${denom} runs` : 'no runs in window'}
         accent={successRate === null ? undefined : successRate >= 80 ? 'text-emerald-300' : successRate >= 50 ? 'text-amber-300' : 'text-rose-300'}
+      />
+      <KpiCell
+        label="Tool Success"
+        value={toolSuccessRate === null ? '—' : `${toolSuccessRate}%`}
+        sub={totalCalls > 0 ? `${totalCalls} calls` : 'no tool calls'}
+        accent={toolSuccessRate === null ? undefined : toolSuccessRate >= 80 ? 'text-emerald-300' : toolSuccessRate >= 50 ? 'text-amber-300' : 'text-rose-300'}
+      />
+      <KpiCell
+        label="Auto-Approve"
+        value={autoApprovalRate === null ? '—' : `${autoApprovalRate}%`}
+        sub={approvalTotal > 0 ? `${approvals?.autoApproved ?? 0}/${approvalTotal}` : 'no approvals'}
+        accent={autoApprovalRate === null ? undefined : autoApprovalRate >= 80 ? 'text-emerald-300' : 'text-amber-300'}
       />
       <KpiCell
         label="Cost 30d"
