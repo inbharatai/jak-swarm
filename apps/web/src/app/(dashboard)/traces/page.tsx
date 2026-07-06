@@ -19,6 +19,7 @@ import { cn } from '@/lib/cn';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Input, Spinner, EmptyState } from '@/components/ui';
 import useSWR from 'swr';
 import { dataFetcher } from '@/lib/api-client';
+import { deriveCostFromTokenUsage, formatCostUsd } from '@/lib/cost';
 import type { Trace, TraceStep, AgentRole } from '@/types';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { PaginatedResult } from '@/types';
@@ -54,6 +55,33 @@ function CostBadge({ cost }: { cost?: number }) {
       ${cost.toFixed(4)}
     </span>
   );
+}
+
+// D.2 — derive USD from the persisted tokenUsage blob (same calculateCost
+// formula the backend uses for UsageLedger.usdCost). AgentTrace has no
+// costUsd column, so an undefined step.costUsd falls back to this. Returns
+// null when no model is present (honest N/A, never a fabricated $0).
+function deriveStepCost(step: TraceStep): number | null {
+  if (typeof step.costUsd === 'number' && step.costUsd > 0) return step.costUsd;
+  return deriveCostFromTokenUsage(step.tokenUsage);
+}
+
+// Extract a total-token count from a tokenUsage blob (handles both the
+// runtime shape { inputTokens, outputTokens } and the seed shape
+// { totalTokens, promptTokens, completionTokens }). null when absent.
+function totalTokensFromUsage(tokenUsage: unknown): number | null {
+  if (!tokenUsage || typeof tokenUsage !== 'object') {
+    return typeof tokenUsage === 'number' && tokenUsage > 0 ? tokenUsage : null;
+  }
+  const u = tokenUsage as Record<string, unknown>;
+  const tot = u['totalTokens'];
+  if (typeof tot === 'number') return tot;
+  const inp = typeof u['inputTokens'] === 'number' ? u['inputTokens'] : 0;
+  const out = typeof u['outputTokens'] === 'number' ? u['outputTokens'] : 0;
+  if (inp + out > 0) return inp + out;
+  const p = typeof u['promptTokens'] === 'number' ? u['promptTokens'] : 0;
+  const c = typeof u['completionTokens'] === 'number' ? u['completionTokens'] : 0;
+  return p + c > 0 ? p + c : null;
 }
 
 function DurationBadge({ durationMs }: { durationMs?: number }) {
@@ -169,10 +197,11 @@ function TraceStepRow({ step, selected = false, onSelect }: TraceStepRowProps) {
             <span className="text-xs text-muted-foreground">{step.toolCalls!.length} tools</span>
           )}
           <DurationBadge durationMs={step.durationMs} />
-          <CostBadge cost={step.costUsd} />
-          {step.tokenUsage && (
-            <span className="text-xs text-muted-foreground">{step.tokenUsage}t</span>
-          )}
+          <CostBadge cost={step.costUsd ?? deriveStepCost(step) ?? undefined} />
+          {(() => {
+            const tt = totalTokensFromUsage(step.tokenUsage);
+            return tt !== null ? <span className="text-xs text-muted-foreground">{tt.toLocaleString()}t</span> : null;
+          })()}
           {hasScreenshot && <Image className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
 
@@ -368,8 +397,11 @@ function TraceDetailPanel({ trace }: { trace: Trace }) {
         {[
           { label: 'Steps', value: totalSteps },
           { label: 'Duration', value: trace.totalDurationMs ? `${(trace.totalDurationMs / 1000).toFixed(1)}s` : 'N/A' },
-          { label: 'Tokens', value: trace.totalTokens?.toLocaleString() ?? 'N/A' },
-          { label: 'Cost', value: trace.totalCostUsd ? `$${trace.totalCostUsd.toFixed(4)}` : 'N/A' },
+          // D.2 — Tokens + Cost derived from the persisted tokenUsage blob
+          // (AgentTrace has no costUsd/totalTokens columns). Honest N/A only
+          // when the blob is absent or has no model.
+          { label: 'Tokens', value: (trace.totalTokens ?? totalTokensFromUsage(trace.tokenUsage))?.toLocaleString() ?? 'N/A' },
+          { label: 'Cost', value: formatCostUsd(trace.totalCostUsd ?? deriveCostFromTokenUsage(trace.tokenUsage)) },
         ].map(stat => (
           <div key={stat.label} className="rounded-lg border bg-muted/30 p-3 text-center">
             <p className="text-lg font-bold">{stat.value}</p>

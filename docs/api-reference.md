@@ -127,6 +127,11 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | GET | `/analytics/usage` | JWT | Tenant usage summary (tokens, cost, time series) |
 | GET | `/analytics/usage/workflow/:workflowId` | JWT | Per-workflow usage report (cost by provider/model/agent) |
 | GET | `/analytics/cost` | JWT | Cost breakdown for current billing period (last 30 days) |
+| GET | `/analytics/tools` | JWT | Per-tool count/success/fail/successRate + avg/p50/p95 durationMs (from `AgentTrace.toolCallsJson`) |
+| GET | `/analytics/approvals/decisions` | JWT | `ApprovalAuditLog` totals/byAgentRole/byRiskLevel + autoApprovalRate |
+| GET | `/analytics/intents` | JWT | `IntentRecord` byIntent (count + avgConfidence + clarificationRate), urgency, topRiskIndicators |
+| GET | `/analytics/latency` | JWT | `UsageLedger.latencyMs` p50/p90/p95/p99 + byProvider (null-latency rows excluded) |
+| GET | `/analytics/routing` | JWT + **SYSTEM_ADMIN** | `RoutingLog` byModel/byProvider/byTaskType + fallbackRate + avgScore (platform-wide, not tenant-scoped) |
 
 ---
 

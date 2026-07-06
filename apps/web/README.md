@@ -107,3 +107,71 @@ pnpm --filter @jak-swarm/web test
 through `@supabase/ssr` in `src/lib/supabase.ts` (browser) +
 `src/lib/supabase-server.ts` (server) + `src/proxy.ts` (the Next 16
 middleware — the renamed `middleware.ts`).
+
+## JARVIS Swarm Inspector — `/swarm` (Phase B)
+
+The `/swarm` route is a dark-only, futuristic command surface
+(`src/components/swarm/SwarmInspector.tsx` + siblings). It is **not** the same
+surface as the `swarm-monitor` dashboard module (`src/modules/swarm-monitor`),
+which is a lightweight polling workflow list embedded in role dashboards
+(CEO / engineering / command-center). The two are intentionally distinct:
+the Inspector owns the full page with a 3-column layout + per-selected-run
+SSE; the monitor is a pane widget. Do not converge them — embedding the
+Inspector inside a dashboard pane would break the registry contract.
+
+Inspector components:
+- `KpiBar` — Active Runs / Success 24h / **Tool Success** / **Auto-Approve** /
+  Cost 30d / Queue Depth. The Tool Success + Auto-Approve gauges (Phase C)
+  read `/analytics/tools` + `/analytics/approvals/decisions`; honest "—" when
+  no samples (never a fake 100%). Queue Depth is TENANT_ADMIN-gated; a 403
+  renders "N/A — admin only".
+- `RunDetailDrawer` — DAG / Gantt / Event Feed / Cost & Tokens / Approvals.
+  `@xyflow/react` is code-split via `next/dynamic` so the graph chunk loads
+  only on drawer open.
+- `EventFeed` — renders the full agent-activity taxonomy with tool `outcome`
+  badges (real_success / draft_created / mock_provider / blocked_… / failed).
+  The badge is **always** rendered — never hidden whether a tool actually ran
+  vs mocked/draft/blocked.
+
+## Honest analytics expansion (Phase C)
+
+`src/modules/analytics/HonestAnalyticsCharts.tsx` (dynamic `ssr:false`,
+recharts stays chunked with `AnalyticsCharts`) renders five aggregation
+charts, each fetching its own endpoint via SWR with an honest "No data"
+empty state (never a faked 100% / sample series):
+
+| Chart | Endpoint | Source table | Scope |
+|-------|----------|--------------|-------|
+| Tools (success + duration) | `GET /analytics/tools` | `AgentTrace.toolCallsJson` | tenant |
+| Approval Decisions (pie) | `GET /analytics/approvals/decisions` | `ApprovalAuditLog` | tenant |
+| Intents (count + clarification rate) | `GET /analytics/intents` | `IntentRecord` | tenant |
+| Latency (p50/p90/p95/p99) | `GET /analytics/latency` | `UsageLedger.latencyMs` | tenant |
+| Routing (by model, fallback rate) | `GET /analytics/routing` | `RoutingLog` | **SYSTEM_ADMIN only** |
+
+Routing is admin-only because `RoutingLog` is platform-wide (not
+tenant-scoped); a 403 renders an "Admin only" banner, not a crash. No schema
+change was needed — all columns already existed, the data was just invisible.
+
+## Cost derivation — `src/lib/cost.ts` (Phase D)
+
+`AgentTrace` has **no `costUsd` column**. Cost is derived client-side from the
+persisted `tokenUsage` JSON blob using the **same `calculateCost` formula the
+backend uses for `UsageLedger.usdCost`** (`@jak-swarm/shared`):
+`deriveCostFromTokenUsage(tokenUsage)` → `calculateCost(model, inputTokens,
+outputTokens)`. It returns `null` when no model is present (honest "N/A",
+never a fabricated `$0`). Handles both blob shapes: the runtime
+`{ inputTokens, outputTokens, model, provider }` and the seed
+`{ promptTokens, completionTokens, totalTokens }`.
+
+Wired into:
+- `AgentCard` (`src/components/swarm/AgentCard.tsx`) — shows derived cost in
+  the header; the expanded step is now a **structured row** (action + duration
+  + status badge + error) with the raw I/O JSON behind a "show raw I/O"
+  toggle, replacing the previous `JSON.stringify` dump. "Steps not recorded"
+  is shown honestly when `steps` is empty.
+- The traces page (`src/app/(dashboard)/traces/page.tsx`) summary Tokens +
+  Cost stats and the per-step `CostBadge` fall back to the same derivation.
+
+Honest limit: a `0` cost is a real computed value (e.g. a local model with
+zero pricing); `null` → "N/A" means cost is not computable (no model). The
+two are distinct in the UI.

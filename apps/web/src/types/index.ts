@@ -302,12 +302,42 @@ export interface AgentTraceRecord {
   tenantId: string;
   agentRole: AgentRole;
   status: string;
-  steps: unknown[];
-  output?: string;
-  error?: string;
+  /** Each DB row is one agent execution; mapTrace surfaces it as a single
+   *  TraceStep so callers can dig into steps[0] OR read the top-level fields. */
+  steps: MappedTraceStep[];
+  /** Parsed inputJson (object) — null when the trace recorded none. */
+  input?: Record<string, unknown> | null;
+  /** Parsed outputJson (object) — null when the trace recorded none. */
+  output?: Record<string, unknown> | null;
+  /** Parsed toolCallsJson — array of stored tool calls. */
+  toolCalls?: unknown[] | null;
+  /** Persisted tokenUsage blob ({ inputTokens, outputTokens, model, provider }
+   *  from the runtime, or { promptTokens, completionTokens, totalTokens } from
+   *  seed). Used by deriveCostFromTokenUsage to compute USD without a column. */
+  tokenUsage?: Record<string, unknown> | null;
+  /** Always null today — AgentTrace has no costUsd column. Cost is derived
+   *  client-side from tokenUsage via apps/web/src/lib/cost.ts. */
+  costUsd?: number | null;
+  error?: string | null;
+  stepIndex?: number;
   durationMs?: number;
   startedAt: string;
   completedAt: string | null;
+  createdAt: string;
+}
+
+/** The single mapped step inside AgentTraceRecord.steps (workflow.service.ts
+ *  mapTrace). Shape is backend-defined; keep permissive. */
+export interface MappedTraceStep {
+  id: string;
+  traceId: string;
+  seq: number;
+  agentRole: AgentRole;
+  action: string;
+  input: Record<string, unknown>;
+  output?: Record<string, unknown> | null;
+  durationMs?: number;
+  error?: string | null;
   createdAt: string;
 }
 
@@ -355,7 +385,10 @@ export interface TraceStep {
   startedAt: string;
   completedAt?: string;
   durationMs?: number;
-  tokenUsage?: number;
+  /** Persisted tokenUsage blob (object) when present; historically typed as
+   *  a bare number — kept permissive (unknown) so callers can derive cost via
+   *  apps/web/src/lib/cost.ts. See AgentTraceRecord.tokenUsage for the shape. */
+  tokenUsage?: unknown;
   costUsd?: number;
   error?: string;
   screenshotUrl?: string;
@@ -370,6 +403,14 @@ export interface Trace {
   totalTokens?: number;
   totalCostUsd?: number;
   createdAt: string;
+  /** GET /traces/:id returns a raw AgentTrace row, which carries the
+   *  tokenUsage blob (inputTokens/outputTokens/model or prompt/completion/
+   *  total). The web derives Tokens + Cost from it honestly (see
+   *  apps/web/src/lib/cost.ts) because AgentTrace has no costUsd column. */
+  tokenUsage?: Record<string, unknown> | null;
+  stepIndex?: number;
+  traceId?: string;
+  runId?: string;
 }
 
 // ─── Memory / Knowledge Types ─────────────────────────────────────────────────

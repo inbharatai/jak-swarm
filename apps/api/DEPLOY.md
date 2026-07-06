@@ -98,3 +98,27 @@ Supabase round-trip to ≤1/min/token per API instance. A revoked Supabase
 session is therefore valid for up to 60s on a given instance after
 revocation — acceptable for this product; a Redis-based revocation
 blocklist is a future hardening step, not Phase A.
+
+## 5. Honest analytics aggregation endpoints (Phase C)
+
+No migration — all columns already existed. Five new tenant-scoped
+aggregation endpoints were added to `src/routes/analytics.routes.ts`:
+
+| Endpoint | Source | Scope |
+|----------|--------|-------|
+| `GET /analytics/tools` | `AgentTrace.toolCallsJson` | tenant (`authenticate` + `enforceTenantIsolation`) |
+| `GET /analytics/approvals/decisions` | `ApprovalAuditLog` | tenant |
+| `GET /analytics/intents` | `IntentRecord` | tenant |
+| `GET /analytics/latency` | `UsageLedger.latencyMs` (null rows excluded) | tenant |
+| `GET /analytics/routing` | `RoutingLog` | **`SYSTEM_ADMIN` only** |
+
+`/analytics/routing` is admin-only because `RoutingLog` is platform-wide (no
+`tenantId` column). A future migration could add `tenantId` to make it
+tenant-scoped; until then non-admins get a 403 and the web renders an "Admin
+only" banner. `GET /usage/history` `select` was extended additively with
+`provider, inputTokens, outputTokens, usdCost, latencyMs` (backward-compatible).
+
+Deploy: the API auto-deploys on push to main when Railway/Cloud Run are
+dashboard-linked; Cloud Run requires a manual `gcloud builds submit
+--config=cloudbuild-api.yaml` (push to main does NOT deploy it — see
+`DEPLOY_TRIGGER.md`). No env vars added.

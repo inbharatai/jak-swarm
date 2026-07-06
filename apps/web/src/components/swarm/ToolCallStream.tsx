@@ -21,17 +21,20 @@ interface FlattenedToolCall extends ToolCall {
 function flattenToolCalls(traces: AgentTraceRecord[]): FlattenedToolCall[] {
   const out: FlattenedToolCall[] = [];
   for (const trace of traces) {
-    // AgentTraceRecord.steps is unknown[] — the persisted shape carries
-    // toolCalls per step. Be defensive: only read toolCalls off objects
-    // that actually have them, never fabricate.
-    const steps = Array.isArray(trace.steps) ? trace.steps : [];
-    for (const step of steps) {
-      if (step && typeof step === 'object' && Array.isArray((step as { toolCalls?: unknown }).toolCalls)) {
-        for (const tc of (step as { toolCalls: ToolCall[] }).toolCalls) {
-          if (tc && typeof tc.toolName === 'string') {
-            out.push({ ...tc, traceId: trace.id, agentRole: trace.agentRole });
-          }
-        }
+    // mapTrace (apps/api workflow.service.ts) surfaces toolCallsJson at the
+    // TOP LEVEL of the record as `trace.toolCalls` (the mapped step has no
+    // toolCalls field). The persisted blob is either `{ calls: [...] }` or a
+    // bare array — normalize both. Be defensive: only read toolCalls off
+    // objects that actually have them, never fabricate.
+    const raw = trace.toolCalls;
+    const arr: unknown[] = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === 'object' && Array.isArray((raw as { calls?: unknown }).calls)
+        ? (raw as { calls: unknown[] }).calls
+        : [];
+    for (const tc of arr) {
+      if (tc && typeof tc === 'object' && typeof (tc as { toolName?: unknown }).toolName === 'string') {
+        out.push({ ...(tc as ToolCall), traceId: trace.id, agentRole: trace.agentRole });
       }
     }
   }

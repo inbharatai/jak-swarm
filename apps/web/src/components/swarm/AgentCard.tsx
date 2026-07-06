@@ -10,11 +10,13 @@ import {
   Loader2,
   Timer,
   Wrench,
+  DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui';
-import type { AgentTraceRecord, AgentRole } from '@/types';
+import type { AgentTraceRecord, AgentRole, MappedTraceStep } from '@/types';
 import { formatDistanceToNow, intervalToDuration } from 'date-fns';
+import { deriveCostFromTokenUsage, formatCostUsd } from '@/lib/cost';
 
 // ─── Role metadata ────────────────────────────────────────────────────────────
 
@@ -98,21 +100,27 @@ export function AgentCard({ step, traceLink, className }: AgentCardProps) {
   const isRunning = !step.completedAt;
   const dur = step.startedAt ? durationStr(step.startedAt, step.completedAt) : null;
 
-  // steps is unknown[] — try to surface useful info
-  const stepCount = Array.isArray(step.steps) ? step.steps.length : 0;
+  // mapTrace surfaces one MappedTraceStep per DB row. `steps` is always a
+  // single-element array when the trace exists; an absent/empty array means
+  // the source didn't record step detail → honest "Steps not recorded".
+  const steps = Array.isArray(step.steps) ? (step.steps as MappedTraceStep[]) : [];
+  const stepCount = steps.length;
 
   const statusUpper = step.status?.toUpperCase() ?? '';
   const isFailed = statusUpper === 'FAILED';
 
+  // D.2 — derive cost from the persisted tokenUsage blob using the SAME
+  // formula the backend uses for UsageLedger.usdCost. Honest null → "N/A"
+  // only when no model is present (cost is not computable), never a fake $0.
+  const derivedCost = deriveCostFromTokenUsage(step.tokenUsage);
+
   return (
     <div className={cn('rounded-xl border overflow-hidden transition-all', meta.colorClass, className)}>
-      {/* Header row */}
+      {/* Header row — always expandable so the honest "Steps not recorded"
+          fallback is reachable even when mapTrace produced no steps. */}
       <button
-        onClick={() => stepCount > 0 && setExpanded(e => !e)}
-        className={cn(
-          'flex w-full items-start gap-3 p-4 text-left',
-          stepCount > 0 && 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5',
-        )}
+        onClick={() => setExpanded(e => !e)}
+        className="flex w-full items-start gap-3 p-4 text-left cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
       >
         {/* Icon */}
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-white/10 text-lg shadow-sm">
@@ -144,6 +152,12 @@ export function AgentCard({ step, traceLink, className }: AgentCardProps) {
                 {stepCount} step{stepCount !== 1 ? 's' : ''}
               </span>
             )}
+            {stepCount === 0 && <span className="italic">no steps</span>}
+            {/* D.2 — honest derived cost (N/A when no model in tokenUsage). */}
+            <span className="flex items-center gap-1" title="derived from token usage (same formula as backend)">
+              <DollarSign className="h-3 w-3" />
+              {formatCostUsd(derivedCost)}
+            </span>
           </div>
         </div>
 
@@ -152,31 +166,23 @@ export function AgentCard({ step, traceLink, className }: AgentCardProps) {
           {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
           {isFailed && <XCircle className="h-3.5 w-3.5 text-destructive" />}
           {!isRunning && !isFailed && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
-          {stepCount > 0 && (
-            expanded
-              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
+          {expanded
+            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
       </button>
 
-      {/* Expanded steps */}
-      {expanded && stepCount > 0 && (
+      {/* Expanded steps — D.3: structured render instead of raw JSON.stringify. */}
+      {expanded && (
         <div className="border-t bg-white/30 dark:bg-black/20 px-4 py-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Steps ({stepCount})
           </p>
-          {(step.steps as Record<string, unknown>[]).map((s, i) => (
-            <div key={i} className="rounded border bg-white/50 dark:bg-black/20 px-3 py-2 text-xs">
-              {typeof s === 'object' && s !== null ? (
-                <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground overflow-x-auto max-h-32">
-                  {JSON.stringify(s, null, 2)}
-                </pre>
-              ) : (
-                <span>{String(s)}</span>
-              )}
-            </div>
-          ))}
+          {stepCount === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Steps not recorded for this trace.</p>
+          ) : (
+            steps.map((s, i) => <StepRow key={s.id ?? i} step={s} />)
+          )}
         </div>
       )}
 
@@ -186,6 +192,71 @@ export function AgentCard({ step, traceLink, className }: AgentCardProps) {
           <a href={traceLink} className="text-xs text-primary hover:underline">
             View full trace →
           </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Structured step row (D.3) ────────────────────────────────────────────────
+// Replaces the raw JSON.stringify dump. Renders the one-line action + duration
+// + status; keeps the full input/output JSON behind a collapsible "raw" toggle
+// so the data is still inspectable without making the card a wall of JSON.
+
+function StepRow({ step }: { step: MappedTraceStep }) {
+  const [showRaw, setShowRaw] = useState(false);
+  const hasError = !!step.error;
+  const hasInput = step.input && Object.keys(step.input).length > 0;
+  const hasOutput = step.output && Object.keys(step.output).length > 0;
+  const durMs = step.durationMs ?? 0;
+
+  return (
+    <div className="rounded border bg-white/50 dark:bg-black/20 px-3 py-2 text-xs space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="text-[10px]">#{step.seq}</Badge>
+        <span className="font-medium">{step.action || 'execute'}</span>
+        {durMs > 0 && (
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Timer className="h-3 w-3" />
+            {durMs < 1000 ? `${durMs}ms` : `${(durMs / 1000).toFixed(1)}s`}
+          </span>
+        )}
+        {hasError ? (
+          <Badge variant="destructive" className="text-[10px]">error</Badge>
+        ) : (
+          <Badge variant="success" className="text-[10px]">ok</Badge>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowRaw(r => !r)}
+          className="ml-auto text-[10px] text-primary hover:underline"
+        >
+          {showRaw ? 'hide raw' : 'show raw I/O'}
+        </button>
+      </div>
+      {hasError && (
+        <pre className="whitespace-pre-wrap font-sans text-[11px] text-destructive overflow-x-auto max-h-24">
+          {String(step.error)}
+        </pre>
+      )}
+      {showRaw && (hasInput || hasOutput) && (
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {hasInput && (
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">Input</p>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-muted-foreground overflow-x-auto max-h-32">
+                {JSON.stringify(step.input, null, 2)}
+              </pre>
+            </div>
+          )}
+          {hasOutput && (
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">Output</p>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-muted-foreground overflow-x-auto max-h-32">
+                {JSON.stringify(step.output, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -33,6 +33,18 @@ const STATUS_LABEL: Record<WorkflowStatus, string> = {
   COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled',
 };
 
+// mapTrace surfaces trace.output as a parsed object (outputJson), not a
+// string. Render a short JSON snippet so the row stays one line.
+function outputSummary(output: unknown): string {
+  if (output === null || output === undefined) return '';
+  if (typeof output === 'string') return output.slice(0, 80);
+  try {
+    return JSON.stringify(output).slice(0, 80);
+  } catch {
+    return '';
+  }
+}
+
 export default function SwarmMonitorModule() {
   const { workflows, isLoading, refresh } = useWorkflows();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -106,7 +118,7 @@ export default function SwarmMonitorModule() {
                   {Array.isArray(wf.traces) ? wf.traces.map(trace => (
                     <div key={trace.id} className="flex items-center gap-2 text-xs">
                       <span className="w-28 truncate text-muted-foreground">{trace.agentRole}</span>
-                      <span className={cn('flex-1 truncate', trace.error ? 'text-destructive' : 'text-foreground')}>{trace.error || trace.output?.slice(0, 80) || '—'}</span>
+                      <span className={cn('flex-1 truncate', trace.error ? 'text-destructive' : 'text-foreground')}>{trace.error || outputSummary(trace.output) || '—'}</span>
                       {trace.durationMs && <span className="text-muted-foreground">{(trace.durationMs / 1000).toFixed(1)}s</span>}
                     </div>
                   )) : (
