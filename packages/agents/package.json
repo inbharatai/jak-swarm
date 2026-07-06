@@ -21,7 +21,7 @@
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/skills": "workspace:^",
     "@jak-swarm/tools": "workspace:^",
-    "openai": "^4.76.3",
+    "openai": "^6.45.0",
     "@google/generative-ai": "^0.24.0",
     "pino": "^9.5.0",
     "zod": "^3.23.8",
