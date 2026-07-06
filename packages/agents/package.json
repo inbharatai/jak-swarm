@@ -24,7 +24,7 @@
     "openai": "^4.76.3",
     "@google/generative-ai": "^0.24.0",
     "pino": "^9.5.0",
-    "zod": "^3.23.8",
+    "zod": "^4.4.3",
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
