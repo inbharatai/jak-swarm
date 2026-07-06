@@ -40,8 +40,13 @@ function LoginPageContent() {
     setServerError(null);
     try {
       await login(data.email, data.password);
+      // A.9 — no router.refresh(): useAuthProfile re-fires on Supabase
+      // onAuthStateChange (login sets the session), and SWR revalidates on
+      // focus. A full router.refresh() here forces a server re-render of the
+      // entire destination route tree, which is the slow, flickery part of
+      // "even when log in its slow to log in". A plain push lets the
+      // destination hydrate from cache + the fresh auth state.
       router.push(redirectTo);
-      router.refresh();
     } catch (err: unknown) {
       setServerError((err as { message?: string })?.message ?? 'Login failed. Please try again.');
     }

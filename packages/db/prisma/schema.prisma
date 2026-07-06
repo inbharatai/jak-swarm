@@ -112,6 +112,12 @@ model User {
   @@unique([tenantId, email])
   @@index([tenantId, departmentId])
   @@index([tenantId, managerId])
+  // Migration 109 — standalone email index. The login + Supabase identity
+  // resolution paths query `WHERE email = ?` with no tenantId, so the
+  // composite @@unique([tenantId, email]) (tenantId leading) cannot serve
+  // them efficiently. This index makes those lookups O(log n) instead of
+  // a seq scan.
+  @@index([email])
   @@map("users")
 }
 

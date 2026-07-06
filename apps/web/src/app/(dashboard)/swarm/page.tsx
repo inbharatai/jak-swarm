@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { mutate } from 'swr';
 import {
   CheckCircle2,
   XCircle,
   Clock,
   Loader2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Network,
   ArrowRight,
@@ -18,6 +20,7 @@ import { cn } from '@/lib/cn';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Spinner, EmptyState } from '@/components/ui';
 import { AgentCard } from '@/components/swarm/AgentCard';
 import { useWorkflows } from '@/hooks/useWorkflow';
+import { dataFetcher } from '@/lib/api-client';
 import type { Workflow, WorkflowStatus } from '@/types';
 import { format, formatDistanceToNow, intervalToDuration } from 'date-fns';
 
@@ -123,7 +126,7 @@ function AgentTimeline({ traces }: { traces: Workflow['traces'] }) {
   );
 }
 
-function WorkflowRunCard({ workflow }: { workflow: Workflow }) {
+function WorkflowRunCard({ workflow, onHover }: { workflow: Workflow; onHover?: (id: string) => void }) {
   const [expanded, setExpanded] = useState(workflow.status === 'RUNNING');
   const traces = workflow.traces ?? [];
 
@@ -137,11 +140,17 @@ function WorkflowRunCard({ workflow }: { workflow: Workflow }) {
     : null;
 
   return (
-    <Card className={cn(
-      'transition-all',
-      workflow.status === 'RUNNING' && 'border-primary/50 shadow-sm shadow-primary/10',
-      workflow.status === 'PAUSED' && 'border-yellow-500/40',
-    )}>
+    <Card
+      // A.12 — hover-prefetch the run detail so clicking through to the
+      // inspector/traces is instant. onHover warms the SWR cache for
+      // /workflows/:id (the key useWorkflow uses) with revalidate:false.
+      onMouseEnter={onHover ? () => onHover(workflow.id) : undefined}
+      className={cn(
+        'transition-all',
+        workflow.status === 'RUNNING' && 'border-primary/50 shadow-sm shadow-primary/10',
+        workflow.status === 'PAUSED' && 'border-yellow-500/40',
+      )}
+    >
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-start gap-4 p-4 text-left"
@@ -239,8 +248,19 @@ function WorkflowRunCard({ workflow }: { workflow: Workflow }) {
   );
 }
 
+// A.12 — page size matches the API list endpoint's `take: 50`. Pagination is
+// the real Phase A perf win here: without it the inspector fetches the first
+// 50 runs and silently drops everything older. Virtualization of the run list
+// is deferred to Phase B's RunRail, which establishes a fixed-header +
+// scroll-list JARVIS command surface (the right place for a virtualizer —
+// virtualizing 50 expandable cards inside the dashboard's natural page scroll
+// would mean a nested scroll container for marginal gain). @tanstack/react-
+// virtual is already in deps for that.
+const PAGE_SIZE = 50;
+
 export default function SwarmPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all');
+  const [page, setPage] = useState(1);
 
   const statusMap = {
     all:       undefined,
@@ -249,9 +269,31 @@ export default function SwarmPage() {
     failed:    ['FAILED', 'CANCELLED'] as WorkflowStatus[],
   };
 
-  const { workflows, isLoading, refresh } = useWorkflows(
-    statusMap[filter] ? { status: statusMap[filter] } : {},
+  const { workflows, isLoading, refresh, totalPages } = useWorkflows(
+    statusMap[filter] ? { status: statusMap[filter], page, pageSize: PAGE_SIZE } : { page, pageSize: PAGE_SIZE },
   );
+
+  // Reset to page 1 whenever the filter changes so a narrow filter doesn't
+  // leave the user on a page that no longer exists.
+  function changeFilter(f: 'all' | 'active' | 'completed' | 'failed') {
+    setFilter(f);
+    setPage(1);
+  }
+
+  // A.12 — warm the SWR cache for /workflows/:id on hover so the click-through
+  // to the run detail / traces is instant. revalidate:false means we trust the
+  // prefetched data rather than re-fetching on first render.
+  function prefetchWorkflow(id: string) {
+    void mutate(`/workflows/${id}`, dataFetcher<Workflow>(`/workflows/${id}`), { revalidate: false });
+  }
+
+  // Windowed page numbers (show up to 5 around the current page).
+  const pageWindow = (() => {
+    if (totalPages <= 1) return [] as number[];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, start + 4);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  })();
 
   return (
     <div className="space-y-6">
@@ -277,7 +319,7 @@ export default function SwarmPage() {
         {(['all', 'active', 'completed', 'failed'] as const).map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => changeFilter(f)}
             className={cn(
               'rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize',
               filter === f
@@ -308,8 +350,61 @@ export default function SwarmPage() {
       ) : (
         <div className="space-y-4">
           {workflows.map(workflow => (
-            <WorkflowRunCard key={workflow.id} workflow={workflow} />
+            <WorkflowRunCard key={workflow.id} workflow={workflow} onHover={prefetchWorkflow} />
           ))}
+        </div>
+      )}
+
+      {/* A.12 — pagination footer driven by useWorkflows.totalPages. */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 pt-2" role="navigation" aria-label="Run list pagination">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="gap-1"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Prev
+          </Button>
+          {pageWindow[0]! > 1 && (
+            <>
+              <button onClick={() => setPage(1)} className={cn('rounded-md px-3 py-1.5 text-xs font-medium', page === 1 ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground')}>1</button>
+              {pageWindow[0]! > 2 && <span className="px-1 text-xs text-muted-foreground">…</span>}
+            </>
+          )}
+          {pageWindow.map(p => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              aria-current={page === p ? 'page' : undefined}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                page === p ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground border',
+              )}
+            >
+              {p}
+            </button>
+          ))}
+          {pageWindow[pageWindow.length - 1]! < totalPages && (
+            <>
+              {pageWindow[pageWindow.length - 1]! < totalPages - 1 && <span className="px-1 text-xs text-muted-foreground">…</span>}
+              <button onClick={() => setPage(totalPages)} className={cn('rounded-md px-3 py-1.5 text-xs font-medium', page === totalPages ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground')}>{totalPages}</button>
+            </>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            className="gap-1"
+            aria-label="Next page"
+          >
+            Next
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
     </div>

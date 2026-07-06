@@ -22,6 +22,16 @@ const loginBodySchema = z.object({
   tenantSlug: z.string().optional(),
 });
 
+// A.1 — accepts a Supabase access token and returns a JAK JWT. Used by
+// non-web clients that authenticate via Supabase but want to call the
+// JAK API with a JAK JWT (so jwtVerify() succeeds on the first try and
+// no per-request Supabase round-trip is incurred). The web instead uses
+// GET /auth/me, which mints the JAK JWT idempotently when the inbound
+// token is a Supabase token.
+const exchangeBodySchema = z.object({
+  supabaseToken: z.string().min(1, 'supabaseToken is required'),
+});
+
 // Strict rate-limit config applied to authentication endpoints.
 // 10 attempts per minute per IP to block brute-force attacks while
 // keeping the door open for rapid testing in development.
@@ -136,6 +146,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /auth/me
    * Returns the currently authenticated user's profile.
+   *
+   * A.1 (perf): when the request was resolved via the Supabase fallback
+   * (request.authViaSupabase === true — the stored token is a Supabase
+   * access token, not a JAK JWT), mint a JAK JWT and return it alongside
+   * the profile as `jakToken`. The web stores it and uses it for all
+   * subsequent API + SSE calls so jwtVerify() succeeds on the first try,
+   * eliminating the per-request Supabase round-trip. Idempotent: when
+   * the request was authenticated via a JAK JWT we do NOT re-mint (the
+   * stored token is already a JAK JWT), so the response envelope is the
+   * plain `{ success, data }` and `jakToken` is omitted.
    */
   fastify.get(
     '/me',
@@ -145,7 +165,41 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const user = await authService.getUserById(request.user.userId);
+        if (request.authViaSupabase === true) {
+          const jakToken = authService.signToken(user);
+          return reply.status(200).send({ ...ok(user), jakToken });
+        }
         return reply.status(200).send(ok(user));
+      } catch (e) {
+        if (e instanceof AppError) {
+          return reply.status(e.statusCode).send(err(e.code, e.message));
+        }
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * POST /auth/exchange
+   * Exchange a Supabase access token for a JAK JWT. Same resolution path
+   * as the Supabase fallback in auth.plugin.ts (authenticateSupabaseToken,
+   * with the 60s in-process identity cache), then mints a JAK JWT. For
+   * non-web clients; the web uses GET /auth/me instead.
+   */
+  fastify.post(
+    '/exchange',
+    AUTH_RATE_LIMIT,
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parseResult = exchangeBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send(
+          err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()),
+        );
+      }
+      try {
+        const user = await authService.authenticateSupabaseToken(parseResult.data.supabaseToken);
+        const jakToken = authService.signToken(user);
+        return reply.status(200).send({ ...ok(user), jakToken });
       } catch (e) {
         if (e instanceof AppError) {
           return reply.status(e.statusCode).send(err(e.code, e.message));

@@ -51,7 +51,12 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Satoshi', 'system-ui', 'sans-serif'],
+        // A.3 — Satoshi was loaded only via the render-blocking Fontshare
+        // <link> removed from layout.tsx. No self-hosted Satoshi file ships in
+        // public/fonts, so the honest stack is the OS UI font + generic. If a
+        // self-hosted Satoshi-Variable.woff2 is added later, wire it through
+        // next/font/local here and re-prepend it.
+        sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['var(--font-display)', 'Syne', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },

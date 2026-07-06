@@ -28,6 +28,67 @@ interface SupabaseIdentity {
   app_metadata?: Record<string, unknown>;
 }
 
+// ─── In-process LRU cache for Supabase identity resolution ───────────────────
+//
+// A.1 (perf): without a cache, EVERY authenticated API call whose stored
+// token is a Supabase access token falls through auth.plugin.ts →
+// authenticateSupabaseToken → `fetch /auth/v1/user` + db.user.findFirst.
+// That round-trip on every request is the single biggest login/slowness
+// driver. Supabase access tokens are short-lived (~1h) so a 60s TTL is
+// safe and caps the per-token round-trips to ≤1/min across all requests
+// on this instance. A miss that threw is NEVER cached (a revoked session
+// must not be pinned as valid for 60s). Module-level so every AuthService
+// instance (auth.plugin + auth.routes each construct one) shares one cache.
+const SUPABASE_IDENTITY_CACHE_TTL_MS = 60_000;
+const SUPABASE_IDENTITY_CACHE_MAX = 1000;
+
+interface CachedSupabaseIdentity {
+  session: AuthSession;
+  exp: number;
+}
+
+const supabaseIdentityCache = new Map<string, CachedSupabaseIdentity>();
+
+function tokenCacheKey(accessToken: string): string {
+  return createHash('sha256').update(accessToken).digest('hex');
+}
+
+function getCachedSupabaseIdentity(accessToken: string): AuthSession | null {
+  const key = tokenCacheKey(accessToken);
+  const entry = supabaseIdentityCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.exp) {
+    supabaseIdentityCache.delete(key);
+    return null;
+  }
+  // LRU touch — Map preserves insertion order; delete + re-set moves the
+  // entry to the most-recent position.
+  supabaseIdentityCache.delete(key);
+  supabaseIdentityCache.set(key, entry);
+  return entry.session;
+}
+
+function cacheSupabaseIdentity(accessToken: string, session: AuthSession): void {
+  const key = tokenCacheKey(accessToken);
+  supabaseIdentityCache.set(key, {
+    session,
+    exp: Date.now() + SUPABASE_IDENTITY_CACHE_TTL_MS,
+  });
+  // Evict the oldest insertion when over capacity.
+  if (supabaseIdentityCache.size > SUPABASE_IDENTITY_CACHE_MAX) {
+    const oldest = supabaseIdentityCache.keys().next().value;
+    if (typeof oldest === 'string') supabaseIdentityCache.delete(oldest);
+  }
+}
+
+/**
+ * Test-only — clears the module-level Supabase identity cache so unit tests
+ * start from a known empty state. Not imported by any production code path.
+ */
+export function _resetSupabaseIdentityCacheForTests(): void {
+  supabaseIdentityCache.clear();
+}
+
 export class AuthService {
   constructor(
     private readonly db: PrismaClient,
@@ -240,6 +301,14 @@ export class AuthService {
       throw new UnauthorizedError('Supabase authentication is not configured');
     }
 
+    // A.1 — serve from the in-process cache when the same Supabase access
+    // token has been seen within the TTL window. This is what eliminates
+    // the per-request Supabase round-trip (the cache is checked BEFORE
+    // any fetch). The cache only ever stores fully-resolved sessions; a
+    // miss that throws falls through uncached.
+    const cached = getCachedSupabaseIdentity(accessToken);
+    if (cached) return cached;
+
     const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
       headers: {
         apikey: config.supabaseAnonKey,
@@ -252,7 +321,9 @@ export class AuthService {
     }
 
     const identity = await response.json() as SupabaseIdentity;
-    return this.resolveSupabaseIdentity(identity);
+    const session = await this.resolveSupabaseIdentity(identity);
+    cacheSupabaseIdentity(accessToken, session);
+    return session;
   }
 
   private async resolveSupabaseIdentity(identity: SupabaseIdentity): Promise<AuthSession> {

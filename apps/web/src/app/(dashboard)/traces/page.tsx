@@ -14,8 +14,6 @@ import {
   Filter,
   X,
   GitCompare,
-  Radio,
-  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Input, Spinner, EmptyState } from '@/components/ui';
@@ -24,7 +22,6 @@ import { dataFetcher } from '@/lib/api-client';
 import type { Trace, TraceStep, AgentRole } from '@/types';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { PaginatedResult } from '@/types';
-import { useWorkflowStream } from '@/hooks/useWorkflowStream';
 
 const AGENT_ROLE_OPTIONS: AgentRole[] = [
   'COMMANDER', 'PLANNER', 'ROUTER', 'VERIFIER', 'GUARDRAIL', 'APPROVAL',
@@ -347,7 +344,12 @@ function TraceDetailPanel({ trace }: { trace: Trace }) {
   const selectedStep = steps[selectedStepIndex] ?? null;
   const previousStep = selectedStepIndex > 0 ? (steps[selectedStepIndex - 1] ?? null) : null;
   const visibleSteps = selectedStep ? steps.filter((s) => s.stepNumber <= selectedStep.stepNumber) : steps;
-  const { events, isConnected } = useWorkflowStream(trace.workflowId);
+  // A.12 — the per-trace SSE stream (`useWorkflowStream`) was opened here only
+  // to light a "Live stream connected" dot + an event count that was never
+  // visualized against the steps. That's a wasted EventSource per open trace.
+  // This page is a *history* view of a persisted AgentTrace; live streaming
+  // lives on the Inspector (Phase B) + Workspace. The indicator below is now
+  // a static "History" badge — no SSE connection, no reconnect churn.
 
   useEffect(() => {
     setSelectedStepIndex(steps.length > 0 ? steps.length - 1 : 0);
@@ -390,10 +392,14 @@ function TraceDetailPanel({ trace }: { trace: Trace }) {
             Timeline Scrubber
           </CardTitle>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {isConnected ? <Radio className="h-3.5 w-3.5 text-green-500" /> : <Pause className="h-3.5 w-3.5" />}
-            {isConnected ? 'Live stream connected' : 'Not streaming'}
+            {/* A.12 — static history badge; the live SSE stream was removed
+                (it only lit a dot + a count that was never visualized). Live
+                streaming lives on the Inspector + Workspace, not this history
+                view. */}
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            History
             <span>•</span>
-            <span>{events.length} stream event{events.length === 1 ? '' : 's'}</span>
+            <span>{totalSteps} step{totalSteps !== 1 ? 's' : ''} recorded</span>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

@@ -147,7 +147,7 @@ async function loginWithBackendPassword(email: string, password: string): Promis
   return user;
 }
 
-async function fetchTrustedAuthUser(accessToken: string | null | undefined, fallbackUser?: SupabaseUser | null): Promise<AuthUser | null> {
+export async function fetchTrustedAuthUser(accessToken: string | null | undefined, fallbackUser?: SupabaseUser | null): Promise<AuthUser | null> {
   if (!accessToken) return fallbackUser ? mapSupabaseUser(fallbackUser) : null;
   const response = await fetch(buildAuthApiUrl('/auth/me'), {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -156,10 +156,22 @@ async function fetchTrustedAuthUser(accessToken: string | null | undefined, fall
     const body = await response.json().catch(() => null) as { error?: { message?: string }; message?: string } | null;
     throw new Error(body?.error?.message ?? body?.message ?? `Auth profile lookup failed (${response.status})`);
   }
-  const payload = await response.json().catch(() => null) as { data?: unknown } | null;
+  const payload = await response.json().catch(() => null) as { data?: unknown; jakToken?: unknown } | null;
   const trusted = coerceAuthUser(payload?.data);
   if (!trusted) {
     throw new Error('Auth profile lookup returned an invalid user profile');
+  }
+  // A.1 (perf) — when the API minted a JAK JWT (the inbound token was a
+  // Supabase access token, so the API fell through to the Supabase
+  // fallback and mints a JAK JWT for the web to reuse), store it so all
+  // subsequent API + SSE calls authenticate via jwtVerify() with zero
+  // Supabase round-trips. When `jakToken` is absent the request was
+  // already authenticated via a JAK JWT (or the API predates this
+  // change) — the existing stored-token flow continues unchanged, so
+  // this is fully backward compatible with a not-yet-updated API.
+  const jakToken = payload?.jakToken;
+  if (typeof jakToken === 'string' && jakToken.length > 0) {
+    setToken(jakToken, trusted);
   }
   return trusted;
 }

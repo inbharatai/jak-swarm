@@ -1,90 +1,30 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import {
-  HeroCockpit,
-  HowItWorks,
-  JAKShield,
-  PainSection,
-  PremiumCTA,
-  ProductCockpit,
-  ShowTheWork,
-  TrustLayer,
-  WhatJakDoes,
-} from '@/components/landing';
+import dynamic from 'next/dynamic';
+import { JakLogo, ArrowRightIcon, CheckIcon, GitHubIcon } from '@/components/landing/LandingSvg';
+import LandingRedirectClient from '@/components/landing/LandingRedirectClient';
+import LandingNavClient from '@/components/landing/LandingNavClient';
 
-/* ─── SVG Logo Component ─────────────────────────────────────────────────── */
+// A.4 — the hero cockpit is above-fold (LCP), so it stays a direct import and
+// server-renders immediately. The below-fold framer-motion-heavy sections are
+// code-split via next/dynamic (ssr:true default → still pre-rendered into the
+// static HTML for SEO, but each section's JS lands in its own chunk and loads
+// after hydration). Skeletons flash only during client-side navigation.
+const HeroCockpit = dynamic(() => import('@/components/landing/HeroCockpit'));
+const PainSection = dynamic(() => import('@/components/landing/PainSection'), { loading: () => <SectionSkeleton /> });
+const WhatJakDoes = dynamic(() => import('@/components/landing/WhatJakDoes'), { loading: () => <SectionSkeleton /> });
+const HowItWorks = dynamic(() => import('@/components/landing/HowItWorks'), { loading: () => <SectionSkeleton /> });
+const ProductCockpit = dynamic(() => import('@/components/landing/ProductCockpit'), { loading: () => <SectionSkeleton /> });
+const ShowTheWork = dynamic(() => import('@/components/landing/ShowTheWork'), { loading: () => <SectionSkeleton /> });
+const TrustLayer = dynamic(() => import('@/components/landing/TrustLayer'), { loading: () => <SectionSkeleton /> });
+const JAKShield = dynamic(() => import('@/components/landing/JAKShield'), { loading: () => <SectionSkeleton /> });
+const PremiumCTA = dynamic(() => import('@/components/landing/PremiumCTA'), { loading: () => <SectionSkeleton /> });
 
-function JakLogo({ className = '', size = 40 }: { className?: string; size?: number }) {
+function SectionSkeleton() {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      className={className}
+    <div
+      className="mx-auto my-12 max-w-5xl h-64 rounded-2xl border border-white/5 bg-white/[0.02] animate-pulse"
       aria-hidden="true"
-      role="img"
-    >
-      {/* Network nodes background */}
-      <circle cx="20" cy="20" r="3" fill="#34d399" opacity="0.4" />
-      <circle cx="100" cy="25" r="2.5" fill="#fbbf24" opacity="0.3" />
-      <circle cx="15" cy="100" r="2" fill="#34d399" opacity="0.3" />
-      <circle cx="105" cy="95" r="3" fill="#f472b6" opacity="0.4" />
-      <circle cx="60" cy="10" r="2" fill="#34d399" opacity="0.25" />
-      <circle cx="60" cy="110" r="2.5" fill="#fbbf24" opacity="0.25" />
-      {/* Connection lines */}
-      <line x1="20" y1="20" x2="35" y2="42" stroke="#34d399" strokeWidth="0.8" opacity="0.2" />
-      <line x1="100" y1="25" x2="82" y2="42" stroke="#fbbf24" strokeWidth="0.8" opacity="0.2" />
-      <line x1="15" y1="100" x2="35" y2="78" stroke="#34d399" strokeWidth="0.8" opacity="0.2" />
-      <line x1="105" y1="95" x2="82" y2="78" stroke="#f472b6" strokeWidth="0.8" opacity="0.2" />
-      {/* Main letterforms */}
-      <text
-        x="60"
-        y="74"
-        textAnchor="middle"
-        fontFamily="var(--font-display), Syne, system-ui, sans-serif"
-        fontWeight="800"
-        fontSize="52"
-        letterSpacing="-2"
-      >
-        <tspan fill="url(#logoGradNew)">JAK</tspan>
-      </text>
-      <defs>
-        <linearGradient id="logoGradNew" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#34d399" />
-          <stop offset="100%" stopColor="#fbbf24" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
-
-/* ─── Icon Components ────────────────────────────────────────────────────── */
-
-function ArrowRightIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-    </svg>
-  );
-}
-
-function GitHubIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-    </svg>
+    />
   );
 }
 
@@ -173,23 +113,6 @@ const PRICING = [
 /* ─── Page ────────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
-  const router = useRouter();
-  const [heroVisible, setHeroVisible] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Redirect authenticated users to workspace
-  // (Supabase middleware handles this at the edge, but this is a client-side safety net)
-  useEffect(() => {
-    const supabaseCookie = document.cookie.split(';').find(c => c.trim().startsWith('sb-'));
-    if (supabaseCookie) router.replace('/workspace');
-  }, [router]);
-
-  // Hero entrance animation
-  useEffect(() => {
-    const t = setTimeout(() => setHeroVisible(true), 100);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <>
       <style>{`
@@ -234,6 +157,16 @@ export default function HomePage() {
         @keyframes border-rotate {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        /* A.4 — hero entrance is now pure CSS (no client useState/useEffect).
+           The 0.1s delay matches the previous setTimeout(…, 100). Reduced
+           motion renders the hero static. */
+        @keyframes hero-enter {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .hero-enter {
+          animation: hero-enter 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
         }
         .landing-root .landing-gradient-text {
           /* Descender protection for gradient-clipped text (g, j, p, q, y).
@@ -283,6 +216,7 @@ export default function HomePage() {
           .gradient-bg { animation: none; }
           .hero-mesh-blob { animation: none; }
           .fade-section { opacity: 1; transform: none; transition: none; }
+          .hero-enter { animation: none; opacity: 1; transform: none; }
         }
       `}</style>
 
@@ -320,90 +254,12 @@ export default function HomePage() {
         }}
       />
 
-      <main id="main-content" className="landing-root min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
-        {/* ── Nav ──────────────────────────────────────────────────────────── */}
-        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(9,9,11,0.6)' }} role="navigation" aria-label="Main navigation">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-            {/*
-              Brand lockup: whitespace-nowrap on the "JAK Swarm" text so
-              it never wraps to two lines on narrow viewports (375px was
-              previously cramped — "JAK" on line 1, "Swarm" on line 2).
-              shrink-0 on the wrapper protects the brand when the CTA
-              group is under pressure.
-            */}
-            <div className="flex items-center gap-2 shrink-0">
-              <JakLogo size={32} />
-              <span className="text-base sm:text-lg font-display font-bold tracking-tight whitespace-nowrap">JAK Swarm</span>
-            </div>
-            <div className="hidden md:flex items-center gap-7 text-sm text-slate-400">
-              <a
-                href="#jak-shield"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-rose-400/30 bg-rose-400/[0.06] text-rose-200 hover:bg-rose-400/10 hover:text-white focus-visible:text-white transition-colors duration-200"
-                aria-label="JAK Shield — security and trust layer"
-              >
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
-                </svg>
-                <span className="font-semibold">JAK Shield</span>
-              </a>
-              <a href="#company-os" className="hover:text-white focus-visible:text-white transition-colors duration-200">Company OS</a>
-              <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Proof</a>
-              <a href="#trust" className="hover:text-white focus-visible:text-white transition-colors duration-200">Trust</a>
-              <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {/* Mobile hamburger */}
-              <button
-                className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label="Toggle menu"
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-menu"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  {mobileMenuOpen
-                    ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  }
-                </svg>
-              </button>
-              {/* Sign In is hidden on mobile to free up horizontal space —
-                  it lives inside the mobile menu dropdown instead. Also
-                  whitespace-nowrap so "Sign In" never wraps on tablet. */}
-              <Link href="/login" className="hidden sm:inline-flex text-sm font-medium text-slate-400 hover:text-white focus-visible:text-white transition-colors whitespace-nowrap">
-                Sign In
-              </Link>
-              <Link href="/register" className="inline-flex items-center gap-1.5 rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold text-[#09090b] transition-all duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap" style={{ background: 'linear-gradient(135deg, #34d399, #fbbf24)', touchAction: 'manipulation' }}>
-                Get Started
-                <ArrowRightIcon className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
+      {/* A.4 — auth-redirect safety net (client island, renders nothing). */}
+      <LandingRedirectClient />
 
-          {/* Mobile menu dropdown */}
-          {mobileMenuOpen && (
-            <div id="mobile-menu" className="md:hidden border-t border-white/5 px-4 py-4 space-y-3" style={{ background: 'rgba(9,9,11,0.95)' }}>
-              <a
-                href="#jak-shield"
-                onClick={() => setMobileMenuOpen(false)}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-300 hover:text-white transition-colors"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
-                </svg>
-                JAK Shield
-              </a>
-              <a href="#company-os" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Company OS</a>
-              <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Proof</a>
-              <a href="#trust" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Trust</a>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
-              <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-emerald-400 hover:text-emerald-300 transition-colors">Builder</Link>
-              {/* Sign In moved here from the top bar so the brand + Get Started
-                  have room to breathe without wrapping on 375px viewports. */}
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-300 hover:text-white transition-colors pt-2 border-t border-white/5">Sign In</Link>
-            </div>
-          )}
-        </nav>
+      <main id="main-content" className="landing-root min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
+        {/* ── Nav (client island — mobile hamburger toggle) ──────────────── */}
+        <LandingNavClient />
 
         {/* ── 1. Hero ─────────────────────────────────────────────────────────
              Beta-first framing, truth-locked to the current product:
@@ -413,14 +269,7 @@ export default function HomePage() {
           <div className="hero-mesh-blob h-[22rem] w-[22rem] sm:h-[37.5rem] sm:w-[37.5rem]" style={{ top: '10%', left: '-10%', background: 'radial-gradient(circle, rgba(52,211,153,0.13) 0%, transparent 70%)' }} />
           <div className="hero-mesh-blob right-8 h-56 w-56 sm:-right-[5%] sm:h-[30rem] sm:w-[30rem]" style={{ top: '35%', background: 'radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 70%)', animationDelay: '-7s' }} />
 
-          <div
-            className="relative mx-auto max-w-4xl w-full z-10 text-center"
-            style={{
-              opacity: heroVisible ? 1 : 0,
-              transform: heroVisible ? 'translateY(0)' : 'translateY(40px)',
-              transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
+          <div className="hero-enter relative mx-auto max-w-4xl w-full z-10 text-center">
             {/* JAK Shield stays visible, but the category lead is now the
                  closed-loop company operating layer the product is building. */}
             <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
@@ -565,7 +414,7 @@ export default function HomePage() {
 
         {/* ── 7b. JAK Shield — security/trust layer brand. Each feature
              card carries `data-evidence-path` pointing at a real file
-             so the truth-lock CI gate can verify nothing is hallucinated. */}
+             so the truth-check CI gate can verify nothing is hallucinated. */}
         <JAKShield />
 
         {/* ── 8. Audit & Compliance Pack — sits after the Trust Layer.

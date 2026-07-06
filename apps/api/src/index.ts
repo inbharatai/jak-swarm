@@ -1,10 +1,14 @@
 // OTel MUST be initialized before any other import for proper auto-instrumentation
 import { initTracing } from './observability/tracing.js';
 import { initSentry, captureException, flushSentry } from './observability/sentry.js';
-await initTracing();
-// Sentry is safe to init after OTel — it hooks the same global process events.
-// If SENTRY_DSN is unset this is a silent no-op with zero overhead.
-await initSentry();
+// A.10 — initTracing and initSentry are independent (OTel does module
+// auto-instrumentation; Sentry hooks global process events). Running them
+// concurrently shaves the sequential top-level await off cold-start. The
+// OTel-before-other-imports constraint is preserved: both still resolve
+// before the Fastify/route imports below. If SENTRY_DSN is unset, initSentry
+// is a silent no-op with zero overhead, so the Promise.all resolves as fast
+// as initTracing alone.
+await Promise.all([initTracing(), initSentry()]);
 
 if (process.env['NODE_ENV'] !== 'production' || process.env['JAK_DEV_AUTH_BYPASS'] === '1') {
   // Local e2e/dev runs legitimately combine Next, API, Prisma, OTel/Sentry,

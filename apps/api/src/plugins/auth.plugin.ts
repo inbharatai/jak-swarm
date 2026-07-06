@@ -24,6 +24,16 @@ declare module 'fastify' {
       details?: Record<string, unknown>,
     ) => Promise<void>;
   }
+  interface FastifyRequest {
+    /**
+     * A.1 (perf) — set to `true` when the request was resolved via the
+     * Supabase fallback (the stored token was a Supabase access token,
+     * not a JAK JWT). Routes that mint JAK JWTs (GET /auth/me) read this
+     * to decide whether to mint: idempotent when the request was already
+     * authenticated via a JAK JWT. Undefined on the JAK-JWT path.
+     */
+    authViaSupabase?: boolean;
+  }
 }
 
 /**
@@ -102,6 +112,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         const session = await authService.authenticateSupabaseToken(token);
         (request as FastifyRequest & { user: AuthSession }).user = session;
+        // A.1 — flag that this request came through the Supabase fallback
+        // so /auth/me can mint a JAK JWT (the stored token is a Supabase
+        // access token, not a JAK JWT). On the JAK-JWT path above this
+        // flag stays undefined and /auth/me is idempotent (no re-mint).
+        request.authViaSupabase = true;
         return;
       } catch (supabaseError) {
         throw new UnauthorizedError(

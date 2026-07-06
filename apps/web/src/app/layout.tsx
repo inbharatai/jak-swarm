@@ -80,7 +80,15 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#09090b" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap" rel="stylesheet" />
+        {/*
+          A.3 — the render-blocking Fontshare <link> for Satoshi lived here.
+          It was the single biggest landing First-Contentful-Paint blocker
+          (a synchronous cross-origin stylesheet fetch before any paint).
+          Satoshi is not self-hosted in public/fonts, so font-sans now falls
+          back to the OS UI stack (see tailwind.config.ts). No external
+          render-blocking CSS remains; Syne + JetBrains_Mono are still
+          optimized via next/font/google below.
+        */}
       </head>
       <body>
         {/* Service-worker registration is co-located inside `AppShell`
