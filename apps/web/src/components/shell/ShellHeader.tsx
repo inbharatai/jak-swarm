@@ -9,7 +9,7 @@ import { useNotificationStore } from '@/store/notification-store';
 import { getModule, LAYOUT_PRESETS } from '@/modules/registry';
 import { useAuth } from '@/lib/auth';
 import { UsageIndicator } from '@/components/billing/UsageIndicator';
-import { Avatar, Badge, Button } from '@/components/ui';
+import { Avatar, Button } from '@/components/ui';
 import { useApprovals } from '@/hooks/useWorkflow';
 import { workflowApi } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';

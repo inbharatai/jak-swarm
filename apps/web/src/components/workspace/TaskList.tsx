@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/cn';
 import { Badge, Button, EmptyState, Spinner } from '@/components/ui';
 import type { WorkflowPlanStep, TaskStatus, AgentRole } from '@/types';
-import { formatDistanceToNow, intervalToDuration } from 'date-fns';
+import { intervalToDuration } from 'date-fns';
 import { workflowApi } from '@/lib/api-client';
 
 const AGENT_ROLE_EMOJIS: Record<AgentRole, string> = {
@@ -107,11 +107,10 @@ function ElapsedTime({ startedAt, status }: { startedAt?: string; status: TaskSt
 
 interface TaskItemProps {
   task: WorkflowPlanStep;
-  workflowId?: string;
   onStop?: () => void;
 }
 
-function TaskItem({ task, workflowId, onStop }: TaskItemProps) {
+function TaskItem({ task, onStop }: TaskItemProps) {
   const [expanded, setExpanded] = useState(false);
   const emoji = AGENT_ROLE_EMOJIS[task.agentRole] ?? '🤖';
   const isActive = task.status === 'IN_PROGRESS' || task.status === 'AWAITING_APPROVAL';
@@ -270,7 +269,6 @@ export function TaskList({
             <TaskItem
               key={task.id}
               task={task}
-              workflowId={workflowId}
               onStop={() => handleStopTask(task)}
             />
           ))}
@@ -295,7 +293,7 @@ export function TaskList({
           {showingCompleted && (
             <div className="space-y-2 mt-2">
               {completedTasks.map(task => (
-                <TaskItem key={task.id} task={task} workflowId={workflowId} />
+                <TaskItem key={task.id} task={task} />
               ))}
             </div>
           )}

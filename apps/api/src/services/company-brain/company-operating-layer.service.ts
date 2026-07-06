@@ -60,37 +60,35 @@ const STUB_BACKEND: LegacyAgentBackend = {
   executeWithToolsPublic: () => { throw new Error('[company-operating-layer] legacy backend invoked unexpectedly'); },
 };
 
-const ArtifactSourceSchema = z.enum([
-  'github',
-  'linear',
-  'jira',
-  'slack',
-  'notion',
-  'google_drive',
-  'gmail',
-  'meeting',
-  'customer_call',
-  'support',
-  'document',
-  'manual',
-  'other',
-]);
+export type ArtifactSource =
+  | 'github'
+  | 'linear'
+  | 'jira'
+  | 'slack'
+  | 'notion'
+  | 'google_drive'
+  | 'gmail'
+  | 'meeting'
+  | 'customer_call'
+  | 'support'
+  | 'document'
+  | 'manual'
+  | 'other';
 
-const ArtifactTypeSchema = z.enum([
-  'ticket',
-  'issue',
-  'pull_request',
-  'commit',
-  'slack_thread',
-  'notion_page',
-  'document',
-  'meeting_transcript',
-  'customer_feedback',
-  'support_ticket',
-  'email',
-  'decision_note',
-  'other',
-]);
+export type ArtifactType =
+  | 'ticket'
+  | 'issue'
+  | 'pull_request'
+  | 'commit'
+  | 'slack_thread'
+  | 'notion_page'
+  | 'document'
+  | 'meeting_transcript'
+  | 'customer_feedback'
+  | 'support_ticket'
+  | 'email'
+  | 'decision_note'
+  | 'other';
 
 const EntityTypeSchema = z.enum([
   'decision',
@@ -152,8 +150,6 @@ const AgentExecutableSpecOutputSchema = z.object({
   }).strict()).min(1).max(20),
 }).strict();
 
-export type ArtifactSource = z.infer<typeof ArtifactSourceSchema>;
-export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
 export type EntityType = z.infer<typeof EntityTypeSchema>;
 
 export interface CompanyArtifactRow {

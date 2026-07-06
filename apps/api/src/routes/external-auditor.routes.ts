@@ -264,7 +264,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       const { auditRunId } = request.params as { auditRunId: string };
       const engagement = (request as FastifyRequest & { engagement: { id: string; tenantId: string; scopes: string[]; expiresAt?: Date | string } }).engagement;
       // Read the audit run scoped to engagement tenant.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const auditRun = await (fastify.db as any).auditRun.findFirst({
         where: { id: auditRunId, tenantId: engagement.tenantId },
       });
@@ -301,7 +300,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       // P1-1 (audit 2026-05-08): cap pagination at 500 to prevent OOM /
       // unbounded transfer for engagements with extreme workpaper counts.
       // Most engagements have <50 workpapers; 500 is a conservative ceiling.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const workpapers = await (fastify.db as any).auditWorkpaper.findMany({
         where: { auditRunId, tenantId: engagement.tenantId },
         orderBy: { createdAt: 'desc' },
@@ -338,7 +336,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
       }
       // Verify the workpaper belongs to this audit run.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const wp = await (fastify.db as any).auditWorkpaper.findFirst({
         where: { id: wpId, auditRunId, tenantId: engagement.tenantId },
       });
@@ -375,7 +372,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
           : parsed.data.decision === 'REJECT'
             ? 'auditor_rejected'
             : 'auditor_changes_requested';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updated = await (fastify.db as any).auditWorkpaper.update({
         where: { id: wpId },
         data: { status: newStatus },
@@ -434,7 +430,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       if (!engagement.scopes.includes('view_final_pack')) {
         return reply.status(403).send(err('SCOPE_DENIED', 'view_final_pack scope required'));
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const auditRun = await (fastify.db as any).auditRun.findFirst({
         where: { id: auditRunId, tenantId: engagement.tenantId },
         select: { id: true, status: true, finalPackArtifactId: true, framework: true },
@@ -443,7 +438,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       if (!auditRun.finalPackArtifactId) {
         return reply.status(409).send(err('NO_FINAL_PACK', 'This audit run has no final pack yet. The pack is generated only after all workpapers are approved.'));
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const artifact = await (fastify.db as any).workflowArtifact.findFirst({
         where: { id: auditRun.finalPackArtifactId, tenantId: engagement.tenantId },
         select: { id: true, mimeType: true, sizeBytes: true, approvalState: true, status: true, createdAt: true, fileName: true },
@@ -491,7 +485,6 @@ const externalAuditorRoutes: FastifyPluginAsync = async (fastify) => {
       if (!engagement.scopes.includes('view_final_pack')) {
         return reply.status(403).send(err('SCOPE_DENIED', 'view_final_pack scope required'));
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const auditRun = await (fastify.db as any).auditRun.findFirst({
         where: { id: auditRunId, tenantId: engagement.tenantId },
         select: { id: true, finalPackArtifactId: true },

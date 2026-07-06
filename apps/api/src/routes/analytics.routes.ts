@@ -78,8 +78,6 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
         const goalMap = new Map(workflows.map((w) => [w.id, w.goal]));
 
         // Aggregate
-        let totalPrompt = 0;
-        let totalCompletion = 0;
         let totalTokens = 0;
         let totalCostUsd = 0;
         const costByProvider: Record<string, number> = {};
@@ -97,8 +95,6 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           const provider = usage.provider ?? 'openai';
           const cost = calculateCost(model, prompt, completion);
 
-          totalPrompt += prompt;
-          totalCompletion += completion;
           totalTokens += tokens;
           totalCostUsd += cost;
 

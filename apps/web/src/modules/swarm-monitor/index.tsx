@@ -10,7 +10,6 @@ import { Card, CardContent, Badge, Button, Spinner, EmptyState } from '@/compone
 import { useWorkflows } from '@/hooks/useWorkflow';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
 import type { WorkflowStatus } from '@/types';
-import type { ModuleProps } from '@/modules/registry';
 import { formatDistanceToNow } from 'date-fns';
 
 function StatusIcon({ status }: { status: WorkflowStatus }) {
@@ -34,7 +33,7 @@ const STATUS_LABEL: Record<WorkflowStatus, string> = {
   COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled',
 };
 
-export default function SwarmMonitorModule({ moduleId, isActive }: ModuleProps) {
+export default function SwarmMonitorModule() {
   const { workflows, isLoading, refresh } = useWorkflows();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<WorkflowStatus | 'ALL'>('ALL');

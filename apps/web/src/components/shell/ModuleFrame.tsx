@@ -3,7 +3,7 @@
 import React, { Component, Suspense, type ErrorInfo, type ReactNode } from 'react';
 import { Minimize2, Maximize2, ExternalLink, X, RotateCcw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { getModule, type ModuleDefinition } from '@/modules/registry';
+import { getModule } from '@/modules/registry';
 import { useShellStore } from '@/store/shell-store';
 import { Spinner } from '@/components/ui/spinner';
 

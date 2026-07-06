@@ -346,7 +346,6 @@ export class GeminiRuntime implements LLMRuntime {
     // Use the same zod-to-json-schema package that OpenAIRuntime uses
     let jsonSchema: Record<string, unknown>;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { zodToJsonSchema } = require('zod-to-json-schema') as typeof import('zod-to-json-schema');
       jsonSchema = zodToJsonSchema(schema, {
         name: options.schemaName ?? 'response',

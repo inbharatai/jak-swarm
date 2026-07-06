@@ -55,7 +55,7 @@ export default function ToolInstallerPage() {
   const [detecting, setDetecting] = useState(false);
   const [requirements, setRequirements] = useState<DetectResp['data']>(undefined);
   const [planFor, setPlanFor] = useState<string | null>(null);
-  const [planning, setPlanning] = useState(false);
+  const [, setPlanning] = useState(false);
   const [plan, setPlan] = useState<PlanResp['data']>(undefined);
   const [executing, setExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<ExecuteResp['data']>(undefined);

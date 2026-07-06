@@ -397,7 +397,6 @@ export class CompanyKnowledgeCrawlerService {
       let total = 0;
       // Node 22's fetch returns a WebReadableStream that is async-iterable
       // at runtime; the type defs disagree, so we cast the body to any.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for await (const chunk of (body as any)) {
         const u8: Uint8Array = chunk instanceof Uint8Array ? chunk : Buffer.from(chunk);
         total += u8.byteLength;
@@ -506,7 +505,6 @@ export class CompanyKnowledgeCrawlerService {
   private async findSourceOrThrow(sourceId: string, tenantId: string): Promise<{ id: string; tenantId: string; url: string; kind: string; title: string | null }> {
     try {
       // The DB client typedef predates migration 16, so we go through `any`.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row = await (this.db as any).companyKnowledgeSource.findFirst({
         where: { id: sourceId, tenantId, deletedAt: null },
         select: { id: true, tenantId: true, url: true, kind: true, title: true },
@@ -527,7 +525,6 @@ export class CompanyKnowledgeCrawlerService {
 
   private async recordFailure(sourceId: string, reason: string, flags: string[] = []): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (this.db as any).companyKnowledgeSource.update({
         where: { id: sourceId },
         data: {
@@ -546,7 +543,6 @@ export class CompanyKnowledgeCrawlerService {
 
   private async recordSuccess(sourceId: string, info: { title?: string | null; vectorChunkCount: number; lastSourceKey: string; flags: string[]; scanWarning?: string }): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (this.db as any).companyKnowledgeSource.update({
         where: { id: sourceId },
         data: {

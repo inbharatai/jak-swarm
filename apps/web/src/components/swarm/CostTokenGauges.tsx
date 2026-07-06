@@ -7,7 +7,6 @@
 // timeline is unavailable or the run has no persisted traces yet, the
 // gauges read 0 with a "No data yet" footnote — never fabricated numbers.
 
-import { cn } from '@/lib/cn';
 import type { WorkflowTimeline } from '@/lib/api-client';
 
 function formatUsd(n: number): string {
@@ -75,7 +74,6 @@ export function CostTokenGauges({ timeline }: { timeline: WorkflowTimeline | nul
   const cost = timeline?.totalCostUsd ?? 0;
   const inputT = timeline?.totalInputTokens ?? 0;
   const outputT = timeline?.totalOutputTokens ?? 0;
-  const totalTokens = inputT + outputT;
   const hasData = !!timeline && timeline.nodeCount > 0;
 
   return (

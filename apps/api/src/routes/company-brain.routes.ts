@@ -271,7 +271,6 @@ const companyBrainRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = knowledgeSourceCreateSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row = await (fastify.db as any).companyKnowledgeSource.create({
         data: {
           tenantId: request.user.tenantId,
@@ -295,7 +294,6 @@ const companyBrainRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = knowledgeSourceListQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send(err('INVALID_REQUEST', parsed.error.issues.map((i) => i.message).join('; ')));
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = await (fastify.db as any).companyKnowledgeSource.findMany({
         where: {
           tenantId: request.user.tenantId,
@@ -330,7 +328,6 @@ const companyBrainRoutes: FastifyPluginAsync = async (fastify) => {
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updated = await (fastify.db as any).companyKnowledgeSource.updateMany({
         where: { id, tenantId: request.user.tenantId, deletedAt: null },
         data: { deletedAt: new Date() },

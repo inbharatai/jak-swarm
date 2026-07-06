@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Clock, Plus, Play, Trash2, Edit2 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { Button, Card, CardContent, Badge, EmptyState, Spinner, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, Input, Textarea, Select } from '@/components/ui';
+import { Button, Card, CardContent, Badge, EmptyState, Spinner, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, Input, Textarea } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { fetcher, scheduleApi } from '@/lib/api-client';
 import type { WorkflowSchedule } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
-import type { ModuleProps } from '@/modules/registry';
 
 const CRON_PRESETS = [
   { label: 'Every day at 9am', value: '0 9 * * *' },
@@ -18,15 +17,6 @@ const CRON_PRESETS = [
   { label: 'Every hour', value: '0 * * * *' },
   { label: 'Every Friday at 5pm', value: '0 17 * * 5' },
   { label: 'First of month at 9am', value: '0 9 1 * *' },
-];
-
-const INDUSTRY_OPTIONS = [
-  { value: '', label: 'Any industry' },
-  { value: 'FINANCE', label: 'Finance' },
-  { value: 'HEALTHCARE', label: 'Healthcare' },
-  { value: 'LEGAL', label: 'Legal' },
-  { value: 'RETAIL', label: 'Retail' },
-  { value: 'TECHNOLOGY', label: 'Technology' },
 ];
 
 interface ScheduleFormData {
@@ -55,7 +45,7 @@ function cronToHuman(cron: string): string {
   return cron;
 }
 
-export default function SchedulesModule({ moduleId, isActive }: ModuleProps) {
+export default function SchedulesModule() {
   const toast = useToast();
   const { data, isLoading, mutate } = useSWR<{ data: WorkflowSchedule[] }>('/schedules', fetcher);
   const schedules = data?.data ?? [];

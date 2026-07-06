@@ -358,7 +358,6 @@ export function getVectorMemoryAdapter(): VectorMemoryAdapter {
 
   try {
     // Try loading Prisma for pgvector
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModule = require('@jak-swarm/db');
     const prisma = dbModule.prisma;
 
@@ -386,7 +385,6 @@ export function resetVectorMemoryAdapter(): void {
 }
 
 function hashString(input: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createHash } = require('crypto') as typeof import('crypto');
   return createHash('sha256').update(input).digest('hex');
 }

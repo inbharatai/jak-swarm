@@ -540,7 +540,6 @@ export class SwarmExecutionService extends EventEmitter {
     this.runner = new SwarmRunner({
       defaultTimeoutMs: 20 * 60 * 1000,
       stateStore,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       db: db as any,
     });
     // workflowRuntime is the same LangGraph runtime SwarmRunner uses
@@ -1087,7 +1086,6 @@ export class SwarmExecutionService extends EventEmitter {
       // JAK_ADK_MODE=1 routes through @google/adk orchestration (satisfies
       // Google Agents Challenge). Falls back to LangGraph on ADK error or
       // when the flag is not set. Both paths produce the same SwarmResult shape.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let result: SwarmResult | undefined;
 
       // Hoisted so BOTH the ADK path (Phase 3 cockpit parity) and the

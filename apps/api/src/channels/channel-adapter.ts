@@ -140,7 +140,6 @@ export interface ChannelAdapter {
  */
 export interface ChannelAdapterDb {
   integration: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findFirst: (args?: any) => Promise<any>;
   };
 }

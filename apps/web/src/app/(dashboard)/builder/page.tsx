@@ -7,7 +7,7 @@ import { useProjects } from '@/hooks/useProject';
 import { projectApi } from '@/lib/api-client';
 import { Button, Card, CardContent, Badge, Spinner, EmptyState, Input, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { Code2, Plus, Globe, GitBranch, Clock, Trash2 } from 'lucide-react';
+import { Code2, Plus, Globe, GitBranch, Clock } from 'lucide-react';
 
 const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
   DRAFT: { label: 'Draft', variant: 'secondary' },

@@ -138,7 +138,7 @@ const initialState: ShellState = {
 
 export const useShellStore = create<ShellState & ShellActions>()(
   subscribeWithSelector(
-  immer((set, get) => ({
+  immer((set) => ({
     ...initialState,
 
     openModule: (moduleId: string) => {

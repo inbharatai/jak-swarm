@@ -31,12 +31,10 @@ if (process.env['NODE_ENV'] !== 'production' || process.env['JAK_DEV_AUTH_BYPASS
 // genuinely unrecoverable the next request will hit it cleanly and the
 // Fastify error handler will respond 500.
 process.on('unhandledRejection', (reason: unknown) => {
-  // eslint-disable-next-line no-console
   console.error('[unhandledRejection]', reason instanceof Error ? reason.stack : reason);
   captureException(reason, { handler: 'unhandledRejection' });
 });
 process.on('uncaughtException', (err: Error) => {
-  // eslint-disable-next-line no-console
   console.error('[uncaughtException]', err.stack ?? err.message);
   captureException(err, { handler: 'uncaughtException' });
   // Best-effort flush; do NOT exit — Sentry may be sending. The OS will

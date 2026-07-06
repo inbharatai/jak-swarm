@@ -376,7 +376,6 @@ export function registerBuiltinTools(): void {
 
       // 2. Fall back to keyword search on MemoryItem table
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const dbModule = require('@jak-swarm/db');
         const prisma = dbModule.prisma;
         if (prisma?.memoryItem) {
@@ -6386,7 +6385,6 @@ Date: _______________`;
       const since = new Date(Date.now() - timeRangeDays * 24 * 60 * 60 * 1000);
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const dbModule = require('@jak-swarm/db');
         const prisma = dbModule.prisma;
         if (!prisma) return { error: 'Database not available.', connected: false };
@@ -6540,7 +6538,6 @@ function buildIdempotencyKey(
   scopeId: string,
   value: unknown,
 ): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createHash } = require('crypto') as typeof import('crypto');
   const content = `${context.tenantId}:${scopeType}:${scopeId}:${key}:${context.runId ?? ''}:${JSON.stringify(value ?? null)}`;
   return createHash('sha256').update(content).digest('hex').slice(0, 48);

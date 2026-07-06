@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Megaphone, Send, BarChart3, Globe, Mail, Users, TrendingUp, Calendar, Sparkles, ExternalLink } from 'lucide-react';
-import { Card, CardContent, Button, Badge, Spinner, Textarea, Input } from '@/components/ui';
+import { Megaphone, Send, BarChart3, Globe, Mail, Users, TrendingUp, Calendar, Sparkles } from 'lucide-react';
+import { Card, CardContent, Button, Badge, Textarea } from '@/components/ui';
 import useSWR from 'swr';
 import {
   fetcher,
@@ -12,7 +12,6 @@ import {
 } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
-import type { ModuleProps } from '@/modules/registry';
 
 interface Campaign {
   id: string;
@@ -58,7 +57,7 @@ const QUICK_ACTIONS = [
   { label: 'Competitor analysis', goal: 'Research top 3 competitors and summarize positioning differences', icon: <Users className="h-3.5 w-3.5" /> },
 ];
 
-export default function CMOMarketingModule({ moduleId, isActive }: ModuleProps) {
+export default function CMOMarketingModule() {
   const toast = useToast();
   const [prompt, setPrompt] = useState('');
   const [sending, setSending] = useState(false);

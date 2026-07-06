@@ -297,7 +297,6 @@ export class LangGraphRuntime implements WorkflowRuntime {
     // We piggyback on the same Prisma client the checkpointer uses by
     // accessing its private `db`. This is intentional — the runtime
     // owns both for the duration of a workflow.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cp = (this.graph as unknown as { checkpointer?: { db?: CheckpointPrismaClient } }).checkpointer;
     if (!cp || !cp.db) return undefined;
     const row = (await cp.db.workflowCheckpoint.findFirst({

@@ -360,7 +360,6 @@ export async function ingestDocumentInBackground(
       try {
         // Lazy require — pdf-parse has no good ESM types but is already
         // a transitive dep of @jak-swarm/tools used by DocumentIngestor.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>;
         const parsed = await pdfParse(bytes);
         ingestedText = parsed.text ?? null;

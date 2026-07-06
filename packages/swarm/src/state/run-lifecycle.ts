@@ -182,7 +182,6 @@ export function assertTransition(
   const log = context.logger;
   if (log) log.warn(info, '[run-lifecycle] illegal transition');
   else if (typeof console !== 'undefined') {
-    // eslint-disable-next-line no-console
     console.warn('[run-lifecycle] illegal transition', info);
   }
   if (isStrictMode()) {

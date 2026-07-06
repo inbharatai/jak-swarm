@@ -62,7 +62,6 @@ export function getWorkflowRuntime(
   const envFlag = process.env['JAK_WORKFLOW_RUNTIME']?.trim().toLowerCase();
   if (envFlag && envFlag !== 'langgraph' && !warnedAboutLegacyEnv) {
     warnedAboutLegacyEnv = true;
-    // eslint-disable-next-line no-console
     console.warn(
       `[getWorkflowRuntime] JAK_WORKFLOW_RUNTIME=${envFlag} is no longer honored. ` +
         `SwarmGraph was deleted in Sprint 2.5 / A.6. Always running LangGraph runtime. ` +

@@ -217,7 +217,6 @@ export function WhatsAppControl() {
         {!isLoading && !error && status === 'qr' && data?.qr && (
           <div className="flex flex-col items-center gap-3">
             <div className="rounded-2xl bg-white p-3 shadow-lg shadow-black/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.qr}
                 alt="WhatsApp QR code — scan with your phone"

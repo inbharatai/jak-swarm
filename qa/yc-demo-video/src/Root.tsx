@@ -7,7 +7,6 @@ import {
   Sequence,
   staticFile,
   useCurrentFrame,
-  useVideoConfig,
 } from 'remotion';
 
 const FPS = 30;

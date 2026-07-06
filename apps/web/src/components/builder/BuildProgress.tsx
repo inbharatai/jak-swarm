@@ -44,7 +44,7 @@ export function BuildProgress({ steps, className }: BuildProgressProps) {
 
       {/* Steps */}
       <div className="space-y-1.5">
-        {steps.map((step, i) => (
+        {steps.map((step) => (
           <div key={step.id} className="flex items-start gap-2">
             <div className="mt-0.5 shrink-0">{STATUS_ICONS[step.status]}</div>
             <div className="min-w-0">

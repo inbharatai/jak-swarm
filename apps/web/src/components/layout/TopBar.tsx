@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Sun, Moon, PanelLeftClose, PanelLeft, LogOut, User, Settings } from 'lucide-react';
+import { Search, Sun, Moon, PanelLeftClose, PanelLeft, LogOut, Settings } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';

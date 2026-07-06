@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { projectApi } from '@/lib/api-client';
-import { Button, Input, Spinner, Badge, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
+import { Button, Input, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
 import { Rocket, ExternalLink, CheckCircle, XCircle, Loader2, Plus, Trash2 } from 'lucide-react';
 
 interface EnvVar {

@@ -23,10 +23,9 @@ import { getAgentFriendlyLabel } from '@/lib/agent-friendly-names';
 import { getToolFriendlyLabel, formatToolInputPreview } from '@/lib/tool-friendly-names';
 import { renderAgentOutput } from '@/lib/render-agent-output';
 import { DetailDrawer } from './DetailDrawer';
-import { mapPlanStatus, updateCockpitTaskStatus, formatCockpitCost, formatCostFooter } from '@/lib/chat-helpers';
+import { mapPlanStatus, updateCockpitTaskStatus, formatCostFooter } from '@/lib/chat-helpers';
 import {
   useConversationStore,
-  useActiveConversation,
   useActiveMessages,
 } from '@/store/conversation-store';
 
@@ -84,10 +83,8 @@ export function ChatWorkspace() {
   // DetailDrawer reads from cockpitByWorkflow[activeWorkflowId] to
   // render the live TaskList + WorkflowDAG.
   const [cockpitByWorkflow, setCockpitByWorkflow] = useState<Record<string, CockpitState>>({});
-  const conversation = useActiveConversation();
   const messages = useActiveMessages();
   const activeRoles = useConversationStore((s) => s.activeRoles);
-  const createConversation = useConversationStore((s) => s.createConversation);
   const ensureActiveConversation = useConversationStore((s) => s.ensureActiveConversation);
   const addMessage = useConversationStore((s) => s.addMessage);
   const drawerOpen = useConversationStore((s) => s.drawerOpen);
@@ -96,7 +93,6 @@ export function ChatWorkspace() {
   // race where a click lands before zustand-persist has restored
   // activeConversationId. See store comment for the contract.
   const hasHydrated = useConversationStore((s) => s._hasHydrated);
-  const isMobile = useMediaQuery('(max-width: 767px)');
   // Narrow breakpoint: tablets and small desktops where the 480px drawer
   // squeezes the chat area below usable width. On these viewports we force
   // the mobile bottom-sheet pattern instead.

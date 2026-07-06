@@ -161,7 +161,6 @@ export class OpenAIRuntime implements LLMRuntime {
   ): Promise<T> {
     const opts = options as OpenAIRuntimeCallOptions & StructuredRespondOptions;
     // Convert zod → JSON Schema lazily to avoid hard dep at module load.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { zodToJsonSchema } = require('zod-to-json-schema') as typeof import('zod-to-json-schema');
     const jsonSchema = zodToJsonSchema(schema, {
       name: opts.schemaName ?? 'response',

@@ -43,7 +43,6 @@ export interface ParsedDocument {
 export async function parseDocx(bytes: Buffer): Promise<ParsedDocument> {
   // Lazy import — mammoth pulls in jszip + xmldom, ~1MB. Only loaded when a
   // DOCX actually arrives.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mammoth = (await import('mammoth')) as typeof import('mammoth');
   const result = await mammoth.extractRawText({ buffer: bytes });
   const notes: string[] = [];
@@ -75,13 +74,11 @@ export async function parseDocx(bytes: Buffer): Promise<ParsedDocument> {
 export async function parseXlsx(bytes: Buffer): Promise<ParsedDocument> {
   // exceljs is already a runtime dep (used by exporters/index.ts in write
   // mode). Same package handles read mode via `wb.xlsx.load(buffer)`.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ExcelJS = (await import('exceljs')) as typeof import('exceljs');
   const wb = new ExcelJS.Workbook();
   // exceljs's typedef declares load(buffer: Buffer<ArrayBuffer>), but our
   // @types/node 22+ widens Buffer to Buffer<ArrayBufferLike>. Runtime
   // accepts both shapes; this cast bridges the type-version mismatch.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (wb.xlsx as { load: (b: unknown) => Promise<unknown> }).load(bytes);
 
   const parts: string[] = [];
@@ -144,9 +141,7 @@ export async function parseXlsx(bytes: Buffer): Promise<ParsedDocument> {
 export async function parseImage(bytes: Buffer): Promise<ParsedDocument> {
   // Lazy imports — tesseract.js pulls 8MB of language data on first run.
   // Sharp is native; loading it for non-image uploads would waste memory.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const sharp = (await import('sharp')).default;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Tesseract = (await import('tesseract.js')) as typeof import('tesseract.js');
 
   // Pre-process: convert to grayscale + auto-normalize contrast. OCR

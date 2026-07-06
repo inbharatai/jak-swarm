@@ -7,7 +7,6 @@ import { Button, Card, CardContent, Badge, Spinner, EmptyState, Input, Dialog, D
 import { useToast } from '@/components/ui/toast';
 import { Code2, Plus, Globe, GitBranch, Clock, ArrowLeft } from 'lucide-react';
 import { useModuleRouter } from '@/hooks/useModuleRouter';
-import type { ModuleProps } from '@/modules/registry';
 
 const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
   DRAFT: { label: 'Draft', variant: 'secondary' },
@@ -146,8 +145,8 @@ function ProjectListView({ onSelectProject }: { onSelectProject: (id: string) =>
 
 // ─── Main Module ─────────────────────────────────────────────────────────────
 
-export default function LiveCodingModule({ moduleId, isActive }: ModuleProps) {
-  const { path, params, navigate } = useModuleRouter('/');
+export default function LiveCodingModule() {
+  const { navigate } = useModuleRouter('/');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const handleSelectProject = (id: string) => {

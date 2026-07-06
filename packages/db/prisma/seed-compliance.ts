@@ -71,11 +71,9 @@ async function main(): Promise<void> {
         controlsUpserted++;
       }
 
-      // eslint-disable-next-line no-console
       console.log(`✓ Upserted framework "${fw.slug}" with ${fw.controls.length} controls`);
     }
 
-    // eslint-disable-next-line no-console
     console.log(`\nDone. ${frameworksUpserted} framework(s), ${controlsUpserted} control(s) upserted.`);
   } finally {
     await prisma.$disconnect();
@@ -83,7 +81,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error('[seed-compliance] failed:', err);
   process.exit(1);
 });

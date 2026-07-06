@@ -5,7 +5,6 @@ import {
   Mic,
   MicOff,
   Radio,
-  Type,
   Globe,
   Loader2,
 } from 'lucide-react';

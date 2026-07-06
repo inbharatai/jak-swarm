@@ -300,9 +300,7 @@ function actionAsToolMetadata(action: ProposedAction): ToolMetadata {
   return {
     name: `browser_${action.kind}`,
     description: action.description,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     category: 'browser' as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     riskClass: (isReadOnly ? 'READ_ONLY' : 'EXTERNAL_SIDE_EFFECT') as any,
     requiresApproval: !isReadOnly,
     inputSchema: {},

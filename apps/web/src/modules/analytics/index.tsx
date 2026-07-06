@@ -6,7 +6,6 @@ import { BarChart3, DollarSign, Zap, Activity, TrendingUp } from 'lucide-react';
 import { Card, CardContent, Spinner } from '@/components/ui';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
-import type { ModuleProps } from '@/modules/registry';
 
 // A.6 — recharts is isolated in AnalyticsCharts and loaded via dynamic
 // ssr:false so the recharts + SVG renderer chunk only loads when the analytics
@@ -41,7 +40,7 @@ function formatCost(n: number): string {
   return `$${n.toFixed(4)}`;
 }
 
-export default function AnalyticsModule({ moduleId, isActive }: ModuleProps) {
+export default function AnalyticsModule() {
   const [period, setPeriod] = useState<Period>('30d');
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
   const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);

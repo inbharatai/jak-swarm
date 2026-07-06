@@ -230,7 +230,6 @@ async function seed() {
 
     const adminUser = createdUsers.find(u => u.role === 'TENANT_ADMIN')!;
     const operatorUser = createdUsers.find(u => u.role === 'OPERATOR')!;
-    const reviewerUser = createdUsers.find(u => u.role === 'REVIEWER')!;
 
     // ── 3. Sample workflows ─────────────────────────────────────────────────
     const goals = SAMPLE_GOALS[tenantDef.industry] ?? [];

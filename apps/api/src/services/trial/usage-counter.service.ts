@@ -211,7 +211,6 @@ export class UsageCounterService {
       });
     } catch (err) {
       // Best-effort. The route layer logs to AuditLog separately.
-      // eslint-disable-next-line no-console
       console.warn(
         `[usage-counter] increment failed for tenant ${tenantId} ${resource} +${amount}`,
         err,

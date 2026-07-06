@@ -10,7 +10,6 @@ import {
   Loader2,
   Timer,
   Wrench,
-  PauseCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui';

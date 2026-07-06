@@ -90,7 +90,6 @@ export function getCRMAdapterFromEnv(tenantId?: string): CRMAdapter | undefined 
   const sfToken = process.env['SALESFORCE_ACCESS_TOKEN'];
   const sfInstance = process.env['SALESFORCE_INSTANCE_URL'];
   if (sfToken && sfInstance) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SalesforceCRMAdapter } = require('./crm/salesforce-crm.adapter.js');
     return new SalesforceCRMAdapter({ accessToken: sfToken, instanceUrl: sfInstance });
   }
@@ -98,14 +97,12 @@ export function getCRMAdapterFromEnv(tenantId?: string): CRMAdapter | undefined 
   // 2. Try HubSpot
   const hubspotKey = process.env['HUBSPOT_API_KEY'];
   if (hubspotKey) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { HubSpotCRMAdapter } = require('./crm/hubspot-crm.adapter.js');
     return new HubSpotCRMAdapter(hubspotKey);
   }
 
   // 3. Try Prisma DB
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModule = require('@jak-swarm/db');
     const prisma = dbModule.prisma;
     if (prisma?.crmContact) {
@@ -133,7 +130,6 @@ export function getSalesforceCRMAdapterForTenant(params: {
   instanceUrl: string | null | undefined;
 }): CRMAdapter | undefined {
   if (!params.accessToken || !params.instanceUrl) return undefined;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { SalesforceCRMAdapter } = require('./crm/salesforce-crm.adapter.js');
   return new SalesforceCRMAdapter({
     accessToken: params.accessToken,

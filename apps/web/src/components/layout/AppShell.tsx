@@ -53,7 +53,6 @@ export function AppShell({ children }: AppShellProps) {
     if (!('serviceWorker' in navigator)) return;
     const register = () => {
       navigator.serviceWorker.register('/sw.js').catch((err: unknown) => {
-        // eslint-disable-next-line no-console
         console.warn('[sw] registration failed (non-fatal):', err);
       });
     };

@@ -298,7 +298,6 @@ export function getMemoryAdapter(): MemoryAdapter {
 
   try {
     // Dynamic require to avoid hard dependency on @jak-swarm/db
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModule = require('@jak-swarm/db');
     const prisma = dbModule.prisma;
     if (prisma?.memoryItem) {
@@ -389,7 +388,6 @@ function hashValue(value: unknown): string {
 }
 
 function hashString(input: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createHash } = require('crypto') as typeof import('crypto');
   return createHash('sha256').update(input).digest('hex');
 }

@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner, EmptyState } 
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import type { Trace, TraceStep, AgentRole } from '@/types';
-import type { ModuleProps } from '@/modules/registry';
 import { formatDistanceToNow } from 'date-fns';
 
 const AGENT_ROLE_OPTIONS: AgentRole[] = [
@@ -54,7 +53,7 @@ function TraceStepRow({ step }: { step: TraceStep }) {
   );
 }
 
-export default function TerminalLogsModule({ moduleId, isActive }: ModuleProps) {
+export default function TerminalLogsModule() {
   const [roleFilter, setRoleFilter] = useState<AgentRole | 'ALL'>('ALL');
   const { data, isLoading } = useSWR<{ data: Trace[]; total: number }>('/traces?limit=50', fetcher, { refreshInterval: 5000 });
 

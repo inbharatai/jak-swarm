@@ -153,7 +153,6 @@ export function calculateCost(
   if (!exactMatch && !prefixMatch && (promptTokens > 0 || completionTokens > 0)) {
     if (!UNKNOWN_MODEL_WARNED.has(model)) {
       UNKNOWN_MODEL_WARNED.add(model);
-      // eslint-disable-next-line no-console
       console.warn(
         `[calculateCost] Unknown model "${model}" — tokens will be tracked but cost=$0. ` +
           `Add pricing to MODEL_PRICING in packages/shared/src/constants/llm-pricing.ts.`,

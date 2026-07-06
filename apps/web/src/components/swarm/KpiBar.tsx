@@ -19,7 +19,7 @@
 import useSWR from 'swr';
 import { cn } from '@/lib/cn';
 import { useWorkflows } from '@/hooks/useWorkflow';
-import { analyticsApi, type CostBreakdown } from '@/lib/api-client';
+import { type CostBreakdown } from '@/lib/api-client';
 import { dataFetcher } from '@/lib/api-client';
 import { StatusDot } from '@/components/ui';
 

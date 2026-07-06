@@ -441,7 +441,7 @@ function TraceDetailPanel({ trace }: { trace: Trace }) {
 
       {/* Steps */}
       <div className="space-y-2">
-        {visibleSteps.map((step, index) => (
+        {visibleSteps.map((step) => (
           <TraceStepRow
             key={step.id}
             step={step}

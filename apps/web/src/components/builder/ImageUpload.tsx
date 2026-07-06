@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { X, Image as ImageIcon } from 'lucide-react';
 
 interface ImageUploadProps {
   onImageSelected: (base64: string) => void;

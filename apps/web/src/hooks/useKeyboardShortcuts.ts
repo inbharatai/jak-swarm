@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useShellStore } from '@/store/shell-store';
-import { MODULE_DEFINITIONS } from '@/modules/registry';
 
 export function useKeyboardShortcuts() {
   const openModules = useShellStore(s => s.openModules);

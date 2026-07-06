@@ -167,7 +167,6 @@ export async function exportPdf(
   // Lazy load via createRequire to avoid ESM/CJS interop issues.
   const { createRequire } = await import('node:module');
   const req = createRequire(import.meta.url);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   type PDFDoc = {
     on: (event: string, cb: (chunk: Buffer | undefined) => void) => void;
     fontSize: (size: number) => PDFDoc;

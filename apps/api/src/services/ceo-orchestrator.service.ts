@@ -320,7 +320,6 @@ export class CEOOrchestratorService {
     let profile: Record<string, unknown> | null = null;
     let profileStatus: CEOPreFlightResult['profileStatus'] = 'missing';
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row = await (this.db as any).companyProfile.findFirst({
         where: { tenantId: ctx.tenantId, status: { in: ['user_approved', 'manual'] } },
         orderBy: { updatedAt: 'desc' },
@@ -331,7 +330,6 @@ export class CEOOrchestratorService {
       } else {
         // Look at any profile (including extracted-but-not-approved) so we
         // can honestly report what exists vs what's approved.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const anyRow = await (this.db as any).companyProfile.findFirst({
           where: { tenantId: ctx.tenantId },
           orderBy: { updatedAt: 'desc' },

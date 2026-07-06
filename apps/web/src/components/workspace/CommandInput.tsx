@@ -13,7 +13,7 @@ import {
 import useSWR from 'swr';
 import { cn } from '@/lib/cn';
 import { apiClient } from '@/lib/api-client';
-import { Button, Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { COMMAND_TEMPLATES } from '@/lib/templates';
 import type { Industry, Integration } from '@/types';
 
@@ -134,7 +134,7 @@ export function CommandInput({
       // Focus textarea so user can review and submit
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [templateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [templateKey]);
 
   // Fetch connected integrations for context chips
   const { data: integrationsData } = useSWR<Integration[]>('workspace-integrations',

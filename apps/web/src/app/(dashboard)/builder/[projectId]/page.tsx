@@ -8,16 +8,16 @@ const MonacoEditor = lazy(() => import('@monaco-editor/react').then(mod => ({ de
 import { useProject, type ProjectFile } from '@/hooks/useProject';
 import { useProjectStream } from '@/hooks/useProjectStream';
 import { projectApi, type Checkpoint } from '@/lib/api-client';
-import { Button, Badge, Spinner, Card, CardContent, Input } from '@/components/ui';
+import { Button, Badge, Spinner, Input } from '@/components/ui';
 import { BuildProgress, eventsToBuildSteps } from '@/components/builder/BuildProgress';
 import { ImageUpload } from '@/components/builder/ImageUpload';
 import { DeployDialog } from '@/components/builder/DeployDialog';
 import { GitHubSync } from '@/components/builder/GitHubSync';
 import { CheckpointTimeline, CheckpointTimelineHeader } from '@/components/builder/CheckpointTimeline';
 import {
-  ArrowLeft, Play, Rocket, GitBranch, Settings, Eye, Code2,
+  ArrowLeft, Rocket, GitBranch, Eye, Code2,
   ChevronRight, ChevronDown, FileText, FolderOpen, Folder, Send,
-  ExternalLink, Loader2, Image as ImageIcon,
+  ExternalLink, Loader2,
 } from 'lucide-react';
 
 // ─── File Tree Helpers ──────────────────────────────────────────────────
@@ -138,7 +138,6 @@ export default function BuilderIDEPage() {
   const [chatMessage, setChatMessage] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployDialog, setShowDeployDialog] = useState(false);
   const [showGitHubSync, setShowGitHubSync] = useState(false);
   // FIX #9: Error state for user-visible error messages
@@ -235,18 +234,6 @@ export default function BuilderIDEPage() {
     }
   };
 
-  const handleDeploy = async () => {
-    setIsDeploying(true);
-    try {
-      await projectApi.deploy(projectId);
-      refresh();
-    } catch (e) {
-      setErrorMessage(e instanceof Error ? e.message : 'Deploy failed');
-    } finally {
-      setIsDeploying(false);
-    }
-  };
-
   // Auto-save on editor change (debounced 1.5s)
   const handleEditorChange = (value: string | undefined) => {
     if (!value || !selectedFile || !currentFile || value === currentFile.content) return;
@@ -258,7 +245,7 @@ export default function BuilderIDEPage() {
       try {
         await projectApi.updateFile(projectId, fileToSave, value);
         refresh();
-      } catch (e) {
+      } catch {
         setErrorMessage('Failed to save file');
         setTimeout(() => setErrorMessage(null), 5000);
       } finally {

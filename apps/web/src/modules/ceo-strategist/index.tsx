@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Crown, Target, TrendingUp, AlertTriangle, CheckCircle2, Clock, Send, Lightbulb, BarChart3, ArrowRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Spinner, Textarea } from '@/components/ui';
+import { Crown, Target, AlertTriangle, Send, Lightbulb } from 'lucide-react';
+import { Card, CardContent, Button, Badge, Textarea } from '@/components/ui';
 import useSWR from 'swr';
 import {
   fetcher,
@@ -12,7 +12,6 @@ import {
 } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
-import type { ModuleProps } from '@/modules/registry';
 
 interface StrategicGoal {
   id: string;
@@ -46,13 +45,13 @@ const INSIGHT_ICONS: Record<string, React.ReactNode> = {
   recommendation: <Target className="h-4 w-4 text-blue-500" />,
 };
 
-export default function CEOStrategistModule({ moduleId, isActive }: ModuleProps) {
+export default function CEOStrategistModule() {
   const toast = useToast();
   const [directive, setDirective] = useState('');
   const [sending, setSending] = useState(false);
 
-  const { data: goalsData, isLoading: goalsLoading } = useSWR<{ data: StrategicGoal[] }>('/ceo/goals', fetcher, { refreshInterval: 15000 });
-  const { data: insightsData, isLoading: insightsLoading } = useSWR<{ data: Insight[] }>('/ceo/insights', fetcher, { refreshInterval: 30000 });
+  const { data: goalsData } = useSWR<{ data: StrategicGoal[] }>('/ceo/goals', fetcher, { refreshInterval: 15000 });
+  const { data: insightsData } = useSWR<{ data: Insight[] }>('/ceo/insights', fetcher, { refreshInterval: 30000 });
   const { data: kpiData } = useSWR<{ data: Record<string, number> }>('/analytics/kpi-summary', fetcher, { refreshInterval: 60000 });
 
   const goals: StrategicGoal[] = goalsData?.data ?? [];

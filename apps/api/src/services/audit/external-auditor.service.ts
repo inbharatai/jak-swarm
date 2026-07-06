@@ -111,7 +111,6 @@ export class ExternalAuditorService {
     const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
 
     // Verify the audit run exists in this tenant before creating the invite.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const auditRun = await (this.db as any).auditRun.findFirst({
       where: { id: params.auditRunId, tenantId: params.tenantId },
       select: { id: true },

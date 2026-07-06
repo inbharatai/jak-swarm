@@ -267,6 +267,40 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   # ---------------------------------------------------------------------------
+  # Lint (ESLint) — real quality gate, not just tsc --noEmit. The root flat
+  # config (eslint.config.mjs) catches unused imports/vars + unreachable
+  # code across the TS packages + apps. --max-warnings=0 means any warning
+  # is a failure; the config is intentionally minimal so the gate stays
+  # enforceable rather than a backlog that blocks every run.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        # Root flat config (eslint.config.mjs). --max-warnings=0 → warnings fail
+        # the build. The config ignores tests/, dist/, .next/, generated Prisma,
+        # and config files; it covers all *.ts/*.tsx in packages/ + apps/.
+        run: pnpm lint:eslint
+
+  # ---------------------------------------------------------------------------
   # Dependency audit — blocks merge if any transitive prod dep has a known
   # high/critical CVE. Dependabot PRs flow through this same gate so security
   # fixes can never regress silently.

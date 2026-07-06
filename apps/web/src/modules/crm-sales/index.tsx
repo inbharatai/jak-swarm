@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { HandCoins, UserPlus, Search, Phone, Mail, Building2, TrendingUp } from 'lucide-react';
-import { Card, CardContent, Button, Badge, Input, Spinner, EmptyState } from '@/components/ui';
+import { HandCoins, UserPlus, Search, Mail, Building2, TrendingUp } from 'lucide-react';
+import { Button, Badge, Input, Spinner, EmptyState } from '@/components/ui';
 import useSWR from 'swr';
 import {
   fetcher,
@@ -12,7 +12,6 @@ import {
 } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { eventBus, SHELL_EVENTS } from '@/lib/event-bus';
-import type { ModuleProps } from '@/modules/registry';
 
 interface Lead {
   id: string;
@@ -57,13 +56,13 @@ function ScoreBadge({ score }: { score: number }) {
   return <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${color}`}>{score}</span>;
 }
 
-export default function CRMSalesModule({ moduleId, isActive }: ModuleProps) {
+export default function CRMSalesModule() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'score' | 'value' | 'recent'>('score');
 
-  const { data: leadsData, isLoading, mutate } = useSWR<{ data: Lead[] }>('/crm/leads', fetcher, { refreshInterval: 30000 });
+  const { data: leadsData, isLoading } = useSWR<{ data: Lead[] }>('/crm/leads', fetcher, { refreshInterval: 30000 });
   const { data: pipelineData } = useSWR<{ data: PipelineSummary }>('/crm/pipeline-summary', fetcher, { refreshInterval: 30000 });
 
   const leads: Lead[] = leadsData?.data ?? [];

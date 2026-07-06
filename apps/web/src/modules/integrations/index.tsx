@@ -9,13 +9,12 @@ import { IntegrationCard, PROVIDER_META } from '@/components/integrations/Integr
 import { ConnectModal } from '@/components/integrations/ConnectModal';
 import { WhatsAppControl } from '@/components/integrations/WhatsAppControl';
 import type { Integration, IntegrationProvider } from '@/types';
-import type { ModuleProps } from '@/modules/registry';
 
 const ALL_PROVIDERS: IntegrationProvider[] = [
   'GMAIL', 'GCAL', 'SLACK', 'GITHUB', 'NOTION', 'HUBSPOT', 'DRIVE',
 ];
 
-export default function IntegrationsModule({ moduleId, isActive }: ModuleProps) {
+export default function IntegrationsModule() {
   const toast = useToast();
   const { data, mutate } = useSWR<Integration[]>('/integrations', dataFetcher, { refreshInterval: 30000 });
 

@@ -112,7 +112,6 @@ export function getRuntime(
   if (useOpenAI) {
     if (explicitLegacy && !warnedAboutIgnoredLegacyEngine) {
       warnedAboutIgnoredLegacyEngine = true;
-      // eslint-disable-next-line no-console
       console.warn('[getRuntime] JAK_EXECUTION_ENGINE=legacy is ignored; OpenAI-only runtime is enforced.');
     }
     return new OpenAIRuntimeImpl();

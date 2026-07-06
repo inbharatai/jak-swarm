@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { apiFetch } from '@/lib/api-client';
 import { useAuthProfile } from '@/lib/auth-profile';
 import { useToast } from '@/components/ui/toast';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Spinner, ProfileGateSkeleton } from '@/components/ui';
+import { Button, Card, CardContent, Input, Badge, Spinner, ProfileGateSkeleton } from '@/components/ui';
 import { Key, Check, Eye, EyeOff, Server, AlertTriangle, Shield, Brain, Sparkles } from 'lucide-react';
 
 interface LLMProvider {

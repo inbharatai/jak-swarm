@@ -1,4 +1,4 @@
-import type { AgentRole, TaskStatus } from '@/types';
+import type { TaskStatus } from '@/types';
 
 export const AGENT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   COMMANDER:          { bg: 'bg-purple-50 dark:bg-purple-950/40',   border: 'border-purple-400',  text: 'text-purple-700 dark:text-purple-300' },

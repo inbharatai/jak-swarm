@@ -28,7 +28,7 @@ import {
 } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import {
-  Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Badge, Button, Card, CardContent,
   Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton,
   EmptyState, Input, Select, Spinner, Textarea,
 } from '@/components/ui';

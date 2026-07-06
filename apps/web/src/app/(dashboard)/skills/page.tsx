@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { apiFetch } from '@/lib/api-client';
 import { Button, Card, CardContent, Badge, Input, Spinner, EmptyState, Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogCloseButton } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { Plus, Search, Package, Zap, Shield, Code2, CheckCircle, XCircle, Clock, ExternalLink, Download } from 'lucide-react';
+import { Plus, Search, Package, Zap, Shield, Code2, Download } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 
 const SKILL_STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {

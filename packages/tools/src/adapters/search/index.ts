@@ -95,7 +95,6 @@ export function availableSearchProviders(subscriptionTier?: 'free' | 'paid'): {
  */
 function logPaidSearch(provider: 'serper' | 'tavily', query: string, latencyMs: number, ok: boolean): void {
   if (process.env['SEARCH_PROVIDER_LOG'] !== '1' && process.env['SEARCH_PROVIDER_LOG'] !== 'true') return;
-  // eslint-disable-next-line no-console
   console.error(
     JSON.stringify({
       event: 'paid_search',

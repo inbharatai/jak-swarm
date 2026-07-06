@@ -105,7 +105,6 @@ export function buildApiUrl(path: string): string {
 }
 
 if (RESOLVED.misconfigured && typeof window !== 'undefined') {
-  // eslint-disable-next-line no-console -- intentional surface for misconfig
   console.error(
     '[api-client] Production-build misconfiguration: ' + RESOLVED.reason +
       '. Dashboard API calls will be rejected with MISCONFIGURED_API_URL.',

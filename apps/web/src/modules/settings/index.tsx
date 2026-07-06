@@ -6,7 +6,6 @@ import { apiFetch, fetcher } from '@/lib/api-client';
 import { useToast } from '@/components/ui/toast';
 import { Button, Card, CardContent, Input, Badge, Spinner } from '@/components/ui';
 import { Key, Check, Eye, EyeOff, Brain, Sparkles } from 'lucide-react';
-import type { ModuleProps } from '@/modules/registry';
 
 interface LLMProvider {
   name: string;
@@ -23,7 +22,7 @@ const PROVIDER_META: Record<string, { icon: React.ReactNode; label: string; desc
   gemini: { icon: <Sparkles className="h-5 w-5" />, label: 'Gemini Runtime', description: 'Gemini 2.5 Pro / Flash — tool calling + thinking', models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'], color: '#4285f4' },
 };
 
-export default function SettingsModule({ moduleId, isActive }: ModuleProps) {
+export default function SettingsModule() {
   const toast = useToast();
   const { data, isLoading, mutate } = useSWR<{ success: boolean; data: { providers: LLMProvider[]; preferredProvider?: string } }>(
     '/settings/llm',

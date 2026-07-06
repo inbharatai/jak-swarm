@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/cn';
-import { ROLE_LIST, getRoleColor, MAX_RECOMMENDED_ROLES, type RoleId } from '@/lib/role-config';
+import { ROLE_LIST, getRoleColor, MAX_RECOMMENDED_ROLES } from '@/lib/role-config';
 import { useConversationStore } from '@/store/conversation-store';
 
 interface RolePickerProps {

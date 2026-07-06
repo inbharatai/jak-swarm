@@ -9,10 +9,9 @@ import { QuickActions } from '@/components/home/QuickActions';
 import { IntegrationHealthWidget } from '@/components/home/IntegrationHealthWidget';
 import { ApprovalsSummary } from '@/components/home/ApprovalsSummary';
 import { RunningWorkflowsWidget } from '@/components/home/RunningWorkflowsWidget';
-import type { ModuleProps } from '@/modules/registry';
 import { useShellStore } from '@/store/shell-store';
 
-export default function DashboardHomeModule({ moduleId, isActive }: ModuleProps) {
+export default function DashboardHomeModule() {
   const { user } = useAuth();
   const openModule = useShellStore(s => s.openModule);
 
