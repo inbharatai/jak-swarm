@@ -51,7 +51,7 @@
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.10",
     "@types/dagre": "^0.7.54",
-    "@types/node": "^22.10.7",
+    "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.0.3",
     "@testing-library/jest-dom": "^6.9.1",
