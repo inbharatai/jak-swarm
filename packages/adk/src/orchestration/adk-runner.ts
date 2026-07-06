@@ -32,6 +32,86 @@ export interface AdkRunResult {
   error?: string;
 }
 
+// ─── ADK event → JAK activity mapper (cockpit parity) ──────────────────────
+
+/**
+ * Map an ADK streaming event into 0+ JAK `onAgentActivity` payloads so the
+ * cockpit SSE + audit log see real-time ADK progress through the SAME
+ * translation the LangGraph path uses (worker_started → step_started,
+ * worker_completed → step_completed / step_failed).
+ *
+ * ADK's event model is coarser than JAK's LangGraph nodes: ADK emits
+ * `{ author, content, errorCode, errorMessage }` chunks as the agent
+ * streams — there is no first-class plan_created / verification / context-
+ * summarized signal. We therefore map FAITHFULLY (no fabricated plan or
+ * verification events):
+ *   - non-user content chunk → worker_started THEN worker_completed for
+ *     that author (the cockpit sees a start+complete pair per chunk,
+ *     which is honest real-time progress).
+ *   - error event → worker_completed with success=false (the existing
+ *     translator routes this to step_failed).
+ *   - user / empty chunks → nothing.
+ *
+ * `author` is mapped to a JAK AgentRole when the uppercased name matches
+ * the enum, else 'COMMANDER' as the conservative fallback (matches the
+ * trace-mapping logic below).
+ *
+ * Exported (pure, no I/O) so tests can lock the mapping without a live LLM.
+ */
+export interface AdkEventLike {
+  author?: string;
+  content?: { parts?: Array<{ text?: string }> };
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export function mapAdkEventToActivities(
+  event: AdkEventLike,
+  _workflowId: string,
+): Array<Record<string, unknown>> {
+  const author = event.author ?? 'unknown';
+  const authorUpper = author.toUpperCase();
+  const agentRole = Object.values(AgentRole).includes(authorUpper as AgentRole)
+    ? (authorUpper as AgentRole)
+    : AgentRole.COMMANDER;
+
+  // Error event → step_failed (via worker_completed success=false).
+  if (event.errorCode) {
+    return [{
+      type: 'worker_completed',
+      agentRole,
+      taskName: author,
+      success: false,
+      error: event.errorMessage ?? event.errorCode,
+      durationMs: 0,
+    }];
+  }
+
+  // Extract text content from the ADK parts shape.
+  const content = event.content?.parts
+    ?.map((p) => p?.text ?? '')
+    .join('') ?? '';
+
+  if (!content.trim() || author === 'user') return [];
+
+  const contentPreview = content.slice(0, 200);
+  return [
+    {
+      type: 'worker_started',
+      agentRole,
+      taskName: author,
+    },
+    {
+      type: 'worker_completed',
+      agentRole,
+      taskName: author,
+      success: true,
+      contentPreview,
+      durationMs: 0,
+    },
+  ];
+}
+
 // ─── ADK runner ─────────────────────────────────────────────────────────────
 
 /**
@@ -60,6 +140,25 @@ export async function runWithAdk(params: {
   allowedToolNames?: string[];
   googleSearchGrounding?: boolean;
   openaiWebSearch?: boolean;
+  /**
+   * Cockpit parity (Phase 3) — optional callback invoked with each ADK
+   * event mapped to the JAK `onAgentActivity` vocabulary. The swarm-
+   * execution service passes the SAME translator the LangGraph path uses
+   * (emit on the workflow SSE channel + translate to canonical lifecycle
+   * events + audit rows). When omitted, the ADK run is silent to the
+   * cockpit until the final SwarmState is returned — which is the prior
+   * behavior and remains correct for headless/bench runs.
+   *
+   * NOTE: ADK's tool model is synchronous within the `for await` event
+   * loop — there is no `interrupt()` equivalent. A `tool_approval_required`
+   * activity can be EMITTED for cockpit visibility, but it CANNOT pause
+   * the ADK run the way LangGraph's per-tool approval gate pauses the
+   * graph. High-risk tools in ADK mode must rely on the tool itself
+   * returning `outcome:'approval_required'` (recorded for review) rather
+   * than workflow-level pause/resume. Documented here so the caller does
+   * not assume parity with the LangGraph approval pause.
+   */
+  onAgentActivity?: (data: unknown) => void;
 }): Promise<AdkRunResult> {
   const {
     workflowId,
@@ -73,6 +172,7 @@ export async function runWithAdk(params: {
     allowedToolNames,
     googleSearchGrounding,
     openaiWebSearch,
+    onAgentActivity,
   } = params;
 
   // Thread the JAK execution context via AsyncLocalStorage so concurrent
@@ -150,6 +250,22 @@ export async function runWithAdk(params: {
         if (event.errorCode) {
           hasError = true;
           errorMessage = event.errorMessage ?? event.errorCode;
+        }
+
+        // Cockpit parity — map the ADK event to JAK activity payloads and
+        // forward to the caller's onAgentActivity (if provided). The caller
+        // (swarm-execution.service) attaches the SAME translator the
+        // LangGraph path uses, so the cockpit SSE + audit log see real-time
+        // ADK progress. See mapAdkEventToActivities for the faithful-
+        // mapping rationale + the approval-pause caveat.
+        if (onAgentActivity) {
+          for (const activity of mapAdkEventToActivities(event, workflowId)) {
+            try {
+              onAgentActivity(activity);
+            } catch {
+              // A misbehaving activity callback must never break the run.
+            }
+          }
         }
       }
     } catch (err) {

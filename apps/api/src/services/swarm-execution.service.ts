@@ -1090,6 +1090,154 @@ export class SwarmExecutionService extends EventEmitter {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let result: SwarmResult | undefined;
 
+      // Hoisted so BOTH the ADK path (Phase 3 cockpit parity) and the
+      // LangGraph fallback path share the SAME activity translator — emit
+      // the raw activity on the workflow SSE channel, then map the fine-
+      // grained agent event to the canonical workflow lifecycle vocabulary
+      // (step_started / step_completed / step_failed / planned / approval_*
+      // / agent_assigned / verification_* / context_summarized) so the
+      // audit log captures it without the runner needing to know about
+      // audit. The ADK path's `mapAdkEventToActivities` already emits
+      // worker_started / worker_completed shapes that this translator
+      // routes to step_started / step_completed — so the cockpit sees
+      // real-time ADK progress through the identical pipeline.
+      const onAgentActivity = (data: unknown) => {
+        this.emit(`workflow:${workflowId}`, data);
+        const ev = data as Record<string, unknown> | undefined;
+        if (!ev || typeof ev !== 'object') return;
+        const t = ev['type'] as string | undefined;
+        const nowIso = new Date().toISOString();
+        if (t === 'plan_created') {
+          const plan = ev['plan'] as { tasks?: unknown[] } | undefined;
+          this.emitLifecycle({
+            type: 'planned',
+            workflowId,
+            planId: ((ev['planId'] as string) ?? `${workflowId}-plan`),
+            taskCount: Array.isArray(plan?.tasks) ? plan!.tasks!.length : 0,
+            timestamp: nowIso,
+          }, tenantId, userId);
+          (this.db.workflow.update as any)({
+            where: { id: workflowId },
+            data: { planJson: plan ?? (ev['plan'] as unknown) },
+          }).catch((persistErr: unknown) => {
+            this.log.warn(
+              { workflowId, err: persistErr instanceof Error ? persistErr.message : String(persistErr) },
+              '[Swarm] planJson persist failed (non-fatal)',
+            );
+          });
+        } else if (t === 'worker_started') {
+          this.emitLifecycle({
+            type: 'step_started',
+            workflowId,
+            stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+            agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'worker_completed') {
+          const success = ev['success'] !== false;
+          this.emitLifecycle(success ? {
+            type: 'step_completed',
+            workflowId,
+            stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+            agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+            durationMs: (ev['durationMs'] as number) ?? 0,
+            timestamp: nowIso,
+          } : {
+            type: 'step_failed',
+            workflowId,
+            stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
+            agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+            error: (ev['error'] as string) ?? 'unknown',
+            durationMs: (ev['durationMs'] as number) ?? 0,
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'agent_assigned') {
+          this.emitLifecycle({
+            type: 'agent_assigned',
+            workflowId,
+            stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) ?? 'task',
+            agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+            ...(typeof ev['routingReason'] === 'string' ? { routingReason: ev['routingReason'] as string } : {}),
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'verification_started') {
+          this.emitLifecycle({
+            type: 'verification_started',
+            workflowId,
+            ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
+              ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
+              : {}),
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'verification_completed') {
+          this.emitLifecycle({
+            type: 'verification_completed',
+            workflowId,
+            ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
+              ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
+              : {}),
+            passed: ev['passed'] === true,
+            ...(typeof ev['groundingScore'] === 'number' ? { groundingScore: ev['groundingScore'] as number } : {}),
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'context_summarized') {
+          const stepId = (typeof ev['taskName'] === 'string' && ev['taskName']) ||
+            (typeof ev['taskId'] === 'string' ? (ev['taskId'] as string) : '');
+          this.emitLifecycle({
+            type: 'context_summarized',
+            workflowId,
+            stepId,
+            inputTaskResultCount: typeof ev['inputTaskResultCount'] === 'number' ? (ev['inputTaskResultCount'] as number) : 0,
+            tokensBefore: typeof ev['estimatedTokensBefore'] === 'number' ? (ev['estimatedTokensBefore'] as number) : 0,
+            tokensAfter: typeof ev['estimatedTokensAfter'] === 'number' ? (ev['estimatedTokensAfter'] as number) : 0,
+            timestamp: nowIso,
+          }, tenantId, userId);
+        } else if (t === 'tool_approval_required') {
+          const toolName = String(ev['toolName'] ?? 'unknown_tool');
+          const category = String(ev['category'] ?? 'WRITE');
+          const reason = String(ev['reason'] ?? 'Approval required.');
+          const inputSummary = String(ev['inputSummary'] ?? '');
+          const riskLevel =
+            category === 'DESTRUCTIVE'
+              ? 'CRITICAL'
+              : category === 'EXTERNAL_POST' || category === 'CREDENTIAL' || category === 'INSTALL'
+                ? 'HIGH'
+                : 'MEDIUM';
+          void this.workflowService
+            .createApprovalRequest({
+              workflowId,
+              tenantId,
+              taskId: (ev['agentRole'] as string) ?? 'tool_call',
+              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
+              action: `tool:${toolName}`,
+              rationale: reason,
+              riskLevel,
+              proposedDataJson: { toolName, category, inputSummary },
+              toolName,
+              ...(category === 'EXTERNAL_POST' ? { externalService: toolName } : {}),
+            })
+            .then((approval) => {
+              this.emitLifecycle(
+                {
+                  type: 'approval_required',
+                  workflowId,
+                  approvalId: approval.id,
+                  riskLevel,
+                  timestamp: nowIso,
+                },
+                tenantId,
+                userId,
+              );
+            })
+            .catch((approvalErr) => {
+              this.log.warn(
+                { workflowId, toolName, err: approvalErr },
+                '[Swarm] Failed to persist tool_approval_required ApprovalRequest (non-fatal)',
+              );
+            });
+        }
+      };
+
       if (process.env['JAK_ADK_MODE']?.trim() === '1') {
         try {
           const { runWithAdk } = await import('@jak-swarm/adk');
@@ -1118,6 +1266,12 @@ export class SwarmExecutionService extends EventEmitter {
             // always evaluated true, making the env var dead.
             googleSearchGrounding: process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() !== '0',
             openaiWebSearch: process.env['OPENAI_WEB_SEARCH']?.trim() === '1',
+            // Phase 3 cockpit parity — forward ADK events through the SAME
+            // onAgentActivity translator the LangGraph path uses, so the
+            // cockpit SSE + audit log see real-time ADK progress. ADK's
+            // mapAdkEventToActivities emits worker_started/worker_completed
+            // shapes that this translator routes to step_started/step_completed.
+            onAgentActivity,
           });
 
           result = {
@@ -1223,166 +1377,7 @@ export class SwarmExecutionService extends EventEmitter {
         // strict whitelist enforced by TenantToolRegistry.isAllowed.
         allowedToolNames: params.allowedToolNames ?? [],
         connectedProviders,
-        onAgentActivity: (data: unknown) => {
-          this.emit(`workflow:${workflowId}`, data);
-          // Hardening pass — translate fine-grained agent events into the
-          // canonical workflow lifecycle vocabulary so the audit log
-          // captures step_started / step_completed / step_failed / planned
-          // without the runner needing to know about audit at all.
-          const ev = data as Record<string, unknown> | undefined;
-          if (!ev || typeof ev !== 'object') return;
-          const t = ev['type'] as string | undefined;
-          const nowIso = new Date().toISOString();
-          if (t === 'plan_created') {
-            const plan = ev['plan'] as { tasks?: unknown[] } | undefined;
-            this.emitLifecycle({
-              type: 'planned',
-              workflowId,
-              planId: ((ev['planId'] as string) ?? `${workflowId}-plan`),
-              taskCount: Array.isArray(plan?.tasks) ? plan!.tasks!.length : 0,
-              timestamp: nowIso,
-            }, tenantId, userId);
-            // Persist the plan so workflow-stream.routes.ts can replay plan_created
-            // to reconnecting clients (it reads workflow.planJson, which was
-            // previously never written). Fire-and-forget; non-fatal — the onAgentActivity
-            // callback is synchronous, so we cannot await here.
-            (this.db.workflow.update as any)({
-              where: { id: workflowId },
-              data: { planJson: plan ?? (ev['plan'] as unknown) },
-            }).catch((persistErr: unknown) => {
-              this.log.warn(
-                { workflowId, err: persistErr instanceof Error ? persistErr.message : String(persistErr) },
-                '[Swarm] planJson persist failed (non-fatal)',
-              );
-            });
-          } else if (t === 'worker_started') {
-            this.emitLifecycle({
-              type: 'step_started',
-              workflowId,
-              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
-              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'worker_completed') {
-            const success = ev['success'] !== false;
-            this.emitLifecycle(success ? {
-              type: 'step_completed',
-              workflowId,
-              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
-              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
-              durationMs: (ev['durationMs'] as number) ?? 0,
-              timestamp: nowIso,
-            } : {
-              type: 'step_failed',
-              workflowId,
-              stepId: (ev['taskName'] as string) ?? (ev['agentRole'] as string) ?? 'step',
-              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
-              error: (ev['error'] as string) ?? 'unknown',
-              durationMs: (ev['durationMs'] as number) ?? 0,
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'agent_assigned') {
-            // Sprint 2.1 / Item K — Router emitted one of these per
-            // (taskId → agentRole) mapping. Translate to workflow lifecycle.
-            this.emitLifecycle({
-              type: 'agent_assigned',
-              workflowId,
-              stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) ?? 'task',
-              agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
-              ...(typeof ev['routingReason'] === 'string' ? { routingReason: ev['routingReason'] as string } : {}),
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'verification_started') {
-            this.emitLifecycle({
-              type: 'verification_started',
-              workflowId,
-              ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
-                ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
-                : {}),
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'verification_completed') {
-            this.emitLifecycle({
-              type: 'verification_completed',
-              workflowId,
-              ...(typeof ev['taskName'] === 'string' || typeof ev['taskId'] === 'string'
-                ? { stepId: (ev['taskName'] as string) ?? (ev['taskId'] as string) }
-                : {}),
-              passed: ev['passed'] === true,
-              ...(typeof ev['groundingScore'] === 'number' ? { groundingScore: ev['groundingScore'] as number } : {}),
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'context_summarized') {
-            // Sprint 2.2 / Item H — long-DAG state compression event.
-            const stepId = (typeof ev['taskName'] === 'string' && ev['taskName']) ||
-              (typeof ev['taskId'] === 'string' ? (ev['taskId'] as string) : '');
-            this.emitLifecycle({
-              type: 'context_summarized',
-              workflowId,
-              stepId,
-              inputTaskResultCount: typeof ev['inputTaskResultCount'] === 'number' ? (ev['inputTaskResultCount'] as number) : 0,
-              tokensBefore: typeof ev['estimatedTokensBefore'] === 'number' ? (ev['estimatedTokensBefore'] as number) : 0,
-              tokensAfter: typeof ev['estimatedTokensAfter'] === 'number' ? (ev['estimatedTokensAfter'] as number) : 0,
-              timestamp: nowIso,
-            }, tenantId, userId);
-          } else if (t === 'tool_approval_required') {
-            // Phase 2 (full-fledged JAK) — close the loop:
-            // BaseAgent emitted this when ToolRegistry.execute returned
-            // outcome:'approval_required'. Persist a real ApprovalRequest
-            // row + emit the canonical lifecycle 'approval_required'
-            // event so the cockpit's existing inbox UI surfaces it.
-            // The user's decision flows through /approvals/:id/decide
-            // and the WorkflowService.resolveApproval pipeline.
-            const toolName = String(ev['toolName'] ?? 'unknown_tool');
-            const category = String(ev['category'] ?? 'WRITE');
-            const reason = String(ev['reason'] ?? 'Approval required.');
-            const inputSummary = String(ev['inputSummary'] ?? '');
-            // Treat per-tool gates as HIGH risk by default for the audit
-            // trail; the actual category drives the approval card copy.
-            const riskLevel =
-              category === 'DESTRUCTIVE'
-                ? 'CRITICAL'
-                : category === 'EXTERNAL_POST' || category === 'CREDENTIAL' || category === 'INSTALL'
-                  ? 'HIGH'
-                  : 'MEDIUM';
-            // Best-effort persist. If the DB call fails we log + continue
-            // — the cockpit still gets the lifecycle event below so the
-            // user sees the gate fired even when persistence is briefly
-            // unavailable.
-            void this.workflowService
-              .createApprovalRequest({
-                workflowId,
-                tenantId,
-                taskId: (ev['agentRole'] as string) ?? 'tool_call',
-                agentRole: (ev['agentRole'] as string) ?? 'UNKNOWN',
-                action: `tool:${toolName}`,
-                rationale: reason,
-                riskLevel,
-                proposedDataJson: { toolName, category, inputSummary },
-                toolName,
-                ...(category === 'EXTERNAL_POST' ? { externalService: toolName } : {}),
-              })
-              .then((approval) => {
-                this.emitLifecycle(
-                  {
-                    type: 'approval_required',
-                    workflowId,
-                    approvalId: approval.id,
-                    riskLevel,
-                    timestamp: nowIso,
-                  },
-                  tenantId,
-                  userId,
-                );
-              })
-              .catch((approvalErr) => {
-                this.log.warn(
-                  { workflowId, toolName, err: approvalErr },
-                  '[Swarm] Failed to persist tool_approval_required ApprovalRequest (non-fatal)',
-                );
-              });
-          }
-        },
+        onAgentActivity,
       });
       } // end if (!result) — ADK fallback block
 

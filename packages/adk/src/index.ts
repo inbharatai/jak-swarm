@@ -47,6 +47,8 @@ export {
 export {
   runWithAdk,
   type AdkRunResult,
+  mapAdkEventToActivities,
+  type AdkEventLike,
 } from './orchestration/adk-runner.js';
 
 // Agent Engine deployment (Layer 3 — bonus)
