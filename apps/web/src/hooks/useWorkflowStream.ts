@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getRawToken } from '@/lib/auth';
 import { connectSSE } from '@/lib/sse-fetch';
+import type { WorkflowPlan } from '@/types';
 
 export interface WorkflowEvent {
   type: string;
@@ -10,6 +11,15 @@ export interface WorkflowEvent {
   status?: string;
   error?: string;
   timestamp?: string;
+  /** The replayed/live plan. `plan_created` (replay) carries `plan` directly;
+   *  the live `planned` event carries it under `data.planJson`. The DAG reads
+   *  whichever is present. Optional because most event types don't carry one. */
+  plan?: WorkflowPlan;
+  data?: { planJson?: WorkflowPlan; [k: string]: unknown };
+  /** Agent role for step_* / agent_assigned events (used by the live Gantt
+   *  to merge in-progress steps before traces persist). */
+  agentRole?: string;
+  stepId?: string;
 }
 
 const TERMINAL_TYPES = new Set(['completed', 'failed', 'cancelled']);

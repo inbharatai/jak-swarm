@@ -2,11 +2,13 @@
 
 import useSWR, { type SWRConfiguration } from 'swr';
 import { dataFetcher } from '@/lib/api-client';
+import type { WorkflowTimeline } from '@/lib/api-client';
 import type {
   Workflow,
   WorkflowFilters,
   ApprovalRequest,
   PaginatedResult,
+  AgentTraceRecord,
 } from '@/types';
 
 // ─── Fetcher ──────────────────────────────────────────────────────────────────
@@ -123,4 +125,40 @@ export function useActiveWorkflows() {
     { status: ['PENDING', 'RUNNING', 'PAUSED'] },
     { refreshInterval: 3_000 },
   );
+}
+
+// ─── useWorkflowTraces (B.4 — inline-traces-empty fix) ───────────────────────
+//
+// The list endpoint returns `traceCount` (via Prisma _count) but NOT the
+// `traces[]` array, so expanding a run card off the list previously showed
+// "0 agent traces" even when traces existed. This hook fetches the full
+// traces for one workflow on demand (expand / drawer open) via the existing
+// GET /workflows/:id/traces endpoint. Kept off the list endpoint so there's
+// no N+1. `active` controls polling: live runs re-fetch every 5s so freshly
+// persisted traces stream in; terminal runs fetch once.
+export function useWorkflowTraces(workflowId: string | null | undefined, active = false) {
+  const { data, error, isLoading, mutate } = useSWR<AgentTraceRecord[]>(
+    workflowId ? `/workflows/${workflowId}/traces` : null,
+    fetcher,
+    {
+      refreshInterval: active ? 5_000 : 0,
+      revalidateOnFocus: false,
+    },
+  );
+  return { traces: data ?? [], isLoading, error, refresh: mutate };
+}
+
+// ─── useWorkflowTimeline (B.3 — wire the unused timeline endpoint) ──────────
+//
+// GET /traces/workflow/:id/timeline returns per-node cost, costByAgent/
+// Provider/Model, and the critical-path agent roles. Powers the Cost & Tokens
+// tab + critical-path DAG highlight in the JARVIS inspector drawer. Fetch once
+// per opened run (no polling — timeline is computed from persisted traces).
+export function useWorkflowTimeline(workflowId: string | null | undefined) {
+  const { data, error, isLoading, mutate } = useSWR<WorkflowTimeline>(
+    workflowId ? `/traces/workflow/${workflowId}/timeline` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  return { timeline: data ?? null, isLoading, error, refresh: mutate };
 }

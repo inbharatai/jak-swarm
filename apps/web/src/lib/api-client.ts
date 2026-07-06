@@ -1,4 +1,5 @@
 import type {
+  AgentTraceRecord,
   ApiError,
   ApprovalRequest,
   Integration,
@@ -432,10 +433,23 @@ export const workflowApi = {
   },
 
   /** GET /workflows/:id/traces */
-  traces: (id: string) => apiDataFetch<unknown>(`/workflows/${id}/traces`),
+  traces: (id: string) => apiDataFetch<AgentTraceRecord[]>(`/workflows/${id}/traces`),
 
   /** GET /workflows/:id/approvals */
   approvals: (id: string) => apiDataFetch<ApprovalRequest[]>(`/workflows/${id}/approvals`),
+
+  /** GET /workflows/queue/stats — TENANT_ADMIN+ only; non-admins get 403
+   *  (the KpiBar shows "N/A — admin only" honestly in that case). */
+  queueStats: () =>
+    apiDataFetch<{
+      queued: number;
+      active: number;
+      completed: number;
+      failed: number;
+      dead: number;
+      running: number;
+      maxConcurrent: number;
+    }>('/workflows/queue/stats'),
 };
 
 export function isWorkflowFollowupResponse(value: WorkflowCreateResponse): value is WorkflowFollowupResponse {
@@ -500,6 +514,37 @@ export const approvalApi = {
     }>(`/approvals/${id}/sandbox-test`, { method: 'POST' }),
 };
 
+export interface WorkflowTimelineNode {
+  agentRole: string;
+  stepIndex: number;
+  model: string;
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  durationMs: number;
+  toolCalls: number;
+}
+
+export interface WorkflowTimeline {
+  workflowId: string;
+  tenantId: string;
+  status: string;
+  goal: string;
+  totalCostUsd: number;
+  totalDurationMs: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  nodeCount: number;
+  nodes: WorkflowTimelineNode[];
+  criticalPath: string[];
+  costByAgent: Record<string, number>;
+  costByProvider: Record<string, number>;
+  costByModel: Record<string, number>;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 export const traceApi = {
   /** GET /traces?workflowId=&agentRole=&page= */
   list: (params?: Record<string, string | number>) => {
@@ -511,6 +556,28 @@ export const traceApi = {
 
   /** GET /traces/:id */
   get: (id: string) => apiClient.get<unknown>(`/traces/${id}`),
+
+  /** GET /traces/workflow/:workflowId/timeline — per-node cost breakdown,
+   *  execution timeline, and DAG critical path. Used by the JARVIS
+   *  Inspector's Cost & Tokens tab + critical-path DAG highlight. */
+  timeline: (workflowId: string) =>
+    apiDataFetch<WorkflowTimeline>(`/traces/workflow/${workflowId}/timeline`),
+};
+
+// ─── Analytics (JARVIS KpiBar) ──────────────────────────────────────────────
+
+export interface CostBreakdown {
+  totalUsd: number;
+  byProvider: Record<string, number>;
+  byAgentRole: Record<string, number>;
+  byModel: Record<string, { tokens: number; costUsd: number; calls: number }>;
+}
+
+export const analyticsApi = {
+  /** GET /analytics/cost — last-30-day cost breakdown for the KpiBar
+   *  "Cost Today" gauge (honest: this is the 30d sum, not literally today;
+   *  the label reflects the window). */
+  cost: () => apiDataFetch<CostBreakdown>('/analytics/cost'),
 };
 
 export const memoryApi = {

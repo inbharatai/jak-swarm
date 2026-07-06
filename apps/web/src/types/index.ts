@@ -274,7 +274,25 @@ export interface ToolCall {
   startedAt: string;
   completedAt?: string;
   durationMs?: number;
+  /** Honest outcome classification — mirrors packages/shared ToolOutcome.
+   *  Optional because older persisted toolCallsJson rows may predate it;
+   *  the UI defaults to 'real_success' when absent + no error (legacy
+   *  compat) but always renders a badge so it's visible whether a tool
+   *  actually ran vs mocked/draft/blocked. Never fabricated. */
+  outcome?: ToolOutcome;
+  outcomeMessage?: string;
 }
+
+/** Honest tool outcome classification (mirrors packages/shared ToolOutcome). */
+export type ToolOutcome =
+  | 'real_success'
+  | 'draft_created'
+  | 'mock_provider'
+  | 'not_configured'
+  | 'blocked_requires_config'
+  | 'approval_required'
+  | 'disabled_by_policy'
+  | 'failed';
 
 // ─── Agent Trace Record (API response shape) ──────────────────────────────────
 

@@ -518,3 +518,71 @@
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── JARVIS Swarm Inspector — scoped dark command surface (Phase B) ────────
+ * The inspector at /swarm is a dark-only JARVIS surface INDEPENDENT of
+ * next-themes: `.jarvis-surface` forces `color-scheme: dark` and overrides
+ * the theme CSS vars locally so the rest of the app keeps its light/dark
+ * toggle. No flash: the client wrapper renders the dark class before its
+ * children mount. Glassmorphism panels + neon accent + JetBrains_Mono for
+ * data readouts. */
+.jarvis-surface {
+  color-scheme: dark;
+  --background: 222 47% 6%;
+  --foreground: 210 40% 96%;
+  --card: 222 40% 9%;
+  --card-foreground: 210 40% 96%;
+  --muted: 217 33% 14%;
+  --muted-foreground: 215 20% 65%;
+  --border: 215 28% 18%;
+  --input: 215 28% 18%;
+  --primary: 158 64% 52%;
+  --primary-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, hsl(158 64% 52% / 0.08), transparent 60%),
+    radial-gradient(900px 500px at 0% 0%, hsl(190 90% 55% / 0.06), transparent 55%),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+.jarvis-surface .jarvis-panel {
+  background: hsl(var(--card) / 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border) / 0.8);
+  border-radius: 10px;
+}
+.jarvis-surface .jarvis-readout {
+  font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+.jarvis-surface .jarvis-neon {
+  color: hsl(158 64% 52%);
+  text-shadow: 0 0 12px hsl(158 64% 52% / 0.45);
+}
+.jarvis-surface .jarvis-divider {
+  background: linear-gradient(90deg, transparent, hsl(158 64% 52% / 0.4), transparent);
+  height: 1px;
+}
+/* Neon glowing edge for the live DAG (animated stroke). */
+@keyframes jarvis-edge-flow {
+  to { stroke-dashoffset: -24; }
+}
+.jarvis-edge {
+  stroke: hsl(158 64% 52%);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 4px hsl(158 64% 52% / 0.6));
+  animation: jarvis-edge-flow 1.2s linear infinite;
+}
+@keyframes jarvis-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.jarvis-pulse { animation: jarvis-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .jarvis-edge { animation: none; }
+  .jarvis-pulse { animation: none; }
+}
