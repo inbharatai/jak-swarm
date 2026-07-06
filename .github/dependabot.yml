@@ -24,6 +24,37 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    # Major-version bumps for these deps need dedicated migration work
+    # (breaking API/schema/SDK changes) and were closed rather than merged:
+    #   #107 prisma 6→7, #108 @fastify/{cors,rate-limit} 10→11 + swagger-ui 5→6,
+    #   #109 vitest 2→4 (+ @vitest/coverage-v8), #110 typescript 5→6,
+    #   #114 openai 4→6, #115 zod 3→4, #116 lucide-react 0.4→1.x.
+    # Ignoring semver-major here so Dependabot doesn't re-open them weekly.
+    # Patch + minor bumps for the same deps STILL come through; remove an
+    # entry here when its migration is intentionally started.
+    ignore:
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@fastify/cors"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@fastify/rate-limit"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@fastify/swagger-ui"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "lucide-react"
+        update-types: ["version-update:semver-major"]
     # Group related ecosystems so we don't drown in one-off PRs.
     groups:
       prisma:
