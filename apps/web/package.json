@@ -31,7 +31,7 @@
     "framer-motion": "^12.42.2",
     "immer": "^11.1.11",
     "jose": "^5.9.6",
-    "lucide-react": "^0.469.0",
+    "lucide-react": "^0.577.0",
     "next": "16.2.10",
     "postcss": "^8.5.16",
     "react": "^19.2.7",

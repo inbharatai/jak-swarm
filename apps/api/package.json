@@ -35,7 +35,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/resources": "^2.9.0",
     "@opentelemetry/sdk-node": "^0.220.0",
-    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@opentelemetry/semantic-conventions": "^1.42.0",
     "@sentry/node": "^10.63.0",
     "@supabase/supabase-js": "^2.110.0",
     "bcryptjs": "^2.4.3",
