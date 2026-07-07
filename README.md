@@ -7,11 +7,11 @@
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster--38-agents)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory-122-registered)
-[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory-122-registered)
+[![Connectors](https://img.shields.io/badge/Connectors-21-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory-122-registered)
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-2200%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2400%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -33,7 +33,7 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,154 blocking CI tests**.
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,416 blocking CI tests** (2,368 root + 48 web).
 
 The submitted system includes:
 
@@ -42,7 +42,7 @@ The submitted system includes:
 * **Google Search Grounding** — built-in with included quota, citation-backed via `GOOGLE_SEARCH` ADK tool
 * **Google Cloud Run deployment** — live API gateway at `jak-swarm-api` in `asia-south1`
 * **JAK Shield** local security, approval, permission, and audit checks
-* **2,200+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
+* **2,400+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
 Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
@@ -60,7 +60,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
-| Tests | 2,200+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
+| Tests | 2,400+ blocking CI tests (unit + integration; 2,368 root + 48 web = 2,416) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
@@ -109,7 +109,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
-6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,200+ blocking CI tests (unit + integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
+6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,400+ blocking CI tests (unit + integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
 ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 20 evaluation iterations (102 metric calls) on the training set, finding the baseline prompt achieves 100% rubric pass rate (6/6). The initial `adk eval` showed 4/6 due to broken API paths (`/api/` prefix instead of production `/workflows`), not poor agent quality. After fixing paths, corrected eval: 6/6 training + 4/4 held-out validation. GEPA explored 3 alternative prompt variants — Candidate 1 (explicit safety refusal + search_knowledge fallback) matched baseline quality and has been adopted in the deployed Agent Engine. The original optimizer run had train/val overlap (same 6 scenarios for both); a separate validation set has been added. Full results in `qa/benchmark-optimization-before-after.md`.
 
@@ -126,7 +126,7 @@ Post-challenge production hardening roadmap:
 
 ## What JAK Swarm Does
 
-JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **23 connectors**.
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **21 connectors**.
 
 ### What's unique
 
@@ -678,7 +678,7 @@ Tool maturity labels enforced by CI: `pnpm check:truth` fails if any tool ships 
 |:--------|:---------:|:------:|:---------:|:-----:|
 | Pre-built agents | **38** | 0 | 0 | 1 |
 | Tools | **122** | 50+ | Custom | ~10 |
-| Built-in UI | **31 pages** | — | LangSmith | IDE |
+| Built-in UI | **26 pages** | — | LangSmith | IDE |
 | **Gemini + OpenAI** (per-tenant) | ✅ | ❌ | ❌ | ❌ |
 | **Google ADK orchestration** | ✅ | ❌ | ❌ | ❌ |
 | **Google Search Grounding** | ✅ | ❌ | ❌ | ❌ |
@@ -718,7 +718,7 @@ flowchart TB
         P6["Audit evidence"] & P7["Autonomy Ladder"]
     end
 
-    subgraph EXECUTION["5. Autonomous Execution Layer"]
+    subgraph EXECUTION["5. Approved Execution Layer"]
         E1["Plan"] & E2["Assign"] & E3["Execute"]
         E4["Verify"] & E5["Report"] & E6["Learn again"]
     end
@@ -783,20 +783,20 @@ jak-swarm/
 │   │       ├── middleware/       # Auth, RBAC, rate limiting
 │   │       └── openapi/         # Zod → JSON Schema → OpenAPI spec
 │   └── web/                     # Next.js 16 dashboard (port 3000)
-│       └── src/app/(dashboard)/ # 31 dashboard pages
+│       └── src/app/(dashboard)/ # 26 dashboard pages
 ├── packages/
 │   ├── adk/                      # 🆕 Google ADK orchestration (JAK_ADK_MODE=1)
 │   │   ├── bridge/              # JAK → ADK tool bridge (FunctionTool, GOOGLE_SEARCH)
 │   │   ├── agents/              # LlmAgent wrappers for Commander, Planner, Workers, Verifier
 │   │   ├── deploy/              # Agent Engine gateway (agent-engine-entry.ts, resource ID)
 │   │   ├── orchestration/       # SequentialAgent + ParallelAgent pipeline + Runner bridge
-│   │   └── types/               # Type augmentation for @google/adk v1.2.0
+│   │   └── types/               # Type augmentation for @google/adk v1.3.0
 │   ├── agents/                  # 38 agent implementations
 │   │   ├── base/                # BaseAgent (decomposed: llm-call, prompt-builder, tool-execution)
 │   │   ├── roles/               # 6 orchestrator agents
 │   │   ├── workers/             # 32 worker agents
 │   │   └── runtime/             # OpenAI + Gemini runtime adapters + grounding config
-│   ├── tools/                   # 122 tool implementations
+│   ├── tools/                   # 122 builtin + 4 Phoring tool implementations
 │   │   ├── registry/            # Singleton ToolRegistry + approval policy
 │   │   ├── builtin/             # Built-in + sandbox tools
 │   │   ├── adapters/            # Email, Calendar, CRM, Browser, Memory
@@ -850,7 +850,7 @@ Full security policy: [`SECURITY.md`](SECURITY.md)
 ## 🛠️ Development
 
 ```bash
-pnpm test                  # Run all tests (2200+ blocking CI)
+pnpm test                  # Run all tests (2400+ blocking CI)
 pnpm typecheck             # Type checking (strict mode, zero errors)
 pnpm lint                  # Lint
 pnpm check:truth           # Verify tool classifications + landing claims
@@ -923,7 +923,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,200+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
+**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,400+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
 
 **Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
 

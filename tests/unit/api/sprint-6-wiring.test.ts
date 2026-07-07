@@ -161,7 +161,7 @@ describe('Sprint 6 — UI surfaces exist for new features', () => {
   });
 
   it('CommandPalette has Social Drafts + Tool Installer entries', () => {
-    const palette = read('apps/web/src/components/CommandPalette.tsx');
+    const palette = read('apps/web/src/components/layout/CommandPalette.tsx');
     expect(palette).toMatch(/social-drafts.*Social Drafts/i);
     expect(palette).toMatch(/tool-installer.*Tool Installer/i);
   });

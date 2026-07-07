@@ -167,9 +167,9 @@ Auth endpoints are rate-limited to 10 requests per minute per IP.
 | Method | Endpoint | Auth | Description |
 |:------:|:---------|:----:|:------------|
 | POST | `/slack/events` | HMAC-SHA256 | Slack Events API webhook (url_verification + event_callback) |
-| POST | `/slack/interactivity` | HMAC-SHA256 | Slack interactive component payloads |
+| POST | `/slack/interactivity` | HMAC-SHA256 | Slack interactive component payloads — **signature verified + 200-acknowledged, but approval-button dispatch is NOT yet implemented** (returns `{ ok, implemented: false }`). Planned: parse `payload.actions` → approvals service. |
 
-Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. Events trigger authenticated workflows with thread-reply results. Idempotent event handling prevents duplicate workflow creation on Slack retries.
+Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. Events trigger authenticated workflows with thread-reply results. Idempotent event handling prevents duplicate workflow creation on Slack retries. The `/slack/interactivity` route is wired and signature-verified but does not yet action button payloads — it acknowledges within Slack's 3s window so Slack does not retry, and logs the not-implemented status explicitly.
 
 ---
 

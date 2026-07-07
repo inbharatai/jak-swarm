@@ -13,10 +13,15 @@ import { hospitalityPack } from './packs/hospitality.js';
 import { customerSupportPack } from './packs/customer-support.js';
 import { generalPack } from './packs/general.js';
 
-// Stub packs for industries that share the general structure but have unique keywords
+// Stub packs for industries that share the general structure but have unique
+// keywords. These are thin relabels of generalPack (spread + renamed
+// displayName/description/keywords) — NOT purpose-built packs. Marked
+// `maturity: 'stub'` so listIndustries() / the product UI can badge them
+// honestly instead of presenting them as full industry packs.
 const manufacturingPack: IndustryPack = {
   ...generalPack,
   industry: Industry.MANUFACTURING,
+  maturity: 'stub',
   displayName: 'Manufacturing Operations',
   description:
     'Workflow automation for manufacturing operations including production scheduling, quality control, maintenance coordination, supply chain management, and compliance reporting.',
@@ -44,6 +49,7 @@ const manufacturingPack: IndustryPack = {
 const consultingPack: IndustryPack = {
   ...generalPack,
   industry: Industry.CONSULTING,
+  maturity: 'stub',
   displayName: 'Consulting Operations',
   description:
     'Workflow automation for consulting firms including engagement management, deliverable tracking, client communication, proposal generation, and billing.',
@@ -111,10 +117,11 @@ export function classifyIndustry(text: string): Industry {
   return bestMatch;
 }
 
-export function listIndustries(): Array<{ industry: Industry; displayName: string; description: string }> {
+export function listIndustries(): Array<{ industry: Industry; displayName: string; description: string; maturity: 'real' | 'stub' }> {
   return Object.values(INDUSTRY_PACK_REGISTRY).map((pack) => ({
     industry: pack.industry,
     displayName: pack.displayName,
     description: pack.description,
+    maturity: pack.maturity ?? 'real',
   }));
 }

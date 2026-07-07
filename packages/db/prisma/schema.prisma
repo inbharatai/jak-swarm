@@ -185,6 +185,7 @@ model Workflow {
   @@index([tenantId, status])
   @@index([updatedAt])
   @@index([conversationId])
+  @@index([userId])
   @@map("workflows")
 }
 
@@ -367,6 +368,7 @@ model AgentTrace {
   @@index([workflowId])
   @@index([traceId])
   @@index([tenantId])
+  @@index([runId])
   @@map("agent_traces")
 }
 
@@ -405,7 +407,7 @@ model ApprovalRequest {
   expectedResult   String?   // 1-line preview of what success looks like, surfaced in the card
 
   workflow         Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  reviewer         User?     @relation("reviewer", fields: [reviewedBy], references: [id])
+  reviewer         User?     @relation("reviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
   approvalScopes   ApprovalScope[]
 
   @@index([workflowId, status])
@@ -669,10 +671,11 @@ model AuditLog {
   severity   String   @default("INFO") // INFO | WARN | ERROR | CRITICAL
   createdAt  DateTime @default(now())
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, action])
   @@index([tenantId, createdAt])
+  @@index([tenantId, userId])
   @@map("audit_logs")
 }
 
@@ -917,7 +920,7 @@ model Project {
 
   // FIX #16: Add proper User relation
   tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User                @relation(fields: [userId], references: [id])
+  user            User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   files           ProjectFile[]
   versions        ProjectVersion[]
   conversations   ProjectConversation[]

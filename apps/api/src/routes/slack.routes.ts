@@ -179,9 +179,28 @@ const slackRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(401).send({ error: 'Invalid signature' });
       }
 
-      // Placeholder for interactive component handling (approval buttons, etc.)
-      fastify.log.info('[slack] Interactivity payload received');
-      return reply.status(200).send({ ok: true });
+      // Honest status: interactivity (approval-button) dispatch is NOT yet
+      // implemented — no Slack approval buttons are sent with parseable
+      // action_ids today, so there is nothing to dispatch. We still verify
+      // the signature (proves the route is wired to Slack) and acknowledge
+      // within Slack's 3s window (200 is required; 5xx makes Slack retry +
+      // spam). The body + log make the not-implemented status explicit so
+      // this is not a silent fake. When approval-button dispatch is built,
+      // parse `payload.actions[0]` here and route to the approvals service.
+      let payloadType = 'unknown';
+      try {
+        const parsed = JSON.parse(rawBody);
+        payloadType = parsed?.type ?? 'unknown';
+      } catch {
+        // rawBody wasn't JSON — Slack sometimes sends urlencoded `payload=`.
+        payloadType = 'parse_failed';
+      }
+      fastify.log.warn({ payloadType }, '[slack] Interactivity payload received but NOT actioned — dispatch not yet implemented');
+      return reply.status(200).send({
+        ok: true,
+        implemented: false,
+        message: 'Slack interactivity handling is not yet implemented; approval-button dispatch is planned. Payload received and signature verified, but not actioned.',
+      });
     },
   );
 };

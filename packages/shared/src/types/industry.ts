@@ -57,4 +57,13 @@ export interface IndustryPack {
   recommendedApprovalThreshold: RiskLevel;
   defaultKPITemplates: string[];
   policyOverlays: PolicyOverlay[];
+  /**
+   * Honesty label: 'real' = purpose-built pack with industry-specific
+   * workflows/tools/policies; 'stub' = a thin relabel of the general pack
+   * (spread of generalPack with renamed displayName/keywords) that shares
+   * the general structure. Surfaced via listIndustries() so the product UI
+   * can badge stubs honestly instead of presenting them as full packs.
+   * Defaults to 'real' for backwards compatibility with existing packs.
+   */
+  maturity?: 'real' | 'stub';
 }

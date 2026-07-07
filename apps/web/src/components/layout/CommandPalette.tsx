@@ -81,6 +81,7 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
   { href: '/workspace', label: 'Chat', description: 'Talk to JAK — the cockpit', icon: MessageSquare, zone: 'Chat', keywords: ['home', 'workspace', 'cockpit'] },
   { href: '/inbox', label: 'Inbox', description: 'Triage emails and notifications', icon: Mail, zone: 'Chat' },
   { href: '/social', label: 'Social', description: 'Schedule and post social content', icon: Megaphone, zone: 'Chat' },
+  { href: '/social-drafts', label: 'Social Drafts', description: 'Review and publish queued social posts', icon: FileText, zone: 'Chat', keywords: ['drafts', 'queue', 'publish'] },
 
   // Tasks zone — observe, monitor, intervene
   { href: '/swarm', label: 'Runs', description: 'All workflow runs and their state', icon: Network, zone: 'Tasks', keywords: ['workflows', 'runs', 'jobs'] },
@@ -96,6 +97,7 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
   { href: '/integrations', label: 'Integrations', description: 'Connect Slack, Gmail, GitHub, Notion, ...', icon: Plug, zone: 'Setup', keywords: ['oauth', 'connect'] },
   { href: '/connectors', label: 'Connectors', description: 'Connector marketplace — Remotion, Blender, MCP servers, runtime status', icon: Plug, zone: 'Setup', keywords: ['marketplace', 'mcp', 'remotion', 'blender', 'runtime'] },
   { href: '/skills', label: 'Skills', description: 'Custom agent skills and tool toggles', icon: Sparkles, zone: 'Setup', keywords: ['tools', 'capabilities'] },
+  { href: '/tool-installer', label: 'Tool Installer', description: 'Install custom MCP tools and integrations', icon: Hammer, zone: 'Setup', keywords: ['install', 'mcp', 'custom tool'] },
   { href: '/builder', label: 'Builder', description: 'No-code project builder (vibe coder)', icon: Hammer, zone: 'Setup', keywords: ['app', 'vibe', 'code'] },
   { href: '/settings', label: 'Settings', description: 'Approvals, voice, domains, account', icon: ShieldCheck, zone: 'Setup', keywords: ['preferences', 'account'] },
   { href: '/billing', label: 'Billing', description: 'Subscription and credits', icon: CreditCard, zone: 'Setup', keywords: ['subscription', 'plan'] },

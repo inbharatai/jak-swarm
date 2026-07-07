@@ -385,11 +385,17 @@ export class ControlTestService {
       }
       const hasManual = input.evidence.manualEvidence.length > 0;
       const hasAuto = input.evidence.autoMappings.length > 0;
-      const result: TestEvaluation['result'] = hasManual && hasAuto ? 'pass' : 'pass';
+      // Honest deterministic fallback: only auto-pass when BOTH evidence types
+      // are present (a real coverage signal). Partial evidence (only auto OR
+      // only manual) cannot honestly be marked pass without LLM judgment —
+      // force 'needs_evidence' so a human reviewer decides. The previous
+      // `? 'pass' : 'pass'` was a no-op ternary that silently auto-passed
+      // every control on partial evidence — a fake in a compliance product.
+      const result: TestEvaluation['result'] = hasManual && hasAuto ? 'pass' : 'needs_evidence';
       const confidence = hasManual && hasAuto ? 0.65 : 0.4;
       return {
         result,
-        rationale: `Deterministic coverage rule (no LLM key configured): ${input.evidence.autoMappings.length} auto-mapped evidence row(s) + ${input.evidence.manualEvidence.length} manual evidence row(s). Marked as needing reviewer override because LLM judgment was unavailable.`,
+        rationale: `Deterministic coverage rule (no LLM key configured): ${input.evidence.autoMappings.length} auto-mapped evidence row(s) + ${input.evidence.manualEvidence.length} manual evidence row(s). ${hasManual && hasAuto ? 'Both evidence types present — auto-passed at low confidence, reviewer override available.' : 'Partial evidence — LLM judgment unavailable, marked needs_evidence so a reviewer decides.'}`,
         confidence,
       };
     }
@@ -431,8 +437,8 @@ export class ControlTestService {
         };
       }
       return {
-        result: 'pass',
-        rationale: `LLM evaluation failed (${err instanceof Error ? err.message : String(err)}); deterministic fallback: ${totalEvidence} evidence row(s) present, marked low-confidence so reviewer override is required.`,
+        result: 'needs_evidence',
+        rationale: `LLM evaluation failed (${err instanceof Error ? err.message : String(err)}); deterministic fallback: ${totalEvidence} evidence row(s) present but LLM judgment unavailable — marked needs_evidence so a reviewer must decide rather than auto-passing on a transient LLM outage.`,
         confidence: 0.3,
       };
     }
