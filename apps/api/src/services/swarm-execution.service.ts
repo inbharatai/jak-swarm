@@ -7,10 +7,11 @@
  * and writes all results to Postgres.
  */
 import { EventEmitter } from 'node:events';
-import type { PrismaClient } from '@jak-swarm/db';
+import type { PrismaClient, Prisma } from '@jak-swarm/db';
 import type { FastifyBaseLogger } from 'fastify';
 import { SwarmRunner, supervisorBus, getWorkflowRuntime } from '@jak-swarm/swarm';
-import type { SwarmResult, WorkflowRuntime, WorkflowLifecycleEvent } from '@jak-swarm/swarm';
+import type { SwarmResult, WorkflowRuntime, WorkflowLifecycleEvent, CheckpointPrismaClient } from '@jak-swarm/swarm';
+import type { ReconcileParams } from '../billing/credit-service.js';
 import { config } from '../config.js';
 import { Industry, ToolRiskClass, WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
@@ -540,7 +541,11 @@ export class SwarmExecutionService extends EventEmitter {
     this.runner = new SwarmRunner({
       defaultTimeoutMs: 20 * 60 * 1000,
       stateStore,
-      db: db as any,
+      // PrismaClient's strongly-typed `workflowCheckpoint.*` methods don't
+      // structurally satisfy CheckpointPrismaClient's loose `unknown`-arg
+      // signatures (function-param contravariance), so a precise boundary
+      // cast is required. Runtime surface is identical.
+      db: db as unknown as CheckpointPrismaClient,
     });
     // workflowRuntime is the same LangGraph runtime SwarmRunner uses
     // internally, exposed for swarm-execution callers that need the
@@ -677,7 +682,7 @@ export class SwarmExecutionService extends EventEmitter {
     running: number;
     maxConcurrent: number;
   }> {
-    const jobModel = (this.db as any).workflowJob;
+    const jobModel = this.db.workflowJob;
     if (!jobModel) {
       return {
         queued: 0,
@@ -710,7 +715,7 @@ export class SwarmExecutionService extends EventEmitter {
   }
 
   private circuitBreakerFactory: ((name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }) | undefined;
-  private creditServiceInstance: { reconcile: (params: Record<string, unknown>) => Promise<void> } | null = null;
+  private creditServiceInstance: { reconcile: (params: ReconcileParams) => Promise<void> } | null = null;
 
   /** Inject distributed circuit breaker factory for multi-instance safety. */
   setCircuitBreakerFactory(factory: (name: string, opts: { failureThreshold: number; resetTimeoutMs: number }) => { call: <T>(fn: () => Promise<T>) => Promise<T> }): void {
@@ -743,7 +748,7 @@ export class SwarmExecutionService extends EventEmitter {
   private async upsertWorkflowJob(
     params: { workflowId: string; tenantId: string; userId: string } & Record<string, unknown>,
   ): Promise<void> {
-    const jobModel = (this.db as any).workflowJob;
+    const jobModel = this.db.workflowJob;
     if (!jobModel) {
       this.log.warn({ workflowId: params.workflowId }, '[SwarmQueue] workflow_jobs model unavailable; executing immediately');
       // Fallback path only runs for execution jobs (no action, or action='execute').
@@ -774,7 +779,7 @@ export class SwarmExecutionService extends EventEmitter {
         where: { workflowId: params.workflowId },
         data: {
           status: 'QUEUED',
-          payloadJson: payload,
+          payloadJson: payload as unknown as Prisma.InputJsonValue,
           availableAt: new Date(),
           lastError: null,
           completedAt: null,
@@ -791,14 +796,14 @@ export class SwarmExecutionService extends EventEmitter {
         status: 'QUEUED',
         attempts: 0,
         maxAttempts: 5,
-        payloadJson: payload,
+        payloadJson: payload as unknown as Prisma.InputJsonValue,
         availableAt: new Date(),
       },
     });
   }
 
   /** Inject credit service for post-execution reconciliation. */
-  setCreditService(service: { reconcile: (params: Record<string, unknown>) => Promise<void> }): void {
+  setCreditService(service: { reconcile: (params: ReconcileParams) => Promise<void> }): void {
     this.creditServiceInstance = service;
   }
 
@@ -1114,9 +1119,9 @@ export class SwarmExecutionService extends EventEmitter {
             taskCount: Array.isArray(plan?.tasks) ? plan!.tasks!.length : 0,
             timestamp: nowIso,
           }, tenantId, userId);
-          (this.db.workflow.update as any)({
+          this.db.workflow.update({
             where: { id: workflowId },
-            data: { planJson: plan ?? (ev['plan'] as unknown) },
+            data: { planJson: (plan ?? ev['plan']) as unknown as Prisma.InputJsonValue },
           }).catch((persistErr: unknown) => {
             this.log.warn(
               { workflowId, err: persistErr instanceof Error ? persistErr.message : String(persistErr) },
@@ -1283,7 +1288,7 @@ export class SwarmExecutionService extends EventEmitter {
             durationMs: 0,
             startedAt: new Date(),
             completedAt: new Date(),
-          } as any;
+          };
 
           this.log.info({ workflowId, provider: llmProvider ?? 'gemini', mode: 'adk' },
             '[Swarm] Workflow completed via ADK orchestration');
@@ -1338,7 +1343,7 @@ export class SwarmExecutionService extends EventEmitter {
                 instanceId: this.instanceId,
               },
             };
-            await (this.db.workflow.update as any)({
+            await this.db.workflow.update({
               where: { id: wfId },
               data: {
                 stateJson: checkpoint,
@@ -1356,10 +1361,10 @@ export class SwarmExecutionService extends EventEmitter {
         // threshold tasks to skip human review. Default false keeps the gate
         // blocking, matching the landing-page claim of human approval on high-risk
         // actions.
-        autoApproveEnabled: Boolean((tenant as any)?.autoApproveEnabled),
-        approvalThreshold: (tenant as any)?.approvalThreshold ?? undefined,
-        allowedDomains: (tenant as any)?.allowedDomains ?? [],
-        browserAutomationEnabled: Boolean((tenant as any)?.enableBrowserAutomation),
+        autoApproveEnabled: Boolean(tenant?.autoApproveEnabled),
+        approvalThreshold: tenant?.approvalThreshold ?? undefined,
+        allowedDomains: tenant?.allowedDomains ?? [],
+        browserAutomationEnabled: Boolean(tenant?.enableBrowserAutomation),
         restrictedCategories: industryPack.restrictedTools,
         // Merge tenant-admin disabled tools (at-admin blocklist) with
         // industry-pack per-name blocks (compliance-driven blocklist)
@@ -1462,7 +1467,7 @@ export class SwarmExecutionService extends EventEmitter {
             }
           }
         }
-        await (this.db.workflow.update as any)({
+        await this.db.workflow.update({
           where: { id: workflowId },
           data: { finalOutput },
         });
@@ -1791,7 +1796,7 @@ export class SwarmExecutionService extends EventEmitter {
           ? 'PAUSED'
           : 'FAILED';
 
-      await (this.db.workflow.update as any)({
+      await this.db.workflow.update({
         where: { id: workflowId },
         data: {
           status: finalStatus,
@@ -1998,7 +2003,7 @@ export class SwarmExecutionService extends EventEmitter {
       }, {
         loadState: async (id: string) => {
           const wf = await this.db.workflow.findUnique({ where: { id } });
-          return (wf as any)?.stateJson ?? undefined;
+          return wf?.stateJson ?? undefined;
         },
       });
 
@@ -2025,7 +2030,7 @@ export class SwarmExecutionService extends EventEmitter {
    */
   async recoverStaleWorkflows(): Promise<void> {
     try {
-      const jobModel = (this.db as any).workflowJob;
+      const jobModel = this.db.workflowJob;
       if (jobModel) {
         const activeJobs = await jobModel.findMany({
           where: { status: 'ACTIVE' },

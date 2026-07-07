@@ -79,7 +79,6 @@ describe('JAK Swarm route contract checks', () => {
 
   it('guards stream auth and UI trace rendering contracts against runtime crashes', () => {
     const workflowStreamRoutes = readRepoFile('apps/api/src/routes/workflows/workflow-stream.routes.ts');
-    const swarmMonitor = readRepoFile('apps/web/src/modules/swarm-monitor/index.tsx');
     const tracesPage = readRepoFile('apps/web/src/app/(dashboard)/traces/page.tsx');
 
     // Stream route should support header auth with query fallback and structured errors.
@@ -88,7 +87,9 @@ describe('JAK Swarm route contract checks', () => {
     expect(workflowStreamRoutes).toContain("err('NOT_FOUND', 'Workflow not found')");
 
     // UI must guard against non-array traces to prevent .map runtime crash.
-    expect(swarmMonitor).toContain('Array.isArray(wf.traces)');
+    // (The legacy apps/web/src/modules/swarm-monitor/index.tsx that rendered
+    // wf.traces was deleted with the dead PlatformShell subtree; the live
+    // /traces page is now the only trace-rendering surface, guarded below.)
     expect(tracesPage).toContain('Array.isArray(data?.items)');
     expect(tracesPage).toContain('Array.isArray(selectedTraceData.steps)');
   });

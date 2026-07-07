@@ -87,7 +87,6 @@ describe('Product truth claims', () => {
       'packages/adk/package.json',
       'packages/voice/package.json',
       'packages/whatsapp-client/package.json',
-      'packages/workflows/package.json',
     ];
 
     for (const manifest of packageManifests) {

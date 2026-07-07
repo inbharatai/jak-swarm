@@ -116,7 +116,7 @@ export class CreditService {
   async reserveCredits(tenantId: string, estimatedCredits: number): Promise<ReservationResult> {
     try {
       // Atomic: check + reserve in one transaction
-      const result = await (this.db as any).$transaction(async (tx: any) => {
+      const result = await this.db.$transaction(async (tx: any) => {
         const sub = await tx.subscription.findUnique({
           where: { tenantId },
           // FOR UPDATE handled implicitly by Prisma in transaction
@@ -186,7 +186,7 @@ export class CreditService {
 
     if (diff !== 0) {
       try {
-        await (this.db as any).$transaction(async (tx: any) => {
+        await this.db.$transaction(async (tx: any) => {
           // Adjust credit balance
           await tx.subscription.update({
             where: { tenantId: params.tenantId },
@@ -204,7 +204,7 @@ export class CreditService {
 
     // Record to usage ledger (always, regardless of reconciliation)
     try {
-      await (this.db as any).usageLedger.create({
+      await this.db.usageLedger.create({
         data: {
           tenantId: params.tenantId,
           userId: params.userId,
@@ -278,7 +278,7 @@ export class CreditService {
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
 
-    await (this.db as any).subscription.create({
+    await this.db.subscription.create({
       data: {
         tenantId,
         planId: 'free',
@@ -303,7 +303,7 @@ export class CreditService {
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
 
-    await (this.db as any).subscription.update({
+    await this.db.subscription.update({
       where: { tenantId },
       data: {
         planId,
@@ -328,14 +328,14 @@ export class CreditService {
   // ── Private helpers ───────────────────────────────────────────────────
 
   private async getSubscription(tenantId: string) {
-    return (this.db as any).subscription.findUnique({ where: { tenantId } });
+    return this.db.subscription.findUnique({ where: { tenantId } });
   }
 
   private async maybeResetDaily(sub: { id: string; dailyResetAt: Date | string; dailyUsed: number }): Promise<void> {
     const now = new Date();
     const resetAt = new Date(sub.dailyResetAt);
     if (now.getTime() - resetAt.getTime() > 24 * 60 * 60 * 1000) {
-      await (this.db as any).subscription.update({
+      await this.db.subscription.update({
         where: { id: sub.id },
         data: { dailyUsed: 0, dailyResetAt: now },
       });

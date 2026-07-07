@@ -33,7 +33,7 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,416 blocking CI tests** (2,368 root + 48 web).
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,407 blocking CI tests** (2,368 root + 39 web).
 
 The submitted system includes:
 
@@ -60,7 +60,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
-| Tests | 2,400+ blocking CI tests (unit + integration; 2,368 root + 48 web = 2,416) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
+| Tests | 2,400+ blocking CI tests (unit + integration; 2,368 root + 39 web = 2,407) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
@@ -810,10 +810,11 @@ jak-swarm/
 │   ├── security/                # Audit logging, RBAC, guardrails, encryption
 │   ├── client/                  # @jak-swarm/client TypeScript SDK
 │   ├── shared/                  # Shared types, enums, skills parser
+│   ├── skills/                  # Tenant skill registry + proposal flow
 │   ├── voice/                   # Voice pipeline (WebRTC, STT, TTS)
 │   ├── verification/            # Email/document/transaction verification
-│   ├── industry-packs/           # 13 industry-specific agent configurations
-│   └── workflows/               # Temporal workflow definitions (optional)
+│   ├── whatsapp-client/         # WhatsApp bridge (Baileys QR client)
+│   └── industry-packs/           # 13 industry-specific agent configurations
 ├── tests/
 │   ├── unit/                    # Unit tests
 │   ├── integration/             # Integration tests

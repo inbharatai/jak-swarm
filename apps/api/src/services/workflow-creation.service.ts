@@ -104,7 +104,7 @@ export async function createWorkflowOrchestration(
     });
 
     // Persist queue execution intent
-    await (fastify.db.workflow.update as any)({
+    await fastify.db.workflow.update({
       where: { id: workflow.id },
       data: {
         maxCostUsd: maxCostUsd ?? null,

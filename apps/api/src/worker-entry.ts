@@ -196,7 +196,7 @@ async function main(): Promise<void> {
   try {
     const { CreditService } = await import('./billing/credit-service.js');
     const creditService = new CreditService(prisma);
-    swarmService.setCreditService(creditService as any);
+    swarmService.setCreditService(creditService);
     log.info('[Worker] Credit reconciliation enabled');
   } catch {
     log.warn('[Worker] CreditService not available — usage ledger will not be recorded');

@@ -396,8 +396,9 @@ export class CompanyKnowledgeCrawlerService {
       const chunks: Uint8Array[] = [];
       let total = 0;
       // Node 22's fetch returns a WebReadableStream that is async-iterable
-      // at runtime; the type defs disagree, so we cast the body to any.
-      for await (const chunk of (body as any)) {
+      // at runtime; the lib ES2022 type defs don't model that, so narrow to
+      // AsyncIterable<Uint8Array> (body is non-null after the guard above).
+      for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
         const u8: Uint8Array = chunk instanceof Uint8Array ? chunk : Buffer.from(chunk);
         total += u8.byteLength;
         if (total > MAX_RESPONSE_BYTES) {
@@ -505,7 +506,7 @@ export class CompanyKnowledgeCrawlerService {
   private async findSourceOrThrow(sourceId: string, tenantId: string): Promise<{ id: string; tenantId: string; url: string; kind: string; title: string | null }> {
     try {
       // The DB client typedef predates migration 16, so we go through `any`.
-      const row = await (this.db as any).companyKnowledgeSource.findFirst({
+      const row = await this.db.companyKnowledgeSource.findFirst({
         where: { id: sourceId, tenantId, deletedAt: null },
         select: { id: true, tenantId: true, url: true, kind: true, title: true },
       });
@@ -525,7 +526,7 @@ export class CompanyKnowledgeCrawlerService {
 
   private async recordFailure(sourceId: string, reason: string, flags: string[] = []): Promise<void> {
     try {
-      await (this.db as any).companyKnowledgeSource.update({
+      await this.db.companyKnowledgeSource.update({
         where: { id: sourceId },
         data: {
           lastCrawledAt: new Date(),
@@ -543,7 +544,7 @@ export class CompanyKnowledgeCrawlerService {
 
   private async recordSuccess(sourceId: string, info: { title?: string | null; vectorChunkCount: number; lastSourceKey: string; flags: string[]; scanWarning?: string }): Promise<void> {
     try {
-      await (this.db as any).companyKnowledgeSource.update({
+      await this.db.companyKnowledgeSource.update({
         where: { id: sourceId },
         data: {
           lastCrawledAt: new Date(),

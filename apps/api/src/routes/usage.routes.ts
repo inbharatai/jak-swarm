@@ -42,7 +42,7 @@ const usageRoutes: FastifyPluginAsync = async (fastify) => {
     const offset = parseInt(query.offset ?? '0', 10);
 
     try {
-      const entries = await (fastify.db as any).usageLedger.findMany({
+      const entries = await fastify.db.usageLedger.findMany({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -62,7 +62,7 @@ const usageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      const total = await (fastify.db as any).usageLedger.count({ where: { tenantId } });
+      const total = await fastify.db.usageLedger.count({ where: { tenantId } });
 
       return reply.send(ok({ entries, total, limit, offset }));
     } catch {

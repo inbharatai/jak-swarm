@@ -254,10 +254,6 @@ export const config = {
   whatsappNumberMap,
   whatsappAllowedNumbers,
 
-  temporalAddress: process.env['TEMPORAL_ADDRESS'] ?? 'localhost:7233',
-  temporalNamespace: process.env['TEMPORAL_NAMESPACE'] ?? 'jak-swarm',
-  temporalTaskQueue: process.env['TEMPORAL_TASK_QUEUE'] ?? 'jak-main',
-
   // Company connector autosync runtime (leader-gated in swarm.plugin).
   // Defaults are conservative to keep API load predictable while still
   // giving tenants a hands-free freshness loop for wave-1 providers.

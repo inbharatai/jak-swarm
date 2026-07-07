@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { CronExpressionParser } from 'cron-parser';
+import type { Prisma } from '@jak-swarm/db';
 import { ok, err } from '../types.js';
 import { enforceTenantIsolation } from '../middleware/tenant-isolation.js';
 
@@ -168,7 +169,7 @@ const schedulesRoutes: FastifyPluginAsync = async (fastify) => {
 
         const schedule = await fastify.db.workflowSchedule.update({
           where: { id },
-          data: updates as any,
+          data: updates as unknown as Prisma.WorkflowScheduleUpdateInput,
         });
 
         await fastify.auditLog(request, 'UPDATE_SCHEDULE', 'Schedule', schedule.id);

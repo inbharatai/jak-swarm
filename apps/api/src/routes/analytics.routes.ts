@@ -446,7 +446,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const rows = await (fastify.db as any).routingLog.findMany({
+        const rows = await fastify.db.routingLog.findMany({
           where: { createdAt: { gte: fromDate, lte: toDate } },
           select: {
             taskType: true,
@@ -519,7 +519,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const rows = await (fastify.db as any).approvalAuditLog.findMany({
+        const rows = await fastify.db.approvalAuditLog.findMany({
           where: { tenantId, decidedAt: { gte: fromDate, lte: toDate } },
           select: { decision: true, agentRole: true, riskLevel: true, autoApproved: true },
         });
@@ -579,7 +579,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const rows = await (fastify.db as any).intentRecord.findMany({
+        const rows = await fastify.db.intentRecord.findMany({
           where: { tenantId, createdAt: { gte: fromDate, lte: toDate } },
           select: { intent: true, intentConfidence: true, urgency: true, riskIndicators: true, clarificationNeeded: true },
         });
@@ -662,7 +662,7 @@ const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const rows = await (fastify.db as any).usageLedger.findMany({
+        const rows = await fastify.db.usageLedger.findMany({
           where: { tenantId, createdAt: { gte: fromDate, lte: toDate }, latencyMs: { not: null } },
           select: { latencyMs: true, provider: true },
         });

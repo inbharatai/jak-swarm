@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import type { Prisma } from '@jak-swarm/db';
 import { ok, err } from '../types.js';
 
 const layoutSchema = z.object({
@@ -67,10 +68,10 @@ const layoutRoutes: FastifyPluginAsync = async (fastify) => {
           where: { userId },
           create: {
             userId,
-            layout: parsed.data.layout as any,
+            layout: parsed.data.layout as unknown as Prisma.InputJsonValue,
           },
           update: {
-            layout: parsed.data.layout as any,
+            layout: parsed.data.layout as unknown as Prisma.InputJsonValue,
           },
         });
 

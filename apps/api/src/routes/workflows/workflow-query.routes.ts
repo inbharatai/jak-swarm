@@ -180,7 +180,7 @@ const workflowQueryRoutes: FastifyPluginAsync = async (fastify) => {
         const { workflowId } = request.params as { workflowId: string };
         const { tenantId } = request.user;
 
-        const workflow = await (fastify.db.workflow.findFirst as any)({
+        const workflow = await fastify.db.workflow.findFirst({
           where: { id: workflowId, tenantId },
           select: { finalOutput: true, goal: true, status: true },
         });

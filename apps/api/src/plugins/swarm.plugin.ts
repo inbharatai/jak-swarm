@@ -90,7 +90,7 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
     const { metrics } = await import('../observability/metrics.js');
 
     if (BaseAgentClass) {
-    (BaseAgentClass as any)['onLLMCallComplete'] = (info: { model: string; provider: string; promptTokens: number; completionTokens: number; costUsd: number; agentRole: string; tenantId?: string }) => {
+    BaseAgentClass['onLLMCallComplete'] = (info: { model: string; provider: string; promptTokens: number; completionTokens: number; costUsd: number; agentRole: string; tenantId?: string }) => {
       // Track in Prometheus metrics
       metrics.llmTokensTotal.inc({ model: info.model, direction: 'prompt' }, info.promptTokens);
       metrics.llmTokensTotal.inc({ model: info.model, direction: 'completion' }, info.completionTokens);
@@ -135,7 +135,7 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
   try {
     const { CreditService } = await import('../billing/credit-service.js');
     const creditService = new CreditService(fastify.db);
-    swarmService.setCreditService(creditService as any);
+    swarmService.setCreditService(creditService);
     fastify.log.info('[billing] Credit reconciliation wired to workflow execution');
   } catch {
     fastify.log.warn('[billing] CreditService not available — usage ledger will not be recorded');

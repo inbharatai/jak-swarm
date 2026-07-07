@@ -43,7 +43,6 @@ export default defineConfig({
       '@jak-swarm/voice': path.resolve(__dirname, 'packages/voice/src/index.ts'),
       '@jak-swarm/verification': path.resolve(__dirname, 'packages/verification/src/index.ts'),
       '@jak-swarm/client': path.resolve(__dirname, 'packages/client/src/index.ts'),
-      '@jak-swarm/workflows': path.resolve(__dirname, 'packages/workflows/src/index.ts'),
     },
   },
   test: {

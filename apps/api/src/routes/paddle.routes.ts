@@ -128,7 +128,7 @@ const paddleRoutes: FastifyPluginAsync = async (fastify) => {
           }
 
           case 'subscription.canceled': {
-            await (fastify.db as any).subscription.update({
+            await fastify.db.subscription.update({
               where: { tenantId },
               data: { status: 'cancelled' },
             });
@@ -143,7 +143,7 @@ const paddleRoutes: FastifyPluginAsync = async (fastify) => {
           }
 
           case 'subscription.past_due': {
-            await (fastify.db as any).subscription.update({
+            await fastify.db.subscription.update({
               where: { tenantId },
               data: { status: 'past_due' },
             });

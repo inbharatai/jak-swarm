@@ -342,7 +342,7 @@ export class QueueWorker extends EventEmitter {
   // -----------------------------------------------------------------------
 
   private async claimNextJob(): Promise<WorkflowJobRow | null> {
-    const jobModel = (this.db as any).workflowJob;
+    const jobModel = this.db.workflowJob;
     if (!jobModel) return null;
 
     // P1b: claim now tags the row with ownerInstanceId, leaseExpiresAt, and
@@ -584,7 +584,7 @@ export class QueueWorker extends EventEmitter {
   // -----------------------------------------------------------------------
 
   private async executeJob(job: WorkflowJobRow): Promise<void> {
-    const jobModel = (this.db as any).workflowJob;
+    const jobModel = this.db.workflowJob;
     if (!jobModel) return;
 
     try {
@@ -616,7 +616,7 @@ export class QueueWorker extends EventEmitter {
   }
 
   private async markFailure(job: WorkflowJobRow, errorMessage: string): Promise<void> {
-    const jobModel = (this.db as any).workflowJob;
+    const jobModel = this.db.workflowJob;
     if (!jobModel) return;
 
     const shouldRetry = job.attempts < job.maxAttempts;

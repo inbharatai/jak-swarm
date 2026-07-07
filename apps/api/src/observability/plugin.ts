@@ -14,6 +14,15 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { metrics, metricsRegistry } from './metrics.js';
 import { config } from '../config.js';
 
+// Request-level high-resolution start timestamp set in the onRequest hook
+// and consumed in onResponse to compute request duration. Lives on the
+// request object rather than a WeakMap to survive across hook boundaries.
+declare module 'fastify' {
+  interface FastifyRequest {
+    _startTime?: bigint;
+  }
+}
+
 // ─── Shutdown state ─────────────────────────────────────────────────────────
 
 let isShuttingDown = false;
@@ -126,7 +135,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     // Database check
     try {
       const dbStart = Date.now();
-      await (fastify as any).db.$queryRawUnsafe('SELECT 1');
+      await fastify.db.$queryRawUnsafe('SELECT 1');
       const dbLatency = Date.now() - dbStart;
       checks['database'] = { status: 'ok', latencyMs: dbLatency };
       metrics.healthCheckDuration.observe({ dependency: 'db' }, dbLatency / 1000);
@@ -140,7 +149,7 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
     if (config.redisUrl) {
       try {
         const redisStart = Date.now();
-        await (fastify as any).redis?.ping();
+        await fastify.redis?.ping();
         const redisLatency = Date.now() - redisStart;
         checks['redis'] = { status: 'ok', latencyMs: redisLatency };
         metrics.healthCheckDuration.observe({ dependency: 'redis' }, redisLatency / 1000);
@@ -182,11 +191,11 @@ const observabilityPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ── 4. HTTP request instrumentation ───────────────────────────────────
   fastify.addHook('onRequest', async (request: FastifyRequest, _reply: FastifyReply) => {
-    (request as any)._startTime = process.hrtime.bigint();
+    request._startTime = process.hrtime.bigint();
   });
 
   fastify.addHook('onResponse', async (request: FastifyRequest, reply: FastifyReply) => {
-    const startTime = (request as any)._startTime as bigint | undefined;
+    const startTime = request._startTime;
     if (startTime) {
       const durationNs = Number(process.hrtime.bigint() - startTime);
       const durationSec = durationNs / 1e9;

@@ -66,6 +66,7 @@ export type {
   WorkflowSnapshot,
   WorkflowLifecycleEvent,
   WorkflowLifecycleEmitter,
+  CheckpointPrismaClient,
 } from './workflow-runtime/index.js';
 
 // Runner

@@ -44,9 +44,9 @@ export async function initTracing(): Promise<void> {
         })
       : undefined;
 
-    const sdk = new (NodeSDK as any)({
+    const sdk = new NodeSDK({
       resource,
-      traceExporter: new (OTLPTraceExporter as any)({
+      traceExporter: new OTLPTraceExporter({
         url: `${endpoint}/v1/traces`,
       }),
       instrumentations: [

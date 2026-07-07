@@ -111,7 +111,9 @@ const voiceRoutes: FastifyPluginAsync = async (fastify) => {
    * The browser uses this token to connect directly to OpenAI — the raw API key
    * is never sent to the client.
    *
-   * Requires OPENAI_API_KEY to be set. Falls back to a mock token in development.
+   * Requires OPENAI_API_KEY to be set. Returns 503 VOICE_NOT_CONFIGURED when it
+   * is unset — this route never issues a placeholder/mock token (a prior version
+   * did, which silently produced WebRTC sessions that could never connect).
    */
   fastify.get(
     '/sessions/:sessionId/token',
