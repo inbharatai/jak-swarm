@@ -58,7 +58,6 @@ jobs:
           pnpm --filter @jak-swarm/adk build
           pnpm --filter @jak-swarm/client build
           pnpm --filter @jak-swarm/voice build
-          pnpm --filter @jak-swarm/workflows build
           pnpm --filter @jak-swarm/whatsapp-client build
           pnpm --filter @jak-swarm/api build
 
@@ -142,7 +141,6 @@ jobs:
           pnpm --filter @jak-swarm/adk build
           pnpm --filter @jak-swarm/client build
           pnpm --filter @jak-swarm/voice build
-          pnpm --filter @jak-swarm/workflows build
           pnpm --filter @jak-swarm/whatsapp-client build
           pnpm --filter @jak-swarm/api build
 

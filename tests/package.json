@@ -8,7 +8,6 @@
     "test:db": "vitest run integration/postgres-integration.test.ts",
     "test:errors": "vitest run integration/workflow-errors-behavioral.test.ts",
     "test:e2e": "playwright test",
-    "test:temporal": "tsx temporal/temporal-workflows.ts",
     "test:load:k6": "k6 run tests/load/api-load.k6.js"
   },
   "dependencies": {
@@ -21,18 +20,13 @@
     "@jak-swarm/swarm": "workspace:*",
     "@jak-swarm/tools": "workspace:*",
     "@jak-swarm/verification": "workspace:*",
-    "@jak-swarm/voice": "workspace:*",
-    "@jak-swarm/workflows": "workspace:*"
+    "@jak-swarm/voice": "workspace:*"
   },
   "devDependencies": {
     "@langchain/core": "^1.2.1",
     "@langchain/langgraph": "^1.4.7",
     "@langchain/langgraph-checkpoint": "^1.1.3",
     "@playwright/test": "^1.61.1",
-    "@temporalio/client": "^1.19.0",
-    "@temporalio/testing": "^1.19.0",
-    "@temporalio/worker": "^1.19.0",
-    "@temporalio/workflow": "^1.19.0",
     "@types/node": "^22.10.7",
     "@vitest/coverage-v8": "2.1.9",
     "cheerio": "^1.0.0",

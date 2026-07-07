@@ -17,7 +17,6 @@ COPY packages/swarm/package.json packages/swarm/
 COPY packages/security/package.json packages/security/
 COPY packages/verification/package.json packages/verification/
 COPY packages/voice/package.json packages/voice/
-COPY packages/workflows/package.json packages/workflows/
 COPY packages/industry-packs/package.json packages/industry-packs/
 # OpenClaw-inspired Phase 1, Item A — @jak-swarm/skills is a runtime
 # dependency of @jak-swarm/agents (BaseAgent.injectBundledSkills uses
