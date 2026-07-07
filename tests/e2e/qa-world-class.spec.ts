@@ -66,6 +66,14 @@ async function sendChatAndWait(
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const startedAt = Date.now();
 
+  // Extend the Playwright test timeout to outlast the poll deadline. The
+  // suite config sets a 60s test timeout, but multi-agent workflows
+  // (CMO/CEO/Research/Coding personas) routinely take 2-4min. Without this,
+  // Playwright tears the page down at 60s while sendChatAndWait is still
+  // polling → "Target page, context or browser has been closed". The +20s
+  // buffer covers the post-deadline assertions + fullPage screenshot.
+  test.setTimeout(timeoutMs + 20_000);
+
   // Always start with a fresh conversation so initialAssistantCount = 0
   const newChatBtn = page.locator('button:has-text("New chat")').first();
   if ((await newChatBtn.count()) > 0) {
@@ -306,6 +314,9 @@ test.describe('JAK Swarm — World-Class QA', () => {
   // specific project (/builder/:projectId), so the CTO scenario must
   // create a project first, then drive the prompt + build flow.
   test('3a. CTO persona — Builder creates project + generates a landing page', async () => {
+    // Builder generation can take up to 4min (see deadline below); extend
+    // the test timeout so Playwright doesn't tear the page down at 60s.
+    test.setTimeout(260_000);
     await page.goto('/builder', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4500);
     await snap(page, 'cto', 'builder-list');

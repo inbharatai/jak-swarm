@@ -5,15 +5,18 @@
  * watches the SSE response stream until completion, and captures
  * screenshots at every step — just like a real human user would.
  *
- * Evidence saved to Desktop/JackStorm test/10_ceo_cto_workflows/
+ * Evidence saved to Desktop/JackSwarm test/10_ceo_cto_workflows/
  */
 
 import { test, expect, type Page } from '@playwright/test';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-const BASE_URL = (process.env['E2E_BASE_URL'] ?? 'http://localhost:3000').replace(/\/$/, '');
-const EVIDENCE = path.resolve('C:/Users/reetu/Desktop/JackStorm test/10_ceo_cto_workflows');
+// Default to Playwright's configured baseURL (127.0.0.1:3100) — never
+// localhost:3000, which is a different app on this dev machine and would
+// silently test the wrong product. Override with E2E_BASE_URL for prod runs.
+const BASE_URL = (process.env['E2E_BASE_URL'] ?? 'http://127.0.0.1:3100').replace(/\/$/, '');
+const EVIDENCE = path.resolve('C:/Users/reetu/Desktop/JackSwarm test/10_ceo_cto_workflows');
 
 const TYPING_PACE = 40;
 

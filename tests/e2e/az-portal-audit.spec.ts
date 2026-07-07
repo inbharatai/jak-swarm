@@ -14,7 +14,7 @@
  *   J. Landing truth audit (claims vs runtime)
  *   K. Final report with verdict, pass/fail table, production proof
  *
- * Screenshots saved to Desktop/JackStorm test/ subdirectories.
+ * Screenshots saved to Desktop/JackSwarm test/ subdirectories.
  * Auth bypass: NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS=1
  */
 
@@ -22,9 +22,12 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-const BASE_URL = (process.env['E2E_BASE_URL'] ?? 'http://localhost:3000').replace(/\/$/, '');
+// Default to Playwright's configured baseURL (127.0.0.1:3100) — never
+// localhost:3000, which is a different app on this dev machine and would
+// silently test the wrong product. Override with E2E_BASE_URL for prod runs.
+const BASE_URL = (process.env['E2E_BASE_URL'] ?? 'http://127.0.0.1:3100').replace(/\/$/, '');
 const API_URL = (process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:4000').replace(/\/$/, '');
-const EVIDENCE_ROOT = path.resolve('C:/Users/reetu/Desktop/JackStorm test');
+const EVIDENCE_ROOT = path.resolve('C:/Users/reetu/Desktop/JackSwarm test');
 
 interface AuditFinding {
   section: string;

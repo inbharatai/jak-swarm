@@ -26,12 +26,24 @@
  *   pnpm --filter @jak-swarm/db exec tsx ../../scripts/seed-dev-bypass.ts
  */
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 const DEV_TENANT_ID = 'dev-tenant-id';
 const DEV_USER_ID = 'dev-user-id';
 const DEV_USER_EMAIL = 'dev@local.test';
+
+// Dev-only password for the bypass user. This is NOT a secret — it is a
+// known, low-entropy literal for a dev-only user that only exists when
+// JAK_DEV_AUTH_BYPASS=1 AND NODE_ENV !== 'production' (the API refuses the
+// bypass in prod). It exists for one reason: the authenticated e2e suites
+// drive the REAL /login form (`useAuth.login` → backend `/auth/login`,
+// bcrypt-verified), which the bypass short-circuit does not satisfy. Without
+// a passwordHash on this user, those suites' beforeAll times out on /login.
+// The hash is computed at runtime (never hardcoded) so gitleaks has no
+// high-entropy blob to flag. Override by setting DEV_USER_PASSWORD in the env.
+const DEV_USER_PASSWORD = process.env['DEV_USER_PASSWORD'] ?? 'devpass-123';
 
 async function main() {
   console.log('[seed-dev-bypass] connecting to DATABASE_URL ...');
@@ -59,6 +71,11 @@ async function main() {
     update: {},
   });
 
+  // Hash the dev password at runtime (bcrypt, 10 rounds). Set on BOTH
+  // create and update so a re-seed always resets the known dev password —
+  // e2e needs the credential to be deterministic across runs.
+  const passwordHash = await bcrypt.hash(DEV_USER_PASSWORD, 10);
+
   const user = await prisma.user.upsert({
     where: { id: DEV_USER_ID },
     create: {
@@ -68,6 +85,7 @@ async function main() {
       name: 'Local Dev User',
       role: 'TENANT_ADMIN',
       active: true,
+      passwordHash,
     },
     update: {
       tenantId: tenant.id,
@@ -75,6 +93,7 @@ async function main() {
       name: 'Local Dev User',
       role: 'TENANT_ADMIN',
       active: true,
+      passwordHash,
     },
   });
 
@@ -127,6 +146,7 @@ async function main() {
   console.log('Set in apps/web/.env.local:');
   console.log('  NEXT_PUBLIC_JAK_DEV_AUTH_BYPASS=1');
   console.log('Then hit any API route with `Authorization: Bearer jak-dev-bypass`.');
+  console.log('Or drive the real /login form with: ' + DEV_USER_EMAIL + ' / ' + DEV_USER_PASSWORD);
 }
 
 main()

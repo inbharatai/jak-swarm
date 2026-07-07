@@ -78,8 +78,12 @@ test.describe('Pass 1 — Landing (unauthenticated)', () => {
 
     await snap(page, 'landing', 'hero-desktop');
 
+    // Hero H1 is "Turn company context into approved agent work." (the
+    // tagline "Trusted Control Plane" lives in the <title>/metadata, not
+    // the H1). Assert the real shipped hero copy — not a stale "trusted
+    // control plane" regex that drifted when the hero was redesigned.
     const h1 = (await page.locator('h1').first().textContent())?.toLowerCase() ?? '';
-    expect(h1).toMatch(/(trusted|secure) control plane/);
+    expect(h1).toMatch(/turn company context into approved agent work/);
 
     const title = await page.title();
     expect(title).toContain('Trusted Control Plane');
