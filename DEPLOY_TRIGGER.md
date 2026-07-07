@@ -34,7 +34,7 @@ These run before/around a deploy. A red CI does not block Vercel/Railway
 auto-deploys (they are independent of GitHub Actions), but it IS the signal
 that something is broken — treat red CI as a broken deploy.
 
-1. **build** — `pnpm install --frozen-lockfile` → Prisma generate → build all 18 packages in dependency order → `next build` → production Docker image.
+1. **build** — `pnpm install --frozen-lockfile` → Prisma generate → build the 13 workspace packages + `@jak-swarm/api` in dependency order → `next build` for web → production Docker image.
 2. **test** — unit + integration suites against real Postgres (pgvector/pg16) + Redis services. Coverage floor enforced via `tests/vitest.config.ts`.
 3. **security-gate** — fails on hardcoded default `AUTH_SECRET`, real-looking API keys, tracked `.env`, missing production boot guard.
 4. **secret-scan** — gitleaks over full history (`.gitleaks.toml` allowlist).

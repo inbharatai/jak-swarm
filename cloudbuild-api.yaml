@@ -3,8 +3,12 @@
 # Build the API Docker image and deploy to Cloud Run.
 #
 # The API serves HTTP requests (port 4000), runs Chromium for browser tools,
-# and can optionally run an embedded queue worker (WORKFLOW_WORKER_MODE=embedded).
-# In production we use standalone mode — the worker runs as a separate service.
+# and runs an embedded queue worker (WORKFLOW_WORKER_MODE=embedded, set below).
+# The dedicated standalone worker (cloudbuild-worker.yaml → jak-swarm-worker) is
+# NOT currently deployed to Cloud Run, so the API must own the queue. To split
+# worker traffic out: deploy cloudbuild-worker.yaml, verify jak-swarm-worker is
+# live, THEN flip WORKFLOW_WORKER_MODE here to "standalone" (do not flip before
+# the worker is live or workflows will stall). See ARCHITECTURE.md §Deployment.
 #
 # Prerequisites:
 #   1. gcloud CLI installed and authenticated
