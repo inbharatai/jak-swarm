@@ -22,35 +22,16 @@
  *   - Anything with a possible external side effect → not auto-retryable.
  */
 
-import type { ErrorClass } from './repair-service.js';
 import { FailureClass, RepairLevel } from '@jak-swarm/shared';
-import type { RepairBudget, TaskRepairState } from '@jak-swarm/shared';
+import type { RepairBudget, TaskRepairState, FailureSignal, ClassificationResult } from '@jak-swarm/shared';
+
+// Re-export the signal + result types (now defined in shared) so existing
+// imports from this module keep working.
+export type { FailureSignal, ClassificationResult };
 
 /** Input to the classifier — whatever signals the runtime has on hand. */
-export interface FailureSignal {
-  message: string;
-  toolName?: string;
-  /** HTTP status or provider error code, if any. */
-  statusCode?: number;
-  /** Legacy ErrorClass from repair-service.ts, if already classified. */
-  legacyClass?: ErrorClass;
-  /** Hint from the caller: did the tool declare external side effects? */
-  toolHadExternalSideEffect?: boolean;
-  /** True if the failure happened before any tool actually executed. */
-  failedBeforeExecution?: boolean;
-}
-
-export interface ClassificationResult {
-  errorClass: FailureClass;
-  retryable: boolean;
-  externalSideEffectPossible: boolean;
-  recommendedRepairLevel: RepairLevel;
-  /** True when the repair path requires a human approval (never bypassed). */
-  requiresApproval: boolean;
-  /** True when the input should be quarantined (prompt injection, etc.). */
-  quarantine: boolean;
-  reason: string;
-}
+// (FailureSignal + ClassificationResult moved to @jak-swarm/shared so the
+//  agents package can type its LLM-diagnose input without a circular import.)
 
 /**
  * The spec §6 Step 3 repair policy, as a per-class table. This is the single
@@ -83,7 +64,7 @@ const POLICY: Readonly<Record<FailureClass, Omit<ClassificationResult, 'errorCla
  * Map the legacy 11-class ErrorClass → the new 20-class FailureClass so the
  * existing safe RepairService can emit structured records without behaviour change.
  */
-export function mapLegacyErrorClass(legacy: ErrorClass): FailureClass {
+export function mapLegacyErrorClass(legacy: string): FailureClass {
   switch (legacy) {
     case 'transient_api': return FailureClass.TRANSIENT_PROVIDER;
     case 'invalid_structured_output': return FailureClass.OUTPUT_SCHEMA;

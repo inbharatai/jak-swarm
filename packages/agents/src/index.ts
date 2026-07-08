@@ -62,6 +62,12 @@ export type { VerificationResult, VerifierInput } from './roles/verifier.agent.j
 export { GuardrailAgent } from './roles/guardrail.agent.js';
 export type { GuardrailResult, GuardrailInput } from './roles/guardrail.agent.js';
 
+// ─── HyperAgent Phase 4: diagnosis + replanning (LLM wrappers; pure logic in @jak-swarm/swarm) ───
+export { FailureDiagnosticianAgent } from './roles/failure-diagnostician.agent.js';
+export type { LlmDiagnoseInput, LlmDiagnosis } from './roles/failure-diagnostician.agent.js';
+export { ReplannerAgent } from './roles/replanner.agent.js';
+export type { LlmReplanProposal } from './roles/replanner.agent.js';
+
 export { ApprovalAgent } from './roles/approval.agent.js';
 export type { ApprovalInput } from './roles/approval.agent.js';
 

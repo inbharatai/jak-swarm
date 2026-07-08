@@ -69,6 +69,8 @@ model Tenant {
   hyperAgentConfig           HyperAgentConfig?
   workflowOutcomes           WorkflowOutcome[]
   failureDiagnoses           FailureDiagnosis[]
+  // Migration 113 — HyperAgent Phase 4 versioned plan history.
+  planVersions               PlanVersion[]
 
   @@map("tenants")
 }
@@ -173,15 +175,59 @@ model FailureDiagnosis {
   requiresApproval       Boolean  @default(false)
   createdAt              DateTime @default(now())
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  workflow  Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  outcome   WorkflowOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
-  outcomeId String?
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow     Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  outcome      WorkflowOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  outcomeId    String?
+  // HyperAgent Phase 4 — plan versions triggered by this diagnosis.
+  planVersions PlanVersion[]
 
   @@index([tenantId, workflowId])
   @@index([workflowId, taskId])
   @@index([failureClass])
   @@map("failure_diagnoses")
+}
+
+// HyperAgent Phase 4 — versioned plan history.
+//
+// The spec (§13 Phase 4) mandates: "Version every plan and store the complete
+// plan history." Every time the Replanner applies a validated revised plan, a
+// new PlanVersion row is appended (never updated in place) so the full
+// self-healing trajectory is auditable + replayable. `parentVersionId` chains
+// the history; `changedTaskIds` / `invalidatedTaskIds` record the diff;
+// `triggeringDiagnosisId` links the failure diagnosis that caused this replan.
+//
+// Additive only: one new table + FKs + indexes. No existing rows change.
+model PlanVersion {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  workflowId            String
+  // Monotonic per-workflow plan version counter (0 = original plan).
+  version               Int
+  planId                String
+  // The full WorkflowPlan snapshot at this version (JSONB). Stored whole so
+  // any historical version can be replayed without reconstruction.
+  plan                  Json
+  // Previous version this one was derived from (null for the initial plan).
+  parentVersionId       Int?
+  changeReason          String   @db.Text
+  // The FailureDiagnosis that triggered this replan, if any (initial plan = null).
+  triggeringDiagnosisId String?
+  // RepairType that produced this version (MODIFY_TASK | REPLACE_AGENT | ...).
+  repairType            String?
+  // Tasks whose definition changed + tasks whose outputs were invalidated.
+  changedTaskIds        Json
+  invalidatedTaskIds    Json
+  createdAt             DateTime @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow  Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  diagnosis FailureDiagnosis? @relation(fields: [triggeringDiagnosisId], references: [id], onDelete: SetNull)
+
+  @@unique([workflowId, version])
+  @@index([tenantId, workflowId])
+  @@index([workflowId, version])
+  @@map("plan_versions")
 }
 
 model User {
@@ -300,6 +346,8 @@ model Workflow {
   // HyperAgent Phase 2 — structured outcome + failure diagnoses for this run.
   outcome          WorkflowOutcome?
   failureDiagnoses FailureDiagnosis[]
+  // HyperAgent Phase 4 — versioned plan history (one row per applied replan).
+  planVersions     PlanVersion[]
 
   @@index([tenantId, status])
   @@index([updatedAt])

@@ -61,7 +61,7 @@ describe('buildLangGraph — graph compiles', () => {
     return topology.edges ?? [];
   }
 
-  it('compiles a graph with the 8 main SwarmGraph nodes (replanner is post-DAG)', () => {
+  it('compiles a graph with the main SwarmGraph nodes + HyperAgent diagnosis/replanner', () => {
     const compiled = buildLangGraph({ db: stubDb() });
     expect(compiled).toBeDefined();
     const ids = nodeIds(compiled);
@@ -73,7 +73,11 @@ describe('buildLangGraph — graph compiles', () => {
     expect(ids).toContain('verifier');
     expect(ids).toContain('approval');
     expect(ids).toContain('validator');
-    // replanner intentionally NOT in the graph — see langgraph-graph-builder.ts
+    // HyperAgent Phase 4 nodes — only reachable when hyperAgentActive(state),
+    // but they ARE registered in the graph topology so the conditional edges
+    // can route to them. See langgraph-graph-builder.ts + edges.ts.
+    expect(ids).toContain('diagnosis');
+    expect(ids).toContain('replanner');
   });
 
   it('wires the START → commander entry edge', () => {

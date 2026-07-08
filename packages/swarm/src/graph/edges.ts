@@ -10,7 +10,7 @@
  * LangGraph's `END` by the builder; nothing else uses them.
  */
 
-import { WorkflowStatus } from '@jak-swarm/shared';
+import { HyperAgentMode, RepairLevel, WorkflowStatus } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
 import {
   getCurrentTask,
@@ -27,9 +27,38 @@ export type NodeName =
   | 'verifier'
   | 'approval'
   | 'validator'
+  | 'diagnosis'
   | 'replanner'
   | '__end__'
   | '__clarification__';
+
+/**
+ * Is the HyperAgent self-healing layer active for this run?
+ *
+ * The new diagnosis/replanner routing is GATED on this so that a workflow
+ * with `hyperAgentMode === OFF` (or the layer disabled) behaves byte-for-byte
+ * like the legacy graph — it can never reach the diagnosis/replanner nodes.
+ * OBSERVE counts as active: it runs diagnosis + proposes a replan, then the
+ * replanner node applies it only if the autonomy decision permits (at L0/L1
+ * it pauses for approval or just records, never mutates).
+ */
+function hyperAgentActive(state: SwarmState): boolean {
+  return (
+    (state.hyperAgentEnabled ?? false) &&
+    (state.hyperAgentMode ?? HyperAgentMode.OFF) !== HyperAgentMode.OFF
+  );
+}
+
+/**
+ * Has the HyperAgent exhausted its self-healing iteration budget for this run?
+ * When true, a failed task routes to the final evaluator (validator) for
+ * human escalation instead of looping back through diagnosis/replanner.
+ */
+function hyperAgentBudgetExhausted(state: SwarmState): boolean {
+  const used = state.hyperAgentIteration ?? 0;
+  const max = state.maxHyperAgentIterations ?? 3;
+  return used >= max;
+}
 
 export function afterCommander(state: SwarmState): NodeName {
   // If commander failed (provider error, timeout, malformed response),
@@ -73,6 +102,9 @@ export function afterApproval(state: SwarmState): NodeName {
 export function afterVerifier(state: SwarmState): NodeName {
   const currentResult = getCurrentVerificationResult(state);
 
+  // R1/R2 output-repair loop — identical for legacy + HyperAgent. The
+  // HyperAgent layer only takes over once the verifier says "no more
+  // same-input retries" (needsRetry false OR the retry ceiling is hit).
   if (currentResult && !currentResult.passed && currentResult.needsRetry) {
     const task = getCurrentTask(state);
     const MAX_TASK_RETRIES = 3;
@@ -82,9 +114,70 @@ export function afterVerifier(state: SwarmState): NodeName {
     }
   }
 
+  // HyperAgent plan-repair path (spec §6 case 3): when a task has failed
+  // verification AND the R1/R2 loop is exhausted, route to root-cause
+  // diagnosis instead of advancing. The diagnosis node classifies the
+  // failure; the replanner node proposes + validates a revised plan.
+  //
+  // GATED: when the HyperAgent layer is OFF (or disabled) this branch is
+  // unreachable, so legacy routing is unchanged.
+  if (
+    hyperAgentActive(state) &&
+    currentResult &&
+    !currentResult.passed &&
+    !hyperAgentBudgetExhausted(state)
+  ) {
+    return 'diagnosis';
+  }
+
   if (hasMoreTasks(state)) {
     return 'guardrail';
   }
 
   return '__end__';
+}
+
+/**
+ * Edge from the diagnosis node. The diagnosis node wrote a `DiagnosisRecord`
+ * into `pendingDiagnoses[taskId]` and left the workflow non-terminal.
+ *
+ * - R3 (PLAN_REPAIR) and not a hard block → replanner (propose + validate +
+ *   maybe apply the revised plan).
+ * - Anything else (R1/R2 on an already-retried task, a deterministic security
+ *   block, a quarantine, or a budget-exhausted escalation) → validator, which
+ *   is the final outcome evaluator + human-escalation path (spec §6 case 6).
+ */
+export function afterDiagnosis(state: SwarmState): NodeName {
+  const task = getCurrentTask(state);
+  if (!task) return 'validator';
+  const pending = state.pendingDiagnoses?.[task.id];
+  if (!pending) return 'validator';
+
+  const diag = pending.diagnosis;
+  // Hard blocks never reach the replanner — they are terminal escalations.
+  if (diag.recommendedRepairLevel !== RepairLevel.R3_PLAN_REPAIR) {
+    return 'validator';
+  }
+  // Budget exhausted mid-diagnosis → escalate rather than replan.
+  if (hyperAgentBudgetExhausted(state)) {
+    return 'validator';
+  }
+  return 'replanner';
+}
+
+/**
+ * Edge from the replanner node. The replanner either applied a revised plan
+ * (status EXECUTING, rewound to the failed task) or surfaced a terminal /
+ * approval-paused state.
+ *
+ * - EXECUTING → guardrail (re-execute the revised plan from the rewound index;
+ *   completed external actions are retained, only invalidated work re-runs).
+ * - AWAITING_APPROVAL → __end__ (paused for a human; the runtime resumes via
+ *   the approval endpoint, same as the task-approval pause).
+ * - FAILED / anything else → validator (final evaluator + human escalation).
+ */
+export function afterReplanner(state: SwarmState): NodeName {
+  if (state.status === WorkflowStatus.EXECUTING) return 'guardrail';
+  if (state.status === WorkflowStatus.AWAITING_APPROVAL) return '__end__';
+  return 'validator';
 }

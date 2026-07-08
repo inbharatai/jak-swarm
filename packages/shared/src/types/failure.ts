@@ -127,3 +127,42 @@ export interface RepairProposal {
   invalidatedTaskIds: string[];
   createdAt: string; // ISO
 }
+
+// ─── Classifier signal + result (Phase 2/4) ──────────────────────────────────
+// These are pure data types. The classification LOGIC lives in
+// packages/swarm/src/recovery/failure-classifier.ts; the types live here so
+// the agents package (FailureDiagnosticianAgent) can type its LLM-diagnose
+// input without importing from swarm (which would be a circular dependency:
+// swarm → agents → swarm).
+
+/** Input to the deterministic classifier — whatever signals the runtime has. */
+export interface FailureSignal {
+  message: string;
+  toolName?: string;
+  /** HTTP status or provider error code, if any. */
+  statusCode?: number;
+  /**
+   * Legacy ErrorClass string from repair-service.ts, if already classified.
+   * Typed loosely as `string` here to avoid a circular shared→swarm type
+   * import; the classifier's `mapLegacyErrorClass` switch maps any unknown
+   * string to UNKNOWN via its default branch.
+   */
+  legacyClass?: string;
+  /** Hint from the caller: did the tool declare external side effects? */
+  toolHadExternalSideEffect?: boolean;
+  /** True if the failure happened before any tool actually executed. */
+  failedBeforeExecution?: boolean;
+}
+
+/** Result of the deterministic classifier (Phase 2). */
+export interface ClassificationResult {
+  errorClass: FailureClass;
+  retryable: boolean;
+  externalSideEffectPossible: boolean;
+  recommendedRepairLevel: RepairLevel;
+  /** True when the repair path requires a human approval (never bypassed). */
+  requiresApproval: boolean;
+  /** True when the input should be quarantined (prompt injection, etc.). */
+  quarantine: boolean;
+  reason: string;
+}

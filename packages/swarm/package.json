@@ -20,6 +20,7 @@
   "dependencies": {
     "@jak-swarm/agents": "workspace:*",
     "@jak-swarm/industry-packs": "workspace:*",
+    "@jak-swarm/security": "workspace:*",
     "@jak-swarm/shared": "workspace:*",
     "@jak-swarm/tools": "workspace:^",
     "@jak-swarm/verification": "workspace:^",

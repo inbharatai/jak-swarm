@@ -10,6 +10,16 @@ import type { WorkflowPlan } from '@jak-swarm/shared';
 import type { RouteMap } from '@jak-swarm/agents';
 import type { GuardrailResult } from '@jak-swarm/agents';
 import type { VerificationResult } from '@jak-swarm/agents';
+import type {
+  AutonomyLevel,
+  FailureDiagnosis,
+  HyperAgentMode,
+  PlanVersion,
+  ReplanResult,
+  RepairBudget,
+  TaskRepairState,
+  DiagnosisRecord,
+} from '@jak-swarm/shared';
 
 export interface SwarmState {
   // Input
@@ -132,6 +142,38 @@ export interface SwarmState {
   vertexAISearchDatastore?: string;
   /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
   openaiWebSearch?: boolean;
+
+  // ─── HyperAgent state (Phase 4+) ──────────────────────────────────────────
+  // All fields default safely so a workflow with no HyperAgent config behaves
+  // exactly as before. The new diagnosis/replanner routing is GATED on
+  // `hyperAgentMode !== OFF && hyperAgentEnabled`; when off, the graph never
+  // reaches the diagnosis/replanner nodes.
+  /** Tenant HyperAgent mode for this run. Undefined/OFF = legacy routing. */
+  hyperAgentMode?: HyperAgentMode;
+  /** Tenant autonomy level for this run. */
+  autonomyLevel?: AutonomyLevel;
+  /** Tenant repair budget for this run. */
+  repairBudget?: RepairBudget;
+  /** Whether the HyperAgent layer is enabled for this tenant. */
+  hyperAgentEnabled?: boolean;
+  /** 'standard' (legacy) | 'hyperagent' | 'shadow'. */
+  executionMode?: 'standard' | 'hyperagent' | 'shadow';
+  /** Monotonic plan version counter (0 = original plan). */
+  activePlanVersion?: number;
+  /** Complete plan history (versioned per spec §13 Phase 4). */
+  planHistory?: PlanVersion[];
+  /** Per-task unified repair accounting (replaces split retry counters). */
+  taskRepairState?: Record<string, TaskRepairState>;
+  /** Diagnoses keyed by taskId. */
+  failureDiagnoses?: Record<string, FailureDiagnosis>;
+  /** Replan results applied so far. */
+  repairProposals?: ReplanResult[];
+  /** HyperAgent self-healing iteration counter. */
+  hyperAgentIteration?: number;
+  /** Ceiling on self-healing iterations. */
+  maxHyperAgentIterations?: number;
+  /** Diagnoses awaiting the replanner, keyed by taskId. */
+  pendingDiagnoses?: Record<string, DiagnosisRecord>;
 }
 
 export function createInitialSwarmState(params: {
@@ -158,6 +200,12 @@ export function createInitialSwarmState(params: {
   googleSearchGrounding?: boolean;
   vertexAISearchDatastore?: string;
   openaiWebSearch?: boolean;
+  // HyperAgent (Phase 4)
+  hyperAgentEnabled?: boolean;
+  hyperAgentMode?: HyperAgentMode;
+  autonomyLevel?: AutonomyLevel;
+  repairBudget?: RepairBudget;
+  maxHyperAgentIterations?: number;
 }): SwarmState {
   return {
     goal: params.goal,
@@ -202,6 +250,20 @@ export function createInitialSwarmState(params: {
     error: undefined,
     outputs: [],
     traces: [],
+    // HyperAgent — safe defaults (OFF / standard / no history).
+    hyperAgentEnabled: params.hyperAgentEnabled ?? false,
+    hyperAgentMode: params.hyperAgentMode,
+    autonomyLevel: params.autonomyLevel,
+    repairBudget: params.repairBudget,
+    executionMode: params.hyperAgentEnabled ? 'hyperagent' : 'standard',
+    activePlanVersion: 0,
+    planHistory: [],
+    taskRepairState: {},
+    failureDiagnoses: {},
+    repairProposals: [],
+    hyperAgentIteration: 0,
+    maxHyperAgentIterations: params.maxHyperAgentIterations ?? 3,
+    pendingDiagnoses: {},
   };
 }
 

@@ -41,6 +41,14 @@ import type {
   AgentTrace,
   ToolCategory,
   WorkflowPlan,
+  AutonomyLevel,
+  FailureDiagnosis,
+  HyperAgentMode,
+  PlanVersion,
+  ReplanResult,
+  RepairBudget,
+  TaskRepairState,
+  DiagnosisRecord,
 } from '@jak-swarm/shared';
 import type { MissionBrief, RouteMap, GuardrailResult, VerificationResult } from '@jak-swarm/agents';
 import { applySummarizationIfNeeded } from '../context/context-summarizer.js';
@@ -52,19 +60,18 @@ import { workerNode } from '../graph/nodes/worker-node.js';
 import { verifierNode } from '../graph/nodes/verifier-node.js';
 import { approvalNode } from '../graph/nodes/approval-node.js';
 import { validatorNode } from '../graph/nodes/validator-node.js';
-// NOTE: a `replannerNode` previously existed in SwarmGraph for an external
-// auto-repair loop AFTER the main DAG completed with partial failures.
-// It was never wired into this LangGraph StateGraph and never invoked by
-// SwarmExecutionService (the claimed post-completion invocation never
-// existed in code), so it was dead and has been removed. If auto-repair
-// is needed, implement it as a real in-graph node or an explicit
-// post-completion service call — do not reintroduce dead plumbing.
+import { failureDiagnosisNode } from '../graph/nodes/failure-diagnosis-node.js';
+import type { FailureDiagnosisNodeDeps } from '../graph/nodes/failure-diagnosis-node.js';
+import { replannerNode } from '../graph/nodes/replanner-node.js';
+import type { ReplannerNodeDeps } from '../graph/nodes/replanner-node.js';
 import {
   afterCommander,
   afterPlanner,
   afterGuardrail,
   afterApproval,
   afterVerifier,
+  afterDiagnosis,
+  afterReplanner,
   type NodeName,
 } from '../graph/edges.js';
 import {
@@ -183,6 +190,21 @@ export const SwarmStateAnnotation = Annotation.Root({
   error: Annotation<string | undefined>({ reducer: lwwReducer, default: () => undefined }),
   outputs: Annotation<unknown[]>({ reducer: appendReducer, default: () => [] }),
   traces: Annotation<AgentTrace[]>({ reducer: appendReducer, default: () => [] }),
+
+  // ─── HyperAgent (Phase 4+) ───────────────────────────────────────────────
+  hyperAgentEnabled: Annotation<boolean | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  hyperAgentMode: Annotation<HyperAgentMode | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  autonomyLevel: Annotation<AutonomyLevel | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  repairBudget: Annotation<RepairBudget | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  executionMode: Annotation<'standard' | 'hyperagent' | 'shadow' | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  activePlanVersion: Annotation<number>({ reducer: lwwReducer, default: () => 0 }),
+  planHistory: Annotation<PlanVersion[]>({ reducer: appendReducer, default: () => [] }),
+  taskRepairState: Annotation<Record<string, TaskRepairState>>({ reducer: mergeReducer, default: () => ({}) }),
+  failureDiagnoses: Annotation<Record<string, FailureDiagnosis>>({ reducer: mergeReducer, default: () => ({}) }),
+  repairProposals: Annotation<ReplanResult[]>({ reducer: appendReducer, default: () => [] }),
+  hyperAgentIteration: Annotation<number>({ reducer: lwwReducer, default: () => 0 }),
+  maxHyperAgentIterations: Annotation<number>({ reducer: lwwReducer, default: () => 3 }),
+  pendingDiagnoses: Annotation<Record<string, DiagnosisRecord>>({ reducer: mergeReducer, default: () => ({}) }),
 });
 
 export type SwarmAnnotationT = typeof SwarmStateAnnotation.State;
@@ -208,11 +230,22 @@ function approvalEdge(state: SwarmAnnotationT): 'worker' | 'end' {
   const next = afterApproval(state as unknown as SwarmState);
   return next === 'worker' ? 'worker' : 'end';
 }
-function verifierEdge(state: SwarmAnnotationT): 'worker' | 'guardrail' | 'validator' {
+function verifierEdge(state: SwarmAnnotationT): 'worker' | 'guardrail' | 'validator' | 'diagnosis' {
   const next = afterVerifier(state as unknown as SwarmState);
   if (next === 'worker') return 'worker';
+  if (next === 'diagnosis') return 'diagnosis';
   if (next === '__end__') return 'validator';
   return 'guardrail';
+}
+function diagnosisEdge(state: SwarmAnnotationT): 'replanner' | 'validator' {
+  const next = afterDiagnosis(state as unknown as SwarmState);
+  return next === 'replanner' ? 'replanner' : 'validator';
+}
+function replannerEdge(state: SwarmAnnotationT): 'guardrail' | 'validator' | 'end' {
+  const next = afterReplanner(state as unknown as SwarmState);
+  if (next === 'guardrail') return 'guardrail';
+  if (next === 'validator') return 'validator';
+  return 'end';
 }
 
 // ─── Node wrappers ────────────────────────────────────────────────────────
@@ -417,6 +450,18 @@ export interface BuildLangGraphParams {
   db: CheckpointPrismaClient;
   shouldStop?: (workflowId: string) => boolean;
   shouldPause?: (workflowId: string) => boolean;
+  /**
+   * HyperAgent node dependencies (Phase 4). When omitted, the diagnosis +
+   * replanner nodes run with no injected LLM / counterfactual re-executor —
+   * the deterministic classifier + deterministic proposer handle everything.
+   * The new nodes are only REACHABLE when the run has
+   * `hyperAgentMode !== OFF && hyperAgentEnabled` (see edges.ts), so omitting
+   * this keeps legacy workflows byte-for-byte unchanged.
+   */
+  hyperAgent?: {
+    failureDiagnosis?: FailureDiagnosisNodeDeps;
+    replanner?: ReplannerNodeDeps;
+  };
 }
 
 export function buildLangGraph(params: BuildLangGraphParams) {
@@ -425,6 +470,8 @@ export function buildLangGraph(params: BuildLangGraphParams) {
     shouldPause: params.shouldPause,
   };
   const checkpointer = new PostgresCheckpointSaver(params.db);
+  const failureDiagnosisDeps = params.hyperAgent?.failureDiagnosis ?? {};
+  const replannerDeps = params.hyperAgent?.replanner ?? {};
 
   const builder = new StateGraph(SwarmStateAnnotation)
     .addNode('commander', wrapNode('commander', commanderNode, deps))
@@ -435,6 +482,15 @@ export function buildLangGraph(params: BuildLangGraphParams) {
     .addNode('verifier', wrapVerifierNode(deps))
     .addNode('approval', wrapApprovalNode(deps))
     .addNode('validator', wrapNode('validator', validatorNode, deps))
+    // HyperAgent Phase 4 nodes — only reachable when hyperAgentActive(state).
+    .addNode(
+      'diagnosis',
+      wrapNode('diagnosis', (s) => failureDiagnosisNode(s, failureDiagnosisDeps), deps),
+    )
+    .addNode(
+      'replanner',
+      wrapNode('replanner', (s) => replannerNode(s, replannerDeps), deps),
+    )
     .addEdge(START, 'commander')
     .addConditionalEdges('commander', commanderEdge, {
       planner: 'planner',
@@ -459,6 +515,17 @@ export function buildLangGraph(params: BuildLangGraphParams) {
       worker: 'worker',
       guardrail: 'guardrail',
       validator: 'validator',
+      diagnosis: 'diagnosis',
+    })
+    // HyperAgent plan-repair routing (gated; unreachable when OFF).
+    .addConditionalEdges('diagnosis', diagnosisEdge, {
+      replanner: 'replanner',
+      validator: 'validator',
+    })
+    .addConditionalEdges('replanner', replannerEdge, {
+      guardrail: 'guardrail',
+      validator: 'validator',
+      end: END,
     })
     .addEdge('validator', END);
 
