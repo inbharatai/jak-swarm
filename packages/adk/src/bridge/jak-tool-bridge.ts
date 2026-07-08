@@ -16,6 +16,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { FunctionTool, GOOGLE_SEARCH } from '@google/adk';
 import type { ToolMetadata, ToolExecutionContext } from '@jak-swarm/shared';
 import { getTenantToolRegistry } from '@jak-swarm/tools';
+import {
+  shouldPauseForApproval,
+  applyApprovalDecision,
+  type ApprovalGate,
+} from '../orchestration/adk-parity.js';
 
 // ─── Context thread ────────────────────────────────────────────────────────
 // ADK FunctionTool.execute receives (input, tool_context) but JAK's
@@ -45,6 +50,30 @@ export function withJakExecutionContext<T>(ctx: ToolExecutionContext, fn: () => 
 /** Get the current JAK execution context (internal use by bridge). */
 export function getJakExecutionContext(): ToolExecutionContext | undefined {
   return executionContextAls.getStore();
+}
+
+// ─── HyperAgent Phase 11: approval pause/resume seam ────────────────────────
+//
+// A second AsyncLocalStorage threads an OPTIONAL ApprovalGate so the bridged
+// FunctionTool handler can PAUSE before executing a high-risk tool and await a
+// (possibly human) decision — real pause/resume at the tool-call boundary,
+// honest parity with LangGraph's per-tool approval gate within ADK's
+// synchronous-event constraint. When no gate is set, the bridge runs the tool
+// exactly as before (non-regressing).
+
+const approvalGateAls = new AsyncLocalStorage<ApprovalGate | null>();
+
+/**
+ * Run `fn` with `gate` as the approval gate for any ADK tool callback invoked
+ * within `fn`. Pass `null` (or omit) to disable the pause seam (legacy behavior).
+ */
+export function withApprovalGate<T>(gate: ApprovalGate | null, fn: () => T): T {
+  return approvalGateAls.run(gate, fn);
+}
+
+/** Get the current approval gate, if any (internal use by bridge). */
+export function getApprovalGate(): ApprovalGate | null | undefined {
+  return approvalGateAls.getStore();
 }
 
 // ─── JSON Schema → Zod converter ────────────────────────────────────────────
@@ -148,6 +177,38 @@ export function jakToolToAdkFunctionTool(metadata: ToolMetadata): FunctionTool {
       const ctx = getJakExecutionContext();
       if (!ctx) {
         return { error: `No JAK execution context set for tool ${metadata.name}` };
+      }
+
+      // HyperAgent Phase 11 — approval pause/resume at the tool-call boundary.
+      // If the tool requires approval AND a gate is configured, PAUSE and await
+      // the decision before executing. On deny / approval_required, do NOT run
+      // the tool — return the recorded-for-review outcome (honest: the tool did
+      // not execute). When no gate is configured, fall back to the prior
+      // behavior (the tool runs; high-risk tools self-report via their own
+      // outcome), so legacy ADK runs are byte-for-byte unchanged.
+      if (shouldPauseForApproval(metadata)) {
+        const gate = getApprovalGate();
+        if (gate) {
+          try {
+            const decision = await gate(metadata.name, metadata);
+            const resolved = applyApprovalDecision(decision);
+            if (!resolved.mayExecute) {
+              return {
+                outcome: resolved.outcome,
+                outcomeMessage: resolved.reason ?? `Tool ${metadata.name} not executed: ${resolved.outcome}`,
+                error: resolved.reason ?? `Tool ${metadata.name} not executed: ${resolved.outcome}`,
+              };
+            }
+          } catch (err) {
+            // A misbehaving gate must never silently let a high-risk tool run.
+            return {
+              outcome: 'approval_required',
+              outcomeMessage: `approval gate errored for ${metadata.name}; tool not executed`,
+              error: err instanceof Error ? err.message : String(err),
+            };
+          }
+        }
+        // No gate configured ⇒ prior behavior (tool runs; self-reports approval_required).
       }
 
       try {

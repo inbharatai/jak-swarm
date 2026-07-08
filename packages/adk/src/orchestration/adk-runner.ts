@@ -14,9 +14,14 @@
 
 import { Runner, InMemorySessionService } from '@google/adk';
 import { WorkflowStatus, AgentRole } from '@jak-swarm/shared';
-import type { ToolMetadata, ToolExecutionContext } from '@jak-swarm/shared';
-import { buildAdkPipeline, buildSimpleAdkPipeline, type AdkPipelineConfig } from './adk-pipeline.js';
-import { withJakExecutionContext } from '../bridge/jak-tool-bridge.js';
+import type { ToolMetadata, ToolExecutionContext, WorkflowPlan } from '@jak-swarm/shared';
+import { buildAdkPipeline, buildSimpleAdkPipeline, buildWavedPipeline, type AdkPipelineConfig } from './adk-pipeline.js';
+import { withJakExecutionContext, withApprovalGate } from '../bridge/jak-tool-bridge.js';
+import {
+  rolesFromPlan,
+  partitionRolesIntoWaves,
+  type ApprovalGate,
+} from './adk-parity.js';
 import type { SwarmState } from '@jak-swarm/swarm';
 
 // ─── ADK run result ─────────────────────────────────────────────────────────
@@ -141,6 +146,26 @@ export async function runWithAdk(params: {
   googleSearchGrounding?: boolean;
   openaiWebSearch?: boolean;
   /**
+   * HyperAgent Phase 11 — the Planner's structured plan. When supplied, the
+   * runner derives worker roles FROM THE PLAN (rolesFromPlan, the parity fix
+   * for "ADK roles from caller roleModes not Planner plan") and builds a WAVED
+   * pipeline (partitionRolesIntoWaves → buildWavedPipeline) so a depended-on
+   * role's wave runs before its dependents'. When omitted, the runner uses
+   * `workerRoles` / the simple pipeline exactly as before (non-regressing).
+   */
+  plannerPlan?: WorkflowPlan;
+  /**
+   * HyperAgent Phase 11 — the approval gate. When supplied, the bridged
+   * FunctionTool handler PAUSES before executing a high-risk tool and awaits
+   * this gate (which may itself await a human) — real pause/resume at the
+   * tool-call boundary, honest parity with LangGraph's per-tool approval gate
+   * within ADK's synchronous-event constraint. On `deny` / `approval_required`
+   * the tool does NOT execute (recorded-for-review outcome returned). When
+   * omitted, high-risk tools run and self-report via their own outcome (prior
+   * behavior, non-regressing).
+   */
+  approvalGate?: ApprovalGate;
+  /**
    * Cockpit parity (Phase 3) — optional callback invoked with each ADK
    * event mapped to the JAK `onAgentActivity` vocabulary. The swarm-
    * execution service passes the SAME translator the LangGraph path uses
@@ -148,15 +173,6 @@ export async function runWithAdk(params: {
    * events + audit rows). When omitted, the ADK run is silent to the
    * cockpit until the final SwarmState is returned — which is the prior
    * behavior and remains correct for headless/bench runs.
-   *
-   * NOTE: ADK's tool model is synchronous within the `for await` event
-   * loop — there is no `interrupt()` equivalent. A `tool_approval_required`
-   * activity can be EMITTED for cockpit visibility, but it CANNOT pause
-   * the ADK run the way LangGraph's per-tool approval gate pauses the
-   * graph. High-risk tools in ADK mode must rely on the tool itself
-   * returning `outcome:'approval_required'` (recorded for review) rather
-   * than workflow-level pause/resume. Documented here so the caller does
-   * not assume parity with the LangGraph approval pause.
    */
   onAgentActivity?: (data: unknown) => void;
 }): Promise<AdkRunResult> {
@@ -172,18 +188,30 @@ export async function runWithAdk(params: {
     allowedToolNames,
     googleSearchGrounding,
     openaiWebSearch,
+    plannerPlan,
+    approvalGate,
     onAgentActivity,
   } = params;
 
-  // Thread the JAK execution context via AsyncLocalStorage so concurrent
-  // ADK runs each see their own context. The whole run body executes
-  // inside this scope; tool-bridge callbacks read it via getJakExecutionContext().
-  return withJakExecutionContext(toolContext, async () => {
-    // 2. Build the ADK pipeline
+  // Thread the JAK execution context + the optional approval gate via
+  // AsyncLocalStorage so concurrent ADK runs each see their own context + gate.
+  // The whole run body executes inside this scope; tool-bridge callbacks read
+  // them via getJakExecutionContext() / getApprovalGate().
+  return withJakExecutionContext(toolContext, () =>
+    withApprovalGate(approvalGate ?? null, async () => {
+    // 2. Derive worker roles from the Planner plan (Phase 11 parity) when
+    //    supplied; otherwise fall back to the caller's workerRoles / ['CEO'].
+    const derivedRoles = plannerPlan
+      ? rolesFromPlan(plannerPlan)
+      : (workerRoles ?? ['CEO']);
+
+    // 2b. Build the ADK pipeline. When a Planner plan is supplied, build a
+    //     WAVED pipeline (dependency-ordered waves — Phase 11 parity with the
+    //     LangGraph path). Otherwise use the flat / simple pipeline as before.
     const pipelineConfig: AdkPipelineConfig = {
       provider,
       jakToolMetadata,
-      workerRoles: workerRoles ?? ['CEO'],
+      workerRoles: derivedRoles,
       allowedToolNames,
       // Search is on by default in ADK mode; either flag opts in, and
       // googleSearchGrounding defaults true (opt out via env = '0').
@@ -191,9 +219,11 @@ export async function runWithAdk(params: {
       includeSearch: Boolean(googleSearchGrounding) || Boolean(openaiWebSearch),
     };
 
-    const pipeline = workerRoles && workerRoles.length > 1
-      ? buildAdkPipeline(pipelineConfig)
-      : buildSimpleAdkPipeline(pipelineConfig);
+    const pipeline = plannerPlan
+      ? buildWavedPipeline(pipelineConfig, partitionRolesIntoWaves(plannerPlan))
+      : (workerRoles && workerRoles.length > 1
+        ? buildAdkPipeline(pipelineConfig)
+        : buildSimpleAdkPipeline(pipelineConfig));
 
     // 3. Create ADK Runner with in-memory sessions
     const sessionService = new InMemorySessionService();
@@ -309,5 +339,5 @@ export async function runWithAdk(params: {
       success: !hasError,
       error: errorMessage,
     };
-  });
+  })); // close withApprovalGate + withJakExecutionContext
 }

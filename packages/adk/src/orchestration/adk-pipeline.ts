@@ -95,3 +95,46 @@ export function buildSimpleAdkPipeline(config: AdkPipelineConfig): LlmAgent {
     includeSearch: true,
   });
 }
+
+// ─── HyperAgent Phase 11: waved pipeline (ADK parity with LangGraph waves) ───
+//
+// The flat ParallelAgent runs every worker concurrently regardless of task
+// dependencies. The LangGraph path runs dependency-ordered WAVES so a depended-
+// on task completes before its dependents start. `buildWavedPipeline` mirrors
+// that: a SequentialAgent of ParallelAgents, one ParallelAgent per wave, each
+// containing a worker per unique role in that wave. Role names are wave-suffixed
+// to keep ADK agent names unique when a role recurs across waves.
+//
+//   SequentialAgent(root)
+//     ├── CommanderAgent
+//     ├── PlannerAgent
+//     ├── ParallelAgent(wave 1)  ─ Worker_<role>_w0, ...
+//     ├── ParallelAgent(wave 2)  ─ Worker_<role>_w1, ...
+//     ├── ...
+//     ├── SynthesisAgent
+//     └── VerifierAgent
+//
+// OPT-IN: the runner uses this only when the caller supplies a Planner plan
+// (hyperAgent mode). Otherwise `buildAdkPipeline` (flat) is used unchanged.
+export function buildWavedPipeline(config: AdkPipelineConfig, waves: readonly (readonly string[])[]): SequentialAgent {
+  const commander = createCommanderAdk(config);
+  const planner = createPlannerAdk(config);
+
+  const waveAgents = waves.map((roles, waveIndex) => {
+    const workers = roles.map((role) => createWorkerAdk(role, config, `Worker_${role}_w${waveIndex}`));
+    return new ParallelAgent({
+      name: `Wave_${waveIndex}`,
+      subAgents: workers,
+      description: `Wave ${waveIndex}: executes roles ${roles.join(', ')} concurrently`,
+    });
+  });
+
+  const synthesis = createSynthesisAdk(config);
+  const verifier = createVerifierAdk(config);
+
+  return new SequentialAgent({
+    name: 'JAKSwarmWavedPipeline',
+    subAgents: [commander, planner, ...waveAgents, synthesis, verifier],
+    description: 'JAK Swarm multi-agent workflow with dependency-ordered waves (HyperAgent Phase 11)',
+  });
+}

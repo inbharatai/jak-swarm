@@ -20,6 +20,8 @@
 export {
   withJakExecutionContext,
   getJakExecutionContext,
+  withApprovalGate,
+  getApprovalGate,
   jsonSchemaToZod,
   jakToolToAdkFunctionTool,
   jakToolsToAdkFunctionTools,
@@ -40,8 +42,20 @@ export {
 export {
   buildAdkPipeline,
   buildSimpleAdkPipeline,
+  buildWavedPipeline,
   type AdkPipelineConfig,
 } from './orchestration/adk-pipeline.js';
+
+// HyperAgent Phase 11 — ADK parity pure cores (waves, roles-from-plan, approval pause/resume)
+export {
+  rolesFromPlan,
+  partitionRolesIntoWaves,
+  shouldPauseForApproval,
+  applyApprovalDecision,
+  type ApprovalGate,
+  type ApprovalDecision,
+  type ApprovalVerdict,
+} from './orchestration/adk-parity.js';
 
 // Runner bridge
 export {

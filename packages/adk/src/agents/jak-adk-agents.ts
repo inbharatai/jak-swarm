@@ -128,7 +128,7 @@ export function createPlannerAdk(config: AdkAgentConfig): LlmAgent {
  * Create a worker ADK agent for a specific role.
  * Each worker gets JAK tools + provider-native search.
  */
-export function createWorkerAdk(role: string, config: AdkAgentConfig): LlmAgent {
+export function createWorkerAdk(role: string, config: AdkAgentConfig, nameOverride?: string): LlmAgent {
   const tools = buildAdkToolsArray({
     provider: config.provider,
     jakToolMetadata: config.jakToolMetadata,
@@ -137,7 +137,7 @@ export function createWorkerAdk(role: string, config: AdkAgentConfig): LlmAgent 
   });
 
   return new LlmAgent({
-    name: `${role}_Worker`,
+    name: nameOverride ?? `${role}_Worker`,
     model: modelForRole(role, config.provider),
     description: `Executes tasks as the ${role} agent using available tools and web search`,
     instruction: WORKER_INSTRUCTION.replace('{role}', role),
