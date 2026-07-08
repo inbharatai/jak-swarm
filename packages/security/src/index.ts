@@ -100,6 +100,42 @@ export type {
   ShieldToolCallEvaluation,
 } from './shield-gateway/types.js';
 
+// JAK Shield — signed decisions (HyperAgent Phase 8). Every autonomous HyperAgent
+// action must carry a Shield-signed decision with a content-addressed decisionId,
+// verifiable + replayable for audit. The agent holds only the Shield's PUBLIC key
+// (verify-only) so it can never forge a decision or bypass the Shield. Pure crypto
+// core in signed-decision.ts; the MCP client (local embedded + remote transport)
+// in shield-mcp-client.ts wires I/O.
+export {
+  ShieldDecisionVerdict,
+  canonicalizeSubject,
+  decisionIdFor,
+  decisionPayload,
+  generateShieldKeyPair,
+  signDecision,
+  verifyDecision,
+  isExpired,
+  replayDecision,
+  verdictFromToolEvaluation,
+  verdictFromScan,
+} from './shield-gateway/signed-decision.js';
+export type {
+  ShieldDecisionSubject,
+  ShieldSignedDecision,
+  UnsignedShieldDecision,
+  ShieldDecisionVerification,
+  ShieldDecisionReplay,
+} from './shield-gateway/signed-decision.js';
+export {
+  ShieldMcpClient,
+  ShieldDecisionUnverifiableError,
+  ShieldMcpConfigError,
+} from './shield-gateway/shield-mcp-client.js';
+export type {
+  ShieldMcpTransport,
+  ShieldMcpClientOptions,
+} from './shield-gateway/shield-mcp-client.js';
+
 // ─── Governance / Autonomy (HyperAgent Phase 1) ─────────────────────────────
 // Central, deterministic autonomy-policy evaluator. ONE place that decides what
 // the HyperAgent may do at a given AutonomyLevel. Later phases (replanner,
