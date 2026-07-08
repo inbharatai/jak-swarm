@@ -197,3 +197,26 @@ export type {
   AgentTraceInput,
   ShieldAuditInput,
 } from './hyperagent/control-centre.js';
+
+// ─── HyperAgent Phase 14 — failure-injection framework ─────────────────────
+// A PURE, deterministic harness that simulates the 16 spec failure modes and
+// runs each through the REAL decision path (classifier → autonomy → Shield →
+// budget → replan bound). No I/O, no clock — every scenario is a fixed signal
+// so failure handling is reproducible in CI. The live E2E (real tenant + DB +
+// Cloud Run worker) is env-gated and lives in tests/e2e; it is never fake-passed
+// here. See failure-injection.ts.
+export {
+  runFailureInjection,
+  signalFor,
+  isSecurityFailureClass,
+  defaultInjectionContext,
+  ALL_FAILURE_KINDS,
+  FailureKind,
+} from './hyperagent/failure-injection.js';
+export type {
+  FailureInjectionContext,
+  FailureInjectionResult,
+  FailureAction,
+  ShieldResponse,
+  ShieldVerdictOutcome,
+} from './hyperagent/failure-injection.js';
