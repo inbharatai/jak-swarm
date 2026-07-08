@@ -4,8 +4,9 @@ import {
   OutcomeVerdict,
   TaskVerdict,
   FailureClass,
+  AcceptanceCriterionKind,
 } from '../../../packages/shared/src/index.js';
-import type { WorkflowPlan, WorkflowTask } from '../../../packages/shared/src/index.js';
+import type { WorkflowPlan, WorkflowTask, RunEvidence } from '../../../packages/shared/src/index.js';
 import type { VerificationResult } from '../../../packages/agents/src/roles/verifier.agent.js';
 import {
   evaluateOutcome,
@@ -169,6 +170,63 @@ describe('outcome-evaluator — honest acceptance-criteria seam', () => {
       acceptanceCriteria: ['c1'],
     }));
     expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_SUCCESS);
+    expect(r.acceptanceResults[0].satisfied).toBe(false);
+  });
+});
+
+describe('outcome-evaluator — Phase 6 wired acceptance seam', () => {
+  it('measures structured criteria against run evidence (wired=true, real evidence)', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a' })]),
+      verificationResults: { a: vPass() },
+      acceptanceCriteria: [
+        { id: 'c1', description: 'task a passed', kind: AcceptanceCriterionKind.TASK_VERIFIED, taskId: 'a' },
+        { id: 'c2', description: 'artifact present', kind: AcceptanceCriterionKind.ARTIFACT_PRESENT, artifactId: 'art-1' },
+      ],
+      acceptanceEvidence: { taskOutcomes: [], artifacts: ['art-1'], metrics: {} } as RunEvidence,
+    }));
+    // TASK_VERIFIED binds against the evaluator's own triage (a passed + verified).
+    expect(r.acceptanceResults[0].wired).toBe(true);
+    expect(r.acceptanceResults[0].satisfied).toBe(true);
+    // ARTIFACT_PRESENT binds against the supplied artifact set.
+    expect(r.acceptanceResults[1].wired).toBe(true);
+    expect(r.acceptanceResults[1].satisfied).toBe(true);
+  });
+
+  it('reports an unsatisfied wired criterion when evidence does not meet it', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a' })]),
+      verificationResults: { a: vPass() },
+      acceptanceCriteria: [
+        { id: 'c1', description: 'artifact present', kind: AcceptanceCriterionKind.ARTIFACT_PRESENT, artifactId: 'missing' },
+      ],
+      acceptanceEvidence: { taskOutcomes: [], artifacts: [], metrics: {} } as RunEvidence,
+    }));
+    expect(r.acceptanceResults[0].wired).toBe(true);
+    expect(r.acceptanceResults[0].satisfied).toBe(false);
+  });
+
+  it('keeps structured criteria unwired when no evidence is supplied (honest stub)', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a' })]),
+      verificationResults: { a: vPass() },
+      acceptanceCriteria: [
+        { id: 'c1', description: 'task a passed', kind: AcceptanceCriterionKind.TASK_VERIFIED, taskId: 'a' },
+      ],
+    }));
+    expect(r.acceptanceResults[0].wired).toBe(false);
+    expect(r.acceptanceResults[0].satisfied).toBe(false);
+    expect(r.acceptanceResults[0].evidence).toBeNull();
+  });
+
+  it('keeps legacy string criteria unwired even when evidence is supplied', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a' })]),
+      verificationResults: { a: vPass() },
+      acceptanceCriteria: ['must be well written'],
+      acceptanceEvidence: { taskOutcomes: [], artifacts: [], metrics: {} } as RunEvidence,
+    }));
+    expect(r.acceptanceResults[0].wired).toBe(false);
     expect(r.acceptanceResults[0].satisfied).toBe(false);
   });
 });

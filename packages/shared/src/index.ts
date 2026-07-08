@@ -14,6 +14,7 @@ export * from './types/failure.js';
 export * from './types/outcome.js';
 export * from './types/plan-repair.js';
 export * from './types/learning.js';
+export * from './types/spec.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 export * from './schemas/agent.schema.js';

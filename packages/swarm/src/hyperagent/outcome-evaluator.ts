@@ -11,10 +11,13 @@
  * Callers stamp `completedAt`/`startedAt`; we only subtract.
  *
  * Honest seams (do NOT paper over):
- *   - acceptanceCriteria are typed on AgentExecutableSpec but NOT yet consumed
- *     by the runner/verifier (audit §0). We record each criterion with
- *     `satisfied=false`, `evidence=null`, `wired=false`. Phase 6 flips `wired`
- *     and binds real evidence. Never mark an unwired criterion satisfied.
+ *   - acceptanceCriteria: Phase 6 wires real evidence. Structured criteria
+ *     (AcceptanceCriterion) paired with `acceptanceEvidence` are measured by the
+ *     deterministic acceptance-checker (wired=true with real evidence). Criteria
+ *     supplied as plain strings, or structured criteria without evidence, stay
+ *     `satisfied=false`, `evidence=null`, `wired=false` (the legacy honest stub
+ *     — never mark an unwired criterion satisfied). CUSTOM criteria are always
+ *     wired=false and surface UNVERIFIABLE.
  *   - Counterfactual replay hints (innovation #1) are *hints*, not execution.
  *     Phase 4's diagnostician replays the agent-only/tool-only/model-only
  *     variants in a sandbox to isolate the fault dimension. The inputHash
@@ -30,11 +33,14 @@ import type { AutonomyDecision, FailureClass } from '@jak-swarm/shared';
 import {
   OutcomeVerdict,
   TaskVerdict,
+  type AcceptanceCriterion,
   type AcceptanceCriterionResult,
   type CounterfactualReplayHint,
   type OutcomeEvaluation,
+  type RunEvidence,
   type TaskOutcome,
 } from '@jak-swarm/shared';
+import { checkCriterion } from './acceptance-checker.js';
 
 /** Input bundle — everything the evaluator needs from a finished run. */
 export interface OutcomeEvaluatorInput {
@@ -53,8 +59,14 @@ export interface OutcomeEvaluatorInput {
   accumulatedCostUsd?: number;
   startedAt: Date | string;
   completedAt: Date | string;
-  /** Spec acceptanceCriteria (AgentExecutableSpec.acceptanceCriteria), if any. */
-  acceptanceCriteria?: string[];
+  /** Spec acceptanceCriteria — structured (AcceptanceCriterion) or legacy strings. */
+  acceptanceCriteria?: Array<AcceptanceCriterion | string>;
+  /**
+   * Phase 6 — runtime evidence to bind structured criteria against. When
+   * supplied alongside structured criteria, the deterministic acceptance-checker
+   * measures them (wired=true). Without it, criteria stay unwired (honest stub).
+   */
+  acceptanceEvidence?: RunEvidence;
   /** Final autonomy decision snapshot for this run, if HyperAgent drove it. */
   finalAutonomy?: AutonomyDecision;
   /** Optional pre-classified failure class per failed task (from Phase 2). */
@@ -183,9 +195,13 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
     verdict = OutcomeVerdict.OUTCOME_FAILED;
   }
 
-  // Honest acceptance-criteria seam: record but do NOT verify until Phase 6.
-  const acceptanceResults: AcceptanceCriterionResult[] = (input.acceptanceCriteria ?? []).map(
-    (criterion) => ({ criterion, satisfied: false, evidence: null, wired: false }),
+  // Phase 6 acceptance seam: measure structured criteria against run evidence
+  // when both are supplied; otherwise keep the honest wired=false stub. String
+  // criteria (legacy) are always unwired — never fake a satisfied criterion.
+  const acceptanceResults: AcceptanceCriterionResult[] = measureAcceptanceSeam(
+    input.acceptanceCriteria,
+    input.acceptanceEvidence,
+    taskOutcomes,
   );
 
   // Counterfactual hints for every failed task — Phase 4 consumes these.
@@ -239,4 +255,44 @@ function buildSummary(
     case OutcomeVerdict.OUTCOME_BLOCKED: return `Blocked by guardrail/policy/approval. ${counts}`;
     default: return `Unknown verdict. ${counts}`;
   }
+}
+
+/**
+ * Phase 6 acceptance seam. Pure.
+ *
+ * - Structured criterion + evidence supplied → measured by the deterministic
+ *   acceptance-checker (wired=true, real evidence).
+ * - Structured criterion WITHOUT evidence → honest stub (wired=false) — we have
+ *   the shape to bind but not the run's evidence yet.
+ * - String criterion (legacy) → honest stub (wired=false) — no binding exists.
+ *
+ * When evidence is supplied but lacks taskOutcomes (e.g. a caller only passed
+ * metrics), fall back to the run's own triaged taskOutcomes so TASK_* criteria
+ * still bind. Never fake a satisfied criterion.
+ */
+function measureAcceptanceSeam(
+  criteria: Array<AcceptanceCriterion | string> | undefined,
+  evidence: RunEvidence | undefined,
+  taskOutcomes: TaskOutcome[],
+): AcceptanceCriterionResult[] {
+  if (!criteria || criteria.length === 0) return [];
+  if (!evidence) {
+    return criteria.map((c) => ({
+      criterion: typeof c === 'string' ? c : c.description,
+      satisfied: false,
+      evidence: null,
+      wired: false,
+    }));
+  }
+  const fullEvidence: RunEvidence = {
+    taskOutcomes: evidence.taskOutcomes.length > 0 ? evidence.taskOutcomes : taskOutcomes,
+    artifacts: evidence.artifacts,
+    metrics: evidence.metrics,
+  };
+  return criteria.map((c) => {
+    if (typeof c === 'string') {
+      return { criterion: c, satisfied: false, evidence: null, wired: false };
+    }
+    return checkCriterion(c, fullEvidence);
+  });
 }
