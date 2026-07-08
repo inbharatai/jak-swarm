@@ -73,6 +73,9 @@ model Tenant {
   planVersions               PlanVersion[]
   // Migration 114 — HyperAgent Phase 5 self-learning records.
   learningRecords            LearningRecord[]
+  // Migration 115 — HyperAgent Phase 9 versioned configs + rollout audit trail.
+  configVersions             ConfigVersion[]
+  configRolloutEvents        ConfigRolloutEvent[]
 
   @@map("tenants")
 }
@@ -286,6 +289,81 @@ model LearningRecord {
   @@index([tenantId, kind])
   @@index([tenantId, source])
   @@map("learning_records")
+}
+
+// ─── HyperAgent Phase 9: versioned self-modification configs ─────────────────
+//
+// ConfigVersion — one row per immutable, versioned config document (autonomy
+// policy, repair budget, learning gate, governance rule, tool policy). A version
+// moves through a bounded lifecycle DRAFT → PROPOSED → SHADOW → CANARY → PROMOTED
+// (or ROLLED_BACK at any gate). Promotion supersedes the prior PROMOTED version
+// (which ARCHIVEs). The pure lifecycle gate (config-lifecycle.ts) decides which
+// transitions are legal + evaluates shadow/canary metrics before advancing; the
+// LLM may PROPOSE, only the gate ADVANCES. `spec` is JSONB, typed per kind by the
+// caller. Persisted so every promotion decision is reproducible + auditable.
+//
+// ConfigRolloutEvent — the immutable audit trail of every lifecycle transition
+// (one row per transition), so an auditor can replay the exact rollout path a
+// config took: which stage, which decision, which rollout percentage, when, why.
+model ConfigVersion {
+  id              String   @id @default(cuid())
+  tenantId        String
+  // ConfigKind: AUTONOMY_POLICY | REPAIR_BUDGET | LEARNING_GATE | GOVERNANCE_RULE | TOOL_POLICY
+  kind            String
+  // Monotonic per-(tenant,kind) version counter (1-based).
+  version         Int
+  // The config payload (JSONB, typed per kind).
+  spec            Json
+  // ConfigVersionStatus: DRAFT | PROPOSED | SHADOW | CANARY | PROMOTED | ROLLED_BACK | ARCHIVED
+  status          String   @default("DRAFT")
+  // The version this one supersedes (null for the first version).
+  parentVersionId String?
+  // The version that superseded this one (set when ARCHIVED).
+  supersededById  String?
+  // Canary traffic percentage (0 outside CANARY; 100 when PROMOTED).
+  rolloutPercent  Int      @default(0)
+  // Caller-stamped ISO timestamps for each lifecycle event.
+  createdAt       DateTime @default(now())
+  proposedAt      DateTime?
+  shadowStartedAt DateTime?
+  canaryStartedAt DateTime?
+  promotedAt      DateTime?
+  rolledBackAt    DateTime?
+  // Free-text reason for the latest transition (audit).
+  changeReason    String?  @db.Text
+  // Last evaluation summary attached by the gate (audit).
+  evaluationSummary String? @db.Text
+
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rolloutEvents    ConfigRolloutEvent[]
+
+  @@unique([tenantId, kind, version])
+  @@index([tenantId, kind, status])
+  @@index([tenantId, status])
+  @@map("config_versions")
+}
+
+model ConfigRolloutEvent {
+  id              String   @id @default(cuid())
+  configVersionId String
+  tenantId        String
+  // ConfigVersionStatus before / after the transition.
+  fromStatus      String
+  toStatus        String
+  // RolloutStage the transition targeted (null for non-stage transitions).
+  stage           String?
+  // PromotionDecision the gate emitted (null for non-evaluation transitions).
+  decision        String?
+  rolloutPercent  Int      @default(0)
+  reason          String   @db.Text
+  occurredAt      DateTime @default(now())
+
+  configVersion ConfigVersion @relation(fields: [configVersionId], references: [id], onDelete: Cascade)
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, configVersionId])
+  @@index([configVersionId, occurredAt])
+  @@map("config_rollout_events")
 }
 
 model User {
