@@ -68,6 +68,10 @@ export type { LlmDiagnoseInput, LlmDiagnosis } from './roles/failure-diagnostici
 export { ReplannerAgent } from './roles/replanner.agent.js';
 export type { LlmReplanProposal } from './roles/replanner.agent.js';
 
+// ─── HyperAgent Phase 5: self-learning (LLM wrapper; pure logic in @jak-swarm/swarm) ───
+export { LearningExtractorAgent } from './roles/learning-extractor.agent.js';
+export type { LlmExtractInput, LlmExtractResult } from './roles/learning-extractor.agent.js';
+
 export { ApprovalAgent } from './roles/approval.agent.js';
 export type { ApprovalInput } from './roles/approval.agent.js';
 

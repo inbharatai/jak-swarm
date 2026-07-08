@@ -71,6 +71,8 @@ model Tenant {
   failureDiagnoses           FailureDiagnosis[]
   // Migration 113 — HyperAgent Phase 4 versioned plan history.
   planVersions               PlanVersion[]
+  // Migration 114 — HyperAgent Phase 5 self-learning records.
+  learningRecords            LearningRecord[]
 
   @@map("tenants")
 }
@@ -228,6 +230,62 @@ model PlanVersion {
   @@index([tenantId, workflowId])
   @@index([workflowId, version])
   @@map("plan_versions")
+}
+
+// ─── HyperAgent Phase 5: self-learning records ──────────────────────────────
+//
+// LearningRecord — one row per extracted learning (candidate or promoted). The
+// deterministic Learning Extractor emits candidates from WorkflowOutcome +
+// FailureDiagnosis rows; the information-theoretic gate (innovation #2) decides
+// promotion; the Bayesian evidence-accrual cluster (innovation #5) may produce
+// the winner; the hazard model (innovation #10) governs expiry. Persisted so
+// promotion decisions are reproducible + auditable, and so the hazard partition
+// can expire stale rules without a rescan of raw outcomes.
+//
+// `value`, `tags`, `contingency`, `hazard` are JSONB — typed on the shared
+// LearningRecord interface (packages/shared/src/types/learning.ts).
+model LearningRecord {
+  id                String    @id @default(cuid())
+  tenantId          String
+  // Stable lookup key (e.g. "cfg:grounding:WORKER_RESEARCH:web_search"). Unique
+  // per tenant — the gate merges new observations into the existing record's
+  // contingency table rather than creating duplicates.
+  key               String
+  // LearningKind: KNOWLEDGE | POLICY | WORKFLOW
+  kind              String
+  // LearningSource: OUTCOME | FAILURE_DIAGNOSIS | COUNTERFACTUAL | HUMAN_FEEDBACK
+  source            String
+  // LearningStatus: CANDIDATE | PROMOTED | DEPRECATED | EXPIRED | REJECTED
+  status            String    @default("CANDIDATE")
+  value             Json
+  summary           String    @db.Text
+  tags              String[]  @default([])
+  // FailureClass this learning is about, when sourced from a diagnosis.
+  failureClass      String?
+  // Outcome / task verdict this learning generalises from.
+  outcomeVerdict    String?
+  taskVerdict       String?
+  // Innovation #2 — contingency table { a, b, c, d } + measured MI at promotion.
+  contingency       Json?
+  mutualInformation Float?
+  // Innovation #10 — hazard model { alpha, beta, decayHalfLifeMs, predictiveFloor,
+  // lastValidatedAt, expiresAt } governing this learning's expiry.
+  hazard            Json?
+  // Innovation #5 — evidence cluster that produced this learning, if any.
+  evidenceClusterId String?
+  // 0..1 confidence (promoted: posterior predictive; candidate: prior).
+  confidence        Float     @default(0)
+  createdAt         DateTime  @default(now())
+  promotedAt        DateTime?
+  expiredAt         DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, status])
+  @@index([tenantId, kind])
+  @@index([tenantId, source])
+  @@map("learning_records")
 }
 
 model User {
