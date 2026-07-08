@@ -55,11 +55,11 @@ This table summarizes what is publicly evidenced in this repository and what is 
 |:------------|:----------------|:------:|
 | Gemini integration | `GeminiRuntime` adapter, `gemini-2.5-pro/flash/flash-lite`, tier-based model selection, per-tenant provider switching | ✅ Verified |
 | Google ADK orchestration | `@google/adk` `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1` feature flag, `adk-pipeline.ts` + `adk-runner.ts` | ✅ Verified |
-| Multi-agent collaboration | 38 agents (6 orchestrators + 32 workers), DAG-based routing, parallel worker execution, verifier / auto-repair loop | ✅ Verified |
+| Multi-agent collaboration | 38 agents (6 orchestrators + 32 workers), DAG-based routing, parallel worker execution, verifier with bounded retry (a full re-plan / auto-repair loop is a roadmap item — see HyperAgent plan) | ✅ Verified |
 | Google Cloud deployment | Verified Cloud Run API deployment in `asia-south1`; Cloud Run deployment docs and Google Cloud deployment path included | ✅ Verified |
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
-| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, signed-decision / HMAC-ready security path | ✅ Verified |
+| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, HMAC-ready security path (signed-decision wiring for the external JAK Shield MCP is a roadmap item, not yet integrated) | ✅ Verified |
 | Tests | 2,400+ blocking CI tests (unit + integration; 2,368 root + 39 web = 2,407) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
@@ -105,7 +105,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 3. **Parallel worker orchestration allows specialist agents to collaborate** — instead of forcing one agent to do everything, 38 specialist agents execute in parallel, each with domain-scoped tools and context. The Verifier agent quality-checks output before delivery.
 
-4. **JAK Shield-style policy controls, approval gates, RBAC, and audit logging reduce unsafe automation risk** — every real-world agent action flows through 6 local policy stages (Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer) with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and cryptographic signing. The external JAK Shield MCP adds 4 additional stages for signed high-risk decisions. High-risk actions require explicit approval. Destructive actions are never auto-retried.
+4. **JAK Shield-style policy controls, approval gates, RBAC, and audit logging reduce unsafe automation risk** — every real-world agent action flows through 6 local policy stages (Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, Audit Evidence Layer) with deterministic blocking, injection detection, taint tracking, PII redaction, RBAC thresholds, and signed evidence bundles. The external JAK Shield MCP will add 4 additional stages for signed high-risk decisions (it is a separate product; the MCP wiring from JAK Swarm to that gateway is a roadmap item, not yet integrated). High-risk actions require explicit approval. Destructive actions are never auto-retried.
 
 5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
@@ -126,7 +126,7 @@ Post-challenge production hardening roadmap:
 
 ## What JAK Swarm Does
 
-JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **21 connectors**.
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **23 connectors** (21 MCP providers + Remotion + Blender, each with an honest live status badge).
 
 ### What's unique
 
@@ -250,7 +250,7 @@ flowchart TD
     N -->|"👎 Rejected"| C
 ```
 
-> **Auto-Repair**: If the Verifier rejects output, the system re-plans and re-routes failed tasks — no human intervention needed (configurable). Destructive actions are never auto-retried.
+> **Bounded retry (auto-repair is a roadmap item)**: If the Verifier rejects output, the system re-runs the same task against the same worker up to a bounded retry budget (`RepairService` classifies the failure and refuses to auto-retry destructive / permission / approval-timeout / unknown classes). A genuine *re-plan* loop — changing the agent, tool, task order, or dependencies on failure — is not yet implemented; it is the core of the HyperAgent roadmap (`docs/hyperagent-current-state-audit.md`). Destructive actions are never auto-retried.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data model, error handling strategy, and scaling considerations.
 
@@ -258,7 +258,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data 
 
 ## 🛡️ JAK Shield — The Trust Gateway
 
-JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with a **10-stage decision pipeline** that protects every real-world agent action. JAK Swarm currently enforces JAK Shield-style local policy controls inside `packages/security`, including guardrails, RBAC, audit logging, and the Agent Governance Overlay that enforces agent profiles, memory scopes, and autonomy boundaries. JAK Shield also exists as a separate MCP-native security gateway, with full signed high-risk action validation planned as a post-challenge hardening step.
+JAK Shield is a **separate MCP-native security gateway** ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) with a **10-stage decision pipeline** that protects every real-world agent action. JAK Swarm currently enforces JAK Shield-style **local** policy controls inside `packages/security` — guardrails, RBAC, audit logging, PII redaction, and tool-risk/approval gating via the embedded `LocalShieldGateway`. The **Agent Governance Overlay** (agent profiles, ability packs, memory scopes, autonomy boundaries) and the **MCP call from JAK Swarm to the external JAK Shield gateway for signed high-risk decisions** are roadmap items (Phase 11B / HyperAgent Phase 7-8), not yet wired. Today the default gateway is the embedded local one; the external Shield is replaceable through the `ShieldGateway` interface override.
 
 **JAK Shield 10-stage decision pipeline:**
 
@@ -796,7 +796,7 @@ jak-swarm/
 │   │   ├── roles/               # 6 orchestrator agents
 │   │   ├── workers/             # 32 worker agents
 │   │   └── runtime/             # OpenAI + Gemini runtime adapters + grounding config
-│   ├── tools/                   # 122 builtin + 4 Phoring tool implementations
+│   ├── tools/                   # 122 builtin tools (Phoring integration removed)
 │   │   ├── registry/            # Singleton ToolRegistry + approval policy
 │   │   ├── builtin/             # Built-in + sandbox tools
 │   │   ├── adapters/            # Email, Calendar, CRM, Browser, Memory
@@ -814,7 +814,7 @@ jak-swarm/
 │   ├── voice/                   # Voice pipeline (WebRTC, STT, TTS)
 │   ├── verification/            # Email/document/transaction verification
 │   ├── whatsapp-client/         # WhatsApp bridge (Baileys QR client)
-│   └── industry-packs/           # 13 industry-specific agent configurations
+│   └── industry-packs/           # 11 industry-specific agent configurations (customer-support, education, finance, general, healthcare, hospitality, insurance, legal, logistics, recruiting, retail)
 ├── tests/
 │   ├── unit/                    # Unit tests
 │   ├── integration/             # Integration tests
@@ -949,7 +949,7 @@ Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
 <details>
 <summary><b>What is Google ADK orchestration?</b></summary>
 
-Google's Agent Development Kit (`@google/adk`) provides `SequentialAgent`, `ParallelAgent`, and `LlmAgent` primitives for building multi-agent workflows. When `JAK_ADK_MODE=1`, JAK routes workflows through ADK's orchestration instead of LangGraph. The output shape is identical (SwarmState) so persistence, SSE, and approval flows work unchanged. ADK's built-in `GOOGLE_SEARCH` tool provides citation-backed web search for Gemini agents (included quota; see [Gemini pricing](https://ai.google.dev/pricing) for limits beyond the allowance).
+Google's Agent Development Kit (`@google/adk`) provides `SequentialAgent`, `ParallelAgent`, and `LlmAgent` primitives for building multi-agent workflows. When `JAK_ADK_MODE=1`, JAK routes workflows through ADK's orchestration instead of LangGraph. The output shape is identical (SwarmState) so persistence and SSE work unchanged. **Approval parity is partial:** ADK's tool model is synchronous and cannot pause/resume a run the way LangGraph's per-tool approval gate does — high-risk tools in ADK mode rely on the tool itself returning `approval_required` (recorded for review) rather than a workflow-level durable pause. Worker roles in ADK come from the caller's `roleModes` (not parsed back from the Planner's plan) and run as one flat `ParallelAgent`; plan-derived, dependency-aware waves are a roadmap item (HyperAgent Phase 11). ADK's built-in `GOOGLE_SEARCH` tool provides citation-backed web search for Gemini agents (included quota; see [Gemini pricing](https://ai.google.dev/pricing) for limits beyond the allowance).
 
 </details>
 
