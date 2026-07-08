@@ -12,10 +12,10 @@
 | **Total** | **38** | **Exact match** |
 
 ### Tool Count Claim: "122 tools"
-**VERDICT: TRUE** (with 4 orphaned implementations noted)
+**VERDICT: TRUE**
 
 - 122 tools actively registered in `registerBuiltinTools()`
-- 4 orphaned Phoring tools exist in source but are NOT wired to runtime
+- The 4 orphaned Phoring tool implementations (`phoring_forecast`, `phoring_graph_query`, `phoring_validate`, `phoring_simulate`) and `PhoringAdapter` were **removed** in the HyperAgent Phase 3.5 dead-code cleanup — they were never wired to `registerBuiltinTools()`. The 122 count is exact with no orphans remaining.
 - MCP bridge loads external tools dynamically at runtime (not counted in 122)
 
 ### 7-Step Pipeline Claim
@@ -102,7 +102,7 @@ When `CommanderAgent.execute()` returns without `missionBrief` (historical "I ha
 ## Known Issues
 
 1. **Production deployment is stale.** The production API returned a workflow with `finalOutputLen: 86` for "www.jakswarm.com, just review the website" — this is too short for a meaningful CTO audit. The new keyword inference + role-aware routing code is NOT deployed yet.
-2. **Phoring tools are orphaned.** 4 tool implementations (`phoring_forecast`, `phoring_graph_query`, `phoring_validate`, `phoring_simulate`) exist in source but are not registered in the runtime. They should either be wired in or removed to avoid confusion.
+2. **Phoring tools are orphaned.** ~~4 tool implementations (`phoring_forecast`, `phoring_graph_query`, `phoring_validate`, `phoring_simulate`) exist in source but are not registered in the runtime. They should either be wired in or removed to avoid confusion.~~ **RESOLVED (HyperAgent Phase 3.5):** the 4 Phoring tool implementations and `PhoringAdapter` were deleted — they were never registered in `registerBuiltinTools()`.
 3. **No E2E test for the new keyword inference path.** The existing E2E (`cto-mobile-production-regression.spec.ts`) tests the happy path but does not explicitly assert that keyword inference produces a `missionBrief` when the LLM fails.
 
 ---
@@ -123,5 +123,5 @@ When `CommanderAgent.execute()` returns without `missionBrief` (historical "I ha
 
 1. **Deploy to Railway** — the fixes are verified locally but not in production.
 2. **Add E2E test** for the LLM-failure path using a mock/stub that forces keyword inference.
-3. **Clean up orphaned Phoring tools** or wire them into `registerBuiltinTools()`.
+3. **Clean up orphaned Phoring tools** or wire them into `registerBuiltinTools()`. — **DONE (Phase 3.5):** deleted; never registered.
 4. **Monitor production** after deploy using `scripts/production-workflow-smoke.mjs`.

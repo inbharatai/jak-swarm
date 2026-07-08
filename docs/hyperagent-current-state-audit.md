@@ -5,6 +5,14 @@
 > **Purpose:** Verify, against executable code, every claim the HyperAgent spec makes about what JAK Swarm currently does — *before* building anything on top of it. No marketing assumptions. Every claim cites `file:line`.
 > **Method:** Six parallel read-only investigations over `packages/swarm`, `packages/agents`, `packages/security`, `packages/adk`, `packages/db`, `apps/api`, `apps/web`, and `docs/`. No files were modified during the audit.
 
+> **Resolution status (updated Phase 3.5, 2026-07-08):** This document is the immutable Phase 0 baseline — findings below describe the state *at* `2d96b2d` and are not rewritten. The following findings have since been **resolved** in Phase 3.5 (README accuracy + dead-code removal):
+> - **Phoring dead code** (§3 item 3, §6 rows): `phoring.tools.ts`, `PhoringAdapter`, friendly-name + builtin-index entries **deleted**; never registered, so the 122-tool count is exact with no orphans.
+> - **`memory-extractor.ts` / `memory-query.ts` dead code** (§4): both modules **deleted** (zero callers, zero tests). `BaseAgent.persistLearning`/`recallLearnings` kept as reserved seams for Phase 5 self-learning.
+> - **Industry-pack count drift** (§3 item 1, §6): README + ARCHITECTURE now state **13 registry entries (11 shipped + 2 stubs: manufacturing, consulting)**, matching `listIndustries().length` enforced by `check:truth`.
+> - **Connector count drift** (§3 item 4, §6): README badge + body now state the CI-enforced canonical **22 connectors** (13 `INTEGRATIONS_CORE` + 9 `INTEGRATIONS_INFRA`), matching `product-truth`, `integration-maturity-matrix.md`, and the tile arrays. EVOLUTION-PLAN corrected to **21 MCP providers** (the MCP-only count).
+> - **README "122 builtin + 4 Phoring"** (§3 item 3): Phoring clause removed; README now states 122 classified tools with no Phoring addendum.
+> Unresolved findings (e.g. sandbox doc, Skill tier/status naming inconsistency) remain open for later phases.
+
 ---
 
 ## 0. Test baseline (recorded on `feature/hyperagent-self-healing-learning` off `main @ 2d96b2d`, 2026-07-08)

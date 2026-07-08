@@ -140,7 +140,7 @@
 | **RBAC** | 5 roles, `PolicyEngine` | Extended with department-scoped access and ability pack enforcement. |
 | **Industry Packs** | 13 vertical configurations | Foundation for Ability Packs. |
 | **Skills System** | SKILL.md parser, cascade loading | Foundation for Skill Upgrade Loop. |
-| **Integrations/MCP** | 22 MCP connectors, `TenantMcpManager` | Foundation for data ingestion. Also the transport for calling JAK Shield. |
+| **Integrations/MCP** | 21 MCP connectors, `TenantMcpManager` | Foundation for data ingestion. Also the transport for calling JAK Shield. |
 
 ### What Already Exists in JAK Shield (Separate Product)
 

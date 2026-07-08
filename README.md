@@ -7,7 +7,7 @@
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster--38-agents)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory-122-registered)
-[![Connectors](https://img.shields.io/badge/Connectors-21-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory-122-registered)
+[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#-tool-inventory-122-registered)
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
@@ -33,7 +33,7 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,407 blocking CI tests** (2,368 root + 39 web).
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,400+ blocking CI tests**.
 
 The submitted system includes:
 
@@ -60,7 +60,7 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, HMAC-ready security path (signed-decision wiring for the external JAK Shield MCP is a roadmap item, not yet integrated) | ✅ Verified |
-| Tests | 2,400+ blocking CI tests (unit + integration; 2,368 root + 39 web = 2,407) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
+| Tests | 2,400+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
@@ -126,7 +126,7 @@ Post-challenge production hardening roadmap:
 
 ## What JAK Swarm Does
 
-JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **23 connectors** (21 MCP providers + Remotion + Blender, each with an honest live status badge).
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors** (13 external SaaS connectors in `INTEGRATIONS_CORE` + 9 infrastructure adapters in `INTEGRATIONS_INFRA`, each surfaced as a UI tile with an honest live status badge; 21 MCP providers auto-mapped at runtime, plus Remotion and Blender connector manifests).
 
 ### What's unique
 
@@ -312,7 +312,7 @@ Full manifest: [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md). Arc
 | 🎤 | **Voice Sessions** | OpenAI Realtime API via WebRTC. Optional Deepgram STT / ElevenLabs TTS adapters. |
 | 🏢 | **Multi-Tenant SaaS** | RBAC (5 roles + External Auditor), approval gates, audit logging, tenant isolation. Tenant secrets are protected through environment secret storage, Supabase Vault, and Google Secret Manager where deployed. |
 | 💰 | **Credit-Based Billing** | 4 plans (Free / Pro / Team / Enterprise), daily + monthly caps, per-task cost estimation, usage dashboard. |
-| 📊 | **Observability** | 35+ Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/ready` readiness endpoint. Additional health and telemetry endpoints are part of the production observability roadmap. |
+| 📊 | **Observability** | 35 Prometheus metrics, OpenTelemetry tracing, per-node cost breakdown, workflow timeline API, `/ready` readiness endpoint. Additional health and telemetry endpoints are part of the production observability roadmap. |
 | 🏗️ | **Distributed Ready** | Redis coordination: distributed locks, leader election, cross-instance signals, shared circuit breakers. Worker-lease reclaim: dead workers' jobs auto-recovered in 30s. |
 
 ---
@@ -611,9 +611,13 @@ The frontend remains on Vercel for challenge accessibility. The submitted Google
 |:---:|:---:|
 | ![Workflow](docs/screenshots/03-workflow.png) | ![Pricing](docs/screenshots/04-pricing.png) |
 
-| Login | Onboarding |
+| Login | Register |
 |:---:|:---:|
-| ![Login](docs/screenshots/05-login.png) | ![Onboarding](docs/screenshots/07-onboarding.png) |
+| ![Login](docs/screenshots/05-login.png) | ![Register](docs/screenshots/06-register.png) |
+
+| Onboarding | |
+|:---:|:---:|
+| ![Onboarding](docs/screenshots/07-onboarding.png) | |
 
 </div>
 
@@ -814,7 +818,7 @@ jak-swarm/
 │   ├── voice/                   # Voice pipeline (WebRTC, STT, TTS)
 │   ├── verification/            # Email/document/transaction verification
 │   ├── whatsapp-client/         # WhatsApp bridge (Baileys QR client)
-│   └── industry-packs/           # 11 industry-specific agent configurations (customer-support, education, finance, general, healthcare, hospitality, insurance, legal, logistics, recruiting, retail)
+│   └── industry-packs/           # 13 industry pack registry entries (11 shipped: customer-support, education, finance, general, healthcare, hospitality, insurance, legal, logistics, recruiting, retail + 2 stubs: manufacturing, consulting)
 ├── tests/
 │   ├── unit/                    # Unit tests
 │   ├── integration/             # Integration tests

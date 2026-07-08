@@ -182,7 +182,7 @@ An 86-character final output for "www.jakswarm.com, just review the website" wit
 
 ## Orphaned Code to Address
 
-1. **Phoring tools** (`packages/tools/src/builtin/phoring.tools.ts`): 4 tools exist but are NOT registered in `registerBuiltinTools()`. Either wire them or delete them.
+1. **Phoring tools** (`packages/tools/src/builtin/phoring.tools.ts`): ~~4 tools exist but are NOT registered in `registerBuiltinTools()`. Either wire them or delete them.~~ **RESOLVED (HyperAgent Phase 3.5):** `phoring.tools.ts` and `adapters/phoring/phoring.adapter.ts` deleted — they were never registered. Friendly-name + builtin-index entries removed.
 2. **No tests in `@jak-swarm/tools`** package. Consider adding basic tool registration tests.
 
 ---

@@ -119,7 +119,6 @@ The Agent Engine gateway is deployed live on Vertex AI. Cloud Run remains the pr
   - `CRMAdapter`: Interface with `PrismaCRMAdapter` (database-backed, tenant-scoped) and `UnconfiguredCRMAdapter` fallback.
   - `BrowserAdapter`: Playwright-based. Singleton engine manages browser lifecycle.
   - `MemoryAdapter`: In-memory or database-backed key-value store.
-  - `PhoringAdapter`: HTTP client for Phoring.ai forecasting and knowledge graph APIs.
 
 - **Adapter Factory** (`adapters/adapter-factory.ts`): Detects environment variables and returns real adapters or unconfigured stubs that throw on use. No fake data is ever returned.
 
@@ -167,7 +166,7 @@ Operators can propose new Tier 3 skills that go through a sandbox-and-review pip
 
 ### `packages/industry-packs` -- Industry Configuration
 
-13 industry-specific agent configurations (healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, manufacturing, consulting, general). Each pack provides agent prompt supplements, policy overlays, recommended approval thresholds, and restricted tool lists.
+13 industry pack registry entries (healthcare, education, retail, logistics, finance, insurance, recruiting, legal, hospitality, customer-support, general — 11 shipped — plus manufacturing and consulting as `maturity: 'stub'` placeholders). Each pack provides agent prompt supplements, policy overlays, recommended approval thresholds, and restricted tool lists. The count is CI-enforced: `pnpm check:truth` fails if `listIndustries()` drifts from the number claimed in `docs/architecture.md`.
 
 ### `packages/client` -- TypeScript SDK
 
@@ -319,8 +318,7 @@ Each check contributes to a grounding score (0.0 to 1.0). If the combined score 
 
 ### Agent memory persistence
 
-- **persistLearning / recallLearnings**: Agents store and retrieve facts across workflows via per-role memory keyed by tenant
-- **Post-workflow fact extraction**: `memory-extractor.ts` extracts up to 10 facts per completed workflow
+- **persistLearning / recallLearnings**: Agents store and retrieve facts across workflows via per-role memory keyed by tenant (reserved BaseAgent seam for the HyperAgent self-learning layer; no current call sites)
 - **Standing Orders**: Per-tenant tool whitelists and blocked-actions lists propagated through SwarmState
 
 ---

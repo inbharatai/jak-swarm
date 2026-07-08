@@ -147,12 +147,6 @@ const TOOL_FRIENDLY_NAMES: Record<string, string> = {
   deploy_to_vercel: 'Deploying to Vercel',
   github_create_repo: 'Creating repository',
   github_push_files: 'Pushing files to GitHub',
-
-  // Phoring
-  phoring_forecast: 'Running forecast',
-  phoring_graph_query: 'Querying graph',
-  phoring_validate: 'Validating data',
-  phoring_simulate: 'Running simulation',
 };
 
 /**

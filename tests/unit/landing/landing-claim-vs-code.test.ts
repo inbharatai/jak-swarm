@@ -308,7 +308,10 @@ describe('Landing — top-line counts', () => {
     const readme = read('README.md');
     expect(readme).toMatch(/AI_Agents-38/);
     expect(readme).toMatch(/Classified_Tools-122/);
-    expect(readme).toMatch(/Connectors-21/);
+    // 22 is the CI-enforced canonical connector count: 13 INTEGRATIONS_CORE
+    // SaaS tiles + 9 INTEGRATIONS_INFRA adapter tiles (see scripts/check-docs-truth.ts
+    // and docs/integration-maturity-matrix.md). Not 21 (MCP providers only) or 23.
+    expect(readme).toMatch(/Connectors-22/);
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
 

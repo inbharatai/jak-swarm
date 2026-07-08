@@ -3,7 +3,6 @@ import type { ToolExecutionContext } from '@jak-swarm/shared';
 import { toolRegistry } from '../registry/tool-registry.js';
 import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
-// Phoring integration removed — disabled
 import { getEmailAdapter, getCalendarAdapter, getCRMAdapterFromEnv, hasRealAdapters } from '../adapters/adapter-factory.js';
 import {
   searchStrategyChain,
@@ -5472,9 +5471,6 @@ Date: _______________`;
       }
     },
   );
-
-  // ─── PHORING.AI INTEGRATION TOOLS ───────────────────────────────────────────
-  // Phoring tools disabled
 
   // ─── SANDBOX / VIBE CODING TOOLS ─────────────────────────────────────────
 

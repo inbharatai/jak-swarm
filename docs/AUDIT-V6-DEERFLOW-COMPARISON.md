@@ -154,7 +154,9 @@ What to take from DeerFlow, what to leave, and why.
 
 ### 5A — Memory Extraction Service
 
-**File:** `packages/swarm/src/memory/memory-extractor.ts`
+> **Status note (HyperAgent Phase 3.5, 2026-07-08):** the prior stub implementations of `memory-extractor.ts` and `memory-query.ts` were **removed as dead code** — they were never invoked by any `apps/` caller, never injected a `<memory>` block into agent prompts, and had no tests. The section below is the **target design spec** for the self-learning memory layer that HyperAgent Phase 5 will build fresh, with real read/write wiring into the agent loop. `BaseAgent.persistLearning` / `recallLearnings` remain as reserved seams for that phase.
+
+**File:** `packages/swarm/src/memory/memory-extractor.ts` (to be (re)created in Phase 5)
 
 ```typescript
 interface MemoryExtractionResult {
@@ -403,7 +405,7 @@ Compound unique: (tenantId, key)
 
 ```
 Step 1: Memory Extractor (new file)
-    packages/swarm/src/memory/memory-extractor.ts
+    packages/swarm/src/memory/memory-extractor.ts  (removed stub; recreate in Phase 5)
     - extractMemories(state: SwarmState, provider: LLMProvider): MemoryExtractionResult
     - Uses tier-1 model (cheap) for extraction
     - Prompt: "Extract key facts from this workflow execution..."
@@ -416,7 +418,7 @@ Step 2: Dedup + Persist Hook (modify existing)
     - Bulk upsert via prisma.tenantMemory.createMany()
 
 Step 3: Memory Query Service (new file)
-    packages/swarm/src/memory/memory-query.ts
+    packages/swarm/src/memory/memory-query.ts  (removed stub; recreate in Phase 5)
     - getRelevantMemories(tenantId, goal?, limit = 15): TenantMemory[]
     - Orders by confidence (if scored), then recency
     - Respects TTL (skip expired)
