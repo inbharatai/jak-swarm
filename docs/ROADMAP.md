@@ -106,9 +106,9 @@ flowchart TB
 
 - Department-scoped RBAC (HR agents see HR context only; Finance agents see Finance context only)
 - Per-department approval policies (Finance actions require Finance REVIEWER; Legal actions require Legal REVIEWER)
-- Agent Governance Overlay enforcing profiles, scopes, and role boundaries (Phase 1-11A: local policy; Phase 11B+: JAK Shield MCP integration)
-- Ability Packs (department-scoped tool, memory, and approval configurations)
-- Autonomy Ladder (L0 answer-only → L4 execute with approval; L5 autonomous loop deferred to Phase 11B+)
+- Agent Governance Overlay enforcing profiles, scopes, and role boundaries — **the autonomy-policy + governance-gate core is built** (HyperAgent Phases 1 + 7, `packages/security` governance); the **external JAK Shield MCP transport** call remains a roadmap item (Phase 11B+)
+- Ability Packs (department-scoped tool, memory, and approval configurations) — roadmap item
+- Autonomy Ladder — **the L0-L5 capability matrix + fixed human-only NEVER set is built** as a central deterministic policy (HyperAgent Phase 1); L5 `CODE_PATCH_BRANCH` is in the matrix and gated to an isolated branch + draft PR only (Phase 12)
 
 ### Long Term — Autonomous Execution Layer
 
@@ -120,10 +120,11 @@ flowchart TB
 - Risk-tiered approval gates with SHA-256 payload binding
 - HMAC-signed audit evidence bundles
 - Self-correction: `reflectAndCorrect()` + `RepairService` with 9 error categories
+- **HyperAgent self-healing + self-learning layer** (Phases 0-14, `feature/hyperagent-self-healing-learning`): deterministic 20-class failure classifier → counterfactual diagnosis → symbolic replanner + validator → autonomy-gated apply; information-theoretic learning gate; versioned-config lifecycle (shadow/canary/promote/rollback); R5 code self-repair (isolated branch + draft PR only); honest Control Centre (9 views). Integration tests prove real plan repair, learning promotion, Shield fail-closed, and rollback end-to-end.
 
 **Evolving toward:**
 
-- Self-improving cycles (the system learns from completed workflows and adjusts future plans without human re-specification)
+- Self-improving cycles in a **live production run** — the pure-core learning/replan layer is built and integration-proven; *measured learning impact in production* (12-step E2E + Cloud Run deploy gate) is env-blocked and not fake-passed
 - Cross-workflow learning (insights from one department's work inform another)
 - Proactive task assignment (the system identifies work that needs doing, rather than waiting for a prompt)
 
@@ -131,7 +132,7 @@ flowchart TB
 
 **Phase 1-11A:** All security enforcement uses local policy logic in `packages/security` — Agent Firewall, Risk-Based Approvals, Secure Tool Permissions, Sandboxed Execution, Defensive Vulnerability Triage, and Audit Evidence Layer are all wired and active. JAK Shield MCP exists as a separate 10-stage product at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield); the MCP call from JAK Swarm to that external service is not yet wired (Phase 11B).
 
-**Phase 11B:** Wire JAK Shield MCP for high-risk action validation. Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures.
+**Phase 11B:** Wire JAK Shield MCP for high-risk action validation. The `ShieldMcpClient` (local embedded mode: signs + verifies decisions with a tenant key pair, fail-closed when unavailable/unverified) and the `AgentGovernanceOverlay` autonomy/governance core are **built** (HyperAgent Phases 7-8). What remains is the **MCP transport** call from JAK Swarm to the external JAK Shield service and persisting those decisions in AuditLog with HMAC signatures.
 
 **Phase 11B+:** JAK Shield MCP provides additional security layer for high-risk actions. If JAK Shield MCP unavailable, fall back to local policy + require approval.
 
@@ -144,10 +145,10 @@ This section explicitly states what the roadmap does **not** claim:
 - **"Company OS" is a direction, not a shipped product.** The beta ships a closed-loop operating layer for product and engineering execution. The full Company OS vision requires auto-sync, department-scoped RBAC, and autonomous learning cycles that are not yet built.
 - **Auto-sync is a product build item.** Full connector auto-sync (all inputs flowing automatically into the evidence graph) does not exist today. The `company-operating-layer.service.ts` pipeline exists for manual ingestion.
 - **Department-scoped RBAC does not exist.** The current 5-role RBAC is tenant-scoped, not department-scoped. Adding department boundaries requires schema changes, migration, and UI work.
-- **Self-improving cycles are not built.** Agent memory (`persistLearning` / `recallLearnings`) persists facts across workflows. It does not yet adjust future plans without human re-specification.
-- **Agent Governance Overlay is not built.** The current Guardrail agent is a stateless in-process policy checker. The Agent Governance Overlay (agent profiles, memory scopes, autonomy boundaries, calling JAK Shield MCP for signed decisions) is a roadmap item. See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for the phased implementation plan.
-- **JAK Shield MCP integration is not yet wired.** JAK Shield is a separate 10-stage MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield). The `ShieldMcpClient` and `Agent Governance Overlay` that will call it are Phase 11B of the evolution plan. **Today, JAK Swarm's 6 local policy defenses in `packages/security` are fully wired and enforced on every agent action** — what is NOT wired is the MCP call to the external JAK Shield service for signed high-risk decisions.
-- **Ability Packs and Autonomy Ladder are not built.** Department-scoped tool configurations and agent autonomy levels (L0–L5) are roadmap items.
+- **Self-improving cycles — pure-core layer built, live impact not yet measured.** The HyperAgent self-learning pipeline (Phase 5: information-theoretic learning gate, Bayesian evidence accrual, hazard-model expiry) + outcome evaluator (Phase 3) + symbolic replanner (Phase 4) are built and proven by integration tests at the pure-core layer. Agent memory (`persistLearning` / `recallLearnings`) persists facts across workflows. What is **not** yet proven is *measured learning impact in a live production run* — the 12-step E2E + Cloud Run deploy gate that would prove a promoted learning improves a future run's outcome is env-blocked (no live stack) and is not fake-passed.
+- **Agent Governance Overlay — autonomy + governance core built, full overlay evolving.** The central autonomy policy (L0-L5 matrix + human-only NEVER set, Phase 1) and the governance gate (Phase 7) are built. The full overlay (agent profiles, memory scopes, department-scoped boundaries) remains a roadmap item. See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for the phased implementation plan.
+- **JAK Shield MCP transport is not yet wired.** JAK Shield is a separate 10-stage MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield). The `ShieldMcpClient` (local embedded signed-decision mode, Phase 8) and `AgentGovernanceOverlay` core are built; what is **not** wired is the MCP **transport** call to the external JAK Shield service for signed high-risk decisions. **Today, JAK Swarm's 6 local policy defenses in `packages/security` are fully wired and enforced on every agent action**, plus the local signed-decision path.
+- **Ability Packs are not built.** Department-scoped tool/memory/approval configurations remain a roadmap item. The Autonomy Ladder (L0-L5) **is** built (HyperAgent Phase 1).
 - **Third-party SOC 2 / HIPAA / ISO 27001 attestation has not happened.** The infrastructure is shipped (182 controls, 108 operationally backed). The certification audit has not.
 
 These boundaries mirror the "Honest boundary" subsection in the README and the "What Is Not Yet Enterprise-Ready" section in [`docs/beta-release.md`](beta-release.md).

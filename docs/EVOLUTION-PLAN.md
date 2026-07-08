@@ -89,8 +89,8 @@
 
 **Phased Approach:**
 - **Phase 1-11A:** All security enforcement uses local policy logic in `packages/security`. JAK Shield MCP exists as a separate product but is NOT called from JAK Swarm.
-- **Phase 11B:** Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures.
-- **If JAK Shield MCP unavailable (Phase 11B+):** Fall back to local policy + require approval for all high-risk actions.
+- **Phase 11B:** Create `ShieldMcpClient` and wire `AgentGovernanceOverlay` to call JAK Shield MCP for high-risk actions. Shield MCP decisions stored in AuditLog with HMAC signatures. **Status (HyperAgent Phases 7-8):** the `ShieldMcpClient` (local embedded signed-decision mode, fail-closed on unavailable/unverified) and the `AgentGovernanceOverlay` autonomy + governance core are **built and tested**. What remains is the **external MCP transport** call to the JAK Shield service and persisting those decisions in AuditLog with HMAC signatures.
+- **If JAK Shield MCP unavailable (Phase 11B+):** Fall back to local policy + require approval for all high-risk actions. (The local `ShieldMcpClient` already fail-closes when the Shield is unavailable or its signature is unverified.)
 
 ---
 

@@ -273,3 +273,23 @@ Slack routes verify `X-Slack-Signature` headers against `SLACK_SIGNING_SECRET`. 
 | POST | `/exports` | JWT | Create an export (json/csv/xlsx/pdf/docx) |
 | POST | `/bundles` | JWT + Reviewer | Generate HMAC-signed evidence bundle for a workflow |
 | GET | `/bundles/:id/verify` | JWT | Verify bundle signature + re-hash referenced artifacts |
+
+---
+
+## 🧭 HyperAgent Control Centre (Phase 13)
+
+Operational dashboard over **real backend rows only**. Every view carries a `dataAvailable: boolean` (true iff backing rows exist), real counts, a human-readable `note`, and a `generatedAt` stamp. Empty states render an honest "no data yet" — never a fabricated "all systems healthy". Surfaces whose backing path is not yet wired (benchmarks persisted, experiment controls wired, Shield decisions persisted) surface a conservative roadmap flag the API can only raise when the backing path exists.
+
+| Method | Endpoint | Auth | Description |
+|:------:|:---------|:----:|:------------|
+| GET | `/hyperagent/overview` | JWT + Reviewer | Run + learning + optimization + experiment counts at a glance |
+| GET | `/hyperagent/runs` | JWT + Reviewer | Outcome / diagnosis / repair rows from real workflow runs |
+| GET | `/hyperagent/learnings` | JWT + Reviewer | Promoted learning records + their measured mutual information |
+| GET | `/hyperagent/optimizations` | JWT + Reviewer | Config-version proposals + diffs (benchmarks shown only when persisted) |
+| GET | `/hyperagent/experiments` | JWT + Reviewer | Shadow/canary experiments + rollout events (controls flag honest until wired) |
+| GET | `/hyperagent/governance` | JWT + Reviewer | Governance violations + active rules (security-class failures surfaced) |
+| GET | `/hyperagent/agent-fleet` | JWT + Reviewer | Agent-role stats (counts, median latency) from real traces |
+| GET | `/hyperagent/autonomy` | JWT + Reviewer | Tenant autonomy config + capability decisions |
+| GET | `/hyperagent/shield` | JWT + Reviewer | Shield decision audit rows (honest "none persisted" until wired) |
+
+**Honesty notes:** `LIST_LIMIT = 100` rows per view (tenant-scoped). DB failure → `500` with an `err` envelope. The Shield view surfaces `AuditLog` rows whose resource contains `shield` (case-insensitive) and degrades to `[]` on error. The pure-core aggregators are deterministic and tested (`tests/unit/swarm/control-centre.test.ts`); the API routes map real Prisma rows to their input shapes.

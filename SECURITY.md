@@ -60,13 +60,13 @@ Older tagged releases receive fixes only if the vulnerability is rated Critical.
 
 Some features intentionally expose high-privilege actions because that's the point of an agent platform. These are documented separately in [docs/SECURITY-NOTES.md](docs/SECURITY-NOTES.md) and have dedicated guardrails:
 
-- **`browser_evaluate_js`** — executes arbitrary JavaScript in a headless browser; gated behind `enableBrowserAutomation` tenant flag + approval. High-risk browser actions will also be routed through JAK Shield MCP when the Agent Governance Overlay is implemented.
-- **`code_execute`** — runs untrusted code in an E2B sandbox; time-bounded, network-restricted, process-isolated. Destructive and shell actions will be routed through JAK Shield MCP when the Agent Governance Overlay is implemented.
+- **`browser_evaluate_js`** — executes arbitrary JavaScript in a headless browser; gated behind `enableBrowserAutomation` tenant flag + approval. High-risk browser actions are governed by the autonomy policy + governance gate (HyperAgent Phases 1 + 7) and will additionally route through the external JAK Shield MCP transport when that wiring lands.
+- **`code_execute`** — runs untrusted code in an E2B sandbox; time-bounded, network-restricted, process-isolated. Destructive and shell actions are governed by the autonomy policy + governance gate and will additionally route through the external JAK Shield MCP transport when wired.
 - **Skill extension system** — user-submitted skills run in an isolated sandbox with a 30-second timeout before any human-review promotion. Agent Forge output will require JAK Shield MCP validation and human approval when implemented.
 - **Webhook signature verification** — Slack, Paddle, and Supabase webhooks use HMAC-SHA256 with `crypto.timingSafeEqual` + 5-minute replay window.
-- **Agent Governance Overlay** (planned) — will enforce agent profiles, memory scopes, autonomy boundaries (Autonomy Ladder L0–L5), and role boundaries, calling JAK Shield MCP for signed security decisions on high-risk actions. Until implemented, local policy logic in `packages/security` provides guardrails.
+- **Agent Governance Overlay** — the autonomy-policy core (L0-L5 capability matrix + a fixed human-only NEVER set: merge/deploy/secrets/payments/prod-data-delete/external-publish/permission-expansion/governance-rewrite) and the governance gate are **built** (HyperAgent Phases 1 + 7, `packages/security`). The `ShieldMcpClient` signs + verifies high-risk decisions in local embedded mode and fail-closes when the Shield is unavailable or its signature is unverified (Phase 8). What remains is the **external JAK Shield MCP transport** call + full agent profiles / memory scopes / department boundaries.
 - **Ability Packs** (planned) — department-scoped tool, memory, and approval configurations. Until implemented, industry packs provide per-vertical policy overlays.
-- **Autonomy level escalation** (planned) — agents will operate on a ladder from L0 (answer only) to L5 (autonomous loop within strict policy). Until implemented, all agents operate at the same autonomy level with local policy enforcement.
+- **Autonomy level escalation** — **built** (HyperAgent Phase 1): agents operate on a central L0→L5 capability matrix where a capability is autonomous only at or above its minimum level; the human-only NEVER set is blocked at every level. L5 `CODE_PATCH_BRANCH` is gated to an isolated branch + draft PR only (Phase 12, never auto-merged).
 
 ## What we'll do
 
