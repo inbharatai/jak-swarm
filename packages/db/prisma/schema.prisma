@@ -13,8 +13,8 @@ model Tenant {
   name                    String
   slug                    String   @unique
   status                  String   @default("ACTIVE") // TenantStatus enum
-  plan                    String   @default("FREE")   // TenantPlan enum
-  industry                String?  // Industry enum
+  plan                    String   @default("FREE") // TenantPlan enum
+  industry                String? // Industry enum
   requireApprovals        Boolean  @default(true)
   // When false (default for NEW tenants), every task routed to the approval
   // node pauses for human review regardless of approvalThreshold. When true,
@@ -22,7 +22,7 @@ model Tenant {
   // tenants are back-filled to `true` in the migration to preserve behavior;
   // only tenants created AFTER the migration get the strict default.
   autoApproveEnabled      Boolean  @default(false)
-  approvalThreshold       String   @default("HIGH")   // RiskLevel
+  approvalThreshold       String   @default("HIGH") // RiskLevel
   allowedDomains          String[] @default([])
   maxConcurrentWorkflows  Int      @default(5)
   enableVoice             Boolean  @default(true)
@@ -32,41 +32,43 @@ model Tenant {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  users            User[]
-  conversations    Conversation[]
-  workflows        Workflow[]
-  workflowJobs     WorkflowJob[]
-  skills           Skill[]
-  auditLogs        AuditLog[]
-  memory           TenantMemory[]
-  memoryItems      MemoryItem[]
-  memoryEvents     MemoryEvent[]
-  apiKeys          ApiKey[]
-  integrations    Integration[]
-  oauthStates     OAuthState[]
-  whatsappLinks  WhatsappLink[]
-  onboardingState OnboardingState?
-  schedules       WorkflowSchedule[]
-  standingOrders  StandingOrder[]
-  projects        Project[]
-  vectorDocuments VectorDocument[]
-  tenantDocuments TenantDocument[]
-  subscription    Subscription?
-  companyProfile  CompanyProfile?
-  companyArtifacts CompanyArtifact[]
-  companyGraphEntities CompanyGraphEntity[]
-  executionDriftFindings ExecutionDriftFinding[]
-  agentExecutableSpecs AgentExecutableSpec[]
+  users                      User[]
+  conversations              Conversation[]
+  workflows                  Workflow[]
+  workflowJobs               WorkflowJob[]
+  skills                     Skill[]
+  auditLogs                  AuditLog[]
+  memory                     TenantMemory[]
+  memoryItems                MemoryItem[]
+  memoryEvents               MemoryEvent[]
+  apiKeys                    ApiKey[]
+  integrations               Integration[]
+  oauthStates                OAuthState[]
+  whatsappLinks              WhatsappLink[]
+  onboardingState            OnboardingState?
+  schedules                  WorkflowSchedule[]
+  standingOrders             StandingOrder[]
+  projects                   Project[]
+  vectorDocuments            VectorDocument[]
+  tenantDocuments            TenantDocument[]
+  subscription               Subscription?
+  companyProfile             CompanyProfile?
+  companyArtifacts           CompanyArtifact[]
+  companyGraphEntities       CompanyGraphEntity[]
+  executionDriftFindings     ExecutionDriftFinding[]
+  agentExecutableSpecs       AgentExecutableSpec[]
   companyConnectorSyncStates CompanyConnectorSyncState[]
-  companyConnectorSyncRuns CompanyConnectorSyncRun[]
+  companyConnectorSyncRuns   CompanyConnectorSyncRun[]
   // Migration 106 — team + trial
-  departments     Department[]
-  taskAssignments TaskAssignment[]
-  notifications   Notification[]
-  trialSignup     TrialSignup?
+  departments                Department[]
+  taskAssignments            TaskAssignment[]
+  notifications              Notification[]
+  trialSignup                TrialSignup?
   // Migration 111 — HyperAgent (bounded self-healing + self-learning) config.
   // One-to-one; nullable so existing tenants are unaffected (defaults to OFF/L0).
-  hyperAgentConfig HyperAgentConfig?
+  hyperAgentConfig           HyperAgentConfig?
+  workflowOutcomes           WorkflowOutcome[]
+  failureDiagnoses           FailureDiagnosis[]
 
   @@map("tenants")
 }
@@ -77,31 +79,109 @@ model Tenant {
 /// `packages/security/src/governance/autonomy-policy.ts` and reads these
 /// fields via `evaluateForConfig()`.
 model HyperAgentConfig {
-  id                              String   @id @default(cuid())
-  tenantId                        String   @unique
-  tenant                          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  hyperAgentEnabled               Boolean  @default(false)
+  id                                  String   @id @default(cuid())
+  tenantId                            String   @unique
+  tenant                              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  hyperAgentEnabled                   Boolean  @default(false)
   // HyperAgentMode: OFF | OBSERVE | ASSISTED | AUTONOMOUS_SAFE
-  hyperAgentMode                  String   @default("OFF")
+  hyperAgentMode                      String   @default("OFF")
   // AutonomyLevel: L0 | L1 | L2 | L3 | L4 | L5
-  autonomyLevel                   String   @default("L0")
-  maxHyperAgentIterations         Int      @default(0)
+  autonomyLevel                       String   @default("L0")
+  maxHyperAgentIterations             Int      @default(0)
   // Unified repair budgets (replaces split retry counters).
-  maxExecutionRetries             Int      @default(2)
-  maxOutputRepairs                Int      @default(2)
-  maxPlanRepairs                  Int      @default(1)
-  maxCapabilityRepairs            Int      @default(1)
-  maxTotalCostUsd                 Float    @default(0)
-  maxDurationMs                   Int      @default(0)
-  allowShadowOptimization         Boolean  @default(false)
-  allowCanaryOptimization         Boolean  @default(false)
-  allowCodePatchProposal          Boolean  @default(false)
-  requireApprovalForPromptPromotion   Boolean @default(true)
-  requireApprovalForWorkflowPromotion Boolean @default(true)
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  maxExecutionRetries                 Int      @default(2)
+  maxOutputRepairs                    Int      @default(2)
+  maxPlanRepairs                      Int      @default(1)
+  maxCapabilityRepairs                Int      @default(1)
+  maxTotalCostUsd                     Float    @default(0)
+  maxDurationMs                       Int      @default(0)
+  allowShadowOptimization             Boolean  @default(false)
+  allowCanaryOptimization             Boolean  @default(false)
+  allowCodePatchProposal              Boolean  @default(false)
+  requireApprovalForPromptPromotion   Boolean  @default(true)
+  requireApprovalForWorkflowPromotion Boolean  @default(true)
+  createdAt                           DateTime @default(now())
+  updatedAt                           DateTime @updatedAt
 
   @@map("hyper_agent_configs")
+}
+
+// ─── HyperAgent Phase 2: structured outcome + failure diagnosis ───────────────
+//
+// WorkflowOutcome — one row per workflow run, the HyperAgent's structured
+// verdict on how it went (status, cost, task pass/fail counts, satisfaction of
+// the spec's acceptanceCriteria, and the final autonomy decision). The Outcome
+// Evaluator (Phase 3) writes this; the Learning Extractor (Phase 5) reads it.
+//
+// FailureDiagnosis — one row per diagnosed failure. The deterministic
+// classifier (failure-classifier.ts) writes the deterministic fields
+// (failureClass, recommendedRepairLevel, confidence=1.0); the Phase 4 LLM
+// diagnostician may add rootCause/evidence/recommendedChanges for the
+// ambiguous cases the classifier deliberately leaves UNKNOWN. Security blocks
+// (PERMISSION_DENIED / POLICY_BLOCK / PROMPT_INJECTION) are never overridden
+// by the LLM row — `deterministicBlock` is immutable once written.
+model WorkflowOutcome {
+  id                String   @id @default(cuid())
+  tenantId          String
+  workflowId        String   @unique
+  // Overall outcome verdict the HyperAgent reached for this run.
+  // OUTCOME_SUCCESS | OUTCOME_PARTIAL | OUTCOME_FAILED | OUTCOME_BLOCKED
+  outcome           String   @default("OUTCOME_BLOCKED")
+  // Counts populated by the Outcome Evaluator (Phase 3).
+  taskTotal         Int      @default(0)
+  taskPassed        Int      @default(0)
+  taskFailed        Int      @default(0)
+  taskBlocked       Int      @default(0)
+  // Did the run satisfy the spec's acceptanceCriteria? (typed on the spec but
+  // not yet consumed by the runner — Phase 6 wires this.) JSON array of
+  // { criterion, satisfied, evidence }.
+  acceptanceResults Json?
+  totalCostUsd      Float    @default(0)
+  durationMs        Int      @default(0)
+  // Final autonomy decision snapshot for this run (auditable).
+  finalAutonomy     String? // AutonomyDecision serialized
+  summary           String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow         Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  failureDiagnoses FailureDiagnosis[]
+
+  @@index([tenantId, outcome])
+  @@map("workflow_outcomes")
+}
+
+model FailureDiagnosis {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  workflowId             String
+  taskId                 String
+  // FailureClass (20-class taxonomy, failure.ts).
+  failureClass           String
+  // RepairLevel R1–R5 recommended by the deterministic classifier.
+  recommendedRepairLevel String
+  // Immutable: when true, an LLM diagnostician MUST NOT change failureClass or
+  // recommendedRepairLevel (security block). Only the deterministic classifier
+  // may set this true.
+  deterministicBlock     Boolean  @default(false)
+  rootCause              String?  @db.Text
+  evidence               Json?
+  confidence             Float    @default(1.0) // 0..1; classifier=1.0, LLM<1.0
+  recommendedChanges     Json?
+  quarantine             Boolean  @default(false) // prompt-injection isolation
+  requiresApproval       Boolean  @default(false)
+  createdAt              DateTime @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow  Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  outcome   WorkflowOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  outcomeId String?
+
+  @@index([tenantId, workflowId])
+  @@index([workflowId, taskId])
+  @@index([failureClass])
+  @@map("failure_diagnoses")
 }
 
 model User {
@@ -115,8 +195,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  jobFunction  String?
-  avatarUrl    String?
+  jobFunction String?
+  avatarUrl   String?
 
   // Migration 106 — Team + Trial.
   // departmentId, jobTitle, managerId let us model a real org chart so a CEO
@@ -129,21 +209,21 @@ model User {
   jobTitle     String?
   managerId    String?
 
-  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessions     Session[]
-  conversations Conversation[]
-  workflows    Workflow[]
-  workflowJobs WorkflowJob[]
-  approvals ApprovalRequest[] @relation("reviewer")
-  projects  Project[]
-  whatsappLinks WhatsappLink[]
+  tenant                 Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions               Session[]
+  conversations          Conversation[]
+  workflows              Workflow[]
+  workflowJobs           WorkflowJob[]
+  approvals              ApprovalRequest[] @relation("reviewer")
+  projects               Project[]
+  whatsappLinks          WhatsappLink[]
   // Migration 106 relations
-  department         Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  manager            User?            @relation("UserManagerSelf", fields: [managerId], references: [id], onDelete: SetNull)
-  reports            User[]           @relation("UserManagerSelf")
-  taskAssignments    TaskAssignment[] @relation("TaskAssignmentAssignee")
-  taskAssignmentsCreated TaskAssignment[] @relation("TaskAssignmentAssigner")
-  notifications      Notification[]
+  department             Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager                User?             @relation("UserManagerSelf", fields: [managerId], references: [id], onDelete: SetNull)
+  reports                User[]            @relation("UserManagerSelf")
+  taskAssignments        TaskAssignment[]  @relation("TaskAssignmentAssignee")
+  taskAssignmentsCreated TaskAssignment[]  @relation("TaskAssignmentAssigner")
+  notifications          Notification[]
 
   @@unique([tenantId, email])
   @@index([tenantId, departmentId])
@@ -164,7 +244,7 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([expiresAt])
   @@map("sessions")
@@ -180,7 +260,7 @@ model ApiKey {
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
 
-  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([expiresAt])
@@ -193,30 +273,33 @@ model Workflow {
   userId         String
   conversationId String?
   goal           String
-  industry      String?
-  status        String    @default("PENDING") // WorkflowStatus
-  planJson      Json?     // WorkflowPlan serialized
-  currentTaskId String?
-  error         String?
-  stateJson     Json?
-  finalOutput   String?   @db.Text
-  totalCostUsd  Float     @default(0)
-  maxCostUsd    Float?
-  startedAt     DateTime  @default(now())
-  completedAt   DateTime?
-  updatedAt     DateTime  @updatedAt
+  industry       String?
+  status         String    @default("PENDING") // WorkflowStatus
+  planJson       Json? // WorkflowPlan serialized
+  currentTaskId  String?
+  error          String?
+  stateJson      Json?
+  finalOutput    String?   @db.Text
+  totalCostUsd   Float     @default(0)
+  maxCostUsd     Float?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // P0-1 (audit 2026-05-08): the migration declares ON DELETE RESTRICT; the
   // schema previously omitted the clause which silently let Prisma assume
   // "no rule" — a truth-of-record lie. Now matches the live DB constraint.
-  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
   traces           AgentTrace[]
   approvalRequests ApprovalRequest[]
   jobs             WorkflowJob[]
   artifacts        WorkflowArtifact[]
-  conversation     Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation     Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   messages         ConversationMessage[]
+  // HyperAgent Phase 2 — structured outcome + failure diagnoses for this run.
+  outcome          WorkflowOutcome?
+  failureDiagnoses FailureDiagnosis[]
 
   @@index([tenantId, status])
   @@index([updatedAt])
@@ -245,64 +328,64 @@ model Workflow {
 //     by a high-risk workflow and must NOT be downloaded until reviewed.
 //   - Download routes MUST check approvalState before signing a URL.
 model WorkflowArtifact {
-  id              String    @id @default(cuid())
-  tenantId        String
-  workflowId      String
+  id               String    @id @default(cuid())
+  tenantId         String
+  workflowId       String
   // Optional — when an artifact corresponds to a single workflow task.
-  taskId          String?
+  taskId           String?
   // Who/what produced the artifact. Worker role for agent output, 'system'
   // for export bundles, the user id for explicit user uploads.
-  producedBy      String
+  producedBy       String
   // Stable type label used by the audit UI for filtering. Open vocabulary
   // because the Audit & Compliance product will introduce new types
   // (evidence_bundle, control_attestation, signed_export, etc.) without
   // a Prisma migration each time.
-  artifactType    String    // e.g. 'final_output' | 'export' | 'evidence_bundle' | 'attachment'
+  artifactType     String // e.g. 'final_output' | 'export' | 'evidence_bundle' | 'attachment'
   // Human-friendly file name shown in the UI.
-  fileName        String
-  mimeType        String
+  fileName         String
+  mimeType         String
   // Total size in bytes. NULL until the artifact materializes.
-  sizeBytes       Int?
+  sizeBytes        Int?
   // sha256 of the bytes — for integrity check + dedupe across a tenant.
-  contentHash     String?
+  contentHash      String?
   // For small text/JSON artefacts kept inline. Null for binary objects in storage.
-  inlineContent   String?   @db.Text
+  inlineContent    String?   @db.Text
   // Supabase Storage key for binary objects. Null for inline-only.
-  storageKey      String?   @unique
+  storageKey       String?   @unique
   // Lifecycle:
   //   PENDING   — row created, file not yet written
   //   READY     — file materialised (inline or storage), download allowed pending approval
   //   FAILED    — production failed; see `error`
   //   DELETED   — soft-delete, blob removed but row stays for audit trail
-  status          String    @default("PENDING")
+  status           String    @default("PENDING")
   // Compliance gate. The Audit & Compliance product reads this to enforce
   // "evidence cannot be exported until human-approved" workflows.
   //   NOT_REQUIRED         — artifact is non-sensitive, downloadable freely
   //   REQUIRES_APPROVAL    — approval gate active; download blocked
   //   APPROVED             — reviewer approved download
   //   REJECTED             — reviewer blocked download permanently
-  approvalState   String    @default("NOT_REQUIRED")
+  approvalState    String    @default("NOT_REQUIRED")
   // When approvalState transitions to APPROVED/REJECTED, who decided.
-  approvedBy      String?
-  approvedAt      DateTime?
+  approvedBy       String?
+  approvedAt       DateTime?
   // Audit field — last user who DOWNLOADED. Per-download events live in AuditLog.
   lastDownloadedBy String?
   lastDownloadedAt DateTime?
   // For multi-format exports — track the source artifact ID.
   // E.g. a PDF export of an evidence_bundle ZIP keeps `parentId` pointing at the bundle.
-  parentId        String?
+  parentId         String?
   // Free-form metadata the producer wants stamped on the row (workflow step
   // id, source dataset version, signing key id, etc.).
-  metadata        Json?
-  error           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  metadata         Json?
+  error            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
   // Soft-delete marker. Hard-delete is reserved for retention sweeps.
-  deletedAt       DateTime?
+  deletedAt        DateTime?
 
-  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  parent          WorkflowArtifact? @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
-  derivatives     WorkflowArtifact[] @relation("ArtifactParent")
+  workflow    Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  parent      WorkflowArtifact?  @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
+  derivatives WorkflowArtifact[] @relation("ArtifactParent")
 
   @@index([tenantId, deletedAt])
   @@index([workflowId])
@@ -322,9 +405,9 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages ConversationMessage[]
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ConversationMessage[]
   workflows Workflow[]
 
   @@index([tenantId, userId, updatedAt])
@@ -335,10 +418,10 @@ model ConversationMessage {
   id             String   @id @default(cuid())
   conversationId String
   workflowId     String?
-  role           String   // "user" | "assistant" | "system"
+  role           String // "user" | "assistant" | "system"
   content        String   @db.Text
-  agentRole      String?  // worker role label for assistant messages
-  metadata       Json?    // cost, tokens, traceId, etc.
+  agentRole      String? // worker role label for assistant messages
+  metadata       Json? // cost, tokens, traceId, etc.
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -349,25 +432,25 @@ model ConversationMessage {
 }
 
 model WorkflowJob {
-  id               String   @id @default(cuid())
-  workflowId       String   @unique
-  tenantId         String
-  userId           String
-  status           String   @default("QUEUED") // QUEUED | ACTIVE | COMPLETED | FAILED | DEAD
-  attempts         Int      @default(0)
-  maxAttempts      Int      @default(5)
-  payloadJson      Json
-  availableAt      DateTime @default(now())
-  startedAt        DateTime?
-  completedAt      DateTime?
-  lastError        String?
+  id              String    @id @default(cuid())
+  workflowId      String    @unique
+  tenantId        String
+  userId          String
+  status          String    @default("QUEUED") // QUEUED | ACTIVE | COMPLETED | FAILED | DEAD
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(5)
+  payloadJson     Json
+  availableAt     DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastError       String?
   // P1b ownership — which instance owns the job right now, when its lease expires,
   // and when it last heartbeated. Reclaim when leaseExpiresAt < NOW() and status='ACTIVE'.
-  ownerInstanceId  String?
-  leaseExpiresAt   DateTime?
-  lastHeartbeatAt  DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  ownerInstanceId String?
+  leaseExpiresAt  DateTime?
+  lastHeartbeatAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -387,7 +470,7 @@ model AgentTrace {
   runId         String
   workflowId    String
   tenantId      String
-  agentRole     String    // AgentRole enum
+  agentRole     String // AgentRole enum
   stepIndex     Int
   inputJson     Json?
   outputJson    Json?
@@ -399,7 +482,7 @@ model AgentTrace {
   tokenUsage    Json?
   error         String?
 
-  workflow      Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
   @@index([traceId])
@@ -436,15 +519,15 @@ model ApprovalRequest {
   // differ — preventing the "approve once, replay with different
   // payload" exploit.
   proposedDataHash String?
-  toolName         String?   // The tool the action will invoke (e.g. "send_email", "stripe_charge")
-  filesAffected    String[]  // Files this action will write to / overwrite
-  externalService  String?   // External system this action targets (e.g. "Slack", "Stripe", "GitHub")
-  idempotencyKey   String?   // Dedup key — retrying the decide for the same key is a no-op
-  expectedResult   String?   // 1-line preview of what success looks like, surfaced in the card
+  toolName         String? // The tool the action will invoke (e.g. "send_email", "stripe_charge")
+  filesAffected    String[] // Files this action will write to / overwrite
+  externalService  String? // External system this action targets (e.g. "Slack", "Stripe", "GitHub")
+  idempotencyKey   String? // Dedup key — retrying the decide for the same key is a no-op
+  expectedResult   String? // 1-line preview of what success looks like, surfaced in the card
 
-  workflow         Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  reviewer         User?     @relation("reviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  approvalScopes   ApprovalScope[]
+  workflow       Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  reviewer       User?           @relation("reviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  approvalScopes ApprovalScope[]
 
   @@index([workflowId, status])
   @@index([tenantId, status])
@@ -462,14 +545,14 @@ model ApprovalRequest {
 // SAME hash is an idempotent no-op (returns the original decision);
 // replaying a DIFFERENT hash triggers APPROVAL_PAYLOAD_MISMATCH.
 model ApprovalScope {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   approvalId       String
   proposedDataHash String
-  decidedAt        DateTime  @default(now())
-  decision         String    // APPROVED | REJECTED | DEFERRED
+  decidedAt        DateTime @default(now())
+  decision         String // APPROVED | REJECTED | DEFERRED
   approverId       String?
 
-  approval         ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  approval ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
 
   @@unique([approvalId, proposedDataHash])
   @@index([approvalId])
@@ -484,19 +567,19 @@ model ApprovalScope {
 // Rows are NEVER deleted except via explicit data-retention jobs; updating
 // the ApprovalRequest row does not mutate the history recorded here.
 model ApprovalAuditLog {
-  id             String   @id @default(cuid())
-  approvalId     String   // FK to ApprovalRequest (soft ref — kept even after request cleanup)
-  workflowId     String
-  tenantId       String
-  taskId         String
-  agentRole      String
-  riskLevel      String
-  decision       String   // APPROVED | REJECTED | DEFERRED | AUTO_APPROVED
-  autoApproved   Boolean  @default(false)
-  approverId     String?  // null for auto-approvals
-  rationale      String?
-  rawDecisionJson Json?   // full request body for forensic debugging
-  decidedAt      DateTime @default(now())
+  id              String   @id @default(cuid())
+  approvalId      String // FK to ApprovalRequest (soft ref — kept even after request cleanup)
+  workflowId      String
+  tenantId        String
+  taskId          String
+  agentRole       String
+  riskLevel       String
+  decision        String // APPROVED | REJECTED | DEFERRED | AUTO_APPROVED
+  autoApproved    Boolean  @default(false)
+  approverId      String? // null for auto-approvals
+  rationale       String?
+  rawDecisionJson Json? // full request body for forensic debugging
+  decidedAt       DateTime @default(now())
 
   @@index([tenantId, decidedAt])
   @@index([workflowId])
@@ -506,7 +589,7 @@ model ApprovalAuditLog {
 
 model Skill {
   id               String    @id @default(cuid())
-  tenantId         String?   // null = global built-in
+  tenantId         String? // null = global built-in
   name             String
   description      String
   tier             Int       @default(1) // SkillTier
@@ -516,14 +599,14 @@ model Skill {
   permissions      String[]  @default([])
   riskLevel        String    @default("MEDIUM")
   testCasesJson    Json?
-  implementation   String?   // source code — only for sandbox
+  implementation   String? // source code — only for sandbox
   sandboxResult    Json?
   approvedBy       String?
   approvedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  tenant           Tenant?   @relation(fields: [tenantId], references: [id])
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
 
   @@map("skills")
 }
@@ -533,13 +616,13 @@ model TenantMemory {
   tenantId   String
   key        String
   value      Json
-  source     String    // who/what wrote it
-  memoryType String    // WORKFLOW | USER_PREF | KNOWLEDGE | POLICY | SKILL_REGISTRY
+  source     String // who/what wrote it
+  memoryType String // WORKFLOW | USER_PREF | KNOWLEDGE | POLICY | SKILL_REGISTRY
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, key])
   @@index([tenantId, memoryType])
@@ -580,8 +663,8 @@ model MemoryItem {
   deletedAt      DateTime?
   lastAccessedAt DateTime?
 
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  events         MemoryEvent[]
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events MemoryEvent[]
 
   @@unique([tenantId, scopeType, scopeId, key])
   @@index([tenantId, scopeType, scopeId])
@@ -593,7 +676,7 @@ model MemoryItem {
 }
 
 model MemoryEvent {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   tenantId       String
   memoryItemId   String?
   scopeType      String
@@ -604,10 +687,10 @@ model MemoryEvent {
   runId          String?
   idempotencyKey String?
   diff           Json?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime @default(now())
 
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  memoryItem     MemoryItem? @relation(fields: [memoryItemId], references: [id], onDelete: SetNull)
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memoryItem MemoryItem? @relation(fields: [memoryItemId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, createdAt])
@@ -616,25 +699,25 @@ model MemoryEvent {
 }
 
 model VectorDocument {
-  id         String   @id @default(cuid())
-  tenantId   String
-  content    String   @db.Text
+  id          String   @id @default(cuid())
+  tenantId    String
+  content     String   @db.Text
   // embedding stored via raw SQL (pgvector); Prisma doesn't natively support vector type
-  metadata   Json?
-  sourceKey  String?
-  sourceType String   @default("DOCUMENT")
-  chunkIndex Int      @default(0)
-  scopeType  String?
-  scopeId    String?
+  metadata    Json?
+  sourceKey   String?
+  sourceType  String   @default("DOCUMENT")
+  chunkIndex  Int      @default(0)
+  scopeType   String?
+  scopeId     String?
   contentHash String?
   // Soft FK to TenantDocument.id — when a file is uploaded via POST /documents/upload,
   // each chunk row carries the originating document id so we can list chunks by
   // document (preview) and delete chunks when the document is removed.
-  documentId String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  documentId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, sourceType])
   @@index([tenantId, scopeType, scopeId])
@@ -654,39 +737,39 @@ model VectorDocument {
 // and "recently uploaded files" queries awkward. Keeping them separate makes
 // the lifecycle clear: upload creates 1 TenantDocument + N VectorDocument rows.
 model TenantDocument {
-  id           String   @id @default(cuid())
-  tenantId     String
+  id             String    @id @default(cuid())
+  tenantId       String
   // Uploader — null when uploaded via API key (future: service-account uploads)
-  uploadedBy   String?
-  fileName     String
+  uploadedBy     String?
+  fileName       String
   // MIME type from Content-Type, validated against an allowlist at upload time.
-  mimeType     String
-  sizeBytes   Int
+  mimeType       String
+  sizeBytes      Int
   // Supabase Storage key: `tenant-documents/<tenantId>/<id>.<ext>`. Frontend
   // builds the signed URL at read-time so we never persist a URL that could
   // outlive its signature.
-  storageKey   String   @unique
+  storageKey     String    @unique
   // Hash of the file content (sha256, hex). Lets us dedupe identical uploads
   // across a tenant and detect silent corruption.
-  contentHash  String?
+  contentHash    String?
   // Ingestion lifecycle:
   //   PENDING   — uploaded, not yet chunked/embedded
   //   INDEXED   — chunks live in VectorDocument, searchable
   //   FAILED    — ingestion failed, see ingestionError for reason
   //   DELETED   — soft-delete marker; storage object also removed
-  status       String   @default("PENDING")
+  status         String    @default("PENDING")
   ingestionError String?
   // Optional scope labels set at upload — e.g., { projectId, workflowId }
   // so the find_document tool can filter to the right context.
-  metadata     Json?
+  metadata       Json?
   // Optional tags the user attaches at upload for organization in the Files tab.
-  tags         String[] @default([])
+  tags           String[]  @default([])
   // Soft delete — storage object is still removed, this row stays for audit.
-  deletedAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, deletedAt])
   @@index([tenantId, status])
@@ -707,7 +790,7 @@ model AuditLog {
   severity   String   @default("INFO") // INFO | WARN | ERROR | CRITICAL
   createdAt  DateTime @default(now())
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, action])
   @@index([tenantId, createdAt])
@@ -746,7 +829,7 @@ model Integration {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   credentials IntegrationCredential?
 
   @@unique([tenantId, provider])
@@ -755,15 +838,15 @@ model Integration {
 }
 
 model IntegrationCredential {
-  id              String      @id @default(cuid())
-  integrationId   String      @unique
+  id              String    @id @default(cuid())
+  integrationId   String    @unique
   accessTokenEnc  String
   refreshTokenEnc String?
   expiresAt       DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   @@map("integration_credentials")
 }
@@ -785,7 +868,7 @@ model OAuthState {
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([expiresAt])
@@ -793,16 +876,16 @@ model OAuthState {
 }
 
 model WhatsappLink {
-  id          String   @id @default(cuid())
-  tenantId    String
-  userId      String
-  phoneNumber String
-  status      String   @default("PENDING")
-  challengeCode String?
+  id                 String    @id @default(cuid())
+  tenantId           String
+  userId             String
+  phoneNumber        String
+  status             String    @default("PENDING")
+  challengeCode      String?
   challengeExpiresAt DateTime?
-  verifiedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  verifiedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -821,36 +904,36 @@ model OnboardingState {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("onboarding_states")
 }
 
 model WorkflowSchedule {
-  id              String    @id @default(cuid())
-  tenantId        String
-  userId          String
-  name            String
-  description     String?
-  goal            String
-  industry        String?
-  cronExpression  String
-  enabled         Boolean   @default(true)
-  maxCostUsd      Float?
-  lastRunAt       DateTime?
-  nextRunAt       DateTime?
-  lastRunStatus   String?
-  lastRunId       String?
-  runCount        Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  tenantId       String
+  userId         String
+  name           String
+  description    String?
+  goal           String
+  industry       String?
+  cronExpression String
+  enabled        Boolean   @default(true)
+  maxCostUsd     Float?
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  lastRunStatus  String?
+  lastRunId      String?
+  runCount       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Item C (OpenClaw-inspired Phase 1) — at most one StandingOrder per
   // schedule. The relation is optional on both sides: a schedule can fire
   // without a standing-order boundary, and a standing-order can apply to
   // a tenant globally without being attached to a specific schedule.
-  standingOrders  StandingOrder[]
+  standingOrders StandingOrder[]
 
   @@index([tenantId, enabled])
   @@index([nextRunAt])
@@ -885,15 +968,15 @@ model WorkflowSchedule {
 //   - `approvalRequiredFor`: forces tasks at these tool/risk levels
 //     through the approval gate even when auto-approve is on
 model StandingOrder {
-  id                  String    @id @default(cuid())
-  tenantId            String
-  userId              String
+  id                 String  @id @default(cuid())
+  tenantId           String
+  userId             String
   /// Optional FK — null means the order applies globally to the tenant
   /// (e.g. "approve nothing destructive ever"); a string FK means the
   /// order is scoped to that one schedule's fires.
-  workflowScheduleId  String?
-  name                String
-  description         String?
+  workflowScheduleId String?
+  name               String
+  description        String?
 
   /// Tool names the schedule MAY invoke. Empty = no whitelist (all tools
   /// allowed except those in blockedActions). Non-empty = strict
@@ -918,11 +1001,11 @@ model StandingOrder {
   expiresAt           DateTime?
   enabled             Boolean   @default(true)
 
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  workflowSchedule    WorkflowSchedule? @relation(fields: [workflowScheduleId], references: [id], onDelete: SetNull)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflowSchedule WorkflowSchedule? @relation(fields: [workflowScheduleId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, enabled])
   @@index([workflowScheduleId])
@@ -933,33 +1016,33 @@ model StandingOrder {
 // ─── Vibe Coding: Project Models ────────────────────────────────────────────
 
 model Project {
-  id              String    @id @default(cuid())
-  tenantId        String
-  userId          String
-  name            String
-  description     String?   @db.Text
-  framework       String    @default("nextjs") // nextjs | react-spa | react-native | fastify-api
-  status          String    @default("DRAFT")  // DRAFT | GENERATING | BUILDING | READY | DEPLOYED | FAILED
-  lastBuildError  String?   @db.Text           // FIX #17: Store last build error for debugging
-  sandboxId       String?
-  previewUrl      String?
-  deploymentUrl   String?
-  deploymentId    String?
-  githubRepo      String?
-  githubBranch    String?   @default("main")
-  templateId      String?
-  currentVersion  Int       @default(0)
-  totalCostUsd    Float     @default(0)
-  metadata        Json?     // architecture, config, env vars, etc.
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String   @id @default(cuid())
+  tenantId       String
+  userId         String
+  name           String
+  description    String?  @db.Text
+  framework      String   @default("nextjs") // nextjs | react-spa | react-native | fastify-api
+  status         String   @default("DRAFT") // DRAFT | GENERATING | BUILDING | READY | DEPLOYED | FAILED
+  lastBuildError String?  @db.Text // FIX #17: Store last build error for debugging
+  sandboxId      String?
+  previewUrl     String?
+  deploymentUrl  String?
+  deploymentId   String?
+  githubRepo     String?
+  githubBranch   String?  @default("main")
+  templateId     String?
+  currentVersion Int      @default(0)
+  totalCostUsd   Float    @default(0)
+  metadata       Json? // architecture, config, env vars, etc.
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // FIX #16: Add proper User relation
-  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  files           ProjectFile[]
-  versions        ProjectVersion[]
-  conversations   ProjectConversation[]
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  files         ProjectFile[]
+  versions      ProjectVersion[]
+  conversations ProjectConversation[]
 
   @@index([tenantId, status])
   @@index([tenantId, userId])
@@ -967,18 +1050,18 @@ model Project {
 }
 
 model ProjectFile {
-  id         String   @id @default(cuid())
-  projectId  String
-  path       String   // e.g. "src/app/page.tsx"
-  content    String   @db.Text
-  language   String?  // tsx, ts, css, json, md, etc.
-  size       Int      @default(0)
-  hash       String?  // SHA-256 for diffing
-  versionId  String?  // which version created/modified this
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  projectId String
+  path      String // e.g. "src/app/page.tsx"
+  content   String   @db.Text
+  language  String? // tsx, ts, css, json, md, etc.
+  size      Int      @default(0)
+  hash      String? // SHA-256 for diffing
+  versionId String? // which version created/modified this
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // FIX #3: Removed isDeleted + soft-delete pattern.
   // Files are hard-deleted; use ProjectVersion.snapshotJson for history/rollback.
@@ -992,13 +1075,13 @@ model ProjectVersion {
   projectId    String
   version      Int
   description  String?
-  snapshotJson Json?    // full file tree snapshot for rollback
-  diffJson     Json?    // files changed in this version
+  snapshotJson Json? // full file tree snapshot for rollback
+  diffJson     Json? // files changed in this version
   createdBy    String   @default("system") // "user" | "agent" | "system"
-  workflowId   String?  // optional link to the workflow that created this version
+  workflowId   String? // optional link to the workflow that created this version
   createdAt    DateTime @default(now())
 
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -1008,13 +1091,13 @@ model ProjectVersion {
 model ProjectConversation {
   id         String   @id @default(cuid())
   projectId  String
-  role       String   // "user" | "assistant" | "system"
+  role       String // "user" | "assistant" | "system"
   content    String   @db.Text
-  metadata   Json?    // file references, agent info, cost, etc.
+  metadata   Json? // file references, agent info, cost, etc.
   workflowId String?
   createdAt  DateTime @default(now())
 
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
   @@map("project_conversations")
@@ -1023,7 +1106,7 @@ model ProjectConversation {
 model UserLayout {
   id        String   @id @default(cuid())
   userId    String   @unique
-  layout    Json     // SerializedLayout from shell-store
+  layout    Json // SerializedLayout from shell-store
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1048,8 +1131,8 @@ model CrmContact {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  notes        CrmNote[]
-  deals        CrmDeal[]
+  notes CrmNote[]
+  deals CrmDeal[]
 
   @@unique([tenantId, email])
   @@index([tenantId, stage])
@@ -1065,7 +1148,7 @@ model CrmNote {
   authorName String
   createdAt  DateTime @default(now())
 
-  contact    CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@map("crm_notes")
@@ -1086,7 +1169,7 @@ model CrmDeal {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  contact           CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, stage])
   @@index([contactId])
@@ -1096,26 +1179,26 @@ model CrmDeal {
 // ─── Managed AI: Subscriptions & Usage ──────────────────────────────────────
 
 model Subscription {
-  id              String    @id @default(cuid())
-  tenantId        String    @unique // One active subscription per tenant
-  planId          String    @default("free") // free | pro | team | enterprise | trial_30d
-  status          String    @default("active") // active | cancelled | past_due | trialing | trial_expired
-  creditsTotal    Int       @default(200)    // Monthly allocation
-  creditsUsed     Int       @default(0)      // Used this billing period
-  premiumTotal    Int       @default(0)      // Premium model (Tier 3) allocation
-  premiumUsed     Int       @default(0)
-  dailyUsed       Int       @default(0)      // Resets daily at midnight UTC
-  dailyCap        Int       @default(30)     // Max credits per day
-  perTaskCap      Int       @default(10)     // Max credits per single task
-  concurrentCap   Int       @default(1)      // Max concurrent workflows
-  maxModelTier    Int       @default(1)      // 1=cheap, 2=balanced, 3=premium
-  periodStart     DateTime  @default(now())
-  periodEnd       DateTime
-  dailyResetAt    DateTime  @default(now())
-  paddleSubId     String?   // Paddle subscription ID
-  paddleCustomerId String?  // Paddle customer ID
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String   @id @default(cuid())
+  tenantId         String   @unique // One active subscription per tenant
+  planId           String   @default("free") // free | pro | team | enterprise | trial_30d
+  status           String   @default("active") // active | cancelled | past_due | trialing | trial_expired
+  creditsTotal     Int      @default(200) // Monthly allocation
+  creditsUsed      Int      @default(0) // Used this billing period
+  premiumTotal     Int      @default(0) // Premium model (Tier 3) allocation
+  premiumUsed      Int      @default(0)
+  dailyUsed        Int      @default(0) // Resets daily at midnight UTC
+  dailyCap         Int      @default(30) // Max credits per day
+  perTaskCap       Int      @default(10) // Max credits per single task
+  concurrentCap    Int      @default(1) // Max concurrent workflows
+  maxModelTier     Int      @default(1) // 1=cheap, 2=balanced, 3=premium
+  periodStart      DateTime @default(now())
+  periodEnd        DateTime
+  dailyResetAt     DateTime @default(now())
+  paddleSubId      String? // Paddle subscription ID
+  paddleCustomerId String? // Paddle customer ID
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Migration 106 — Free 30-day trial (the landing-page CTA destination).
   //
@@ -1128,20 +1211,20 @@ model Subscription {
   //
   // trialStartedAt + trialEndsAt are nullable so non-trial tenants are
   // identical to before. usage-counter.service.ts owns reset + increment.
-  trialStartedAt          DateTime?
-  trialEndsAt             DateTime?
-  dailyAgentRunsUsed      Int       @default(0)
-  dailyAgentRunsCap       Int       @default(20)
-  dailyApprovalsUsed      Int       @default(0)
-  dailyApprovalsCap       Int       @default(5)
-  dailyToolMinutesUsed    Int       @default(0)
-  dailyToolMinutesCap     Int       @default(120)
+  trialStartedAt       DateTime?
+  trialEndsAt          DateTime?
+  dailyAgentRunsUsed   Int       @default(0)
+  dailyAgentRunsCap    Int       @default(20)
+  dailyApprovalsUsed   Int       @default(0)
+  dailyApprovalsCap    Int       @default(5)
+  dailyToolMinutesUsed Int       @default(0)
+  dailyToolMinutesCap  Int       @default(120)
   // dailyTokensUsed/Cap is a per-day version of creditsUsed/Total, expressed
   // in raw input+output tokens so the cap doesn't depend on credit pricing.
-  dailyTokensUsed         Int       @default(0)
-  dailyTokensCap          Int       @default(200000)
+  dailyTokensUsed      Int       @default(0)
+  dailyTokensCap       Int       @default(200000)
 
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([paddleSubId])
   @@index([trialEndsAt])
@@ -1153,14 +1236,14 @@ model UsageLedger {
   tenantId        String
   userId          String
   workflowId      String?
-  taskType        String   // chat, coding, analysis, research, etc.
-  modelUsed       String   // OpenAI model id used for the trace, e.g. gpt-5.4 / gpt-5.5.
-  provider        String   // openai, anthropic, google
+  taskType        String // chat, coding, analysis, research, etc.
+  modelUsed       String // OpenAI model id used for the trace, e.g. gpt-5.4 / gpt-5.5.
+  provider        String // openai, anthropic, google
   inputTokens     Int      @default(0)
   outputTokens    Int      @default(0)
-  creditsCost     Int      @default(0)    // Credits consumed
-  creditsReserved Int?                     // What was reserved pre-execution
-  usdCost         Float    @default(0)    // Actual $ cost to Jaak
+  creditsCost     Int      @default(0) // Credits consumed
+  creditsReserved Int? // What was reserved pre-execution
+  usdCost         Float    @default(0) // Actual $ cost to Jaak
   latencyMs       Int?
   status          String   @default("completed") // completed, failed, cancelled
   createdAt       DateTime @default(now())
@@ -1172,16 +1255,16 @@ model UsageLedger {
 }
 
 model RoutingLog {
-  id              String   @id @default(cuid())
-  taskType        String
-  selectedModel   String
+  id               String   @id @default(cuid())
+  taskType         String
+  selectedModel    String
   selectedProvider String
-  fallbackUsed    Boolean  @default(false)
-  score           Float?
-  reason          String?
-  userPlan        String
-  inputTokens     Int?
-  createdAt       DateTime @default(now())
+  fallbackUsed     Boolean  @default(false)
+  score            Float?
+  reason           String?
+  userPlan         String
+  inputTokens      Int?
+  createdAt        DateTime @default(now())
 
   @@index([taskType, createdAt])
   @@map("routing_log")
@@ -1217,8 +1300,8 @@ model ComplianceFramework {
   id          String   @id @default(cuid())
   // Stable slug used in URLs + auto-mapping rule lookups (e.g. "soc2-type2").
   slug        String   @unique
-  name        String   // "SOC 2 Type 2"
-  shortName   String   // "SOC 2"
+  name        String // "SOC 2 Type 2"
+  shortName   String // "SOC 2"
   // Issuing body (e.g. "AICPA", "ISO/IEC", "HHS").
   issuer      String
   // Free-text description shown on the framework selector page.
@@ -1229,41 +1312,41 @@ model ComplianceFramework {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  controls    ComplianceControl[]
+  controls ComplianceControl[]
 
   @@map("compliance_frameworks")
 }
 
 model ComplianceControl {
-  id            String   @id @default(cuid())
-  frameworkId   String
+  id          String   @id @default(cuid())
+  frameworkId String
   // Stable code from the source standard (e.g. "CC6.1", "P1.1").
-  code          String
+  code        String
   // Trust Services Category for SOC2 (e.g. "Security", "Privacy") or
   // equivalent grouping for other frameworks.
-  category      String
+  category    String
   // Common Criteria / Series identifier within the category (e.g. "CC6").
-  series        String
-  title         String
-  description   String   @db.Text
+  series      String
+  title       String
+  description String   @db.Text
   // Auto-mapping rule key — resolves to a function in the rule registry
   // that decides which evidence rows belong to this control. Null when
   // the control is human-mapped only (no automation).
-  autoRuleKey   String?
+  autoRuleKey String?
   // Sub-control breakdown — JSON array of `{code, title, description}`.
   // E.g. SOC 2 CC6.1 has 11 sub-points (CC6.1.1 ... CC6.1.11). NULL
   // when the control has no published sub-points or the catalog hasn't
   // seeded them yet. Auditors use these to write attestation narratives
   // at sub-point granularity. The auto-mapping engine still maps
   // evidence to the parent control today; sub-point routing is roadmap.
-  subControls   Json?
+  subControls Json?
   // Display order within its category.
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  framework     ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
-  evidence      ControlEvidenceMapping[]
+  framework ComplianceFramework      @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  evidence  ControlEvidenceMapping[]
 
   @@unique([frameworkId, code])
   @@index([frameworkId, category, sortOrder])
@@ -1271,30 +1354,30 @@ model ComplianceControl {
 }
 
 model ControlEvidenceMapping {
-  id           String   @id @default(cuid())
-  tenantId     String
-  controlId    String
+  id            String   @id @default(cuid())
+  tenantId      String
+  controlId     String
   // What kind of row this mapping points at.
   //   - 'audit_log'        → AuditLog.id
   //   - 'workflow'         → Workflow.id
   //   - 'approval'         → ApprovalRequest.id
   //   - 'artifact'         → WorkflowArtifact.id
   //   - 'evidence_bundle'  → WorkflowArtifact.id where artifactType='evidence_bundle'
-  evidenceType String
-  evidenceId   String
+  evidenceType  String
+  evidenceId    String
   // When the underlying evidence was produced (denormalised so the
   // attestation can do period queries without joining 4 tables).
-  evidenceAt   DateTime
+  evidenceAt    DateTime
   // Who created the mapping. 'auto-mapper' for engine-created rows;
   // user id for human curated rows.
-  mappedBy     String
+  mappedBy      String
   // 'auto' = engine-created via autoRuleKey; 'manual' = human curated.
-  mappingSource String  @default("auto")
+  mappingSource String   @default("auto")
   // Optional human note when mappingSource=manual.
-  notes        String?  @db.Text
-  createdAt    DateTime @default(now())
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
 
-  control      ComplianceControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  control ComplianceControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, controlId, evidenceType, evidenceId])
   @@index([tenantId, controlId, evidenceAt])
@@ -1311,23 +1394,23 @@ model ControlEvidenceMapping {
 // alongside auto-mapped rows; both count toward coverage. The auto-
 // mapper never deletes manual evidence — it only adds/upserts auto rows.
 model ManualEvidence {
-  id                  String    @id @default(cuid())
-  tenantId            String
-  controlId           String
-  title               String
-  description         String    @db.Text
+  id                 String    @id @default(cuid())
+  tenantId           String
+  controlId          String
+  title              String
+  description        String    @db.Text
   // Optional FK (soft — no cascade) to a WorkflowArtifact (e.g. an
   // uploaded PDF policy). When set, the UI can deep-link to download.
-  attachedArtifactId  String?
-  createdBy           String
+  attachedArtifactId String?
+  createdBy          String
   // For period-scoped attestations, the date the evidence is "valid as
   // of". Defaults to createdAt when not supplied — operators can backdate
   // to reflect when a policy actually went into effect.
-  evidenceAt          DateTime  @default(now())
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  evidenceAt         DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
   // Soft-delete pattern matches WorkflowArtifact + TenantDocument.
-  deletedAt           DateTime?
+  deletedAt          DateTime?
 
   @@index([tenantId, controlId, deletedAt])
   @@index([tenantId, evidenceAt])
@@ -1351,38 +1434,38 @@ model ManualEvidence {
 // schedules whose dependencies aren't satisfied (logs + leaves
 // nextRunAt unchanged so a future tick retries).
 model ScheduledAttestation {
-  id              String    @id @default(cuid())
-  tenantId        String
-  frameworkId     String
+  id                String    @id @default(cuid())
+  tenantId          String
+  frameworkId       String
   // Standard 5-field cron expression in UTC (e.g. "0 0 * * 1" = every
   // Monday midnight UTC). Validated at write time via cron-parser.
-  cronExpression  String
+  cronExpression    String
   // How many days back from the firing time the attestation covers.
-  windowDays      Int       @default(7)
+  windowDays        Int       @default(7)
   // When true, attempts to also create a signed evidence bundle alongside.
   // Requires EVIDENCE_SIGNING_SECRET; failure to sign leaves the PDF
   // attestation but logs a warning.
-  signBundles     Boolean   @default(false)
+  signBundles       Boolean   @default(false)
   // Optional metadata stamped on every generated attestation
   // (e.g. control framework variant, customer name).
-  metadata        Json?
+  metadata          Json?
   // Operator opt-in — defaults to false; flipping to true starts firings
   // on the next scheduler tick.
-  active          Boolean   @default(false)
+  active            Boolean   @default(false)
   // Computed by the scheduler from cronExpression at create + after
   // every fire. NULL means "schedule paused" — never fired again until
   // active flips back on.
-  nextRunAt       DateTime?
+  nextRunAt         DateTime?
   // Timestamp of the most recent successful fire (for the UI history table).
-  lastRunAt       DateTime?
+  lastRunAt         DateTime?
   // Last fire's outcome — "success" or "failed:<reason>" for the UI.
-  lastRunStatus   String?
+  lastRunStatus     String?
   // ID of the most recent attestation row produced by this schedule
   // (lets the UI deep-link to the latest output).
   lastAttestationId String?
-  createdBy       String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdBy         String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([active, nextRunAt])
   @@index([tenantId, frameworkId])
@@ -1464,9 +1547,9 @@ model AuditRun {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  controlTests        ControlTest[]
-  exceptions          AuditException[]
-  workpapers          AuditWorkpaper[]
+  controlTests ControlTest[]
+  exceptions   AuditException[]
+  workpapers   AuditWorkpaper[]
 
   @@index([tenantId, status, deletedAt])
   @@index([tenantId, frameworkSlug])
@@ -1483,36 +1566,36 @@ model AuditRun {
 //
 // Result: 'pass' / 'fail' / 'exception' / 'needs_evidence' (terminal)
 model ControlTest {
-  id              String    @id @default(cuid())
-  tenantId        String
-  auditRunId      String
+  id                 String    @id @default(cuid())
+  tenantId           String
+  auditRunId         String
   // Soft FK to ComplianceControl.id — the control being tested
-  controlId       String
+  controlId          String
   // Snapshot of the control code at test time (e.g. "CC6.1") so the
   // workpaper survives if the catalog is reorganised
-  controlCode     String
-  controlTitle   String
+  controlCode        String
+  controlTitle       String
   // Test procedure narrative (LLM-generated or human-curated)
-  testProcedure   String?   @db.Text
+  testProcedure      String?   @db.Text
   // Per-test status (state machine — see comment above model)
-  status          String    @default("not_started")
+  status             String    @default("not_started")
   // Terminal result (when status reaches a terminal state)
-  result          String?
+  result             String?
   // LLM rationale for the result
-  rationale       String?   @db.Text
+  rationale          String?   @db.Text
   // 0-1 confidence — when <0.7 the workpaper requires reviewer override
-  confidence      Float?
+  confidence         Float?
   // Snapshot of evidence considered (audit_log/workflow/approval/artifact/manual_evidence ids)
   evidenceConsidered Json?
-  evidenceCount   Int       @default(0)
+  evidenceCount      Int       @default(0)
   // Set when result='fail' or 'exception' → AuditException row id
-  exceptionId     String?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  exceptionId        String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
 
   @@unique([auditRunId, controlId])
   @@index([tenantId, auditRunId, status])
@@ -1527,33 +1610,33 @@ model ControlTest {
 // Status: 'open' / 'remediation_planned' / 'remediation_in_progress' /
 // 'remediation_complete' / 'accepted' / 'rejected' / 'closed'
 model AuditException {
-  id              String    @id @default(cuid())
-  tenantId        String
-  auditRunId      String
-  controlTestId   String?
-  controlId       String
-  controlCode     String
-  severity        String    @default("medium")
+  id                 String    @id @default(cuid())
+  tenantId           String
+  auditRunId         String
+  controlTestId      String?
+  controlId          String
+  controlCode        String
+  severity           String    @default("medium")
   // Description of the exception (LLM-synthesised or human)
-  description     String    @db.Text
+  description        String    @db.Text
   // Root cause analysis
-  cause           String?   @db.Text
+  cause              String?   @db.Text
   // Business impact narrative
-  impact          String?   @db.Text
+  impact             String?   @db.Text
   // Remediation plan (suggested by AI or curated)
-  remediationPlan String?   @db.Text
-  remediationOwner String?
+  remediationPlan    String?   @db.Text
+  remediationOwner   String?
   remediationDueDate DateTime?
-  status          String    @default("open")
+  status             String    @default("open")
   // Reviewer decision when accepted/rejected
-  reviewerStatus  String?
-  reviewerComment String?   @db.Text
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  reviewerStatus     String?
+  reviewerComment    String?   @db.Text
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, auditRunId, status])
   @@index([tenantId, severity, status])
@@ -1568,28 +1651,28 @@ model AuditException {
 // Status: 'draft' / 'needs_evidence' / 'needs_review' / 'rejected' /
 // 'approved' / 'final'
 model AuditWorkpaper {
-  id              String    @id @default(cuid())
-  tenantId        String
-  auditRunId      String
-  controlTestId   String?
-  controlId       String
-  controlCode     String
-  controlTitle    String
+  id            String    @id @default(cuid())
+  tenantId      String
+  auditRunId    String
+  controlTestId String?
+  controlId     String
+  controlCode   String
+  controlTitle  String
   // The PDF artifact id (FK to workflow_artifacts via app code; no schema FK
   // because WorkflowArtifact has its own approval gate flow)
-  artifactId      String?
+  artifactId    String?
   // Status (mirrors WorkflowArtifact.approvalState semantics; 'final' set
   // once included in a final pack)
-  status          String    @default("draft")
+  status        String    @default("draft")
   // Reviewer narrative override (when reviewer edits the LLM-generated text)
-  reviewerNotes   String?   @db.Text
-  generatedBy     String
-  reviewedBy      String?
-  approvedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  reviewerNotes String?   @db.Text
+  generatedBy   String
+  reviewedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  auditRun        AuditRun  @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
 
   @@unique([auditRunId, controlId])
   @@index([tenantId, auditRunId, status])
@@ -1623,31 +1706,31 @@ model AuditWorkpaper {
 // user for review but NOT used by agents until approved. No silent
 // overwrite — the user must explicitly approve.
 model CompanyProfile {
-  id                  String    @id @default(cuid())
-  tenantId            String    @unique
-  name                String?
-  industry            String?
-  description         String?   @db.Text
-  productsServices    Json?     // Array of {name, description}
-  targetCustomers     String?   @db.Text
-  brandVoice          String?   @db.Text  // e.g. "professional, warm, jargon-light"
-  competitors         Json?     // Array of {name, url?, notes?}
-  pricing             String?   @db.Text
-  websiteUrl          String?
-  goals               String?   @db.Text
-  constraints         String?   @db.Text
-  preferredChannels   Json?     // ['email', 'slack', 'whatsapp']
-  status              String    @default("extracted")
+  id                   String    @id @default(cuid())
+  tenantId             String    @unique
+  name                 String?
+  industry             String?
+  description          String?   @db.Text
+  productsServices     Json? // Array of {name, description}
+  targetCustomers      String?   @db.Text
+  brandVoice           String?   @db.Text // e.g. "professional, warm, jargon-light"
+  competitors          Json? // Array of {name, url?, notes?}
+  pricing              String?   @db.Text
+  websiteUrl           String?
+  goals                String?   @db.Text
+  constraints          String?   @db.Text
+  preferredChannels    Json? // ['email', 'slack', 'whatsapp']
+  status               String    @default("extracted")
   // Confidence per LLM extraction (0-1). Null when status='manual'.
   extractionConfidence Float?
   // Source documents the extraction was based on (TenantDocument ids)
-  sourceDocumentIds   Json?
-  reviewedBy          String?
-  reviewedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  sourceDocumentIds    Json?
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("company_profiles")
 }
@@ -1656,22 +1739,22 @@ model CompanyProfile {
 // Separate from TenantDocument because this is for ongoing tracking
 // (monitor a competitor's pricing page, watch for changes, etc.).
 model CompanyKnowledgeSource {
-  id          String    @id @default(cuid())
-  tenantId    String
-  url         String
-  kind        String    // 'website' | 'competitor' | 'pricing' | 'product' | 'blog' | 'other'
-  title       String?
+  id                String    @id @default(cuid())
+  tenantId          String
+  url               String
+  kind              String // 'website' | 'competitor' | 'pricing' | 'product' | 'blog' | 'other'
+  title             String?
   // Last successful crawl
-  lastCrawledAt DateTime?
+  lastCrawledAt     DateTime?
   // Status of last crawl: 'pending' | 'crawled' | 'failed'
-  lastCrawlStatus String  @default("pending")
-  lastCrawlError String?  @db.Text
+  lastCrawlStatus   String    @default("pending")
+  lastCrawlError    String?   @db.Text
   // Vector document ids produced from the crawl (so we can re-ingest)
   vectorDocumentIds Json?
-  createdBy   String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdBy         String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   @@unique([tenantId, url])
   @@index([tenantId, kind, deletedAt])
@@ -1688,8 +1771,8 @@ model CompanyKnowledgeSource {
 model CompanyArtifact {
   id              String    @id @default(cuid())
   tenantId        String
-  sourceType      String    // 'github' | 'linear' | 'slack' | 'notion' | 'meeting' | 'document' | 'customer' | ...
-  artifactType    String    // 'ticket' | 'pr' | 'commit' | 'meeting_transcript' | 'customer_feedback' | ...
+  sourceType      String // 'github' | 'linear' | 'slack' | 'notion' | 'meeting' | 'document' | 'customer' | ...
+  artifactType    String // 'ticket' | 'pr' | 'commit' | 'meeting_transcript' | 'customer_feedback' | ...
   externalId      String?
   sourceUrl       String?
   title           String
@@ -1705,7 +1788,7 @@ model CompanyArtifact {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   primaryEntities CompanyGraphEntity[] @relation("CompanyEntityPrimaryArtifact")
 
   @@unique([tenantId, sourceType, externalId])
@@ -1721,16 +1804,16 @@ model CompanyGraphEntity {
   id                String    @id @default(cuid())
   tenantId          String
   primaryArtifactId String?
-  entityType        String    // 'decision' | 'task' | 'spec' | 'customer_signal' | 'code_change' | 'risk' | ...
+  entityType        String // 'decision' | 'task' | 'spec' | 'customer_signal' | 'code_change' | 'risk' | ...
   title             String
   summary           String    @db.Text
   status            String    @default("active")
   ownerName         String?
-  priority          String?   // 'low' | 'medium' | 'high' | 'critical'
+  priority          String? // 'low' | 'medium' | 'high' | 'critical'
   confidence        Float     @default(0.5)
   occurredAt        DateTime?
   dueAt             DateTime?
-  sourceArtifactIds Json      // string[]
+  sourceArtifactIds Json // string[]
   relatedEntityIds  Json?
   properties        Json?
   extractedBy       String    @default("openai")
@@ -1739,8 +1822,8 @@ model CompanyGraphEntity {
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  primaryArtifact   CompanyArtifact? @relation("CompanyEntityPrimaryArtifact", fields: [primaryArtifactId], references: [id], onDelete: SetNull)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryArtifact CompanyArtifact? @relation("CompanyEntityPrimaryArtifact", fields: [primaryArtifactId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, entityType, status, updatedAt])
   @@index([tenantId, ownerName])
@@ -1759,7 +1842,7 @@ model ExecutionDriftFinding {
   tenantId            String
   fingerprint         String
   driftType           String
-  severity            String    // 'low' | 'medium' | 'high' | 'critical'
+  severity            String // 'low' | 'medium' | 'high' | 'critical'
   status              String    @default("open") // 'open' | 'acknowledged' | 'resolved' | 'dismissed'
   title               String
   summary             String    @db.Text
@@ -1773,8 +1856,8 @@ model ExecutionDriftFinding {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  specs               AgentExecutableSpec[]
+  tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  specs  AgentExecutableSpec[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId, status, severity, detectedAt])
@@ -1809,8 +1892,8 @@ model AgentExecutableSpec {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driftFinding        ExecutionDriftFinding? @relation(fields: [driftFindingId], references: [id], onDelete: SetNull)
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driftFinding ExecutionDriftFinding? @relation(fields: [driftFindingId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, driftFindingId])
@@ -1835,8 +1918,8 @@ model CompanyConnectorSyncState {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  runs                CompanyConnectorSyncRun[]
+  tenant Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   CompanyConnectorSyncRun[]
 
   @@unique([tenantId, provider])
   @@index([tenantId, status, updatedAt])
@@ -1846,26 +1929,26 @@ model CompanyConnectorSyncState {
 // CompanyConnectorSyncRun — append-only execution history for sync jobs.
 // Lets operators inspect scheduled/manual runs, counts, and errors.
 model CompanyConnectorSyncRun {
-  id              String    @id @default(cuid())
-  syncStateId     String?
-  tenantId        String
-  provider        String
-  trigger         String    @default("scheduled") // scheduled | manual | bootstrap
-  status          String    @default("running") // running | success | partial | failed
-  startedAt       DateTime  @default(now())
-  completedAt     DateTime?
-  durationMs      Int?
-  fetchedCount    Int       @default(0)
-  ingestedCount   Int       @default(0)
-  skippedCount    Int       @default(0)
-  errorMessage    String?   @db.Text
+  id               String    @id @default(cuid())
+  syncStateId      String?
+  tenantId         String
+  provider         String
+  trigger          String    @default("scheduled") // scheduled | manual | bootstrap
+  status           String    @default("running") // running | success | partial | failed
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  durationMs       Int?
+  fetchedCount     Int       @default(0)
+  ingestedCount    Int       @default(0)
+  skippedCount     Int       @default(0)
+  errorMessage     String?   @db.Text
   cursorBeforeJson Json?
-  cursorAfterJson Json?
-  metadata        Json?
-  createdAt       DateTime  @default(now())
+  cursorAfterJson  Json?
+  metadata         Json?
+  createdAt        DateTime  @default(now())
 
-  syncState       CompanyConnectorSyncState? @relation(fields: [syncStateId], references: [id], onDelete: SetNull)
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  syncState CompanyConnectorSyncState? @relation(fields: [syncStateId], references: [id], onDelete: SetNull)
+  tenant    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, provider, startedAt])
   @@index([tenantId, status, startedAt])
@@ -1881,22 +1964,22 @@ model CompanyConnectorSyncRun {
 // the 18 named values defined in COMPANY_OS_INTENTS (packages/agents/
 // src/intents/intent-vocabulary.ts).
 model IntentRecord {
-  id                String    @id @default(cuid())
-  tenantId          String
-  workflowId        String?   // null when Commander short-circuits with directAnswer
-  userId            String
-  rawInput          String    @db.Text
-  intent            String    // one of the 18 named intents
-  intentConfidence  Float?    // 0-1, LLM-self-reported
-  subFunction       String?
-  urgency           Int?      // 1-5
-  riskIndicators    Json?     // String[]
-  requiredOutputs   Json?     // String[]
-  workflowTemplateId String?  // FK to WorkflowTemplate.id when matched
-  clarificationNeeded Boolean @default(false)
-  clarificationQuestion String? @db.Text
-  directAnswer      String?   @db.Text  // when Commander short-circuited
-  createdAt         DateTime  @default(now())
+  id                    String   @id @default(cuid())
+  tenantId              String
+  workflowId            String? // null when Commander short-circuits with directAnswer
+  userId                String
+  rawInput              String   @db.Text
+  intent                String // one of the 18 named intents
+  intentConfidence      Float? // 0-1, LLM-self-reported
+  subFunction           String?
+  urgency               Int? // 1-5
+  riskIndicators        Json? // String[]
+  requiredOutputs       Json? // String[]
+  workflowTemplateId    String? // FK to WorkflowTemplate.id when matched
+  clarificationNeeded   Boolean  @default(false)
+  clarificationQuestion String?  @db.Text
+  directAnswer          String?  @db.Text // when Commander short-circuited
+  createdAt             DateTime @default(now())
 
   @@index([tenantId, intent, createdAt])
   @@index([tenantId, workflowId])
@@ -1911,29 +1994,29 @@ model IntentRecord {
 //
 // status: 'active' | 'inactive' | 'experimental'
 model WorkflowTemplate {
-  id              String    @id @default(cuid())
+  id                     String   @id @default(cuid())
   // Per-tenant overrides allowed. tenantId=null means a system template
   // available to all tenants (the seeded library).
-  tenantId        String?
-  intent          String    // one of the 18 named intents
-  name            String
-  description     String    @db.Text
+  tenantId               String?
+  intent                 String // one of the 18 named intents
+  name                   String
+  description            String   @db.Text
   // The tasks the Planner should produce. Array of {id, name, agentRole,
   // toolsRequired, dependsOn, riskLevel, requiresApproval, retryable}.
-  tasksJson       Json
+  tasksJson              Json
   // Required company-context fields (e.g. ['brandVoice', 'targetCustomers'])
   // The Commander surfaces "missing inputs" when these aren't on the tenant's
   // CompanyProfile.
   requiredCompanyContext Json?
   // Required user inputs (e.g. ['websiteUrl', 'audience'])
-  requiredUserInputs Json?
+  requiredUserInputs     Json?
   // Approval gates — array of step ids that need approval before continuing.
-  approvalGates   Json?
+  approvalGates          Json?
   // Expected artifact types (e.g. ['report.pdf', 'campaign.json'])
-  expectedArtifacts Json?
-  status          String    @default("active")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  expectedArtifacts      Json?
+  status                 String   @default("active")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@unique([tenantId, intent, name])
   @@index([intent, status])
@@ -1964,29 +2047,29 @@ model WorkflowTemplate {
 // is logged for audit-trail purposes.
 
 model ExternalAuditorInvite {
-  id              String    @id @default(cuid())
-  tenantId        String    @map("tenant_id")
-  auditRunId      String    @map("audit_run_id")
-  auditorEmail    String    @map("auditor_email")
-  auditorName     String?   @map("auditor_name")
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  auditRunId     String    @map("audit_run_id")
+  auditorEmail   String    @map("auditor_email")
+  auditorName    String?   @map("auditor_name")
   // SHA-256 hex of the cleartext token. Cleartext is returned ONCE on
   // creation; the system NEVER stores raw tokens.
-  tokenHash       String    @unique @map("token_hash")
-  scopes          String[]
-  status          String    @default("PENDING")  // PENDING | ACCEPTED | REVOKED | EXPIRED
-  createdBy       String    @map("created_by")
-  expiresAt       DateTime  @map("expires_at")
-  acceptedAt      DateTime? @map("accepted_at")
-  acceptedUserId  String?   @map("accepted_user_id")
-  revokedAt       DateTime? @map("revoked_at")
-  revokedBy       String?   @map("revoked_by")
+  tokenHash      String    @unique @map("token_hash")
+  scopes         String[]
+  status         String    @default("PENDING") // PENDING | ACCEPTED | REVOKED | EXPIRED
+  createdBy      String    @map("created_by")
+  expiresAt      DateTime  @map("expires_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  acceptedUserId String?   @map("accepted_user_id")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedBy      String?   @map("revoked_by")
   // Final hardening / Gap C — invite email send tracking.
-  emailStatus     String?   @map("email_status")  // pending | sent | not_configured | failed
-  emailSentAt     DateTime? @map("email_sent_at")
-  emailError      String?   @map("email_error")
-  emailProvider   String?   @map("email_provider")  // 'smtp' when configured
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  emailStatus    String?   @map("email_status") // pending | sent | not_configured | failed
+  emailSentAt    DateTime? @map("email_sent_at")
+  emailError     String?   @map("email_error")
+  emailProvider  String?   @map("email_provider") // 'smtp' when configured
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   @@index([tenantId, status], map: "external_auditor_invites_tenant_status_idx")
   @@index([auditRunId], map: "external_auditor_invites_audit_run_idx")
@@ -1994,18 +2077,18 @@ model ExternalAuditorInvite {
 }
 
 model ExternalAuditorEngagement {
-  id                String    @id @default(cuid())
-  tenantId          String    @map("tenant_id")
-  userId            String    @map("user_id")
-  auditorEmail      String    @map("auditor_email")
-  auditRunId        String    @map("audit_run_id")
-  inviteId          String    @map("invite_id")
-  scopes            String[]
-  accessGrantedAt   DateTime  @default(now()) @map("access_granted_at")
-  accessRevokedAt   DateTime? @map("access_revoked_at")
-  expiresAt         DateTime  @map("expires_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  userId          String    @map("user_id")
+  auditorEmail    String    @map("auditor_email")
+  auditRunId      String    @map("audit_run_id")
+  inviteId        String    @map("invite_id")
+  scopes          String[]
+  accessGrantedAt DateTime  @default(now()) @map("access_granted_at")
+  accessRevokedAt DateTime? @map("access_revoked_at")
+  expiresAt       DateTime  @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@unique([userId, auditRunId], map: "external_auditor_engagements_user_run_key")
   @@index([tenantId, userId], map: "external_auditor_engagements_tenant_user_idx")
@@ -2014,18 +2097,18 @@ model ExternalAuditorEngagement {
 }
 
 model ExternalAuditorAction {
-  id            String    @id @default(cuid())
-  tenantId      String    @map("tenant_id")
-  userId        String    @map("user_id")
-  auditorEmail  String    @map("auditor_email")
-  auditRunId    String    @map("audit_run_id")
-  engagementId  String    @map("engagement_id")
-  objectType    String    @map("object_type")  // workpaper | evidence | control | final_pack | engagement
-  objectId      String?   @map("object_id")
-  action        String                            // view | comment | approve | reject | request_changes | download
-  comment       String?
-  metadata      Json?
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  userId       String   @map("user_id")
+  auditorEmail String   @map("auditor_email")
+  auditRunId   String   @map("audit_run_id")
+  engagementId String   @map("engagement_id")
+  objectType   String   @map("object_type") // workpaper | evidence | control | final_pack | engagement
+  objectId     String?  @map("object_id")
+  action       String // view | comment | approve | reject | request_changes | download
+  comment      String?
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([tenantId, auditRunId], map: "external_auditor_actions_tenant_run_idx")
   @@index([engagementId, createdAt(sort: Desc)], map: "external_auditor_actions_engagement_idx")
@@ -2076,23 +2159,23 @@ model Department {
 }
 
 model TaskAssignment {
-  id            String    @id @default(cuid())
-  tenantId      String
-  workflowId    String
+  id               String    @id @default(cuid())
+  tenantId         String
+  workflowId       String
   // Identifier of the task within the workflow's planJson/stateJson. We do
   // not FK to Workflow on this column because tasks live in JSON; tenantId
   // + workflowId scoping is the integrity guarantee.
-  taskId        String
+  taskId           String
   // The user the task is assigned to. Required — there's no point creating
   // an unassigned TaskAssignment row (use the in-state task itself).
-  assigneeUserId String
+  assigneeUserId   String
   // Who created the assignment (CEO, manager, or the planner agent itself
   // when an org-chart-aware planner routes a step to a human).
   assignedByUserId String
   // Free-form copy of the task description so the assignee doesn't need to
   // open the workflow to understand what's being asked.
-  title         String
-  instructions  String?  @db.Text
+  title            String
+  instructions     String?   @db.Text
   // Lifecycle:
   //   PENDING      — assigned, not yet acknowledged
   //   ACKNOWLEDGED — assignee opened it, hasn't completed
@@ -2100,28 +2183,28 @@ model TaskAssignment {
   //   DECLINED     — assignee refused (with reason in `resultJson.reason`)
   //   CANCELLED    — assigner withdrew
   //   EXPIRED      — `dueAt` passed without action (background job sweeps)
-  status        String    @default("PENDING")
+  status           String    @default("PENDING")
   // Risk lattice (matches ToolRiskLevel) so the inbox can show a badge and
   // sort by urgency. Optional — many human tasks are LOW.
-  riskLevel     String    @default("MEDIUM")
-  dueAt         DateTime?
-  acknowledgedAt DateTime?
-  completedAt   DateTime?
+  riskLevel        String    @default("MEDIUM")
+  dueAt            DateTime?
+  acknowledgedAt   DateTime?
+  completedAt      DateTime?
   // Result captured when the human completes — could be free-form text,
   // a decision, an attachment reference, anything the next agent step needs.
-  resultJson    Json?
+  resultJson       Json?
   // Free-form metadata for the producer (e.g. workflow step number).
-  metadata      Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignee    User   @relation("TaskAssignmentAssignee", fields: [assigneeUserId], references: [id], onDelete: Cascade)
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee   User   @relation("TaskAssignmentAssignee", fields: [assigneeUserId], references: [id], onDelete: Cascade)
   // P0-1 (audit 2026-05-08): explicit `onDelete: NoAction` matches the
   // live DB constraint (migration 106 line 94). NoAction is intentional —
   // we want to PREVENT user-deletion when there are still TaskAssignments
   // attributing actions to them, so the audit trail can never be orphaned.
-  assignedBy  User   @relation("TaskAssignmentAssigner", fields: [assignedByUserId], references: [id], onDelete: NoAction)
+  assignedBy User   @relation("TaskAssignmentAssigner", fields: [assignedByUserId], references: [id], onDelete: NoAction)
 
   @@index([tenantId, assigneeUserId, status])
   @@index([tenantId, workflowId])
@@ -2130,7 +2213,7 @@ model TaskAssignment {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   tenantId  String
   userId    String
   // Open vocabulary so we can add new kinds without migrations:
@@ -2139,13 +2222,13 @@ model Notification {
   //   | 'trial_ending'  | 'workflow_completed'
   kind      String
   title     String
-  body      String?  @db.Text
+  body      String?   @db.Text
   // Optional deep-link target so the inbox row can route the user with one click.
   linkPath  String?
   // Extra payload for renderers (workflowId, taskAssignmentId, etc.)
   payload   Json?
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -2165,11 +2248,11 @@ model TrialSignup {
   // per 90 days at the application layer).
   fingerprint     String?
   // Marketing source for funnel analysis.
-  source          String?   // 'landing' | 'jak-shield-section' | 'partner-link' | ...
+  source          String? // 'landing' | 'jak-shield-section' | 'partner-link' | ...
   // Form fields collected on landing — all optional.
   companyName     String?
   industry        String?
-  teamSize        String?   // '1' | '2-5' | '6-20' | '21-100' | '100+'
+  teamSize        String? // '1' | '2-5' | '6-20' | '21-100' | '100+'
   // Lifecycle:
   //   PENDING_VERIFY — email sent, awaiting click
   //   VERIFIED       — clicked, awaiting workspace bootstrap
@@ -2196,19 +2279,19 @@ model TrialSignup {
 }
 
 model WorkflowCheckpoint {
-  id                  String    @id @default(cuid())
-  threadId            String    @map("thread_id")
-  checkpointNs        String    @default("") @map("checkpoint_ns")
-  checkpointId        String    @map("checkpoint_id")
-  parentCheckpointId  String?   @map("parent_checkpoint_id")
-  tenantId            String    @map("tenant_id")
-  type                String    // 'checkpoint' | 'write'
-  checkpointJson      Json?     @map("checkpoint_json")
-  metadataJson        Json?     @map("metadata_json")
-  channelVersionsJson Json?     @map("channel_versions_json")
-  taskId              String?   @map("task_id")
-  writesJson          Json?     @map("writes_json")
-  createdAt           DateTime  @default(now()) @map("created_at")
+  id                  String   @id @default(cuid())
+  threadId            String   @map("thread_id")
+  checkpointNs        String   @default("") @map("checkpoint_ns")
+  checkpointId        String   @map("checkpoint_id")
+  parentCheckpointId  String?  @map("parent_checkpoint_id")
+  tenantId            String   @map("tenant_id")
+  type                String // 'checkpoint' | 'write'
+  checkpointJson      Json?    @map("checkpoint_json")
+  metadataJson        Json?    @map("metadata_json")
+  channelVersionsJson Json?    @map("channel_versions_json")
+  taskId              String?  @map("task_id")
+  writesJson          Json?    @map("writes_json")
+  createdAt           DateTime @default(now()) @map("created_at")
 
   @@index([tenantId, threadId, createdAt(sort: Desc)], map: "workflow_checkpoints_tenant_thread_created_idx")
   @@index([threadId, parentCheckpointId], map: "workflow_checkpoints_thread_parent_idx")

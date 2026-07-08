@@ -10,6 +10,7 @@ export * from './types/voice.js';
 export * from './types/workflow.js';
 export * from './types/analytics.js';
 export * from './types/hyperagent.js';
+export * from './types/failure.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 export * from './schemas/agent.schema.js';
