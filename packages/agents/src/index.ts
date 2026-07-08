@@ -72,6 +72,10 @@ export type { LlmReplanProposal } from './roles/replanner.agent.js';
 export { LearningExtractorAgent } from './roles/learning-extractor.agent.js';
 export type { LlmExtractInput, LlmExtractResult } from './roles/learning-extractor.agent.js';
 
+// ─── HyperAgent Phase 12: code self-repair R5 (LLM wrapper; pure gate in @jak-swarm/swarm) ───
+export { CodeRepairAgent } from './roles/code-repair-agent.js';
+export type { LlmCodePatchProposal, LlmCodeRepairInput } from './roles/code-repair-agent.js';
+
 export { ApprovalAgent } from './roles/approval.agent.js';
 export type { ApprovalInput } from './roles/approval.agent.js';
 

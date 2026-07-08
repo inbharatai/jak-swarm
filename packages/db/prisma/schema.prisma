@@ -76,6 +76,8 @@ model Tenant {
   // Migration 115 — HyperAgent Phase 9 versioned configs + rollout audit trail.
   configVersions             ConfigVersion[]
   configRolloutEvents        ConfigRolloutEvent[]
+  // Migration 116 — HyperAgent Phase 12 R5 code-repair proposals.
+  codeRepairProposals        CodeRepairProposal[]
 
   @@map("tenants")
 }
@@ -186,6 +188,8 @@ model FailureDiagnosis {
   outcomeId    String?
   // HyperAgent Phase 4 — plan versions triggered by this diagnosis.
   planVersions PlanVersion[]
+  // HyperAgent Phase 12 — R5 code-repair proposals triggered by this diagnosis.
+  codeRepairProposals CodeRepairProposal[]
 
   @@index([tenantId, workflowId])
   @@index([workflowId, taskId])
@@ -364,6 +368,54 @@ model ConfigRolloutEvent {
   @@index([tenantId, configVersionId])
   @@index([configVersionId, occurredAt])
   @@map("config_rollout_events")
+}
+
+// ─── HyperAgent Phase 12: bounded code self-repair (R5) ──────────────────────
+//
+// CodeRepairProposal — one row per R5 code-repair proposal. The agent PROPOSES a
+// patch from a FailureDiagnosis; the pure policy gate (code-repair.ts in swarm)
+// classifies it SAFE / NEEDS_REVIEW / FORBIDDEN and refuses to create a branch
+// for any FORBIDDEN proposal (branch protection / CI / secrets / Shield /
+// approval controls / governance / migrations / CRITICAL risk). The repair moves
+// through a bounded lifecycle DRAFT → BRANCH_CREATED → PR_OPENED → PR_DRAFT
+// (terminal, human-owned — the agent NEVER merges its own PR and NEVER deploys).
+// `patchDiff` is Text. Persisted so every R5 proposal is reproducible + auditable.
+model CodeRepairProposal {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  // The diagnosis that triggered this repair, if any (null for human-filed).
+  failureDiagnosisId  String?
+  // CodeRepairKind: BUG_FIX | REFACTOR | GUARDRAIL_ADDITION | TEST_ADDITION | CONFIG_FIX
+  kind                String
+  // CodeRepairStatus: DRAFT | BRANCH_CREATED | PR_OPENED | PR_DRAFT | REJECTED | MERGED | ABANDONED
+  status              String   @default("DRAFT")
+  // Repo-relative paths the patch touches (Text[] — the gate checks against forbidden prefixes).
+  targetFiles         String[]
+  targetSymbol        String?
+  description         String   @db.Text
+  // Unified diff / patch payload (Text). Never executed by the agent.
+  patchDiff           String   @db.Text
+  rationale           String   @db.Text
+  // CodeRepairRisk: LOW | MEDIUM | HIGH | CRITICAL (CRITICAL ⇒ FORBIDDEN).
+  risk                String
+  // CodeRepairSafetyClass: SAFE | NEEDS_REVIEW | FORBIDDEN (the gate's verdict).
+  safetyClass         String
+  // The isolated branch the patch lands on (never main/master). Prefixed hyperagent/r5-.
+  branchName          String
+  // The draft PR URL/number once opened (null until PR_OPENED).
+  prUrl               String?
+  prNumber            Int?
+  createdBy           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  diagnosis FailureDiagnosis? @relation(fields: [failureDiagnosisId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, kind])
+  @@index([failureDiagnosisId])
+  @@map("code_repair_proposals")
 }
 
 model User {
