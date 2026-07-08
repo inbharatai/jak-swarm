@@ -64,8 +64,44 @@ model Tenant {
   taskAssignments TaskAssignment[]
   notifications   Notification[]
   trialSignup     TrialSignup?
+  // Migration 111 — HyperAgent (bounded self-healing + self-learning) config.
+  // One-to-one; nullable so existing tenants are unaffected (defaults to OFF/L0).
+  hyperAgentConfig HyperAgentConfig?
 
   @@map("tenants")
+}
+
+/// HyperAgent tenant configuration (Phase 1). One row per tenant.
+/// Defaults preserve current Swarm behaviour: disabled, observe-only, zero
+/// budget. The central autonomy-policy evaluator lives in
+/// `packages/security/src/governance/autonomy-policy.ts` and reads these
+/// fields via `evaluateForConfig()`.
+model HyperAgentConfig {
+  id                              String   @id @default(cuid())
+  tenantId                        String   @unique
+  tenant                          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  hyperAgentEnabled               Boolean  @default(false)
+  // HyperAgentMode: OFF | OBSERVE | ASSISTED | AUTONOMOUS_SAFE
+  hyperAgentMode                  String   @default("OFF")
+  // AutonomyLevel: L0 | L1 | L2 | L3 | L4 | L5
+  autonomyLevel                   String   @default("L0")
+  maxHyperAgentIterations         Int      @default(0)
+  // Unified repair budgets (replaces split retry counters).
+  maxExecutionRetries             Int      @default(2)
+  maxOutputRepairs                Int      @default(2)
+  maxPlanRepairs                  Int      @default(1)
+  maxCapabilityRepairs            Int      @default(1)
+  maxTotalCostUsd                 Float    @default(0)
+  maxDurationMs                   Int      @default(0)
+  allowShadowOptimization         Boolean  @default(false)
+  allowCanaryOptimization         Boolean  @default(false)
+  allowCodePatchProposal          Boolean  @default(false)
+  requireApprovalForPromptPromotion   Boolean @default(true)
+  requireApprovalForWorkflowPromotion Boolean @default(true)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  @@map("hyper_agent_configs")
 }
 
 model User {

@@ -99,3 +99,16 @@ export type {
   ShieldToolCallEvaluationRequest,
   ShieldToolCallEvaluation,
 } from './shield-gateway/types.js';
+
+// ─── Governance / Autonomy (HyperAgent Phase 1) ─────────────────────────────
+// Central, deterministic autonomy-policy evaluator. ONE place that decides what
+// the HyperAgent may do at a given AutonomyLevel. Later phases (replanner,
+// learning, governance overlay, Shield MCP, code-patch) call this before acting.
+export {
+  evaluateAutonomy,
+  evaluateForConfig,
+  validateRepairBudget,
+  levelAtLeast,
+  AutonomyPolicyService,
+  autonomyPolicyService,
+} from './governance/autonomy-policy.js';

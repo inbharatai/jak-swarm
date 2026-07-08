@@ -9,6 +9,7 @@ export * from './types/user.js';
 export * from './types/voice.js';
 export * from './types/workflow.js';
 export * from './types/analytics.js';
+export * from './types/hyperagent.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 export * from './schemas/agent.schema.js';
