@@ -18,6 +18,7 @@ export * from './types/spec.js';
 export * from './types/config-version.js';
 export * from './types/meta-optimiser.js';
 export * from './types/code-repair.js';
+export * from './types/control-centre.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 export * from './schemas/agent.schema.js';

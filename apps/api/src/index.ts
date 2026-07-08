@@ -105,6 +105,7 @@ import companyOperatingLayerRoutes from './routes/company-operating-layer.routes
 import companySyncRoutes from './routes/company-sync.routes.js';
 import adminAggregateRoutes from './routes/admin-aggregate.routes.js';
 import { adminDiagnosticsRoutes } from './routes/admin-diagnostics.routes.js';
+import hyperagentRoutes from './routes/hyperagent.routes.js';
 import { ensureModelMap } from '@jak-swarm/agents';
 import { registerObservability } from './observability/index.js';
 import { validateConfigOnBoot } from './boot/validate-config.js';
@@ -317,6 +318,11 @@ async function buildApp() {
   // /audit/* which is tenant-scoped).
   await fastify.register(adminAggregateRoutes);
   await fastify.register(adminDiagnosticsRoutes);
+  // HyperAgent Control Centre (Phase 13) — operational dashboard over real
+  // backend data only. Tenant-scoped, REVIEWER+ read. Honest empty views when
+  // tables are empty; never a fabricated "all healthy". See
+  // apps/api/src/routes/hyperagent.routes.ts.
+  await fastify.register(hyperagentRoutes, { prefix: '/hyperagent' });
 
   // ─── Model capability check ────────────────────────────────────────────
   // Warm the ModelResolver cache at boot so the first real LLM call hits

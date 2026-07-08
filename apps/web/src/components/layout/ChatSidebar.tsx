@@ -42,6 +42,7 @@ import {
   Sparkles,
   X,
   type LucideIcon,
+  Activity,
 } from 'lucide-react';
 import useSWR from 'swr';
 
@@ -62,7 +63,7 @@ import { useToast } from '@/components/ui/toast';
 // `/workspace` belongs to Chat even though it's also matched by other entries.
 
 interface Zone {
-  id: 'chat' | 'tasks' | 'files' | 'setup' | 'audit';
+  id: 'chat' | 'tasks' | 'files' | 'setup' | 'audit' | 'hyperagent';
   label: string;
   href: string;
   icon: LucideIcon;
@@ -77,6 +78,7 @@ const ZONES: Zone[] = [
   { id: 'tasks', label: 'Tasks', href: '/swarm', icon: Network, match: ['/swarm', '/traces', '/analytics', '/schedules', '/calendar'] },
   { id: 'files', label: 'Files', href: '/files', icon: FileText, match: ['/files', '/knowledge'] },
   { id: 'setup', label: 'Setup', href: '/integrations', icon: Plug, match: ['/integrations', '/connectors', '/skills', '/builder', '/settings', '/billing'] },
+  { id: 'hyperagent', label: 'HyperAgent', href: '/hyperagent', icon: Activity, match: ['/hyperagent'], gate: 'reviewerOrAdmin' },
   { id: 'audit', label: 'Audit', href: '/audit', icon: ScrollText, match: ['/audit', '/admin'], gate: 'reviewerOrAdmin' },
 ];
 

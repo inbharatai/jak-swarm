@@ -168,3 +168,32 @@ export type {
   ClassifyOptions as RepairClassifyOptions,
   RepairContext,
 } from './recovery/repair-service.js';
+
+// ─── HyperAgent Phase 13 — Control Centre pure aggregation core ────────────
+// Deterministic, no I/O, no clock, fabricates nothing. The API control-centre
+// routes select real Prisma rows, map them to these input shapes, call the
+// aggregators, stamp `generatedAt`, and return honest views (empty when tables
+// are empty — never a fabricated "all healthy"). See control-centre.ts.
+export {
+  aggregateOverview,
+  aggregateRuns,
+  aggregateLearnings,
+  aggregateOptimizations,
+  aggregateExperiments,
+  aggregateGovernance,
+  aggregateAgentFleet,
+  aggregateAutonomy,
+  aggregateShield,
+} from './hyperagent/control-centre.js';
+export type {
+  OutcomeInput,
+  DiagnosisInput,
+  RepairInput,
+  PlanVersionInput,
+  LearningInput,
+  ConfigVersionInput,
+  RolloutEventInput,
+  HyperAgentConfigInput,
+  AgentTraceInput,
+  ShieldAuditInput,
+} from './hyperagent/control-centre.js';
