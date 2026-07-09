@@ -31,6 +31,7 @@ export {
 export {
   buildLangGraph,
   makeRunnableConfig,
+  raceNodeWithTimeout,
   SwarmStateAnnotation,
   type SwarmAnnotationT,
   type CompiledLangGraph,

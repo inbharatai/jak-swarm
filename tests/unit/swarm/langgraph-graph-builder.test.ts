@@ -9,11 +9,12 @@
  * exercised by the existing integration tests against the live runtime.
  * These unit tests cover the pure plumbing.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   SwarmStateAnnotation,
   buildLangGraph,
   makeRunnableConfig,
+  raceNodeWithTimeout,
   type CheckpointPrismaClient,
 } from '../../../packages/swarm/src/workflow-runtime/index.js';
 
@@ -31,6 +32,57 @@ function stubDb(): CheckpointPrismaClient {
     },
   };
 }
+
+describe('raceNodeWithTimeout — timer-leak fix', () => {
+  it('returns the node result when it resolves before the timeout', async () => {
+    const result = await raceNodeWithTimeout(async () => 'ok', 60_000, 'fast');
+    expect(result).toBe('ok');
+  });
+
+  it('CLEARS the timeout timer when the node resolves quickly (no dangling 120s timer)', async () => {
+    // Before the fix, wrapNode used `Promise.race([fn, new Promise(reject =>
+    // setTimeout(reject, t))])` and never cleared the timer — every fast node
+    // invocation left a 120s timer live. Assert the cleanup path calls
+    // clearTimeout so the timer does not outlive the node call.
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    try {
+      await raceNodeWithTimeout(async () => 'ok', 60_000, 'fast');
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+    } finally {
+      clearTimeoutSpy.mockRestore();
+    }
+  });
+
+  it('rejects with the timeout message when the node hangs past the timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = raceNodeWithTimeout(
+        () => new Promise<string>(() => { /* never resolves */ }),
+        1_000,
+        'hang',
+      );
+      // Attach the rejection handler BEFORE firing the timer so the rejection
+      // is never momentarily unhandled when the fake timer callback runs.
+      const assertion = expect(pending).rejects.toThrow(/Node 'hang' exceeded 1000ms timeout/);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the timer when the node rejects before the timeout', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    try {
+      await expect(
+        raceNodeWithTimeout(async () => { throw new Error('boom'); }, 60_000, 'fails'),
+      ).rejects.toThrow('boom');
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+    } finally {
+      clearTimeoutSpy.mockRestore();
+    }
+  });
+});
 
 describe('SwarmStateAnnotation reducers (Sprint 2.5 / A.3)', () => {
   it('exposes Annotation with all SwarmState fields', () => {

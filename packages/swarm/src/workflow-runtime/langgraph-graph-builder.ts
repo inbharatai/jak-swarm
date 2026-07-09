@@ -258,6 +258,51 @@ interface NodeDeps {
 }
 
 /**
+ * Race a node promise against a timeout, CLEARING the timer the moment the
+ * node settles (success or failure) so a fast node does not leave a 120s
+ * dangling timer per invocation.
+ *
+ * The prior implementation used `Promise.race([fn, new Promise(reject =>
+ * setTimeout(reject, t))])` and never cleared the timer: when `fn` resolved
+ * quickly (the common case), the 120s timeout timer kept running for every
+ * single node invocation, leaking one timer per node call for the full
+ * timeout window. Over a long workflow with many nodes this held an unbounded
+ * number of live timers (and, under real timers, kept the event loop alive).
+ *
+ * The underlying node work is NOT cancelled when the timeout wins — there is no
+ * AbortSignal plumbed through the node contract — only the timer is cleared;
+ * an orphaned late resolution is dropped on the floor. Exported for unit
+ * testing of the cleanup behaviour.
+ */
+export async function raceNodeWithTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  name: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      timer = setTimeout(
+        () => reject(new Error(`Node '${name}' exceeded ${timeoutMs}ms timeout`)),
+        timeoutMs,
+      );
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
+    fn()
+      .then((result) => {
+        if (timer) clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((err) => {
+        if (timer) clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+/**
  * Wrap an existing SwarmGraph node function for LangGraph:
  *   - apply context summarization
  *   - poll cancel/pause flags
@@ -294,12 +339,7 @@ function wrapNode(
       // Node-level timeout — prevents any single node from hanging the workflow.
       // 120s matches the documented NODE_TIMEOUT_MS in ARCHITECTURE.md.
       const NODE_TIMEOUT_MS = 120_000;
-      updates = await Promise.race([
-        fn(condensed),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Node '${name}' exceeded ${NODE_TIMEOUT_MS}ms timeout`)), NODE_TIMEOUT_MS),
-        ),
-      ]);
+      updates = await raceNodeWithTimeout(() => fn(condensed), NODE_TIMEOUT_MS, name);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       // Node-level failure: return a status patch the next node sees.
