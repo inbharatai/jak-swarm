@@ -68,9 +68,65 @@ export function branchNameFor(proposal: Pick<CodeRepairProposal, 'kind' | 'id'>)
   return `hyperagent/r5-${proposal.kind.toLowerCase()}-${slug}`;
 }
 
-/** True when a target path starts with any forbidden prefix. Pure. */
+/**
+ * Normalize a target path so prefix matching can't be evaded by redundant
+ * `./`, `.\`, mixed separators, or `..` traversal. Resolves `.`/`..`
+ * segments lexically (no filesystem access), preserves a trailing slash, and
+ * re-anchors absolute paths. Pure + deterministic.
+ *
+ *   ./packages/security/src/shield-gateway/x.ts  ->  packages/security/src/shield-gateway/x.ts
+ *   packages\\security\\src\\shield-gateway\\x.ts   ->  packages/security/src/shield-gateway/x.ts
+ *   packages/security/src/../shield-gateway/x.ts ->  packages/security/src/shield-gateway/x.ts
+ *   /etc/passwd                                    ->  /etc/passwd            (absolute, kept)
+ *   ../../etc/passwd                               ->  ../../etc/passwd        (`..` retained to flag escape)
+ */
+function normalizeTargetPath(p: string): string {
+  const unified = p.replace(/\\/g, '/');
+  const isAbsolute = unified.startsWith('/');
+  const parts = unified.split('/');
+  const out: string[] = [];
+  for (const seg of parts) {
+    if (seg === '' || seg === '.') continue; // drop empty (//, leading ./) + cwd refs
+    if (seg === '..') {
+      // Pop a real segment if we have one; otherwise retain the `..` so an
+      // escape past the repo root is still detectable downstream.
+      if (out.length > 0 && out[out.length - 1] !== '..') out.pop();
+      else out.push('..');
+      continue;
+    }
+    out.push(seg);
+  }
+  const trailing = unified.endsWith('/') ? '/' : '';
+  let norm = out.join('/');
+  if (isAbsolute) norm = `/${norm}`;
+  if (trailing && norm.length > 0 && !norm.endsWith('/')) norm += trailing;
+  if (norm.length === 0) return isAbsolute ? '/' : '.';
+  return norm;
+}
+
+/**
+ * True when a normalized path escapes the repo root: absolute, or still
+ * contains a `..` segment after normalization (traversal above the root).
+ * Such a target is itself forbidden — code self-repair must stay in-repo.
+ * Pure.
+ */
+function escapesRepoRoot(normalized: string): boolean {
+  if (normalized.startsWith('/')) return true;
+  return normalized.split('/').some((seg) => seg === '..');
+}
+
+/**
+ * True when a target path is forbidden: it escapes the repo root, OR it
+ * matches a forbidden prefix after normalization. Normalizing the candidate
+ * (but NOT the trusted prefix constants, whose trailing-slash semantics must
+ * be preserved) closes the `./` / `..\` / `..`-traversal evasion that let an
+ * LLM-proposed path like `./packages/security/src/shield-gateway/x.ts`
+ * bypass the `packages/security/src/shield-gateway/` prefix. Pure.
+ */
 function matchesForbiddenPath(path: string, prefixes: readonly string[]): boolean {
-  return prefixes.some((p) => path === p || path.startsWith(p));
+  const n = normalizeTargetPath(path);
+  if (escapesRepoRoot(n)) return true;
+  return prefixes.some((p) => n === p || n.startsWith(p));
 }
 
 /** True when the diff/rationale contains any forbidden marker. Pure. */

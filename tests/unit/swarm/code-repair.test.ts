@@ -118,6 +118,45 @@ describe('classifyRepair — FORBIDDEN hard boundary', () => {
     expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
     expect(r.blockReason).toMatch(/protected branch/);
   });
+
+  // ── Path-normalization evasion hardening ────────────────────────────────
+  // Before the fix, matchesForbiddenPath compared the RAW path against the
+  // forbidden prefixes with startsWith, so a path prefixed with `./`, using
+  // backslashes, or smuggling `..` past a boundary evaded the hard boundary.
+  it('FORBIDS a forbidden path even when prefixed with ./', () => {
+    const r = classifyRepair(proposal({ targetFiles: ['./packages/security/src/shield-gateway/gateway.ts'] }));
+    expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
+    expect(r.blockReason).toMatch(/forbidden path/);
+  });
+
+  it('FORBIDS a forbidden path even when it uses backslash separators', () => {
+    const r = classifyRepair(proposal({ targetFiles: ['packages\\security\\src\\shield-gateway\\gateway.ts'] }));
+    expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
+  });
+
+  it('FORBIDS a forbidden path reached via .. traversal across a sibling dir', () => {
+    // `../rbac` smuggles past the shield-gateway prefix into the rbac area.
+    const r = classifyRepair(proposal({ targetFiles: ['packages/security/src/shield-gateway/../rbac/rbac.ts'] }));
+    expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
+  });
+
+  it('FORBIDS a path that escapes the repo root (.. traversal above root)', () => {
+    const r = classifyRepair(proposal({ targetFiles: ['../../etc/passwd'] }));
+    expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
+  });
+
+  it('FORBIDS an absolute path target', () => {
+    const r = classifyRepair(proposal({ targetFiles: ['/etc/passwd'] }));
+    expect(r.safety).toBe(CodeRepairSafetyClass.FORBIDDEN);
+  });
+
+  it('still ALLOWS (NEEDS_REVIEW) a benign path that uses ./ or a .. that stays in-repo', () => {
+    // Regression guard: normalization must not over-block legitimate targets.
+    const r = classifyRepair(proposal({ targetFiles: ['./packages/swarm/src/runner/swarm-runner.ts'] }));
+    expect(r.safety).not.toBe(CodeRepairSafetyClass.FORBIDDEN);
+    const r2 = classifyRepair(proposal({ targetFiles: ['packages/swarm/src/runner/../runner/swarm-runner.ts'] }));
+    expect(r2.safety).not.toBe(CodeRepairSafetyClass.FORBIDDEN);
+  });
 });
 
 describe('classifyRepair — NEEDS_REVIEW (R5 always requires human review)', () => {
