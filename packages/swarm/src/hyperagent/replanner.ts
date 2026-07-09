@@ -199,10 +199,16 @@ function proposeDeterministic(ctx: ReplanContext): {
     };
   }
 
-  // Budget exhausted → reduce scope (drop highest-risk tool) or escalate.
+  // Budget exhausted → reduce scope (drop one tool) or escalate.
   if (cls === FailureClass.BUDGET_EXCEEDED) {
     const failed = ctx.failedTask;
     if (failed.toolsRequired.length > 1) {
+      // NOTE: tools carry no modelled per-tool cost or risk, so there is no
+      // principled "highest-risk tool" to drop — the prior reason claimed exactly
+      // that and was a lie. We drop the LAST tool as a deterministic heuristic
+      // and say so plainly in the audit trail. A human reviewing the replan can
+      // re-add the tool or pick a different one.
+      const dropped = failed.toolsRequired[failed.toolsRequired.length - 1];
       const trimmed = failed.toolsRequired.slice(0, -1);
       const tasks = ctx.originalPlan.tasks.map((t) =>
         t.id === failed.id ? withTask(t, { toolsRequired: trimmed }) : t,
@@ -210,11 +216,11 @@ function proposeDeterministic(ctx: ReplanContext): {
       return {
         repairType: 'REDUCE_SCOPE',
         updatedPlan: { ...ctx.originalPlan, tasks, updatedAt: new Date() },
-        reason: `Reduced scope on '${failed.id}': dropped highest-risk tool to fit budget.`,
+        reason: `Reduced scope on '${failed.id}': dropped tool '${dropped}' (last in toolsRequired) to fit the remaining budget. Per-tool cost/risk is not modelled, so the dropped tool is not provably the least essential — a human may re-add it.`,
         expectedImprovement: 0.3,
       };
     }
-    return { repairType: 'ESCALATE', reason: 'Budget exceeded with no scope to reduce.', expectedImprovement: 0 };
+    return { repairType: 'ESCALATE', reason: 'Budget exceeded with no scope to reduce (single-tool task).', expectedImprovement: 0 };
   }
 
   // WRONG_AGENT or counterfactual isolated agent-only.
@@ -386,12 +392,29 @@ function computeInvalidated(plan: WorkflowPlan, changedIds: string[]): string[] 
   return Array.from(invalidated);
 }
 
-/** Additional risk = max risk level among changed/inserted tasks vs the original. */
+/**
+ * Additional risk introduced by the repair = the max riskLevel among tasks that
+ * are NEWLY INSERTED or CHANGED in `next` vs `prev`. "Changed" mirrors the
+ * replan() diff (agent / tools / deps) and also catches a riskLevel bump.
+ *
+ * Before the fix only INSERTED tasks were counted, so a repair that modified an
+ * existing HIGH-risk task (REPLACE_AGENT / REPLACE_TOOL / REDUCE_SCOPE) reported
+ * additionalRisk = LOW — understating the risk surfaced to the autonomy policy
+ * before a replan is approved. The comment said "changed/inserted" but the code
+ * only did inserted; this makes the code match the comment.
+ */
 function computeAdditionalRisk(prev: WorkflowPlan, next: WorkflowPlan): RiskLevel {
   const RANK: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
   let maxNew: RiskLevel = RiskLevel.LOW;
   for (const t of next.tasks) {
-    if (!prev.tasks.some((p) => p.id === t.id) && RANK[t.riskLevel] > RANK[maxNew]) {
+    const prevTask = prev.tasks.find((p) => p.id === t.id);
+    const changed =
+      !prevTask ||
+      prevTask.agentRole !== t.agentRole ||
+      JSON.stringify(prevTask.toolsRequired) !== JSON.stringify(t.toolsRequired) ||
+      JSON.stringify(prevTask.dependsOn) !== JSON.stringify(t.dependsOn) ||
+      prevTask.riskLevel !== t.riskLevel;
+    if (changed && RANK[t.riskLevel] > RANK[maxNew]) {
       maxNew = t.riskLevel;
     }
   }

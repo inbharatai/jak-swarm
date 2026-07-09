@@ -158,12 +158,78 @@ describe('replanner — deterministic repairs', () => {
     expect(r.changedTaskIds).toContain(prereq?.id);
   });
 
-  it('BUDGET_EXCEEDED with multiple tools → REDUCE_SCOPE drops the highest-risk tool', async () => {
+  it('BUDGET_EXCEEDED with multiple tools → REDUCE_SCOPE drops one tool (last), honest reason', async () => {
     const failed = task({ id: 'fail', toolsRequired: ['web_search', 'alt_tool'] });
     const r = await replan(ctx({ failedTask: failed, diagnosis: diagnosis(FailureClass.BUDGET_EXCEEDED) }), { knownToolNames: knownTools });
     expect(r.repairType).toBe('REDUCE_SCOPE');
     expect(r.valid).toBe(true);
+    // The LAST tool is dropped (deterministic heuristic — tools carry no per-tool risk).
     expect(r.updatedPlan?.tasks.find((t) => t.id === 'fail')?.toolsRequired).toEqual(['web_search']);
+    // The reason must NOT lie about "highest-risk tool" (no per-tool risk is modelled).
+    expect(r.reason).toMatch(/dropped tool 'alt_tool'/);
+    expect(r.reason).not.toMatch(/highest-risk/);
+  });
+
+  it('BUDGET_EXCEEDED with a single tool → ESCALATE (no scope to reduce)', async () => {
+    const failed = task({ id: 'fail', toolsRequired: ['web_search'] });
+    const r = await replan(ctx({ failedTask: failed, diagnosis: diagnosis(FailureClass.BUDGET_EXCEEDED) }), { knownToolNames: knownTools });
+    expect(r.repairType).toBe('ESCALATE');
+    expect(r.reason).toMatch(/no scope to reduce/);
+  });
+});
+
+describe('replanner — additionalRisk reflects changed + inserted tasks', () => {
+  it('additionalRisk = HIGH when a repair changes an existing HIGH-risk task (REPLACE_AGENT)', async () => {
+    // Before the fix, computeAdditionalRisk only counted INSERTED tasks, so
+    // changing an existing HIGH-risk task's agent reported additionalRisk = LOW.
+    const failed = task({ id: 'fail', riskLevel: RiskLevel.HIGH });
+    const r = await replan(ctx({ failedTask: failed, diagnosis: diagnosis(FailureClass.WRONG_AGENT) }), { knownToolNames: knownTools });
+    expect(r.repairType).toBe('REPLACE_AGENT');
+    expect(r.additionalRisk).toBe(RiskLevel.HIGH);
+  });
+
+  it('additionalRisk = HIGH when a repair changes an existing HIGH-risk task\'s tools (REPLACE_TOOL)', async () => {
+    const failed = task({ id: 'fail', riskLevel: RiskLevel.HIGH, toolsRequired: ['unavailable_tool'] });
+    const r = await replan(
+      ctx({
+        failedTask: failed,
+        diagnosis: diagnosis(FailureClass.TOOL_UNAVAILABLE),
+        toolAlternates: { unavailable_tool: ['alt_tool'] },
+      }),
+      { knownToolNames: new Set([...knownTools, 'alt_tool']) },
+    );
+    expect(r.repairType).toBe('REPLACE_TOOL');
+    expect(r.additionalRisk).toBe(RiskLevel.HIGH);
+  });
+
+  it('additionalRisk = LOW when an inserted prerequisite is LOW-risk and the changed task is also LOW', async () => {
+    const failed = task({ id: 'fail', riskLevel: RiskLevel.LOW });
+    const r = await replan(ctx({ failedTask: failed, diagnosis: diagnosis(FailureClass.MISSING_CONTEXT) }), { knownToolNames: knownTools });
+    expect(r.repairType).toBe('ADD_PREREQUISITE');
+    expect(r.additionalRisk).toBe(RiskLevel.LOW);
+  });
+
+  it('additionalRisk reflects a riskLevel bump on a changed task', async () => {
+    // LLM proposes MODIFY_TASK that raises an existing task from LOW to HIGH.
+    const failed = task({ id: 'fail', riskLevel: RiskLevel.LOW });
+    const bumped = plan([task({ id: 'fail', riskLevel: RiskLevel.HIGH, toolsRequired: ['web_search'] })]);
+    const r = await replan(
+      ctx({
+        failedTask: failed,
+        diagnosis: diagnosis(FailureClass.WRONG_AGENT),
+        originalPlan: plan([failed]),
+      }),
+      {
+        knownToolNames: knownTools,
+        llmPropose: async () => ({
+          repairType: 'MODIFY_TASK' as never,
+          updatedPlan: bumped,
+          reason: 'raise risk',
+          expectedImprovement: 0.4,
+        }) as never,
+      },
+    );
+    expect(r.additionalRisk).toBe(RiskLevel.HIGH);
   });
 });
 
