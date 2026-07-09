@@ -97,6 +97,32 @@ import { PostgresCheckpointSaver, type CheckpointPrismaClient } from './postgres
  *   - Sum for accumulatedCostUsd.
  */
 const lwwReducer = <T>(_old: T, next: T) => (next === undefined ? _old : next);
+/**
+ * Clearable last-writer-wins: `next` ALWAYS wins, INCLUDING when it is
+ * `undefined` (which clears the field). Used ONLY for state a node can
+ * legitimately reset after recovery — currently `error` (the replanner returns
+ * `error: undefined` to clear a stale error before re-executing a revised plan).
+ *
+ * Why not use this everywhere? LangGraph only dispatches a channel's reducer for
+ * keys a node ACTUALLY returned, so a node that omits `error` never touches the
+ * reducer — `undefined` is therefore always an explicit "clear" intent, never a
+ * "leave it alone" intent. The plain `lwwReducer` (which keeps the old value on
+ * `undefined`) was a defensive no-op guard that had the unintended effect of
+ * making the stale-error clear a no-op: a workflow that failed, got re-planned,
+ * and then completed successfully still carried the stale error in its final
+ * SwarmResult (`toSwarmResult` includes `state.error` whenever truthy), mis-
+ * reporting a recovered run as errored.
+ *
+ * Safety: when `next === undefined` wins, the BinaryOperatorAggregate channel
+ * value becomes `undefined` — identical to its initial state (the `default:
+ * () => undefined` factory already yields `undefined` at startup, so `get()`
+ * throws `EmptyChannelError` and the key is omitted from the assembled state →
+ * `state.error` is `undefined`). Clearing simply returns the channel to that
+ * initial semantic state; verified against @langchain/langgraph 1.4.7's
+ * BinaryOperatorAggregate.update + _isOverwriteValue (a plain `undefined` write
+ * is NOT an Overwrite sentinel, so it IS dispatched to the operator).
+ */
+export const clearableLwwReducer = <T>(_old: T, next: T) => next;
 const mergeReducer = <T extends Record<string, unknown>>(old: T | undefined, next: T | undefined): T => {
   if (!next) return old ?? ({} as T);
   return { ...(old ?? {} as T), ...next };
@@ -187,7 +213,9 @@ export const SwarmStateAnnotation = Annotation.Root({
 
   // Output / terminal
   status: Annotation<WorkflowStatus>({ reducer: lwwReducer, default: () => WorkflowStatus.PENDING }),
-  error: Annotation<string | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  // `error` is clearable: a recovering node (replanner) returns `error: undefined`
+  // to clear a stale error before re-execution. See clearableLwwReducer above.
+  error: Annotation<string | undefined>({ reducer: clearableLwwReducer, default: () => undefined }),
   outputs: Annotation<unknown[]>({ reducer: appendReducer, default: () => [] }),
   traces: Annotation<AgentTrace[]>({ reducer: appendReducer, default: () => [] }),
 

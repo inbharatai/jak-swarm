@@ -10,11 +10,13 @@
  * These unit tests cover the pure plumbing.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { StateGraph, START, END } from '@langchain/langgraph';
 import {
   SwarmStateAnnotation,
   buildLangGraph,
   makeRunnableConfig,
   raceNodeWithTimeout,
+  clearableLwwReducer,
   type CheckpointPrismaClient,
 } from '../../../packages/swarm/src/workflow-runtime/index.js';
 
@@ -90,6 +92,56 @@ describe('SwarmStateAnnotation reducers (Sprint 2.5 / A.3)', () => {
     // The Annotation.Root produces a spec with state + update typings.
     // We assert the spec is callable to build a graph.
     expect(typeof SwarmStateAnnotation).toBe('object');
+  });
+});
+
+describe('clearableLwwReducer — stale-error clear (Bug 5)', () => {
+  it('clears the old value when the next write is undefined (last-write-wins incl. undefined)', () => {
+    // The whole point of the clearable reducer: a node returning `error: undefined`
+    // must CLEAR the field, not keep the stale value.
+    expect(clearableLwwReducer('stale boom', undefined)).toBeUndefined();
+    expect(clearableLwwReducer(undefined, undefined)).toBeUndefined();
+  });
+
+  it('still overwrites with a defined value (last-write-wins for real writes)', () => {
+    expect(clearableLwwReducer('old', 'new')).toBe('new');
+    expect(clearableLwwReducer(undefined, 'first error')).toBe('first error');
+  });
+
+  it('end-to-end: a stale error set in one node is CLEARED by a later node returning error: undefined', async () => {
+    // This is the real Bug 5 scenario against the live LangGraph superstep
+    // dispatch. The replanner returns `error: undefined` to clear the stale
+    // error before re-executing a revised plan. With the old `lwwReducer`
+    // (`next === undefined ? _old : next`), LangGraph's BinaryOperatorAggregate
+    // still dispatched the `undefined` write to the operator, which then kept
+    // the old error — so a workflow that failed, got re-planned, and completed
+    // successfully still carried the stale error in its final SwarmResult. We
+    // build a two-node graph (setError → clearError) on the real
+    // SwarmStateAnnotation and assert the final state has no error.
+    const graph = new StateGraph(SwarmStateAnnotation)
+      .addNode('setError', () => ({ error: 'boom: transient failure' }))
+      .addNode('clearError', () => ({ error: undefined }))
+      .addEdge(START, 'setError')
+      .addEdge('setError', 'clearError')
+      .addEdge('clearError', END)
+      .compile();
+    const result = await graph.invoke({ goal: 'test' });
+    expect(result.error).toBeUndefined();
+  });
+
+  it('end-to-end: without a clear, the error persists (regression guard for the test above)', async () => {
+    // Guard: confirm the end-to-end test above is actually exercising the clear
+    // path — if no node clears, the error must survive. This proves the fix is
+    // what makes the error disappear, not some other LangGraph defaulting.
+    const graph = new StateGraph(SwarmStateAnnotation)
+      .addNode('setError', () => ({ error: 'boom' }))
+      .addNode('keepGoing', () => ({ currentTaskIndex: 1 }))
+      .addEdge(START, 'setError')
+      .addEdge('setError', 'keepGoing')
+      .addEdge('keepGoing', END)
+      .compile();
+    const result = await graph.invoke({ goal: 'test' });
+    expect(result.error).toBe('boom');
   });
 });
 
