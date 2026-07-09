@@ -23,7 +23,7 @@ The primary API deployment is Google Cloud Run (`jak-swarm-api` in `asia-south1`
 
 ## Parallel deployment: Google Cloud Run
 
-A parallel Cloud Run deployment exists for the Google AI Agents Challenge. Both Railway and Cloud Run can run simultaneously — traffic shifts via `NEXT_PUBLIC_API_URL` in Vercel. See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for the full setup guide.
+A parallel Cloud Run deployment exists for running JAK Swarm on Google Cloud with first-class Gemini integration. Both Railway and Cloud Run can run simultaneously — traffic shifts via `NEXT_PUBLIC_API_URL` in Vercel. See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for the full setup guide.
 
 | Piece | Where | What runs |
 |---|---|---|

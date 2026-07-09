@@ -13,7 +13,7 @@ That rating means the core architecture is now credible enough for controlled be
 
 ## What Is In Scope
 
-- Gemini-first model execution policy for the Google AI Agents Challenge (OpenAI available as alternate provider).
+- Two first-class LLM providers with per-tenant switching — OpenAI (GPT-5.5/5.4) and Gemini (2.5 Pro/Flash/Flash-Lite), selected per tenant from the Settings UI.
 - LangGraph-backed workflow runtime with Postgres checkpointing.
 - JAK Shield gateway — a separate MCP-native 10-stage security gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)) that JAK Swarm calls for signed security decisions on high-risk actions. Local policy enforcement (injection detection, PII redaction, RBAC, audit logging) runs inside Swarm via `packages/security`.
 - Risk-tiered tool execution and human approval pause semantics.

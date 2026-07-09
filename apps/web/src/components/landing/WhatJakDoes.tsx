@@ -33,7 +33,7 @@ const PILLARS: Array<{
     key: 'memory',
     eyebrow: 'Company memory',
     title: 'Evidence first, not chatbot memory.',
-    body: 'JAK stores source-labeled artifacts from docs, tickets, code, meetings, customer calls, support, Slack, Notion, Linear/Jira, GitHub, Gmail, or manual notes. It then extracts decisions, tasks, risks, owners, deadlines, customer signals, and code changes with citations.',
+    body: 'JAK stores source-labeled artifacts from docs, tickets, code, meetings, customer calls, support, Slack, Notion, Linear/Jira, GitHub, Gmail, or manual notes. GitHub, Gmail, and Google Drive auto-sync on a 5-minute schedule; the other sources ingest on-demand or by manual upload. JAK then extracts decisions, tasks, risks, owners, deadlines, customer signals, and code changes with citations.',
     points: [
       'Artifacts are tenant-scoped and body-hashed',
       'Entities cite the artifacts they came from',

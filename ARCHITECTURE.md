@@ -81,7 +81,7 @@ The core execution engine. Contains:
 
 - **Base Layer** (`base/`):
   - `BaseAgent`: Abstract class with `run()` method implementing the tool loop pattern.
-  - `GeminiRuntime`: Primary LLM execution path for the Google AI Agents Challenge. Bridges Google's Generative AI SDK (Gemini 2.5 Pro/Flash/Flash-Lite) to JAK's agent-first architecture via `geminiResponseToChatCompletion()`. Supports parallel function calling, `responseSchema` structured output, controllable thinking, and Google Search Grounding. Per-tenant provider switching from Settings UI stored in `TenantMemory` → `BaseAgent.setContextOverride()`.
+  - `GeminiRuntime`: Gemini LLM execution path — a first-class provider alongside OpenAI. Bridges Google's Generative AI SDK (Gemini 2.5 Pro/Flash/Flash-Lite) to JAK's agent-first architecture via `geminiResponseToChatCompletion()`. Supports parallel function calling, `responseSchema` structured output, controllable thinking, and Google Search Grounding. Per-tenant provider switching from Settings UI stored in `TenantMemory` → `BaseAgent.setContextOverride()`.
   - `OpenAIRuntime`: Alternate LLM execution path. Uses OpenAI Responses API with `json_schema` strict mode for structured output and prompt-cache-aware cost telemetry. Available for tenants that prefer OpenAI models.
   - `ModelRouter`: Tier-based routing. When Gemini is selected: Tier 3 → Gemini 2.5 Pro, Tier 2 → Gemini 2.5 Flash, Tier 1 → Gemini 2.5 Flash-Lite. When OpenAI is selected: Tier 3 → GPT-5.5, Tier 1/2 → GPT-5.4.
   - `AntiHallucination`: Four detection layers run on every agent output before it's accepted.
@@ -200,9 +200,9 @@ WhatsApp Cloud API integration for workflow control via chat. QR verification fo
 
 ## LLM Provider Routing
 
-JAK Swarm supports two first-class LLM providers with per-tenant switching. Gemini is the primary provider for the Google AI Agents Challenge; OpenAI is an alternate supported path.
+JAK Swarm supports two first-class LLM providers with per-tenant switching — tenants choose OpenAI (GPT-5.5/5.4) or Gemini (2.5 Pro/Flash/Flash-Lite) from the Settings UI; the choice is stored in `TenantMemory` and applied at runtime. Both paths are fully supported.
 
-### Gemini Path (primary for Google competition)
+### Gemini Path
 
 ```
                         ModelRouter

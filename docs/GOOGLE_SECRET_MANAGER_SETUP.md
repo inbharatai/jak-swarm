@@ -303,7 +303,7 @@ curl -s "$API_URL/version" | jq .
 | `WORKFLOW_WORKER_MODE` | `embedded` | API runs embedded worker in Cloud Run single-service mode |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | `/usr/bin/chromium-browser` | Path in Docker image |
 | `REQUIRE_REDIS_IN_PROD` | `true` | Fail fast if Redis is missing |
-| `LLM_PROVIDER` | `gemini` | Use Gemini as default provider for Google AI Agents Challenge |
+| `LLM_PROVIDER` | `gemini` | Default LLM provider (set to `gemini` for Gemini-first tenants; per-tenant preference overrides at runtime) |
 | `JAK_ADK_MODE` | `1` | Enable Google ADK orchestration |
 | `GEMINI_GOOGLE_SEARCH_GROUNDING` | `1` | Enable Google Search grounding |
 | `OPENAI_WEB_SEARCH` | `1` | Enable OpenAI web_search_preview |

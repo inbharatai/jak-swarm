@@ -315,12 +315,12 @@ describe('Landing — top-line counts', () => {
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
 
-  it('README declares challenge build status and current local verification evidence', () => {
+  it('README declares beta build status and current local verification evidence', () => {
     const readme = read('README.md');
     const beta = read('docs/beta-release.md');
     const page = read('apps/web/src/app/page.tsx');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
-    expect(readme).toContain('working challenge build');
+    expect(readme).toContain('working beta build');
     expect(readme).toMatch(/Tests-\d{4,}(?:%2B|\+)?_blocking_CI/);
     expect(page).toContain('Beta 0.1.0-beta.0');
     expect(page).toContain('Controlled beta');

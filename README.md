@@ -11,11 +11,11 @@
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-2800%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2900%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-> 🏆 **Google for Startups AI Agents Challenge** — Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, deployed on **Vertex AI Agent Engine**, uses **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, and integrates **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching configured from the Settings UI.
+> Built with Google's **Agent Development Kit (ADK)** for multi-agent orchestration, deployable on **Vertex AI Agent Engine**, running **Gemini 2.5 Pro/Flash/Flash-Lite** alongside **GPT-5.5/5.4**, with **Google Search Grounding** for real-time, citation-backed responses. Per-tenant provider switching configured from the Settings UI.
 
 **JAK turns scattered company context into approved agent work. JAK Shield makes that work safe.**
 
@@ -31,27 +31,27 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ---
 
-## Challenge Build Status
+## Build Status & Verified Evidence
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,800+ blocking CI tests**.
+JAK Swarm is a **working beta build** (0.1.0-beta.0). Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,900+ blocking CI tests**.
 
-The submitted system includes:
+The system includes:
 
-* **Gemini-powered** mission interpretation, planning, routing, tool calling, and verification
+* **Gemini and OpenAI** mission interpretation, planning, routing, tool calling, and verification (per-tenant provider switching from the Settings UI)
 * **Google ADK orchestration** through `@google/adk` (`SequentialAgent` + `ParallelAgent` pipeline, activated via `JAK_ADK_MODE=1`)
 * **Google Search Grounding** — built-in with included quota, citation-backed via `GOOGLE_SEARCH` ADK tool
 * **Google Cloud Run deployment** — live API gateway at `jak-swarm-api` in `asia-south1`
 * **JAK Shield** local security, approval, permission, and audit checks
-* **2,800+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
+* **2,900+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
 Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
 
-### Challenge Evidence Snapshot
+### Verified Evidence
 
 This table summarizes what is publicly evidenced in this repository and what is intentionally not overclaimed.
 
-| Requirement | Evidence in JAK | Status |
+| Capability | Evidence in JAK | Status |
 |:------------|:----------------|:------:|
 | Gemini integration | `GeminiRuntime` adapter, `gemini-2.5-pro/flash/flash-lite`, tier-based model selection, per-tenant provider switching | ✅ Verified |
 | Google ADK orchestration | `@google/adk` `SequentialAgent` + `ParallelAgent` pipeline, `JAK_ADK_MODE=1` feature flag, `adk-pipeline.ts` + `adk-runner.ts` | ✅ Verified |
@@ -60,8 +60,8 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
 | Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, HMAC-ready security path + a **`ShieldMcpClient`** that signs/verifies high-risk decisions (local embedded mode, unit-tested, Phase 8) and an **Agent Governance Overlay** (autonomy policy L0-L5 + human-only NEVER set, governance gate, Phase 7). Both are pure-core-tested; the `ShieldMcpClient` is **not yet instantiated in the live action path**, the external JAK Shield MCP *transport* wiring remains a roadmap item, and `AuditLog` row-chain HMAC is not yet implemented. Today the enforced gateway is the embedded local one | ✅ Verified |
-| Tests | 2,800+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
-| Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
+| Tests | 2,900+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
+| Live demo | Publicly accessible demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
 | Agent Optimizer | Google ADK `adk eval` + `GEPARootAgentPromptOptimizer` run against `jak-swarm-gateway`; corrected eval: 6/6 training + 4/4 held-out validation; GEPA Candidate 1 prompt adopted in deployed Agent Engine; results in [`benchmark-optimization-before-after.md`](qa/benchmark-optimization-before-after.md) and [`adk-eval-results.json`](qa/_generated/adk-eval-results.json) | ✅ Verified |
@@ -83,19 +83,19 @@ Optional Agent Engine gateway path:
 Vertex AI Agent Engine → JAK Agent Engine gateway → Cloud Run API → JAK workflows
 ```
 
-This keeps the existing demo and production path safe. It does not replace the submitted demo path or the verified Cloud Run backend.
+This keeps the existing demo and production path safe. It does not replace the public demo path or the verified Cloud Run backend.
 
 | Component | Status | Details |
 |:----------|:------:|:--------|
 | **Cloud Run API** (`jak-swarm-api`) | ✅ Verified | Primary deployment — `asia-south1`; health endpoints implemented (`/ready`, `/health`, `/healthz`) and passing internally; require auth on public Cloud Run |
-| **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for challenge accessibility; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
+| **Frontend / demo** | ✅ Verified | Vercel + Railway continuity for the public demo; `NEXT_PUBLIC_API_URL` switch to Cloud Run planned post-validation |
 | **Agent Engine** | ✅ Verified | Live at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`; 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt; `agent-engine-entry.ts` + `deploy-agent-engine-python.py` + `agent-engine-resource.ts` |
-| **Cloud Run Worker** | 🔜 Post-challenge | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
+| **Cloud Run Worker** | 🔜 Roadmap | `jak-swarm-worker` Dockerfile + Cloud Build config exist; deployment is part of the production hardening roadmap |
 | **Google Secret Manager** | ✅ Configured | 12 secrets mounted |
 | **Supabase PostgreSQL** | ✅ Connected | Shared across deployments |
 | **Redis** | ✅ Connected | Railway public endpoint (`rediss://`) |
 
-### Track 2 Optimization Story
+### Optimization Story
 
 JAK's optimization story is not a single prompt tweak. It is an architecture-level shift from a broad workflow system into a Google-aligned multi-agent execution layer:
 
@@ -109,11 +109,11 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
-6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,800+ blocking CI tests (unit + integration, 2,905 at last count) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
+6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,900+ blocking CI tests (unit + integration, 2,905 at last count) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
 ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 20 evaluation iterations (102 metric calls) on the training set, finding the baseline prompt achieves 100% rubric pass rate (6/6). The initial `adk eval` showed 4/6 due to broken API paths (`/api/` prefix instead of production `/workflows`), not poor agent quality. After fixing paths, corrected eval: 6/6 training + 4/4 held-out validation. GEPA explored 3 alternative prompt variants — Candidate 1 (explicit safety refusal + search_knowledge fallback) matched baseline quality and has been adopted in the deployed Agent Engine. The original optimizer run had train/val overlap (same 6 scenarios for both); a separate validation set has been added. Full results in `qa/benchmark-optimization-before-after.md`.
 
-Post-challenge production hardening roadmap:
+Post-build production hardening roadmap:
 
 * full Cloud Run worker cutover
 * expanded health and observability endpoints
@@ -147,7 +147,7 @@ JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and e
 
 ### Build scope
 
-This is a **working challenge build** submitted for the Google AI Agents Challenge. Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap. The current submitted Google Cloud deployment supports the JAK API / agent gateway for live workflows. Full connector auto-sync is an active product build item. The accurate claim is **Company OS working challenge foundation**, not a finished enterprise product. API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full scope and go/no-go checklist.
+This is a **working beta build** (0.1.0-beta.0), not a finished enterprise product. **Blunt beta truth:** JAK has the Company OS data model, API routes, dashboard surface, deterministic drift detector, agent spec generator, approval decision route, and audit foundation. It still needs deeper connector auto-sync before it should claim full company-wide OS coverage — today only **GitHub, Gmail, and Google Drive** auto-sync on a 5-minute schedule; the other 19 of 22 connectors are callable as agent tools but ingest evidence on-demand/manually. Enterprise SLA packaging, expanded observability, and production hardening are on the roadmap. The Google Cloud Run deployment supports the JAK API / agent gateway for live workflows. API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle API keys or provide free LLM access. See [`docs/beta-release.md`](docs/beta-release.md) for the full scope and go/no-go checklist.
 
 ---
 
@@ -487,7 +487,7 @@ Docker: [`docker/docker-compose.yml`](docker/docker-compose.yml) · Production: 
 
 ### Deploy to Railway (Rollback Continuity)
 
-Railway remains available as rollback continuity during the challenge window. Google Cloud Run is the primary submitted deployment.
+Railway remains available as rollback continuity. Google Cloud Run is the primary deployment.
 
 ```bash
 npm i -g @railway/cli
@@ -499,14 +499,14 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ### Deploy to Google Cloud Run
 
-JAK Swarm API is deployed on Google Cloud Run (primary). Railway remains available as rollback continuity during the challenge window.
+JAK Swarm API is deployed on Google Cloud Run (primary). Railway remains available as rollback continuity.
 
 ```bash
 # Prerequisites: gcloud CLI, billing-enabled GCP project
 # See docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md for full setup
 
 gcloud builds submit --config=cloudbuild-api.yaml
-# Worker migration to Cloud Run is part of the post-challenge production hardening roadmap
+# Worker migration to Cloud Run is part of the post-build production hardening roadmap
 ```
 
 See [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) for step-by-step instructions.
@@ -545,12 +545,12 @@ gcloud run services logs read jak-swarm-api \
 
 | Component | Status |
 |-----------|--------|
-| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, accessible through the submitted demo path |
-| Cloud Run Worker (`jak-swarm-worker`) | 🔜 Post-challenge hardening roadmap |
+| Cloud Run API (`jak-swarm-api`) | ✅ Deployed, accessible through the public demo path |
+| Cloud Run Worker (`jak-swarm-worker`) | 🔜 Roadmap (post-build hardening) |
 | Supabase PostgreSQL | ✅ Connected (shared with Railway) |
 | Redis | ✅ Connected via Railway public endpoint (`rediss://`, not `.railway.internal`) |
 | Google Secret Manager | ✅ Configured, 12 secrets mounted |
-| Vercel `NEXT_PUBLIC_API_URL` | 🔜 Points to Railway for challenge accessibility; Cloud Run URL switch planned post-validation |
+| Vercel `NEXT_PUBLIC_API_URL` | 🔜 Points to Railway for the public demo; Cloud Run URL switch planned post-validation |
 
 **Health Endpoints:**
 
@@ -560,14 +560,14 @@ gcloud run services logs read jak-swarm-api \
 | `/health` | ✅ Implemented | Deep diagnostic. Uses `$queryRawUnsafe` for Supabase pooler compatibility. Requires auth on public Cloud Run. |
 | `/healthz` | ✅ Implemented | Liveness probe (always 200, no dependency checks). Requires auth on public Cloud Run. |
 
-**Post-Challenge Hardening Items:**
+**Post-Build Hardening Items:**
 
 - Complete Cloud Run Worker migration
 - Switch Vercel `NEXT_PUBLIC_API_URL` to Cloud Run URL after full validation
 
 **Railway as Rollback Continuity:**
 
-The frontend remains on Vercel for challenge accessibility. The submitted Google Cloud deployment supports the JAK API / agent gateway path, while Railway remains available as rollback continuity during the challenge window. If Cloud Run has issues, switch `NEXT_PUBLIC_API_URL` in Vercel back to the Railway URL and redeploy — no code changes needed.
+The frontend remains on Vercel for the public demo. The Google Cloud Run deployment supports the JAK API / agent gateway path, while Railway remains available as rollback continuity. If Cloud Run has issues, switch `NEXT_PUBLIC_API_URL` in Vercel back to the Railway URL and redeploy — no code changes needed.
 
 ### Integration Setup
 
@@ -938,9 +938,9 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,800+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
+**This is a working beta build (0.1.0-beta.0).** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,900+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
 
-**Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
+**Enterprise SLA packaging, expanded observability, and production hardening are part of the post-build roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
 
 Full checklist: [`docs/beta-release.md`](docs/beta-release.md).
 

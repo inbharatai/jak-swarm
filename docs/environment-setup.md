@@ -17,7 +17,7 @@ Complete reference for environment variables, integration setup, and common issu
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (for storage) | — | Supabase service-role key — used by `ArtifactService` to upload to the `tenant-artifacts` bucket |
 | `OPENAI_API_KEY` | Yes (one of OpenAI or Gemini) | — | OpenAI API key for GPT-5.5/5.4 execution |
 | `GEMINI_API_KEY` | Yes (one of OpenAI or Gemini) | — | Google Gemini API key for 2.5 Pro/Flash/Flash-Lite execution |
-| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. Gemini is the primary path for the Google AI Agents Challenge; OpenAI is the alternate supported path. |
+| `LLM_PROVIDER` | No | `openai` | Default LLM provider: `openai` or `gemini`. Per-tenant preference overrides this at runtime. Both providers are fully supported; choose per tenant from the Settings UI. |
 | `JAK_SHIELD_MCP_URL` | No | — | JAK Shield MCP gateway URL. When set, routes high-risk actions through the 10-stage security pipeline. Defaults to local-only policy enforcement if unset. |
 | `JAK_SHIELD_MCP_ENABLED` | No | `0` | Set to `1` to enable JAK Shield MCP integration for signed security decisions. Defaults to `0` (local policy enforcement only). |
 | `JAK_SHIELD_MCP_API_KEY` | No | — | API key for JAK Shield MCP gateway (required if `JAK_SHIELD_MCP_ENABLED=1`). |

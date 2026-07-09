@@ -420,7 +420,7 @@ docker compose up    — runs Postgres (5432) + Redis (6379)
 - One process can be restarted without affecting the other
 - Each worker carries a stable `WORKFLOW_WORKER_INSTANCE_ID` so reclaim logs correlate with dead workers
 
-### Google Cloud Run (primary — Google AI Agents Challenge)
+### Google Cloud Run (primary deployment)
 
 ```
             ┌──────────────────┐

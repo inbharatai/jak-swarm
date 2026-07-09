@@ -93,9 +93,9 @@ describe('Product truth claims', () => {
       const pkg = JSON.parse(readRepoFile(manifest)) as { version: string };
       expect(pkg.version, manifest).toBe('0.1.0-beta.0');
     }
-    expect(readme).toContain('working challenge build');
+    expect(readme).toContain('working beta build');
     expect(readme).toMatch(/Release-Beta_0\.1\.0--beta\.0/);
-    expect(readme).toContain('post-challenge production hardening roadmap');
+    expect(readme).toContain('post-build production hardening roadmap');
     expect(beta).toContain('hosted Cloud Run / Railway health');
     expect(readRepoFile('docs/railway-deployment.md')).toContain('API | Railway');
     expect(readRepoFile('docs/railway-deployment.md')).toContain('Worker | Railway');

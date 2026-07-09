@@ -2,7 +2,7 @@
 
 > **Primary deployment**: Cloud Run is the primary deployment for the JAK Swarm API. Railway remains available as a rollback/fallback path — switch `NEXT_PUBLIC_API_URL` in Vercel to return to Railway at any time.
 
-> **Google AI Agents Challenge**: This deployment demonstrates JAK Swarm running on Google Cloud infrastructure with Gemini integration. The API uses per-tenant LLM provider switching (OpenAI ↔ Gemini) with zero code changes, and Google ADK orchestration via `JAK_ADK_MODE=1`.
+> **Google Cloud + Gemini**: This deployment runs JAK Swarm on Google Cloud infrastructure with first-class Gemini integration. The API uses per-tenant LLM provider switching (OpenAI ↔ Gemini) with zero code changes, and Google ADK orchestration via `JAK_ADK_MODE=1`.
 
 ---
 
