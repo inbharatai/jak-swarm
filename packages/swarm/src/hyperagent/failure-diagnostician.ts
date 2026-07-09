@@ -67,7 +67,14 @@ export interface LlmDiagnoseFn {
     rootCause: string;
     confidence: number;
     recommendedChanges: Record<string, unknown>;
-    /** The LLM may suggest a different failure class; the orchestrator validates it. */
+    /**
+     * The LLM may suggest a different failure class. The orchestrator
+     * INTENTIONALLY IGNORES this field: UNKNOWN is a sealed deterministic block
+     * and the LLM can never re-classify it (a reclassify would risk downgrading
+     * UNKNOWN → a retryable class, reopening an auto-retry loop on a failure we
+     * do not understand). Kept on the interface only so the LLM parser stays
+     * permissive; it has no behavioural effect.
+     */
     suggestedFailureClass?: FailureClass;
   }>;
 }
@@ -180,17 +187,20 @@ export async function diagnoseFailure(input: DiagnoseInput): Promise<DiagnoseOut
       rootCause = llm.rootCause;
       confidence = clamp01(llm.confidence);
       recommendedChanges = { ...recommendedChanges, ...llm.recommendedChanges, llmProposed: true };
-      // The LLM may re-classify an UNKNOWN, but it can never downgrade a
-      // deterministic block class. It may only promote UNKNOWN → a more
-      // specific NON-block class, or leave it UNKNOWN.
-      if (
-        llm.suggestedFailureClass &&
-        llm.suggestedFailureClass !== FailureClass.UNKNOWN &&
-        !DETERMINISTIC_BLOCK_CLASSES.has(llm.suggestedFailureClass) &&
-        !deterministicBlock
-      ) {
-        failureClass = llm.suggestedFailureClass;
-      }
+      // SECURITY: the LLM can NEVER re-classify an UNKNOWN failure. UNKNOWN is a
+      // sealed deterministic block (DETERMINISTIC_BLOCK_CLASSES + requiresApproval
+      // ⇒ deterministicBlock === true whenever this branch runs), and the
+      // classifier invariant "UNKNOWN ⇒ retryable = false (never loop / never
+      // bypass)" must hold regardless of any LLM suggestion. Honoring
+      // `suggestedFailureClass` here — even restricted to "non-block" classes —
+      // would let the LLM downgrade UNKNOWN → TRANSIENT_PROVIDER (retryable),
+      // reopening an auto-retry loop on a failure we do not understand: a
+      // security hole. The field is therefore intentionally IGNORED; the LLM may
+      // only refine rootCause / recommendedChanges TEXT. (The reclassify branch
+      // that used to live here was dead — `!deterministicBlock` was always false
+      // on the UNKNOWN path — and was removed so a future "drop UNKNOWN from the
+      // block set" cleanup can never accidentally revive it.)
+      void llm.suggestedFailureClass; // explicitly acknowledged + discarded
     } catch {
       // LLM failure must never block diagnosis — fall back to deterministic.
       rootCause = `${deterministic.reason} (LLM diagnosis unavailable; fell back to deterministic)`;

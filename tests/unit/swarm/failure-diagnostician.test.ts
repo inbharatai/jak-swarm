@@ -125,6 +125,41 @@ describe('failure-diagnostician — LLM only for UNKNOWN, rootCause refined only
     expect(out.diagnosis.failureClass).toBe(FailureClass.UNKNOWN);
     expect(out.diagnosis.rootCause).toMatch(/deterministic|fallback/i);
   });
+
+  it('NEVER reclassifies UNKNOWN even when the LLM suggests a non-block retryable class (Bug 4)', async () => {
+    // The reclassify branch that used to honour `suggestedFailureClass` was dead
+    // (`!deterministicBlock` was always false on the UNKNOWN path because
+    // UNKNOWN ∈ DETERMINISTIC_BLOCK_CLASSES and UNKNOWN ⇒ requiresApproval).
+    // Removing it sealed the security invariant: the LLM can never downgrade
+    // UNKNOWN → a retryable class (e.g. TRANSIENT_PROVIDER), which would reopen
+    // an auto-retry loop on a failure we do not understand. This pins that the
+    // class stays UNKNOWN and the block stays sealed, regardless of the LLM
+    // suggestion. A future "drop UNKNOWN from the block set" cleanup must NOT
+    // accidentally make this suggestion live.
+    const out = await diagnoseFailure({
+      failure: failure(),
+      signal: { message: 'a genuinely novel, unmatched failure mode' },
+      hint: hint(),
+      verifierIssues: [],
+      tenantId: 't-1',
+      now: '2026-01-01T00:00:00Z',
+      llmDiagnose: (async () => ({
+        rootCause: 'llm thinks this is just a transient blip',
+        confidence: 0.95,
+        recommendedChanges: { llmProposed: true },
+        // A plausible-looking downgrade: TRANSIENT_PROVIDER is NOT in the block
+        // set and IS retryable — exactly the kind of suggestion that must never
+        // escape the sealed UNKNOWN block.
+        suggestedFailureClass: FailureClass.TRANSIENT_PROVIDER,
+      })) as unknown as LlmDiagnoseFn,
+    });
+    expect(out.diagnosis.failureClass).toBe(FailureClass.UNKNOWN);
+    expect(out.deterministicBlock).toBe(true);
+    // The LLM rootCause text is still adopted (it may explain the ambiguity)...
+    expect(out.diagnosis.rootCause).toContain('transient blip');
+    // ...but the retry policy is sealed by the deterministic classifier, not the LLM.
+    expect(out.diagnosis.recommendedRepairLevel).toBe(RepairLevel.R3_PLAN_REPAIR);
+  });
 });
 
 describe('failure-diagnostician — counterfactual replay (Innovation #1)', () => {
