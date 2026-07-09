@@ -12,6 +12,8 @@
 > - **Connector count drift** (§3 item 4, §6): README badge + body now state the CI-enforced canonical **22 connectors** (13 `INTEGRATIONS_CORE` + 9 `INTEGRATIONS_INFRA`), matching `product-truth`, `integration-maturity-matrix.md`, and the tile arrays. EVOLUTION-PLAN corrected to **21 MCP providers** (the MCP-only count).
 > - **README "122 builtin + 4 Phoring"** (§3 item 3): Phoring clause removed; README now states 122 classified tools with no Phoring addendum.
 > Unresolved findings (e.g. sandbox doc, Skill tier/status naming inconsistency) remain open for later phases.
+>
+> **Resolution status (updated 2026-07-09, post-merge):** All 15 phases are built, gate-green, and **merged to `main`** (single trunk; the `feature/hyperagent-self-healing-learning` branch has been deleted — references to it above are the immutable Phase-0 historical record of where the audit was performed). A subsequent **16-bug hardening sweep** landed further safety fixes: host-JS `code_execute` production-disabled (Node `vm` is not a security boundary), graph-state `error` channel made clearable (recovered runs no longer mis-reported as failed), Shield subject-substitution defense, DP-noise scale matched to reported sensitivity, cyclic-spec rejection, code-repair path normalization, node-timeout timer-leak fix, risk-classifier security floor unbypassable, and retry accounting unified on `taskRetryCount` + a single shared `MAX_TASK_RETRIES=2` (the previously-flagged "two parallel counters" inconsistency is resolved). Unit tests now 2,905 passing. Still env-blocked / not fake-passed: live measured learning impact, external Shield MCP transport, `AuditLog` HMAC, and wiring the outcome/learning loop into the live graph.
 
 ---
 
