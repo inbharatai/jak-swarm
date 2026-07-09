@@ -187,6 +187,13 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
   let verdict: OutcomeVerdict;
   if (runBlocked || taskBlocked > 0) {
     verdict = OutcomeVerdict.OUTCOME_BLOCKED;
+  } else if (activeTotal === 0) {
+    // No active tasks ran (empty plan, or every task SKIPPED — e.g. all
+    // dependencies failed so every dependent was skipped). This is neither a
+    // failure (nothing failed) nor a success (nothing passed); label it
+    // BLOCKED so the learning extractor doesn't ingest a false FAILED signal
+    // for a run that simply made no progress.
+    verdict = OutcomeVerdict.OUTCOME_BLOCKED;
   } else if (activeTotal > 0 && taskPassed === activeTotal && taskFailed === 0) {
     verdict = OutcomeVerdict.OUTCOME_SUCCESS;
   } else if (taskPassed > 0) {

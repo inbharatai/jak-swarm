@@ -137,6 +137,30 @@ describe('outcome-evaluator — verdict logic', () => {
     expect(r.taskOutcomes[0].verdict).toBe(TaskVerdict.TASK_FAILED);
   });
 
+  it('ALL tasks SKIPPED (no active work ran) → OUTCOME_BLOCKED, not FAILED', () => {
+    // Before the fix the verdict ladder had no activeTotal === 0 branch, so a
+    // run where every task was skipped (e.g. all dependencies failed and every
+    // dependent was skipped) fell through to the final else → OUTCOME_FAILED —
+    // feeding the learning extractor a false FAILED signal for a run that simply
+    // made no progress. Nothing failed; nothing passed. Label it BLOCKED.
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a', status: TaskStatus.SKIPPED }), task({ id: 'b', status: TaskStatus.SKIPPED })]),
+      verificationResults: {},
+    }));
+    expect(r.taskPassed).toBe(0);
+    expect(r.taskFailed).toBe(0);
+    expect(r.taskSkipped).toBe(2);
+    expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_BLOCKED);
+  });
+
+  it('an empty plan (zero tasks) → OUTCOME_BLOCKED, not FAILED', () => {
+    // Same guard: activeTotal === 0 must short-circuit to BLOCKED before the
+    // SUCCESS/PARTIAL/FAILED ladder. An empty plan is not a failure.
+    const r = evaluateOutcome(baseInput({ plan: plan([]), verificationResults: {} }));
+    expect(r.taskTotal).toBe(0);
+    expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_BLOCKED);
+  });
+
   it('incomplete task at run end WITH block → TASK_BLOCKED', () => {
     const r = evaluateOutcome(baseInput({
       plan: plan([task({ id: 'a', status: TaskStatus.PENDING })]),
