@@ -97,19 +97,26 @@ export function auctionRepairs(
   const rejected: AuctionRejected[] = [];
   let remainingCost = Math.max(0, budget.costUsd);
   let remainingDuration = Math.max(0, budget.durationMs);
+  // R4 (config repair) and R5 (code repair) SHARE one capability budget —
+  // `budget.maxCapabilityRepairs` — matching failure-classifier.ts which
+  // tracks a single capabilityRepairAttempts counter for both. Previously the
+  // auction kept separate R4 and R5 counters, each capped at
+  // maxCapabilityRepairs, so it could award maxCapabilityRepairs R4 repairs
+  // AND maxCapabilityRepairs R5 repairs = 2× the intended capability budget.
+  // Collapse them into one shared 'CAPABILITY' bucket.
+  const bucketFor = (level: string): string =>
+    level === 'R4_CONFIG_REPAIR' || level === 'R5_CODE_REPAIR' ? 'CAPABILITY' : level;
   const levelUsed: Record<string, number> = {
     R1_EXECUTION_RETRY: 0,
     R2_OUTPUT_CORRECTION: 0,
     R3_PLAN_REPAIR: 0,
-    R4_CONFIG_REPAIR: 0,
-    R5_CODE_REPAIR: 0,
+    CAPABILITY: 0,
   };
   const levelCap: Record<string, number> = {
     R1_EXECUTION_RETRY: budget.maxExecutionRetries,
     R2_OUTPUT_CORRECTION: budget.maxOutputRepairs,
     R3_PLAN_REPAIR: budget.maxPlanRepairs,
-    R4_CONFIG_REPAIR: budget.maxCapabilityRepairs,
-    R5_CODE_REPAIR: budget.maxCapabilityRepairs,
+    CAPABILITY: budget.maxCapabilityRepairs,
   };
 
   for (const c of ranked) {
@@ -121,9 +128,16 @@ export function auctionRepairs(
       rejected.push({ candidate: c, reason: 'non-positive expected value' });
       continue;
     }
-    const cap = levelCap[c.repairLevel] ?? 0;
-    if ((levelUsed[c.repairLevel] ?? 0) >= cap) {
-      rejected.push({ candidate: c, reason: `repair-level cap reached (${c.repairLevel}: ${cap})` });
+    const bucket = bucketFor(c.repairLevel);
+    const cap = levelCap[bucket] ?? 0;
+    if ((levelUsed[bucket] ?? 0) >= cap) {
+      rejected.push({
+        candidate: c,
+        reason:
+          bucket === 'CAPABILITY'
+            ? `capability repair cap reached (R4+R5 shared: ${cap})`
+            : `repair-level cap reached (${c.repairLevel}: ${cap})`,
+      });
       continue;
     }
     if (c.costUsd > remainingCost) {
@@ -137,7 +151,7 @@ export function auctionRepairs(
     winners.push(c);
     remainingCost -= c.costUsd;
     remainingDuration -= c.durationMs;
-    levelUsed[c.repairLevel] = (levelUsed[c.repairLevel] ?? 0) + 1;
+    levelUsed[bucket] = (levelUsed[bucket] ?? 0) + 1;
   }
 
   const totalCostUsd = winners.reduce((s, c) => s + Math.max(0, c.costUsd), 0);

@@ -109,6 +109,26 @@ describe('repair-budget-auction — per-level caps', () => {
     expect(r.winners.map((w) => w.taskId)).toEqual(['a']);
     expect(r.rejected.filter((x) => x.reason.match(/cap/))).toHaveLength(2);
   });
+
+  it('shares ONE capability cap across R4 (config) and R5 (code) repairs — no 2× budget bypass', () => {
+    // Before the fix, R4 and R5 had separate counters each capped at
+    // maxCapabilityRepairs, so the auction could award maxCapabilityRepairs R4
+    // AND maxCapabilityRepairs R5 = 2× the intended capability budget.
+    const r = auctionRepairs(
+      [
+        cand({ taskId: 'r4', repairLevel: RepairLevel.R4_CONFIG_REPAIR, probabilityOfSuccess: 0.9, value: 10, costUsd: 1 }),
+        cand({ taskId: 'r5', repairLevel: RepairLevel.R5_CODE_REPAIR, probabilityOfSuccess: 0.9, value: 10, costUsd: 1 }),
+      ],
+      budget({ maxCapabilityRepairs: 1 }),
+    );
+    // Both are high-EV (tie → lower cost tie → taskId tie: 'r4' wins), but the
+    // shared capability budget is 1 → only one is awarded; the other is rejected
+    // for the shared capability cap, not allowed to spend a second slot.
+    expect(r.winners).toHaveLength(1);
+    expect(r.winners[0].taskId).toBe('r4');
+    const loserReason = r.rejected.find((x) => x.candidate.taskId === 'r5')?.reason;
+    expect(loserReason).toMatch(/capability repair cap reached/);
+  });
 });
 
 describe('repair-budget-auction — approval invariant', () => {
