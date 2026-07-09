@@ -1,3 +1,5 @@
+import { prepareAuditChainFields, type PreparedChainFields } from './audit-chain.js';
+
 export enum AuditAction {
   USER_LOGIN = 'USER_LOGIN',
   USER_LOGOUT = 'USER_LOGOUT',
@@ -71,6 +73,7 @@ export interface AuditPrismaClient {
   auditLog: {
     create: (args: {
       data: {
+        id?: string;
         action: string;
         tenantId: string;
         userId?: string;
@@ -80,8 +83,15 @@ export interface AuditPrismaClient {
         ip?: string;
         severity: string;
         createdAt: Date;
+        /** Phase 7 HMAC row-chain fields (nullable — null when the chain is
+         *  INACTIVE, i.e. EVIDENCE_SIGNING_SECRET is unset). */
+        prevHash?: string | null;
+        rowHash?: string | null;
+        chainSeq?: number;
       };
     }) => Promise<{ id: string }>;
+    /** Phase 7 — fetch the tenant's latest chained row to chain off it. */
+    findFirst: (args: unknown) => Promise<unknown>;
   };
 }
 
@@ -117,8 +127,32 @@ export class AuditLogger {
     };
 
     try {
+      // Phase 7 — compute the HMAC row-chain fields for this row. INACTIVE
+      // (rowHash=null, chainSeq=0) when EVIDENCE_SIGNING_SECRET is unset; the
+      // row is still written (auditable), just not tamper-evident. Errors in
+      // chain prep MUST NOT break the write — fall back to unsigned.
+      let chain: PreparedChainFields | null = null;
+      try {
+        chain = await prepareAuditChainFields(this.db, {
+          tenantId: entry.tenantId,
+          userId: entry.userId,
+          action: entry.action,
+          resource: entry.resource,
+          resourceId: entry.resourceId,
+          details: entry.details as unknown,
+          ip: entry.ip,
+          userAgent: entry.userAgent,
+          severity: entry.severity,
+          createdAt: entry.createdAt,
+        });
+      } catch (chainErr) {
+        // Chain prep failure is non-fatal — write unsigned below.
+        console.error('[AuditLogger] chain prep failed (writing unsigned):', chainErr);
+      }
+
       await this.db.auditLog.create({
         data: {
+          id: chain?.id ?? entry.id,
           action: entry.action,
           tenantId: entry.tenantId,
           ...(entry.userId !== undefined && { userId: entry.userId }),
@@ -128,6 +162,7 @@ export class AuditLogger {
           ...(entry.ip !== undefined && { ip: entry.ip }),
           severity: entry.severity ?? 'INFO',
           createdAt: entry.createdAt,
+          ...(chain ? { prevHash: chain.prevHash, rowHash: chain.rowHash, chainSeq: chain.chainSeq } : {}),
         },
       });
     } catch (err) {
@@ -166,6 +201,7 @@ export function createNullAuditLogger(): AuditLogger {
   const noopDb: AuditPrismaClient = {
     auditLog: {
       create: async () => ({ id: crypto.randomUUID() }),
+      findFirst: async () => null,
     },
   };
   return new AuditLogger(noopDb, () => {});

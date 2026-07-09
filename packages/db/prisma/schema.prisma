@@ -1025,12 +1025,19 @@ model AuditLog {
   userAgent  String?
   severity   String   @default("INFO") // INFO | WARN | ERROR | CRITICAL
   createdAt  DateTime @default(now())
+  // Phase 7 — HMAC row-chain hashing (tamper-evidence). Nullable so existing
+  // rows + the unsigned path (EVIDENCE_SIGNING_SECRET unset → chain INACTIVE)
+  // stay valid. See migration 117_audit_log_chain.
+  prevHash   String?
+  rowHash    String?
+  chainSeq   Int      @default(0)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, action])
   @@index([tenantId, createdAt])
   @@index([tenantId, userId])
+  @@index([tenantId, chainSeq])
   @@map("audit_logs")
 }
 

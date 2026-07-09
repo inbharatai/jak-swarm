@@ -3,6 +3,7 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import type { AuthSession, UserRole } from '../types.js';
 import { AuthService } from '../services/auth.service.js';
 import { UnauthorizedError, ForbiddenError } from '../errors.js';
+import { prepareAuditChainFields, type PreparedChainFields, type AuditChainPrismaClient } from '@jak-swarm/security';
 
 // Augment @fastify/jwt so that request.user is typed as AuthSession
 declare module '@fastify/jwt' {
@@ -162,8 +163,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     if (!request.user) return;
 
     try {
-      await fastify.db.auditLog.create({
-        data: {
+      // Phase 7 — compute HMAC row-chain fields. INACTIVE (rowHash=null) when
+      // EVIDENCE_SIGNING_SECRET is unset; the row is still written (auditable),
+      // just not tamper-evident. Chain prep is non-fatal — falls back to unsigned.
+      const createdAt = new Date();
+      let chain: PreparedChainFields | null = null;
+      try {
+        chain = await prepareAuditChainFields(fastify.db as unknown as AuditChainPrismaClient, {
           tenantId: request.user.tenantId,
           userId: request.user.userId,
           action,
@@ -172,6 +178,28 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
           details: details ? (details as object) : {},
           ip: request.ip ?? null,
           userAgent: request.headers['user-agent'] ?? null,
+          createdAt,
+        });
+      } catch (chainErr) {
+        request.log.error({ err: chainErr }, 'audit chain prep failed (writing unsigned)');
+      }
+
+      await fastify.db.auditLog.create({
+        data: {
+          ...(chain ? { id: chain.id } : {}),
+          tenantId: request.user.tenantId,
+          userId: request.user.userId,
+          action,
+          resource,
+          resourceId: resourceId ?? null,
+          details: details ? (details as object) : {},
+          ip: request.ip ?? null,
+          userAgent: request.headers['user-agent'] ?? null,
+          // Pin createdAt so the stored value matches the value hashed into
+          // rowHash (otherwise Prisma's @default(now()) would diverge and
+          // verifyChain would fail).
+          createdAt,
+          ...(chain ? { prevHash: chain.prevHash, rowHash: chain.rowHash, chainSeq: chain.chainSeq } : {}),
         },
       });
     } catch (err) {

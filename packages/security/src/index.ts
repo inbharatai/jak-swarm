@@ -68,6 +68,24 @@ export type {
   AuditPrismaClient,
 } from './audit/audit-log.js';
 
+// Audit Log HMAC Row-Chain (Phase 7 — tamper-evidence)
+export {
+  canonicalJson,
+  getEvidenceSigningSecret,
+  auditChainActive,
+  deriveAuditTenantKey,
+  computeRowHash,
+  prepareAuditChainFields,
+  verifyChain,
+  AUDIT_CHAIN_ALGO,
+} from './audit/audit-chain.js';
+export type {
+  AuditChainRow,
+  AuditChainPrismaClient,
+  PreparedChainFields,
+  VerifyChainResult,
+} from './audit/audit-chain.js';
+
 // Tool Risk Classification
 export {
   TOOL_RISK_OVERRIDES,
