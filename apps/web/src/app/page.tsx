@@ -238,8 +238,8 @@ export default function HomePage() {
             operatingSystem: 'Web',
             offers: [
               { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free' },
-              { '@type': 'Offer', price: '29', priceCurrency: 'USD', name: 'Starter' },
-              { '@type': 'Offer', price: '99', priceCurrency: 'USD', name: 'Professional' },
+              { '@type': 'Offer', price: '29', priceCurrency: 'USD', name: 'Pro' },
+              { '@type': 'Offer', price: '99', priceCurrency: 'USD', name: 'Team' },
               { '@type': 'Offer', price: '249', priceCurrency: 'USD', name: 'Enterprise' },
             ],
             featureList: [
@@ -248,7 +248,7 @@ export default function HomePage() {
               '22 integrations',
               'Human approval gates',
               'Audit trail',
-              'SOC 2 compliance',
+              'Audit-ready SOC 2 evidence',
             ],
           }),
         }}
@@ -639,7 +639,7 @@ export default function HomePage() {
                   <li><a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors">How It Works</a></li>
                   <li><a href="#audit" className="hover:text-white focus-visible:text-white transition-colors">Audit &amp; Compliance</a></li>
                   <li><a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors">Pricing</a></li>
-                  <li><a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Documentation</a></li>
+                  <li><a href="https://github.com/inbharatai/jak-swarm/tree/main/docs" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Documentation</a></li>
                 </ul>
               </div>
 

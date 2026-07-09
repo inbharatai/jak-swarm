@@ -116,10 +116,11 @@ function NetworkBackground({ isActive }: { isActive: boolean }) {
 
 // Numbers held to a strict honesty bar: every claim below is grep-able
 // in the codebase. `<2min To Deploy` was retired here because it never
-// had a benchmark behind it. `22 Integrations` softened to `20+
-// connectable services` since the connector registry currently ships
-// 21 MCP + Remotion + Blender = 23, and we'd rather understate than
-// dance on a fence.
+// had a benchmark behind it. The canonical connector count is 22
+// (13 INTEGRATIONS_CORE SaaS tiles + 9 INTEGRATIONS_INFRA adapter tiles;
+// see apps/web/src/lib/product-truth.ts and the CI truth gate). We surface
+// an honest `20+` understatement here rather than the precise 22, since
+// we'd rather understate than dance on a fence.
 const CTA_STATS = [
   { value: '38', label: 'Agents' },
   { value: '122', label: 'Classified Tools' },
