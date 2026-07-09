@@ -55,15 +55,48 @@ describe('code_execute Python production guard', () => {
     expect(result.data?.errorCode).toBe('HOST_PYTHON_DISABLED_IN_PRODUCTION');
   });
 
-  it('still allows JavaScript execution under NODE_ENV=production (the JS path is sandboxed)', async () => {
+  it('ALSO blocks host JavaScript execution under NODE_ENV=production (vm is NOT a security boundary)', async () => {
+    // Previously this test asserted JS ran in production "because the JS path
+    // is sandboxed" — that was a false premise. Node's `vm` is explicitly NOT a
+    // security mechanism: the dev sandbox blocks the trivially-named globals
+    // (process/require/timers) but the exposed built-ins carry the real
+    // `Function` constructor on their prototype chain, so untrusted code escapes
+    // with e.g. `this.constructor.constructor('return process')()` and reaches
+    // the host. Host JS is therefore production-disabled like host Python.
     process.env.NODE_ENV = 'production';
 
+    const result = await toolRegistry.execute<{
+      stdout: string;
+      stderr: string;
+      error?: boolean;
+      errorCode?: string;
+      language?: string;
+    }>('code_execute', { language: 'javascript', code: 'console.log("hi"); 1 + 2' }, ctx);
+
+    expect(result.success).toBe(true); // structured error, did not throw
+    expect(result.data?.error).toBe(true);
+    expect(result.data?.errorCode).toBe('HOST_JS_DISABLED_IN_PRODUCTION');
+    expect(result.data?.stderr).toMatch(/sandbox_exec/);
+    expect(result.data?.stderr).toMatch(/not a security boundary/);
+  });
+
+  it('blocks the "js" alias under NODE_ENV=production too', async () => {
+    process.env.NODE_ENV = 'production';
+    const result = await toolRegistry.execute<{ errorCode?: string }>(
+      'code_execute',
+      { language: 'js', code: '1+1' },
+      ctx,
+    );
+    expect(result.data?.errorCode).toBe('HOST_JS_DISABLED_IN_PRODUCTION');
+  });
+
+  it('still runs JavaScript under NON-production (dev convenience, NOT a security control)', async () => {
+    process.env.NODE_ENV = 'test';
     const result = await toolRegistry.execute<{ stdout: string; result: unknown; error?: boolean }>(
       'code_execute',
       { language: 'javascript', code: 'console.log("hi"); 1 + 2' },
       ctx,
     );
-
     expect(result.success).toBe(true);
     expect(result.data?.error).toBeUndefined();
     expect(result.data?.stdout).toBe('hi');
@@ -81,5 +114,29 @@ describe('code_execute Python production guard', () => {
     // The host may or may not have python3 installed — we only assert that the
     // production guard did NOT fire. Any other error is acceptable here.
     expect(result.data?.errorCode).not.toBe('HOST_PYTHON_DISABLED_IN_PRODUCTION');
+  });
+});
+
+describe('code_execute — vm is not a security boundary (honest escape documentation)', () => {
+  // This test DOCUMENTS why host JS is production-disabled. The dev sandbox
+  // blocks the trivially-named globals (process/require/timers) but the
+  // exposed built-ins carry the real `Function` constructor on their prototype
+  // chain, so untrusted code escapes the vm sandbox and reaches the host
+  // `process`. We assert the escape reaches `process` (harmless read of
+  // `typeof process`), proving the sandbox is NOT a security control and the
+  // production-disable + sandbox_exec routing is the real mitigation.
+  it('the dev vm sandbox is escapable: untrusted code reaches the host `process`', async () => {
+    process.env.NODE_ENV = 'test';
+    const escapeCode = `this.constructor.constructor('return typeof process')()`;
+    const result = await toolRegistry.execute<{ result: unknown; stdout: string; error?: boolean }>(
+      'code_execute',
+      { language: 'javascript', code: escapeCode },
+      ctx,
+    );
+    // If the sandbox were a real boundary, `process` would be undefined and the
+    // result would be 'undefined'. Instead the escape reaches the HOST process
+    // (an object), proving the sandbox is escapable.
+    expect(result.success).toBe(true);
+    expect(String(result.data?.result)).toBe('object');
   });
 });

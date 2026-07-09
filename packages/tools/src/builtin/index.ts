@@ -2643,12 +2643,18 @@ export function registerBuiltinTools(): void {
   toolRegistry.register(
     {
       name: 'code_execute',
-      description: 'Execute code in a sandboxed environment. Supports JavaScript (via Node.js vm) and Python (via subprocess). Returns stdout, stderr, and result.',
+      description: 'Execute code in a sandboxed environment. JavaScript host execution uses Node.js vm (NOT a security boundary — see code); Python uses a subprocess. Production host execution is DISABLED for both — route production code through sandbox_exec (Docker/E2B). Returns stdout, stderr, and result.',
       category: ToolCategory.RESEARCH,
-      riskClass: ToolRiskClass.WRITE,
+      // Host code execution can reach the filesystem, env secrets, and the
+      // network via the vm-prototype escape (Node's `vm` is explicitly NOT a
+      // security mechanism per its docs), so classify it as DESTRUCTIVE even
+      // though the dev sandbox blocks the trivially-named globals. Approval is
+      // still required.
+      riskClass: ToolRiskClass.DESTRUCTIVE,
       requiresApproval: true,
-      // 'real' for JS (vm-sandboxed). Python path is host-only and gated by NODE_ENV;
-      // production Python should route through sandbox_exec (Docker / E2B adapters).
+      // 'real' for JS (vm) in NON-production only. Both host JS and host Python
+      // are production-disabled — production code must route through sandbox_exec
+      // (Docker / E2B adapters) for real isolation.
       maturity: 'real_external',
       liveTested: false,
       sideEffectLevel: 'write',
@@ -2679,6 +2685,30 @@ export function registerBuiltinTools(): void {
       const startTime = Date.now();
 
       if (language === 'javascript' || language === 'js') {
+        // SECURITY: Node's `vm` module is NOT a security boundary — per the
+        // Node docs, "The vm module is not a security mechanism. Do not use it
+        // to run untrusted code." The sandbox below only blocks the
+        // trivially-named globals (process, require, timers), but the exposed
+        // built-ins carry the real `Function` constructor on their prototype
+        // chain, so untrusted code can escape with, e.g.
+        //   this.constructor.constructor('return process')()
+        // and reach the host filesystem, env secrets, and network. Therefore:
+        //   1. Host JS execution is DISABLED in production (below) — production
+        //      code must route through sandbox_exec (Docker / E2B) for real
+        //      isolation. The dev sandbox here is a convenience for trusted
+        //      local code only, NOT a security control.
+        //   2. The tool is classified DESTRUCTIVE and always requires approval.
+        if (process.env.NODE_ENV === 'production') {
+          return {
+            stdout: '',
+            stderr: 'Host JavaScript execution disabled in production: Node vm is not a security boundary (escapable via the prototype chain). Use sandbox_exec (Docker/E2B-backed) for production code workloads.',
+            result: null,
+            executionTimeMs: Date.now() - startTime,
+            language: 'javascript',
+            error: true,
+            errorCode: 'HOST_JS_DISABLED_IN_PRODUCTION',
+          };
+        }
         const vm = require('vm') as typeof import('vm');
         const logs: string[] = [];
         const errors: string[] = [];
@@ -2717,10 +2747,12 @@ export function registerBuiltinTools(): void {
       }
 
       if (language === 'python' || language === 'py') {
-        // Production guard: host Python execution is disabled because the JS path is
-        // hardened via vm but the Python path shells out to the host interpreter with
-        // no syscall sandbox. Use sandbox_exec for production Python workloads — it
-        // routes through Docker / E2B (see packages/tools/src/adapters/sandbox/).
+        // Production guard: host Python execution is disabled because the Python
+        // path shells out to the host interpreter with no syscall sandbox. (The
+        // JS path is ALSO production-disabled — Node `vm` is not a security
+        // boundary either; see the JS branch above.) Use sandbox_exec for
+        // production Python workloads — it routes through Docker / E2B
+        // (see packages/tools/src/adapters/sandbox/).
         if (process.env.NODE_ENV === 'production') {
           return {
             stdout: '',
