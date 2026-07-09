@@ -117,6 +117,42 @@ describe('materializePlan — validation guard', () => {
       materializePlan({ spec: spec({ tasks: [desc({ id: '' })] }), now: NOW }),
     ).toThrow(SpecPlanValidationError);
   });
+
+  it('throws SpecPlanValidationError on a dependency cycle (Bug 10)', () => {
+    // Before the fix, validatePlan checked non-empty / duplicate ids / dangling
+    // deps but NOT cycles. A cyclic plan would materialise into a runnable
+    // WorkflowPlan whose tasks deadlock forever (every task waits on another
+    // in the cycle) — a bad spec silently reaching the runner.
+    const cyclic = [
+      desc({ id: 'a', dependsOn: ['b'] }),
+      desc({ id: 'b', dependsOn: ['a'] }),
+    ];
+    expect(() => materializePlan({ spec: spec({ tasks: cyclic }), now: NOW })).toThrow(
+      SpecPlanValidationError,
+    );
+    expect(() => materializePlan({ spec: spec({ tasks: cyclic }), now: NOW })).toThrow(/cycle/);
+  });
+
+  it('throws on a longer dependency cycle (a → b → c → a)', () => {
+    const cyclic = [
+      desc({ id: 'a', dependsOn: ['c'] }),
+      desc({ id: 'b', dependsOn: ['a'] }),
+      desc({ id: 'c', dependsOn: ['b'] }),
+    ];
+    expect(() => materializePlan({ spec: spec({ tasks: cyclic }), now: NOW })).toThrow(/cycle/);
+  });
+
+  it('still accepts a valid acyclic dependency DAG', () => {
+    // Regression guard: the cycle check must not reject a legit diamond DAG.
+    const acyclic = [
+      desc({ id: 'root' }),
+      desc({ id: 'a', dependsOn: ['root'] }),
+      desc({ id: 'b', dependsOn: ['root'] }),
+      desc({ id: 'leaf', dependsOn: ['a', 'b'] }),
+    ];
+    const p = materializePlan({ spec: spec({ tasks: acyclic }), now: NOW });
+    expect(p.tasks).toHaveLength(4);
+  });
 });
 
 describe('materializePlan — determinism', () => {

@@ -26,6 +26,7 @@ import type {
   WorkflowPlan,
   WorkflowTask,
 } from '@jak-swarm/shared';
+import { findCycleTask } from './plan-validator.js';
 
 /** Thrown when a non-approved spec is materialised. */
 export class SpecNotApprovedError extends Error {
@@ -86,6 +87,15 @@ function validatePlan(spec: AgentExecutableSpec): void {
         throw new SpecPlanValidationError(spec.id, `task ${t.id} depends on unknown task ${dep}`);
       }
     }
+  }
+  // The dependency DAG must be acyclic. A cyclic plan can never make progress
+  // (deadlock) — every task waits on another in the cycle forever — so a spec
+  // carrying one must never reach the runner. findCycleTask reads only id +
+  // dependsOn, so the SpecTaskDescriptor[] shape is sufficient (cast through
+  // unknown because the helper is typed for WorkflowPlan).
+  const cycleTask = findCycleTask({ tasks } as unknown as WorkflowPlan);
+  if (cycleTask) {
+    throw new SpecPlanValidationError(spec.id, `dependency cycle detected at task ${cycleTask}`);
   }
 }
 
