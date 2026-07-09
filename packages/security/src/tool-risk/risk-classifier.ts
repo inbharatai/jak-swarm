@@ -150,9 +150,9 @@ export function toolRequiresApproval(
   threshold: RiskLevel,
   metadata?: ToolMetadata,
 ): boolean {
-  // Explicit requiresApproval in metadata always wins
+  // Explicit `requiresApproval: true` in metadata ALWAYS mandates approval —
+  // metadata may only ever RAISE the approval bar, never lower it.
   if (metadata?.requiresApproval === true) return true;
-  if (metadata?.requiresApproval === false) return false;
 
   const riskClass = classifyToolRisk(toolName, metadata);
 
@@ -165,7 +165,23 @@ export function toolRequiresApproval(
   };
 
   const toolRiskLevel = riskClassToLevel[riskClass];
-  return RISK_LEVEL_WEIGHTS[toolRiskLevel] >= RISK_LEVEL_WEIGHTS[threshold];
+
+  // SECURITY FLOOR: when the tool's risk class meets the configured approval
+  // threshold, approval is MANDATORY regardless of tool metadata. This closes
+  // the prior bypass where `metadata.requiresApproval === false` short-
+  // circuited to `return false` BEFORE the risk check — disarming approval for
+  // EXTERNAL_SIDE_EFFECT / DESTRUCTIVE tools (send_email, submit_payment,
+  // delete_*) even at a HIGH/CRITICAL threshold. A tool may not self-declare
+  // its way out of a risk-mandated approval.
+  if (RISK_LEVEL_WEIGHTS[toolRiskLevel] >= RISK_LEVEL_WEIGHTS[threshold]) {
+    return true;
+  }
+
+  // Below the threshold, the risk class alone does not require approval. A
+  // `requiresApproval: false` hint is redundant here (approval is already off)
+  // and is intentionally NOT honoured as an override — see the SECURITY FLOOR
+  // note above.
+  return false;
 }
 
 /**
