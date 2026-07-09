@@ -1,10 +1,20 @@
-import { WorkflowStatus, TaskStatus } from '@jak-swarm/shared';
+import {
+  AutonomyCapability,
+  AutonomyLevel,
+  FailureClass,
+  HyperAgentMode,
+  OutputCorrection,
+  TaskStatus,
+  WorkflowStatus,
+} from '@jak-swarm/shared';
 import { VerifierAgent, AgentContext } from '@jak-swarm/agents';
+import { evaluateForConfig } from '@jak-swarm/security';
 import type { VerifierInput, VerificationResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
-import { MAX_TASK_RETRIES } from '../edges.js';
+import { classifyFailure } from '../../recovery/failure-classifier.js';
+import { hyperAgentActive, MAX_TASK_RETRIES } from '../edges.js';
 
 /**
  * Sprint 2.1 / Item K — `verification_completed` emit helper.
@@ -40,6 +50,76 @@ function emitVerificationCompleted(
   } catch {
     // Emission failure must never break verification.
   }
+}
+
+/**
+ * Build an R2 CORRECT_OUTPUT typed correction for a failed verification, when
+ * the failure classifies as a malformed-output class (`OUTPUT_SCHEMA` /
+ * `TOOL_BAD_INPUT`). Returns `undefined` otherwise (passed, or a non-malformed
+ * failure class like GROUNDING_FAILURE / HALLUCINATION) — the caller returns
+ * `outputCorrection: undefined` to clear any prior correction via the
+ * clearable reducer, so a stale correction can never leak across passes or
+ * tasks. Pure given (task, result).
+ *
+ * Classification reuses the deterministic `classifyFailure` (no LLM): the
+ * verifier's `issues` joined as the signal message map cleanly to
+ * OUTPUT_SCHEMA (schema/parse/validation keywords) or TOOL_BAD_INPUT. This is
+ * the R2 territory the HyperAgent spec reserves for typed correction.
+ */
+function buildOutputCorrection(
+  task: { id: string; name?: string; description: string },
+  result: VerificationResult,
+): OutputCorrection | undefined {
+  if (result.passed) return undefined;
+  const message = result.issues.join('; ');
+  if (!message) return undefined;
+  const classification = classifyFailure({ message });
+  if (
+    classification.errorClass !== FailureClass.OUTPUT_SCHEMA &&
+    classification.errorClass !== FailureClass.TOOL_BAD_INPUT
+  ) {
+    return undefined;
+  }
+  const retryHint = result.retryReason ? ` Retry reason: ${result.retryReason}.` : '';
+  const correctionPrompt =
+    `The previous attempt failed verification and was classified as ${classification.errorClass}. ` +
+    `Issues found: ${result.issues.join('; ')}.${retryHint} ` +
+    `Re-run the task and produce well-formed output that directly fixes every issue above. ` +
+    `Do not repeat the malformed shape; match the expected structure exactly.`;
+  return {
+    taskId: task.id,
+    failureClass: classification.errorClass,
+    issues: [...result.issues],
+    correctionPrompt,
+  };
+}
+
+/**
+ * Emit a typed correction ONLY when the R2 CORRECT_OUTPUT path is usable for
+ * this run: HyperAgent ON AND the autonomy policy permits CORRECT_OUTPUT
+ * (L2+). This gate is what keeps default workflows (HyperAgent OFF / L0–L1)
+ * byte-for-byte unchanged — at those levels no correction is emitted, so the
+ * worker re-runs with the identical input (a blind same-input retry) exactly
+ * as before. The `afterVerifier` edge re-checks the same autonomy condition
+ * before routing on the correction, so emission and routing can never
+ * disagree on whether the typed path is active.
+ */
+function maybeOutputCorrection(
+  state: SwarmState,
+  task: { id: string; name?: string; description: string },
+  result: VerificationResult,
+): OutputCorrection | undefined {
+  if (!hyperAgentActive(state)) return undefined;
+  const allowed = evaluateForConfig(
+    {
+      hyperAgentEnabled: state.hyperAgentEnabled ?? false,
+      hyperAgentMode: state.hyperAgentMode ?? HyperAgentMode.OFF,
+      autonomyLevel: state.autonomyLevel ?? AutonomyLevel.L0,
+    },
+    AutonomyCapability.CORRECT_OUTPUT,
+  ).allowed;
+  if (!allowed) return undefined;
+  return buildOutputCorrection(task, result);
 }
 
 export async function verifierNode(state: SwarmState): Promise<Partial<SwarmState>> {
@@ -152,6 +232,12 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     return {
       verificationResults: { [task.id]: result },
       traces,
+      // R2 CORRECT_OUTPUT: emit the typed correction (or clear it). The
+      // afterVerifier edge consults the autonomy policy + outputRepairAttempts
+      // budget to decide whether to route back to the worker with this
+      // correction (L2+ + HyperAgent ON) or fall through to the legacy
+      // same-input retry (default). `undefined` clears a stale prior correction.
+      outputCorrection: maybeOutputCorrection(state, task, result),
       // Status stays VERIFYING so the graph goes back to worker
     };
   }
@@ -197,6 +283,10 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     taskResults: {
       [`${task.id}_status`]: finalResult.passed ? TaskStatus.COMPLETED : TaskStatus.FAILED,
     },
+    // Clear any stale typed correction (the task is done — passed, or failed
+    // and advancing/escalating). Returning `undefined` clears via the
+    // clearable reducer so a correction from a prior pass can never leak.
+    outputCorrection: maybeOutputCorrection(state, task, finalResult),
     // VERIFYING tells the graph runner "routing should decide what happens next".
     // afterVerifier() reads finalResult.needsRetry (now false) → advances correctly.
     status: WorkflowStatus.VERIFYING,

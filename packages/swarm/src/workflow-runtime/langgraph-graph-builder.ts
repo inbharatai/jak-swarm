@@ -44,6 +44,7 @@ import type {
   AutonomyLevel,
   FailureDiagnosis,
   HyperAgentMode,
+  OutputCorrection,
   PlanVersion,
   ReplanResult,
   RepairBudget,
@@ -54,6 +55,7 @@ import type {
 } from '@jak-swarm/shared';
 import type { MissionBrief, RouteMap, GuardrailResult, VerificationResult } from '@jak-swarm/agents';
 import { applySummarizationIfNeeded } from '../context/context-summarizer.js';
+import { freshTaskRepairState } from '../recovery/failure-classifier.js';
 import { commanderNode } from '../graph/nodes/commander-node.js';
 import { plannerNode } from '../graph/nodes/planner-node.js';
 import type { PlannerNodeDeps } from '../graph/nodes/planner-node.js';
@@ -78,6 +80,7 @@ import {
   afterDiagnosis,
   afterReplanner,
   afterValidator,
+  decideVerifierRouting,
   type NodeName,
 } from '../graph/edges.js';
 import {
@@ -239,6 +242,14 @@ export const SwarmStateAnnotation = Annotation.Root({
   hyperAgentIteration: Annotation<number>({ reducer: lwwReducer, default: () => 0 }),
   maxHyperAgentIterations: Annotation<number>({ reducer: lwwReducer, default: () => 3 }),
   pendingDiagnoses: Annotation<Record<string, DiagnosisRecord>>({ reducer: mergeReducer, default: () => ({}) }),
+  // R2 CORRECT_OUTPUT typed correction (Phase 5). `clearableLwwReducer` so the
+  // verifier can clear it by returning `outputCorrection: undefined` when the
+  // task passes or the failure is not malformed-output. Only the verifier
+  // returns this key, so no other node can accidentally clear it.
+  outputCorrection: Annotation<OutputCorrection | undefined>({
+    reducer: clearableLwwReducer,
+    default: () => undefined,
+  }),
 
   // ─── HyperAgent self-learning (Phase 5 live wiring) ───────────────────────
   // outcomeEvaluation: lww (single write by the learning node per run).
@@ -523,24 +534,46 @@ function wrapApprovalNode(deps: NodeDeps) {
  * this in the orchestrator loop; LangGraph computes the next node
  * AFTER the node returns, so we have to fold it into the verifier's
  * own update.
+ *
+ * Phase 5: the counter bumped depends on the routing reason from
+ * `decideVerifierRouting` — `legacy-retry` bumps `taskRetryCount`, while
+ * `typed-correction` bumps `taskRepairState[taskId].outputRepairAttempts`
+ * (the distinct R2 CORRECT_OUTPUT counter). Reading the decision from the
+ * SAME pure function the edge uses guarantees the wrapper and the edge can
+ * never disagree on which budget a worker re-run consumes.
  */
 function wrapVerifierNode(deps: NodeDeps) {
   const inner = wrapNode('verifier', verifierNode, deps);
   return async (state: SwarmAnnotationT): Promise<Partial<SwarmAnnotationT>> => {
     const updates = await inner(state);
     const merged = { ...state, ...updates } as unknown as SwarmState;
-    const next = afterVerifier(merged);
-    if (next === 'worker') {
-      // Bump retry counter for the current task.
+    const decision = decideVerifierRouting(merged);
+    if (decision.next === 'worker') {
       const task = getCurrentTask(merged);
       if (task) {
+        if (decision.reason === 'typed-correction') {
+          // Bump the R2 typed-correction counter (distinct from taskRetryCount).
+          const prevRepair = merged.taskRepairState?.[task.id] ?? freshTaskRepairState(task.id);
+          const failureClass = merged.outputCorrection?.failureClass;
+          return {
+            ...(updates as Partial<SwarmAnnotationT>),
+            taskRepairState: {
+              [task.id]: {
+                ...prevRepair,
+                outputRepairAttempts: prevRepair.outputRepairAttempts + 1,
+                ...(failureClass ? { lastFailureClass: failureClass } : {}),
+              },
+            } as Record<string, TaskRepairState>,
+          };
+        }
+        // Legacy same-input retry — bump the shared retry counter.
         const current = (merged.taskRetryCount ?? {})[task.id] ?? 0;
         return {
           ...(updates as Partial<SwarmAnnotationT>),
           taskRetryCount: { [task.id]: current + 1 } as Record<string, number>,
         };
       }
-    } else if (next === 'guardrail') {
+    } else if (decision.next === 'guardrail') {
       // Advance to next task (SwarmGraph used to do this in the orchestrator).
       // Only advance when the current verification result is a pass OR retry-exhausted.
       const idx = merged.currentTaskIndex ?? 0;

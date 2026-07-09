@@ -14,6 +14,7 @@ import type {
   AutonomyLevel,
   FailureDiagnosis,
   HyperAgentMode,
+  OutputCorrection,
   PlanVersion,
   ReplanResult,
   RepairBudget,
@@ -176,6 +177,15 @@ export interface SwarmState {
   maxHyperAgentIterations?: number;
   /** Diagnoses awaiting the replanner, keyed by taskId. */
   pendingDiagnoses?: Record<string, DiagnosisRecord>;
+  /**
+   * R2 CORRECT_OUTPUT typed correction for the current task (Phase 5). Set by
+   * the verifier on a malformed-output failure; read by `afterVerifier` (to
+   * route back to the worker with a correction) + the worker node (to thread
+   * the correction into the next pass's prompt). Cleared by the verifier when
+   * the task passes or the failure is not malformed-output. `undefined` when
+   * HyperAgent is OFF / autonomy < L2 (the legacy same-input retry path runs).
+   */
+  outputCorrection?: OutputCorrection;
 
   // ─── HyperAgent self-learning (Phase 5 live wiring) ────────────────────────
   // The learning node (reached after the validator when HyperAgent is ON)
@@ -305,6 +315,8 @@ export function createInitialSwarmState(params: {
     relevantLearnings: [],
     promotedLearnings: [],
     banditSelections: [],
+    // R2 typed correction — absent until the verifier emits one.
+    outputCorrection: undefined,
   };
 }
 

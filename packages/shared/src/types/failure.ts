@@ -87,6 +87,32 @@ export interface TaskRepairState {
   exhausted: boolean;
 }
 
+/**
+ * R2 CORRECT_OUTPUT typed correction (HyperAgent Phase 5).
+ *
+ * Emitted by the verifier when a task fails verification with `needsRetry` AND
+ * the failure classifies as a malformed-output class (`OUTPUT_SCHEMA` /
+ * `TOOL_BAD_INPUT`). The `afterVerifier` edge consults the autonomy policy
+ * (`AutonomyCapability.CORRECT_OUTPUT`, min level L2) and, when permitted +
+ * within the `outputRepairAttempts` budget, routes back to the worker with
+ * this correction threaded into the next pass's prompt — instead of a blind
+ * same-input retry. This is a DISTINCT counter
+ * (`taskRepairState[taskId].outputRepairAttempts`) from the legacy
+ * `taskRetryCount` same-input loop; both honor the shared `MAX_TASK_RETRIES`
+ * ceiling. Default workflows (HyperAgent OFF / L0–L1) never emit/consume it.
+ */
+export interface OutputCorrection {
+  taskId: string;
+  /** Classified failure class that triggered the correction (OUTPUT_SCHEMA | TOOL_BAD_INPUT). */
+  failureClass: FailureClass;
+  /** The verifier's issue list for the failed pass. */
+  issues: string[];
+  /** Optional schema/shape hint the output should satisfy (derived from issues when present). */
+  expectedSchema?: string;
+  /** Agent-facing instruction appended to the next worker pass's task description. */
+  correctionPrompt: string;
+}
+
 /** Result of diagnosing a failure (deterministic classifier first, LLM only for ambiguous cases — Phase 4). */
 export interface FailureDiagnosis {
   id: string;

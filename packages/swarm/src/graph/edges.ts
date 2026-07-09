@@ -10,7 +10,14 @@
  * LangGraph's `END` by the builder; nothing else uses them.
  */
 
-import { HyperAgentMode, RepairLevel, WorkflowStatus } from '@jak-swarm/shared';
+import {
+  AutonomyCapability,
+  AutonomyLevel,
+  HyperAgentMode,
+  RepairLevel,
+  WorkflowStatus,
+} from '@jak-swarm/shared';
+import { evaluateForConfig } from '@jak-swarm/security';
 import type { SwarmState } from '../state/swarm-state.js';
 import {
   getCurrentTask,
@@ -118,25 +125,103 @@ export function afterApproval(state: SwarmState): NodeName {
   return 'worker';
 }
 
-export function afterVerifier(state: SwarmState): NodeName {
+/**
+ * The reason `decideVerifierRouting` routed back to the worker. The verifier
+ * wrapper (`wrapVerifierNode`) reads this to bump the RIGHT counter:
+ *   - `legacy-retry`     → `taskRetryCount[taskId]++` (the R1/R2 same-input loop)
+ *   - `typed-correction` → `taskRepairState[taskId].outputRepairAttempts++`
+ *                          (the R2 CORRECT_OUTPUT loop — distinct counter)
+ * Exposed so the wrapper and the edge can never disagree on which budget a
+ * worker re-run consumes — the same divergence pattern that bit the legacy
+ * R1/R2 loop before it was unified on `taskRetryCount` + `MAX_TASK_RETRIES`.
+ */
+export type VerifierRoutingReason =
+  | 'typed-correction'
+  | 'legacy-retry'
+  | 'diagnosis'
+  | 'next-task'
+  | 'end';
+
+export interface VerifierRoutingDecision {
+  next: NodeName;
+  reason: VerifierRoutingReason;
+}
+
+/**
+ * Single source of truth for the post-verifier routing decision. Pure.
+ *
+ * Order of precedence on a retryable (`needsRetry`) failure:
+ *   1. R2 CORRECT_OUTPUT typed correction — ONLY when the HyperAgent layer is
+ *      ON, autonomy permits `CORRECT_OUTPUT` (L2+), and the verifier emitted
+ *      an `outputCorrection` for the current task (malformed-output class). A
+ *      malformed output is not helped by re-sending the identical input, so
+ *      the worker is re-run with the correction threaded into its prompt.
+ *      Budget: `outputRepairAttempts < maxOutputRepairs`, where
+ *      `maxOutputRepairs` is capped at the shared `MAX_TASK_RETRIES` ceiling.
+ *      When the typed budget exhausts, this escalates straight to R3 diagnosis
+ *      (NOT a blind legacy retry — a second pass with guidance already failed).
+ *   2. R1/R2 legacy same-input retry — the default loop. Runs when typed
+ *      correction was not applicable (no correction payload, HyperAgent OFF,
+ *      autonomy < L2, or the failure is not malformed-output). Unchanged from
+ *      before; the HyperAgent OFF / L0–L1 path is byte-for-byte identical.
+ *   3. R3 diagnosis — HyperAgent active, failed, plan-repair budget remains.
+ *   4. Next task / END.
+ *
+ * Default workflows (HyperAgent OFF / L0) never take branch 1: the
+ * `hyperAgentActive(state)` gate is false (OFF) and `evaluateForConfig` returns
+ * `allowed=false` for CORRECT_OUTPUT at L0, so the function falls straight to
+ * branch 2 — the legacy same-input retry, exactly as before.
+ */
+export function decideVerifierRouting(state: SwarmState): VerifierRoutingDecision {
   const currentResult = getCurrentVerificationResult(state);
 
-  // R1/R2 output-repair loop — identical for legacy + HyperAgent. The
-  // HyperAgent layer only takes over once the verifier says "no more
-  // same-input retries" (needsRetry false OR the retry ceiling is hit).
   if (currentResult && !currentResult.passed && currentResult.needsRetry) {
     const task = getCurrentTask(state);
     const retries = task ? (state.taskRetryCount[task.id] ?? 0) : MAX_TASK_RETRIES;
-    if (retries < MAX_TASK_RETRIES) {
-      return 'worker';
+
+    // ── Branch 1: R2 CORRECT_OUTPUT typed correction ───────────────────────
+    // When the typed-correction budget exhausts we SKIP the legacy same-input
+    // retry (a guided correction already failed; re-sending identical input
+    // burns budget without new information) and escalate straight to R3.
+    let skipLegacyRetry = false;
+    const correction = state.outputCorrection;
+    if (
+      task &&
+      correction &&
+      correction.taskId === task.id &&
+      hyperAgentActive(state)
+    ) {
+      const correctOutput = evaluateForConfig(
+        {
+          hyperAgentEnabled: state.hyperAgentEnabled ?? false,
+          hyperAgentMode: state.hyperAgentMode ?? HyperAgentMode.OFF,
+          autonomyLevel: state.autonomyLevel ?? AutonomyLevel.L0,
+        },
+        AutonomyCapability.CORRECT_OUTPUT,
+      );
+      if (correctOutput.allowed) {
+        const outputRepairs = state.taskRepairState?.[task.id]?.outputRepairAttempts ?? 0;
+        // Cap the configured budget at the shared ceiling so the typed loop
+        // can never spin past MAX_TASK_RETRIES (belt-and-braces guard).
+        const configuredMax = state.repairBudget?.maxOutputRepairs ?? MAX_TASK_RETRIES;
+        const maxOutputRepairs = Math.min(configuredMax, MAX_TASK_RETRIES);
+        if (outputRepairs < maxOutputRepairs) {
+          return { next: 'worker', reason: 'typed-correction' };
+        }
+        // Typed budget exhausted → escalate to R3 diagnosis, skipping legacy.
+        skipLegacyRetry = true;
+      }
+      // If CORRECT_OUTPUT is not allowed at this level (L0/L1), fall through to
+      // the legacy same-input retry below — the default, unchanged behaviour.
+    }
+
+    // ── Branch 2: R1/R2 legacy same-input retry ─────────────────────────────
+    if (!skipLegacyRetry && retries < MAX_TASK_RETRIES) {
+      return { next: 'worker', reason: 'legacy-retry' };
     }
   }
 
-  // HyperAgent plan-repair path (spec §6 case 3): when a task has failed
-  // verification AND the R1/R2 loop is exhausted, route to root-cause
-  // diagnosis instead of advancing. The diagnosis node classifies the
-  // failure; the replanner node proposes + validates a revised plan.
-  //
+  // ── Branch 3: R3 plan-repair diagnosis (HyperAgent only) ──────────────────
   // GATED: when the HyperAgent layer is OFF (or disabled) this branch is
   // unreachable, so legacy routing is unchanged.
   if (
@@ -145,14 +230,19 @@ export function afterVerifier(state: SwarmState): NodeName {
     !currentResult.passed &&
     !hyperAgentBudgetExhausted(state)
   ) {
-    return 'diagnosis';
+    return { next: 'diagnosis', reason: 'diagnosis' };
   }
 
+  // ── Branch 4: advance / END ───────────────────────────────────────────────
   if (hasMoreTasks(state)) {
-    return 'guardrail';
+    return { next: 'guardrail', reason: 'next-task' };
   }
 
-  return '__end__';
+  return { next: '__end__', reason: 'end' };
+}
+
+export function afterVerifier(state: SwarmState): NodeName {
+  return decideVerifierRouting(state).next;
 }
 
 /**

@@ -143,7 +143,28 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
           // Telemetry failure must never break the worker.
         }
       }
-      const taskInput = buildTaskInput(task, stateForInput);
+
+      // ─── HyperAgent Phase 5 — R2 CORRECT_OUTPUT typed correction ──────────
+      // When the verifier emitted a typed correction for THIS task (a
+      // malformed-output failure the afterVerifier edge routed back here at
+      // L2+), thread the correction into the next pass's prompt by appending
+      // it to the task description. Every role's task-input builder consumes
+      // `task.description`, so this is the single minimal seam that reaches the
+      // agent's input without touching each builder or BaseAgent.
+      // `taskForInput` is a LOCAL copy — the persisted plan task is never
+      // mutated. No-op when there is no correction (default workflows / first
+      // pass / non-malformed failures) — byte-for-byte the legacy path.
+      const correction = state.outputCorrection;
+      const correctionForThisTask =
+        correction && correction.taskId === task.id ? correction : undefined;
+      const taskForInput: typeof task = correctionForThisTask
+        ? {
+            ...task,
+            description: `${task.description}\n\n[VERIFIER CORRECTION — R2 CORRECT_OUTPUT] ${correctionForThisTask.correctionPrompt}`,
+          }
+        : task;
+
+      const taskInput = buildTaskInput(taskForInput, stateForInput);
 
       // Distributed breaker (shared across instances) if registered for this
       // workflow in the breaker-registry side-channel; else local per-process.
@@ -280,7 +301,7 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
           const outputStr = JSON.stringify(output);
           const { corrected, wasChanged } = await agent.reflectAndCorrect(
             outputStr,
-            task.description,
+            taskForInput.description,
             {
               maxTokens: 2048,
               mode: getReflectionMode(task.agentRole),
