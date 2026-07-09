@@ -207,6 +207,30 @@ describe('Phase 4 spec scenarios', () => {
     expect(afterReplanner({ ...s, ...out } as SwarmState)).toBe('guardrail');
   });
 
+  it('1b. resets the per-task R1/R2 retry budget for the re-executed task on a successful replan', async () => {
+    // The failed task reached diagnosis BECAUSE its R1/R2 budget exhausted
+    // (taskRetryCount[fail] = MAX = 2). Before the fix the replanner rewound
+    // currentTaskIndex but left the counter at 2, so the revised task got zero
+    // same-input retries and any minor defect jumped straight back to diagnosis.
+    const s = stateWithFailedTask({
+      pendingDiagnoses: { fail: pendingRecord(FailureClass.WRONG_AGENT) },
+      taskRetryCount: { fail: 2 },
+    });
+    const out = await replannerNode(s, { knownToolNames: KNOWN_TOOLS });
+    expect(out.status).toBe(WorkflowStatus.EXECUTING);
+    expect(out.taskRetryCount?.fail).toBe(0);
+    // Other tasks' counters (if any) are preserved — only re-executed tasks reset.
+    const s2 = stateWithFailedTask({
+      tasks: [task({ id: 'fail', agentRole: AgentRole.WORKER_CODER, toolsRequired: ['web_search'] }), task({ id: 'other' })],
+      pendingDiagnoses: { fail: pendingRecord(FailureClass.WRONG_AGENT) },
+      taskRetryCount: { fail: 2, other: 1 },
+    });
+    const out2 = await replannerNode(s2, { knownToolNames: KNOWN_TOOLS });
+    // The node returns a per-key DELTA (merged by the LangGraph reducer), so it
+    // resets only the re-executed task and does not clobber `other`'s counter.
+    expect(out2.taskRetryCount).toEqual({ fail: 0 });
+  });
+
   it('2. TOOL_UNAVAILABLE → REPLACE_TOOL → re-execute', async () => {
     const s = stateWithFailedTask({
       tasks: [task({ id: 'fail', toolsRequired: ['unavailable_tool'] })],

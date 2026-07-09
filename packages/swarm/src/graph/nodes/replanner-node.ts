@@ -204,6 +204,18 @@ export async function replannerNode(
       },
     },
     failureDiagnoses: { [task.id]: pending.diagnosis },
+    // Reset the same-input (R1/R2) retry budget for every task being re-executed
+    // under the revised plan. The prior counters were spent on the OLD plan
+    // version — and the failed task's counter is at MAX_TASK_RETRIES after the
+    // R1/R2 exhaustion that routed it to diagnosis in the first place. Without
+    // this reset, a replanned task starts at the ceiling and gets ZERO same-input
+    // retries, so even a minor output defect jumps straight back into another
+    // expensive plan-repair iteration instead of the cheap R1/R2 retry a fresh
+    // task would get. mergeReducer merges per-key, so only the re-executed tasks
+    // are reset; other tasks' counters are preserved.
+    taskRetryCount: Object.fromEntries(
+      [...result.changedTaskIds, ...result.invalidatedTaskIds].map((id) => [id, 0]),
+    ) as Record<string, number>,
     // Rewind to the failed task so the guardrail re-executes only invalidated work.
     // (The consumed pendingDiagnosis is left in place; the diagnosis node overwrites
     //  it if the task fails again on the next pass.)
