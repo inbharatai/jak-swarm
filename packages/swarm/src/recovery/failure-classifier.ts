@@ -84,7 +84,13 @@ export function mapLegacyErrorClass(legacy: string): FailureClass {
 /** Regex signals for raw-message classification when no legacy class is given. */
 const SIGNALS: ReadonlyArray<{ class: FailureClass; re: RegExp }> = Object.freeze([
   { class: FailureClass.RATE_LIMIT, re: /429|rate.?limit|too many requests|quota/i },
-  { class: FailureClass.TRANSIENT_PROVIDER, re: /503|502|504|service unavailable|temporarily unavailable|econnreset|econnrefused|socket hang up|network|timeout/i },
+  // NOTE: bare "timeout" must NOT match TRANSIENT_PROVIDER. TIMEOUT is ordered
+  // below and its policy marks externalSideEffectPossible=true (→ not auto-
+  // retried), which is the safe classification for a timed-out side-effecting
+  // tool (e.g. a payment request). Earlier this regex included `|timeout`,
+  // which matched FIRST and misrouted "timeout" → TRANSIENT_PROVIDER (retryable)
+  // — risking a double-charge on retry. Keep `timeout` only on the TIMEOUT line.
+  { class: FailureClass.TRANSIENT_PROVIDER, re: /503|502|504|service unavailable|temporarily unavailable|econnreset|econnrefused|socket hang up|network/i },
   { class: FailureClass.TIMEOUT, re: /\btimeout\b|timed out|deadline exceeded|aborted/i },
   { class: FailureClass.PERMISSION_DENIED, re: /permission|forbidden|403|unauthorized|401|not allowed|access denied/i },
   { class: FailureClass.MISSING_CREDENTIAL, re: /missing.*(api.?key|credential|token|secret)|unconfigured|no.*credentials/i },

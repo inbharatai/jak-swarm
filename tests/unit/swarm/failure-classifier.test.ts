@@ -135,6 +135,22 @@ describe('failure-classifier — hard security invariants', () => {
     expect(r.externalSideEffectPossible).toBe(true);
     expect(r.retryable).toBe(false);
   });
+
+  it('regression: bare word "timeout" classifies as TIMEOUT (not TRANSIENT_PROVIDER), so a timed-out side-effecting tool is not auto-retried', () => {
+    // Before the fix, "timeout" matched the TRANSIENT_PROVIDER regex (which used
+    // to include `|timeout`) BEFORE the TIMEOUT signal, classifying a timed-out
+    // payment as retryable → risk of double-charge on retry.
+    const r = classifyFailure({ message: 'request timeout' });
+    expect(r.errorClass).toBe(FailureClass.TIMEOUT);
+    expect(r.externalSideEffectPossible).toBe(true);
+    expect(r.retryable).toBe(false);
+
+    // And a tool that already executed (side effect) before timing out must also
+    // be non-retryable via the caller hint path.
+    const r2 = classifyFailure({ message: 'timeout', toolHadExternalSideEffect: true, failedBeforeExecution: false });
+    expect(r2.errorClass).toBe(FailureClass.TIMEOUT);
+    expect(r2.retryable).toBe(false);
+  });
 });
 
 describe('failure-classifier — budget accounting', () => {
