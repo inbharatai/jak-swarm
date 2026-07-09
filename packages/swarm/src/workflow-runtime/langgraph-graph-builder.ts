@@ -697,6 +697,78 @@ export function buildLangGraph(params: BuildLangGraphParams) {
 export type CompiledLangGraph = ReturnType<typeof buildLangGraph>;
 
 /**
+ * Spec-execution graph — Phase 6 `executeApprovedSpec` run seam.
+ *
+ * A FOCUSED subgraph that runs the REAL execution nodes (guardrail → worker →
+ * verifier → validator) against a pre-materialised `WorkflowPlan`, WITHOUT the
+ * commander/planner prefix (the plan is already decided — it came from an
+ * APPROVED AgentExecutableSpec, so re-deriving it from the goal would break the
+ * task-id binding the acceptance criteria depend on). START → guardrail.
+ *
+ * HyperAgent is OFF in this graph: the diagnosis/replanner/learning nodes are
+ * absent, so `verifierEdge`'s `'diagnosis'` branch and `validatorEdge`'s
+ * `'learning'` branch are unreachable — they are mapped to terminal paths
+ * (validator / END) so LangGraph's conditional-edge mapping is exhaustive
+ * without spawning the HyperAgent nodes. This is the spec EXECUTE half; the
+ * self-healing/self-learning half is a separate concern.
+ *
+ * HONEST SCOPE: every node calls an LLM agent (GuardrailAgent / worker agent /
+ * VerifierAgent / validator agent), so invoking this graph is env-blocked
+ * without provider keys — wired-into-runtime, NOT production-proven here. The
+ * closed-loop LOGIC that consumes this graph's output is proven by the
+ * integration test with a stub runPlan.
+ */
+export interface SpecExecutionGraphParams {
+  db: CheckpointPrismaClient;
+  shouldStop?: (workflowId: string) => boolean;
+  shouldPause?: (workflowId: string) => boolean;
+}
+
+export function buildSpecExecutionGraph(params: SpecExecutionGraphParams) {
+  const deps: NodeDeps = {
+    shouldStop: params.shouldStop,
+    shouldPause: params.shouldPause,
+  };
+  const checkpointer = new PostgresCheckpointSaver(params.db);
+
+  const builder = new StateGraph(SwarmStateAnnotation)
+    .addNode('guardrail', wrapNode('guardrail', guardrailNode, deps))
+    .addNode('worker', wrapNode('worker', workerNode, deps))
+    .addNode('verifier', wrapVerifierNode(deps))
+    .addNode('approval', wrapApprovalNode(deps))
+    .addNode('validator', wrapNode('validator', validatorNode, deps))
+    .addEdge(START, 'guardrail')
+    .addConditionalEdges('guardrail', guardrailEdge, {
+      approval: 'approval',
+      worker: 'worker',
+      end: END,
+    })
+    .addConditionalEdges('approval', approvalEdge, {
+      worker: 'worker',
+      end: END,
+    })
+    .addEdge('worker', 'verifier')
+    // HyperAgent is OFF → 'diagnosis' is unreachable; map it to 'validator' so
+    // the conditional-edge mapping is exhaustive without a diagnosis node.
+    .addConditionalEdges('verifier', verifierEdge, {
+      worker: 'worker',
+      guardrail: 'guardrail',
+      validator: 'validator',
+      diagnosis: 'validator',
+    })
+    // HyperAgent is OFF → 'learning' is unreachable; map it to END so the
+    // mapping is exhaustive without a learning node.
+    .addConditionalEdges('validator', validatorEdge, {
+      learning: END,
+      end: END,
+    });
+
+  return builder.compile({ checkpointer });
+}
+
+export type CompiledSpecExecutionGraph = ReturnType<typeof buildSpecExecutionGraph>;
+
+/**
  * Build the RunnableConfig for a given workflow + tenant. The
  * `tenantId` is REQUIRED — the PostgresCheckpointSaver rejects calls
  * without it. The `thread_id` is the workflow id (one thread per

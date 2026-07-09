@@ -7,6 +7,7 @@
 
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { SpecNotApprovedError, SpecPlanValidationError } from '@jak-swarm/swarm';
 import { CompanyBrainSchemaUnavailableError } from '../services/company-brain/company-profile.service.js';
 import { CompanyOperatingLayerService } from '../services/company-brain/company-operating-layer.service.js';
 import { ok, err } from '../types.js';
@@ -145,6 +146,16 @@ function validationMessage(error_: z.ZodError): string {
 function sendCompanyOsError(reply: FastifyReply, e: unknown, fallbackCode: string): FastifyReply {
   if (e instanceof CompanyBrainSchemaUnavailableError) {
     return reply.status(503).send(err('COMPANY_OPERATING_LAYER_SCHEMA_UNAVAILABLE', e.message));
+  }
+  // Phase 6 — the spec closed loop refuses a non-approved spec (409: the
+  // resource exists but is in the wrong state to execute) and a malformed
+  // agentTaskPlan (422: the spec content is unprocessable). Both surface the
+  // honest reason rather than a generic 500.
+  if (e instanceof SpecNotApprovedError) {
+    return reply.status(409).send(err('SPEC_NOT_APPROVED', e.message));
+  }
+  if (e instanceof SpecPlanValidationError) {
+    return reply.status(422).send(err('SPEC_PLAN_INVALID', e.message));
   }
   if (e instanceof Error && /OPENAI_API_KEY/i.test(e.message)) {
     return reply.status(503).send(err('LLM_KEY_REQUIRED', e.message));
@@ -332,6 +343,29 @@ const companyOperatingLayerRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send(ok({ spec }));
     } catch (e) {
       return sendCompanyOsError(reply, e, 'COMPANY_SPEC_DECIDE_FAILED');
+    }
+  });
+
+  // Phase 6 — execute an APPROVED spec's closed loop (materialise → run →
+  // harvest → acceptance verdict). REVIEWER+ only (same guard as /decide) since
+  // it launches a workflow run. Returns the tri-state verdict + per-criterion
+  // results + the outcome evaluation. The production runPlan is env-blocked at
+  // every agent call; the closed-loop LOGIC is integration-proven (see
+  // tests/integration/hyperagent-spec-execution.test.ts).
+  fastify.post('/company/specs/:id/execute', {
+    preHandler: [fastify.authenticate, ...reviewGuard],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const params = idParamsSchema.safeParse(request.params ?? {});
+    if (!params.success) return reply.status(400).send(err('INVALID_PARAMS', validationMessage(params.error)));
+    try {
+      const result = await service.executeSpec({
+        tenantId: request.user.tenantId,
+        userId: request.user.userId,
+        specId: params.data.id,
+      });
+      return reply.send(ok({ execution: result }));
+    } catch (e) {
+      return sendCompanyOsError(reply, e, 'COMPANY_SPEC_EXECUTE_FAILED');
     }
   });
 };

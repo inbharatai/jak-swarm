@@ -21,6 +21,19 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import { AgentContext, getRuntime, type LLMRuntime, type LegacyAgentBackend } from '@jak-swarm/agents';
 import { AuditAction, AuditLogger, type AuditPrismaClient } from '@jak-swarm/security';
+import {
+  executeApprovedSpec,
+  runPlanViaLangGraph,
+  type CheckpointPrismaClient,
+  type ExecuteSpecResult,
+} from '@jak-swarm/swarm';
+import type {
+  AgentExecutableSpec,
+  AcceptanceCriterion,
+  SpecStatus,
+  SpecTaskDescriptor,
+  SpecTaskPlan,
+} from '@jak-swarm/shared';
 import { CompanyBrainSchemaUnavailableError } from './company-profile.service.js';
 
 type DbWithCompanyOs = PrismaClient & {
@@ -282,6 +295,72 @@ function jsonObject(value: unknown): Record<string, unknown> {
 export function jsonStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+}
+
+/**
+ * Parse a spec row's `acceptanceCriteria` Json column into the typed shape the
+ * closed loop measures. Accepts STRUCTURED criteria (objects with a `kind`) and
+ * legacy plain-string criteria (no deterministic binding ⇒ UNVERIFIABLE). Never
+ * fakes a structured criterion — an element that is neither a non-empty string
+ * nor a kinded object is dropped (a malformed criterion must not crash the run).
+ */
+function parseAcceptanceCriteria(value: unknown): Array<AcceptanceCriterion | string> {
+  if (!Array.isArray(value)) return [];
+  const out: Array<AcceptanceCriterion | string> = [];
+  for (const el of value) {
+    if (typeof el === 'string') {
+      if (el.trim().length > 0) out.push(el);
+      continue;
+    }
+    if (el && typeof el === 'object' && typeof (el as Record<string, unknown>).kind === 'string') {
+      out.push(el as AcceptanceCriterion);
+    }
+  }
+  return out;
+}
+
+/** Parse a spec row's `agentTaskPlan` Json column into the typed plan. The
+ *  generator zod-validates this shape on write; defensive on read so a manually
+ *  authored spec with a missing/empty tasks array surfaces SpecPlanValidationError
+ *  from `materializePlan` rather than crashing the loader. */
+function parseSpecTaskPlan(value: unknown): SpecTaskPlan {
+  if (value && typeof value === 'object' && Array.isArray((value as SpecTaskPlan).tasks)) {
+    return { tasks: (value as SpecTaskPlan).tasks as SpecTaskDescriptor[] };
+  }
+  return { tasks: [] };
+}
+
+/** Map a Prisma `agent_executable_specs` row to the typed `AgentExecutableSpec`
+ *  the HyperAgent closed loop operates on. Json columns are parsed defensively;
+ *  the approval guard + plan validation run in `materializePlan` (inside
+ *  `executeApprovedSpec`) so a bad spec never reaches the runner. */
+function mapSpecRow(row: AgentExecutableSpecRow): AgentExecutableSpec {
+  const approved = row.status === 'approved' && row.reviewedAt;
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    driftFindingId: row.driftFindingId,
+    title: row.title,
+    problemStatement: row.problemStatement,
+    objective: row.objective,
+    contextSummary: row.contextSummary,
+    proposedApproach: row.proposedApproach,
+    acceptanceCriteria: parseAcceptanceCriteria(row.acceptanceCriteria),
+    testPlan: row.testPlan,
+    agentTaskPlan: parseSpecTaskPlan(row.agentTaskPlan),
+    approvalGates: row.approvalGates,
+    evidenceArtifactIds: jsonStringArray(row.evidenceArtifactIds),
+    evidenceEntityIds: jsonStringArray(row.evidenceEntityIds),
+    status: row.status as SpecStatus,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : new Date(row.updatedAt).toISOString(),
+    ...(approved
+      ? {
+          approvedAt: (row.reviewedAt as Date).toISOString(),
+          approvedBy: row.reviewedBy ?? undefined,
+        }
+      : {}),
+  };
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -1090,6 +1169,64 @@ export class CompanyOperatingLayerService {
     }).catch(() => {});
 
     return row;
+  }
+
+  /**
+   * Phase 6 — execute an APPROVED spec's closed loop: materialise the spec's
+   * `agentTaskPlan` into a `WorkflowPlan`, run it via the real spec-execution
+   * graph, harvest run evidence, and MEASURE it against the spec's
+   * `acceptanceCriteria` (tri-state MET / UNMET / UNVERIFIABLE). REVIEWER+ only
+   * (the route guards this) since it launches a workflow run.
+   *
+   * Honest scope: the closed-loop LOGIC is proven by the integration test with
+   * a stub runPlan. The production `runPlan` (`runPlanViaLangGraph`) drives the
+   * real graph and is env-blocked at every agent call — wired-into-runtime, NOT
+   * production-proven here. Artifact harvesting from taskResults is an open
+   * edge (ARTIFACT_PRESENT criteria are UNMET unless the run produces one).
+   */
+  async executeSpec(input: {
+    tenantId: string;
+    userId: string;
+    specId: string;
+  }): Promise<ExecuteSpecResult> {
+    const row = await this.db.agentExecutableSpec.findFirst({
+      where: { id: input.specId, tenantId: input.tenantId, deletedAt: null },
+    }).catch((err: unknown) => rethrowIfCompanyOsSchemaMissing(err));
+    if (!row) throw new Error(`Agent executable spec id=${input.specId} not found in this tenant.`);
+
+    const spec = mapSpecRow(row);
+    const result = await executeApprovedSpec({
+      spec,
+      tenantId: input.tenantId,
+      userId: input.userId,
+      now: new Date(),
+      deps: {
+        // The real production run seam. Env-blocked at every agent call
+        // (GuardrailAgent / worker / VerifierAgent / validator) — see
+        // spec-executor-runtime.ts header for the honest scope.
+        runPlan: (planInput) => runPlanViaLangGraph(planInput, {
+          db: this.db as unknown as CheckpointPrismaClient,
+        }),
+      },
+    });
+
+    void this.audit.log({
+      action: AuditAction.AGENT_SPEC_EXECUTED,
+      tenantId: input.tenantId,
+      userId: input.userId,
+      resource: 'agent_executable_spec',
+      resourceId: row.id,
+      details: {
+        workflowId: result.workflowId,
+        verdict: result.verdict,
+        taskPassed: result.outcome.taskPassed,
+        taskFailed: result.outcome.taskFailed,
+        taskBlocked: result.outcome.taskBlocked,
+        resolvedDrift: result.resolvedDrift,
+      },
+    }).catch(() => {});
+
+    return result;
   }
 
   private async assertArtifactsBelongToTenant(tenantId: string, artifactIds: string[]): Promise<void> {

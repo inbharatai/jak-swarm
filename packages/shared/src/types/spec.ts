@@ -97,12 +97,24 @@ export interface SpecTaskPlan {
 export interface AgentExecutableSpec {
   id: string;
   tenantId: string;
+  /** Drift finding this spec was generated to resolve (Prisma column; null when
+   *  the spec was authored standalone). Carried so the closed loop can report
+   *  whether the originating drift was resolved. */
+  driftFindingId?: string | null;
   title: string;
   problemStatement: string;
   objective: string;
   contextSummary: string;
   proposedApproach: string;
-  acceptanceCriteria: AcceptanceCriterion[];
+  /**
+   * Acceptance criteria. Phase 6 introduced STRUCTURED `AcceptanceCriterion`
+   * criteria (bound deterministically to run evidence by the acceptance
+   * checker). The legacy spec GENERATOR emits plain-string criteria (no
+   * deterministic binding ⇒ UNVERIFIABLE), so the type accepts both — a
+   * string criterion is the honest stub, never faked as satisfied. Upgrading
+   * the generator to emit structured criteria is a separate open edge.
+   */
+  acceptanceCriteria: Array<AcceptanceCriterion | string>;
   testPlan: unknown;
   agentTaskPlan: SpecTaskPlan;
   approvalGates: unknown;

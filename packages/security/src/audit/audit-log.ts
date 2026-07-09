@@ -41,6 +41,9 @@ export enum AuditAction {
   AGENT_SPEC_GENERATED = 'AGENT_SPEC_GENERATED',
   AGENT_SPEC_APPROVED = 'AGENT_SPEC_APPROVED',
   AGENT_SPEC_REJECTED = 'AGENT_SPEC_REJECTED',
+  /** Phase 6 — an approved spec was executed via the closed loop (materialise
+   *  → run → harvest → acceptance verdict). The details carry the verdict. */
+  AGENT_SPEC_EXECUTED = 'AGENT_SPEC_EXECUTED',
 }
 
 export interface AuditEvent {

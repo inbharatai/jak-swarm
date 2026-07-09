@@ -239,3 +239,27 @@ export type {
 } from './hyperagent/learning-persist.js';
 export type { LearningNodeDeps } from './graph/nodes/learning-node.js';
 export type { PlannerNodeDeps } from './graph/nodes/planner-node.js';
+
+// ─── HyperAgent Phase 6 — approved-spec closed loop ───────────────────────
+// `executeApprovedSpec` binds the three pure halves (materialise → run →
+// harvest → measure → verdict) into one closed loop. `runPlanViaLangGraph` is
+// the PRODUCTION run seam (drives the real spec-execution graph; env-blocked at
+// every agent call — wired-into-runtime, NOT production-proven here). The
+// closed-loop LOGIC is proven by the integration test with a stub runPlan.
+export {
+  materializePlan,
+  acceptanceCriteriaForSpec,
+  executeApprovedSpec,
+  SpecNotApprovedError,
+  SpecPlanValidationError,
+} from './hyperagent/spec-executor.js';
+export type {
+  MaterializePlanInput,
+  ExecuteSpecInput,
+  ExecuteSpecResult,
+  ExecuteSpecDeps,
+  RunPlanInput,
+  FinishedRun,
+} from './hyperagent/spec-executor.js';
+export { runPlanViaLangGraph } from './hyperagent/spec-executor-runtime.js';
+export type { RunPlanViaLangGraphDeps } from './hyperagent/spec-executor-runtime.js';

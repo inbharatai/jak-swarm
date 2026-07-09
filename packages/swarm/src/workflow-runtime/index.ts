@@ -31,13 +31,16 @@ export {
 } from './postgres-checkpointer.js';
 export {
   buildLangGraph,
+  buildSpecExecutionGraph,
   makeRunnableConfig,
   raceNodeWithTimeout,
   clearableLwwReducer,
   SwarmStateAnnotation,
   type SwarmAnnotationT,
   type CompiledLangGraph,
+  type CompiledSpecExecutionGraph,
   type BuildLangGraphParams,
+  type SpecExecutionGraphParams,
 } from './langgraph-graph-builder.js';
 export {
   NOOP_LIFECYCLE_EMITTER,

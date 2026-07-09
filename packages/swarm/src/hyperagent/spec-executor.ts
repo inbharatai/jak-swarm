@@ -20,13 +20,21 @@
  * Pure + deterministic — no I/O, no LLM, no Date.now.
  */
 import { RiskLevel, TaskStatus } from '@jak-swarm/shared';
+import { AcceptanceVerdict } from '@jak-swarm/shared';
 import type {
+  AcceptanceCriterionResult,
   AgentExecutableSpec,
+  FailureClass,
+  OutcomeEvaluation,
+  RunEvidence,
   SpecTaskDescriptor,
   WorkflowPlan,
   WorkflowTask,
 } from '@jak-swarm/shared';
+import type { VerificationResult } from '@jak-swarm/agents';
 import { findCycleTask } from './plan-validator.js';
+import { evaluateOutcome } from './outcome-evaluator.js';
+import { acceptanceVerdict } from './acceptance-checker.js';
 
 /** Thrown when a non-approved spec is materialised. */
 export class SpecNotApprovedError extends Error {
@@ -146,5 +154,167 @@ export function acceptanceCriteriaForSpec(spec: AgentExecutableSpec) {
   return {
     criteria: spec.acceptanceCriteria,
     allowedArtifactIds: spec.evidenceArtifactIds,
+  };
+}
+
+// ─── Phase 6 closed-loop execution (service layer over the pure core) ─────────
+//
+// `executeApprovedSpec` is the orchestrator that binds the three pure halves
+// into one closed loop:  materialise the approved spec → run the plan → harvest
+// run evidence → measure acceptance → tri-state verdict. It is async only
+// because `runPlan` is async (the swarm execution seam); the orchestration
+// itself is deterministic given the finished run.
+//
+// HONEST SCOPE — what this does and does NOT claim:
+//   - The closed-loop LOGIC (guard → materialise → run → harvest → measure →
+//     verdict) is fully proven by the integration test with a stub `runPlan`
+//     (deterministic MET / UNMET / UNVERIFIABLE + SpecNotApprovedError +
+//     SpecPlanValidationError). The real harvester (`evaluateOutcome`) and the
+//     real deterministic acceptance checker (`checkCriterion` via
+//     `measureAcceptanceSeam`) are exercised — no faked satisfied criterion.
+//   - The PRODUCTION `runPlan` (`runPlanViaLangGraph`) drives the real graph
+//     (guardrail/worker/verifier/validator nodes) against the materialised
+//     plan. It is env-blocked at every agent call (no provider keys here) —
+//     wired-into-runtime, NOT production-proven. That is the same honesty
+//     posture as every other live-graph HyperAgent seam.
+//   - The spec `executed` + workflow-link persistence is an OPEN EDGE: the
+//     Prisma `AgentExecutableSpec` has no `executedAt`/`executedWorkflowId`
+//     column, so the loop RETURNS the verdict + workflowId without mutating
+//     the spec row. Persisting the link is a separate (migration-gated) step.
+
+/** Input to the run seam: everything the executor needs to drive the plan. */
+export interface RunPlanInput {
+  plan: WorkflowPlan;
+  tenantId: string;
+  userId: string;
+  workflowId: string;
+  /** The caller-supplied instant (no Date.now in the pure orchestration). */
+  now: Date;
+}
+
+/** A finished run — the terminal state the harvester + measurer consume. */
+export interface FinishedRun {
+  /** The plan with terminal task statuses (COMPLETED/FAILED/SKIPPED/...). */
+  plan: WorkflowPlan;
+  /** Per-task verifier results (SwarmState.verificationResults). */
+  verificationResults: Record<string, VerificationResult>;
+  /** Task ids the run marked failed (SwarmState.failedTaskIds). */
+  failedTaskIds?: string[];
+  /** Task ids the run marked completed (SwarmState.completedTaskIds). */
+  completedTaskIds?: string[];
+  /** Run-level guardrail/policy block flag (SwarmState.blocked). */
+  blocked?: boolean;
+  /** Artifact ids the run produced/referenced (defaults to the spec's
+   *  evidenceArtifactIds when the run harvests none). */
+  artifacts: string[];
+  /** Named numeric metrics the run reported (cost, latency, counts). */
+  metrics: Record<string, number>;
+  /** Accumulated spend, when available. */
+  accumulatedCostUsd?: number;
+  /** Pre-classified failure class per failed task, so NO_FAILURE_CLASS criteria
+   *  bind to real classified failures (not a vacuous "no offenders" when the
+   *  run simply didn't classify). Optional — the real graph does not yet wire
+   *  failure classification into the harvested run (open edge). */
+  failureClassByTask?: Record<string, FailureClass>;
+  startedAt: Date;
+  completedAt: Date;
+}
+
+/** Deps the closed loop needs. `runPlan` is the swarm execution seam. */
+export interface ExecuteSpecDeps {
+  runPlan: (input: RunPlanInput) => Promise<FinishedRun>;
+}
+
+export interface ExecuteSpecInput {
+  spec: AgentExecutableSpec;
+  tenantId: string;
+  userId: string;
+  /** Caller-supplied instant (the loop is deterministic given this + the run). */
+  now: Date;
+  deps: ExecuteSpecDeps;
+  /** Optional override for the workflow id (default: `wf_spec_<specId>`). */
+  workflowId?: string;
+}
+
+/** The closed-loop result returned to the caller (route / service). */
+export interface ExecuteSpecResult {
+  specId: string;
+  workflowId: string;
+  /** Tri-state acceptance verdict over the wired criteria. */
+  verdict: AcceptanceVerdict;
+  /** Per-criterion measurement (wired + satisfied, with evidence). */
+  acceptanceResults: AcceptanceCriterionResult[];
+  /** The full outcome evaluation (task triage + counterfactual hints + summary). */
+  outcome: OutcomeEvaluation;
+  /** The drift finding the spec was generated to resolve, and whether the run
+   *  MET it (so the caller can mark the drift resolved — a separate open edge). */
+  resolvedDrift: { driftFindingId: string | null; resolved: boolean };
+}
+
+/**
+ * Execute an APPROVED spec's closed loop: materialise → run → harvest → measure
+ * → verdict. Reuses the pure `materializePlan` (guard + plan), the pure
+ * `evaluateOutcome` (harvests `taskOutcomes` from the finished plan + verification
+ * AND measures acceptance via `measureAcceptanceSeam`), and the pure
+ * `acceptanceVerdict` (reduces criterion results to MET / UNMET / UNVERIFIABLE).
+ *
+ * Throws `SpecNotApprovedError` for a non-approved spec (never silently runs an
+ * unapproved spec) and `SpecPlanValidationError` for a malformed plan (the
+ * guard runs in `materializePlan` before any execution). Non-fatal: a run that
+ * finishes with no wired criteria surfaces `UNVERIFIABLE` (a human must sign off)
+ * rather than the system pretending it passed.
+ */
+export async function executeApprovedSpec(input: ExecuteSpecInput): Promise<ExecuteSpecResult> {
+  const { spec, tenantId, userId, now, deps } = input;
+
+  // 1. Guard approved + validate plan (reuses the pure materializePlan guard —
+  //    throws SpecNotApprovedError / SpecPlanValidationError before any run).
+  const plan = materializePlan({ spec, now });
+
+  // 2. Run the materialised plan via the swarm execution seam. The workflow id
+  //    is deterministic from the spec id (no Date.now); a caller may override.
+  const workflowId = input.workflowId ?? `wf_spec_${spec.id}`;
+  const finished = await deps.runPlan({ plan, tenantId, userId, workflowId, now });
+
+  // 3. Harvest run evidence + measure acceptance in one pass. evaluateOutcome
+  //    triages taskOutcomes from finished.plan + verificationResults, then
+  //    measureAcceptanceSeam binds the spec's structured criteria against the
+  //    evidence (artifacts + metrics + the triaged taskOutcomes). Passing an
+  //    empty taskOutcomes array lets the evaluator's own triage win — never fake
+  //    an outcome the run did not produce.
+  const acceptanceEvidence: RunEvidence = {
+    taskOutcomes: [],
+    artifacts: finished.artifacts,
+    metrics: finished.metrics,
+  };
+  const outcome = evaluateOutcome({
+    workflowId,
+    tenantId,
+    plan: finished.plan,
+    verificationResults: finished.verificationResults,
+    failedTaskIds: finished.failedTaskIds,
+    completedTaskIds: finished.completedTaskIds,
+    blocked: finished.blocked,
+    accumulatedCostUsd: finished.accumulatedCostUsd,
+    startedAt: finished.startedAt,
+    completedAt: finished.completedAt,
+    acceptanceCriteria: spec.acceptanceCriteria,
+    acceptanceEvidence,
+    failureClassByTask: finished.failureClassByTask,
+  });
+
+  // 4. Reduce the criterion results to a tri-state verdict.
+  const verdict = acceptanceVerdict(outcome.acceptanceResults);
+
+  return {
+    specId: spec.id,
+    workflowId,
+    verdict,
+    acceptanceResults: outcome.acceptanceResults,
+    outcome,
+    resolvedDrift: {
+      driftFindingId: spec.driftFindingId ?? null,
+      resolved: verdict === AcceptanceVerdict.MET,
+    },
   };
 }
