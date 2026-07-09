@@ -11,7 +11,7 @@
 [![ADK](https://img.shields.io/badge/Google_ADK-Integrated-4285f4?style=for-the-badge&logo=google&logoColor=white)](#-google-adk--grounding)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-2400%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2800%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -33,7 +33,7 @@ Give it a goal in plain English. JAK decomposes, routes, executes, and verifies 
 
 ## Challenge Build Status
 
-JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,400+ blocking CI tests**.
+JAK Swarm is submitted as a **working Google AI Agents Challenge build**. Its strongest verified evidence is **Google Cloud Run + Gemini + ADK multi-agent orchestration + Google Search Grounding + JAK Shield safety layer + 2,800+ blocking CI tests**.
 
 The submitted system includes:
 
@@ -42,7 +42,7 @@ The submitted system includes:
 * **Google Search Grounding** — built-in with included quota, citation-backed via `GOOGLE_SEARCH` ADK tool
 * **Google Cloud Run deployment** — live API gateway at `jak-swarm-api` in `asia-south1`
 * **JAK Shield** local security, approval, permission, and audit checks
-* **2,400+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
+* **2,800+ blocking CI tests** (unit + integration) + `check:truth` documentation validation
 * Live demo access, short and long demo videos, audit-ready workflow evidence
 
 Agent Engine is deployed at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`. Gateway code lives in `packages/adk/src/deploy/agent-engine-entry.ts`, with deployment scripts `scripts/deploy-agent-engine.sh`, `scripts/deploy-agent-engine.ts`, and `scripts/deploy-agent-engine-python.py`. The verified public deployment documented here is Cloud Run; Agent Engine is an additional gateway path.
@@ -59,8 +59,8 @@ This table summarizes what is publicly evidenced in this repository and what is 
 | Google Cloud deployment | Verified Cloud Run API deployment in `asia-south1`; Cloud Run deployment docs and Google Cloud deployment path included | ✅ Verified |
 | Grounding / RAG | ADK `GOOGLE_SEARCH` tool, Gemini Google Search grounding, private knowledge retrieval, optional Vertex AI Search datastore configuration | ✅ Verified |
 | Business use case | Company operating layer: evidence graph → drift detection → agent-executable specs → approved multi-agent execution | ✅ Verified |
-| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, HMAC-ready security path + a **`ShieldMcpClient`** that signs/verifies high-risk decisions (local embedded mode, Phase 8) and an **Agent Governance Overlay** (autonomy policy L0-L5, governance gate, Phase 7). External JAK Shield MCP *transport* wiring remains a roadmap item; the local signed-decision path is built and tested | ✅ Verified |
-| Tests | 2,400+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
+| Safety / security layer | JAK Shield-style local policy controls, RBAC, approval gates, audit logging, PII redaction, HMAC-ready security path + a **`ShieldMcpClient`** that signs/verifies high-risk decisions (local embedded mode, unit-tested, Phase 8) and an **Agent Governance Overlay** (autonomy policy L0-L5 + human-only NEVER set, governance gate, Phase 7). Both are pure-core-tested; the `ShieldMcpClient` is **not yet instantiated in the live action path**, the external JAK Shield MCP *transport* wiring remains a roadmap item, and `AuditLog` row-chain HMAC is not yet implemented. Today the enforced gateway is the embedded local one | ✅ Verified |
+| Tests | 2,800+ blocking CI tests (unit + integration) + `check:truth` documentation validation; badge shows a floor count | ✅ Verified |
 | Live demo | Publicly accessible submitted demo path with verified Cloud Run API backend support | ✅ Verified |
 | Agent Engine | Live deployment at `projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728` with 6 tools (google_search + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`); GEPA Candidate 1 prompt adopted; gateway code in `agent-engine-entry.ts`, deploy script `deploy-agent-engine-python.py`, resource ID in `agent-engine-resource.ts` | ✅ Verified |
 | Agent Simulation / benchmarking | Benchmark harness and scenarios committed; Gemini Flash 2.5 benchmark: 4/4 pass, p50 7.6s, p95 9.0s ([`benchmark-results-gemini.md`](qa/benchmark-results-gemini.md)); harness supports `--gemini` and `--adk` flags | ✅ Verified |
@@ -109,7 +109,7 @@ JAK's optimization story is not a single prompt tweak. It is an architecture-lev
 
 5. **Provider switching allows tenants to use Gemini or other supported providers without rewriting workflows** — each tenant chooses from the Settings UI. The preference flows through `TenantMemory` → `SwarmExecutionService` → `SwarmRunner` → `AgentContext.llmProvider`. No code changes, no env-var swaps.
 
-6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,400+ blocking CI tests (unit + integration) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
+6. **Benchmark/readiness scripts and the blocking test suite provide regression protection** — 2,800+ blocking CI tests (unit + integration, 2,851 at last count) with CI-enforced truth checks (`pnpm check:truth`). Tool maturity labels are CI-enforced. Landing page claims are CI-enforced.
 
 ADK Agent Optimizer (`adk optimize` with `GEPARootAgentPromptOptimizer`) has been executed against the JAK gateway agent. The GEPA algorithm ran 20 evaluation iterations (102 metric calls) on the training set, finding the baseline prompt achieves 100% rubric pass rate (6/6). The initial `adk eval` showed 4/6 due to broken API paths (`/api/` prefix instead of production `/workflows`), not poor agent quality. After fixing paths, corrected eval: 6/6 training + 4/4 held-out validation. GEPA explored 3 alternative prompt variants — Candidate 1 (explicit safety refusal + search_knowledge fallback) matched baseline quality and has been adopted in the deployed Agent Engine. The original optimizer run had train/val overlap (same 6 scenarios for both); a separate validation set has been added. Full results in `qa/benchmark-optimization-before-after.md`.
 
@@ -250,7 +250,7 @@ flowchart TD
     N -->|"👎 Rejected"| C
 ```
 
-> **Bounded retry + genuine re-plan loop**: If the Verifier rejects output, the system re-runs the same task against the same worker up to a bounded retry budget (`RepairService` classifies the failure and refuses to auto-retry destructive / permission / approval-timeout / unknown classes). Beyond retry, the **HyperAgent self-healing layer** (`feature/hyperagent-self-healing-learning`, Phases 0-14) adds a genuine *re-plan* loop: a deterministic 20-class failure classifier → counterfactual fault isolation (agent/tool/model) → a **symbolic replanner** that proposes agent/tool/task-order/dependency/scope changes and a **deterministic validator** that rejects cyclic / unpermitted / unsafe plans (Innovation #3 — an LLM may propose, only the symbolic layer may apply) → autonomy-gated apply that preserves completed external actions + signed approvals + receipts. Integration tests prove real plan repair (REPLACE_AGENT, SPLIT_TASK), learning promotion via measured mutual information, Shield fail-closed, and versioned-config rollback end-to-end. Destructive actions are never auto-retried. The live 12-step E2E + Cloud Run deploy gate that would prove *measured learning impact in production* is env-blocked (no live stack in this session) and is not fake-passed. See `docs/hyperagent-current-state-audit.md` (Phase 0 baseline) and the HyperAgent section below.
+> **Bounded retry + genuine re-plan loop**: If the Verifier rejects output, the system re-runs the same task against the same worker up to a bounded retry budget (`RepairService` classifies the failure and refuses to auto-retry destructive / permission / approval-timeout / unknown classes). Beyond retry, the **HyperAgent self-healing layer** (`feature/hyperagent-self-healing-learning`, Phases 0-14) adds a genuine *re-plan* loop that is **wired into the live LangGraph graph** (OFF-gated so default workflows are byte-for-byte unchanged): a deterministic 20-class failure classifier → counterfactual fault isolation (agent/tool/model) → a **symbolic replanner** that proposes agent/tool/task-order/dependency/scope changes and a **deterministic validator** that rejects cyclic / unpermitted / unsafe plans (Innovation #3 — an LLM may propose, only the symbolic layer may apply) → autonomy-gated apply that preserves completed external actions + signed approvals + receipts. Integration tests prove real plan repair (REPLACE_AGENT, SPLIT_TASK), learning promotion via measured mutual information, Shield fail-closed, and versioned-config rollback end-to-end — *by composing the pure cores directly*. **Honest scope:** only the *repair* half (diagnosis → replanner → selective re-execution) is wired into the live workflow runner; the *self-learning* half (outcome evaluator, learning extraction/recall, mutual-information gate, meta-optimiser, R2 output-correction) and the `ShieldMcpClient` exist as **pure cores with unit tests but are not yet called from the live execution path**, and retry accounting still has two parallel counters (`MAX_RETRIES=2`/`${task.id}_retries` vs `MAX_TASK_RETRIES=3`/`taskRetryCount`) that the typed `TaskRepairState` has not yet replaced — see the HyperAgent section below for the full wired-vs-pure-core breakdown. Destructive actions are never auto-retried. The live 12-step E2E + Cloud Run deploy gate that would prove *measured learning impact in production* is env-blocked (no live stack in this session) and is not fake-passed. See `docs/hyperagent-current-state-audit.md` (Phase 0 baseline).
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system architecture, data model, error handling strategy, and scaling considerations.
 
@@ -739,7 +739,17 @@ flowchart TB
 - Phase 11A: Production hardening, Cloud Run Worker cutover
 - Phase 11B: Full JAK Shield MCP signed-decision integration for high-risk action validation (separate MCP-native gateway at [github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield))
 
-**HyperAgent self-healing + self-learning layer** (`feature/hyperagent-self-healing-learning`, Phases 0-15): a bounded, test-driven layer that evaluates and improves JAK Swarm without weakening it. Phases 0-14 are built and gate-green: Phase 0 baseline audit; Phase 1 central autonomy policy (L0-L5 + human-only NEVER set); Phase 2 20-class failure taxonomy + repair budget; Phase 3 outcome evaluator; Phase 4 root-cause diagnosis + genuine symbolic plan repair (Innovations #1 + #3); Phase 5 self-learning pipeline (info-theoretic gate #2, Bayesian evidence accrual #5, hazard-model expiry #10); Phase 6 approved-spec closed loop; Phase 7 governance + red-team/counterfactual/DP innovations (#4/#7/#8/#9); Phase 8 `ShieldMcpClient` (local signed decisions, fail-closed on unavailable/unverified); Phase 9 versioned config lifecycle (shadow→canary→promote/rollback); Phase 10 meta-optimiser; Phase 11 ADK parity; Phase 12 R5 code self-repair (isolated branch + draft PR only, never auto-merge); Phase 13 honest Control Centre aggregation (9 views, `dataAvailable` flags — no fake "all healthy"); Phase 14 failure-injection framework + integration proof (16 modes, 9 end-to-end scenarios). **Honest scope:** the pure-core layer is proven by 2,851 unit + integration tests; the live 12-step E2E + Cloud Run deploy gate that would prove *measured learning impact in production* is env-blocked (no live stack) and is not fake-passed. JAK Swarm stays the execution engine; the HyperAgent layer only observes/proposes/replans; JAK Shield stays the independent trust gateway.
+**HyperAgent self-healing + self-learning layer** (`feature/hyperagent-self-healing-learning`, Phases 0-15): a bounded, test-driven layer that evaluates and improves JAK Swarm without weakening it. Phases 0-14 are built and gate-green: Phase 0 baseline audit; Phase 1 central autonomy policy (L0-L5 + human-only NEVER set); Phase 2 20-class failure taxonomy + repair budget; Phase 3 outcome evaluator; Phase 4 root-cause diagnosis + genuine symbolic plan repair (Innovations #1 + #3); Phase 5 self-learning pipeline (info-theoretic gate #2, Bayesian evidence accrual #5, hazard-model expiry #10); Phase 6 approved-spec closed loop; Phase 7 governance + red-team/counterfactual/DP innovations (#4/#7/#8/#9); Phase 8 `ShieldMcpClient` (local signed decisions, fail-closed on unavailable/unverified); Phase 9 versioned config lifecycle (shadow→canary→promote/rollback); Phase 10 meta-optimiser; Phase 11 ADK parity; Phase 12 R5 code self-repair (isolated branch + draft PR only, never auto-merge); Phase 13 honest Control Centre aggregation (9 views, `dataAvailable` flags — no fake "all healthy"); Phase 14 failure-injection framework + integration proof (16 modes, 9 end-to-end scenarios).
+
+**Honest scope — what is wired vs what is pure-core-only (verified against source):**
+- ✅ **Wired into the live LangGraph graph (OFF-gated, non-regressing):** deterministic 20-class failure classifier → counterfactual fault diagnosis → symbolic replanner + plan validator → selective re-execute-only-invalidated-tasks. The legacy bounded-retry path is unchanged.
+- ✅ **Wired / enforced as policy cores:** central autonomy policy (L0-L5 matrix + human-only NEVER set), versioned config lifecycle state machine (DRAFT→PROPOSED→SHADOW→CANARY→PROMOTED→ROLLED_BACK), R5 code-repair gate (isolated `hyperagent/r5-*` branch + draft PR, never auto-merge, forbidden symbols/paths), ADK parity (roles-from-plan + Kahn dependency-ordered waves + honest approval-pause docs), and the 9 reviewer-gated Control Centre routes (honest `dataAvailable` flags).
+- 🟡 **Pure cores with unit + integration tests, NOT yet wired into the live execution path:** outcome evaluator + acceptance checker, learning extraction / persist / recall, mutual-information learning gate, meta-optimiser (UCB1/ε-greedy bandit over arms), R2 `CORRECT_OUTPUT` typed correction, and the `ShieldMcpClient` itself (signs/verifies/fail-closed at the unit level but never instantiated in runtime).
+- ❌ **Not yet implemented:** the full `executeApprovedSpec` closed loop (only the pure `materializePlan` half exists — no method starts a real workflow / evaluates acceptance / resolves drift), learning dedup / conflict / scoping, `AuditLog` HMAC row-chain hashing, and the `agent-governance-overlay.ts` aggregate file (Shield pieces live under `shield-gateway/` instead).
+- ⚠️ **Actively inconsistent:** retry accounting — the typed `TaskRepairState`/`RepairBudget` (Phase 2) coexists with the old split counters (`MAX_RETRIES=2`/`${task.id}_retries` in `verifier-node.ts`, `MAX_TASK_RETRIES=3`/`taskRetryCount` in `edges.ts`); the live verifier/edges retry loop has **not** been migrated to the unified structure.
+- 🟡 **Env-blocked, not fake-passed:** the live 12-step E2E + Cloud Run deploy gate that would prove *measured learning impact in production*, the external JAK Shield MCP network transport, and persisted benchmark evaluation (`BENCHMARKS_PERSISTED=false`).
+
+The pure-core layer is proven by 2,851 unit + integration tests; integration tests compose the pure cores end-to-end (real plan repair, learning promotion, Shield fail-closed, config rollback) but do **not** imply those cores run inside every live workflow. JAK Swarm stays the execution engine; the HyperAgent layer only observes/proposes/replans; JAK Shield stays the independent trust gateway.
 
 </details>
 
@@ -855,7 +865,7 @@ Full security policy: [`SECURITY.md`](SECURITY.md)
 ## 🛠️ Development
 
 ```bash
-pnpm test                  # Run all tests (2400+ blocking CI)
+pnpm test                  # Run all tests (2800+ blocking CI)
 pnpm typecheck             # Type checking (strict mode, zero errors)
 pnpm lint                  # Lint
 pnpm check:truth           # Verify tool classifications + landing claims
@@ -928,7 +938,7 @@ Set `JAK_ADK_MODE=1` in your `.env`. Workflows will route through `@google/adk`'
 <details>
 <summary><b>Is JAK Swarm production-ready?</b></summary>
 
-**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,400+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
+**This is a working challenge build.** The architecture is solid (LangGraph + ADK + Postgres checkpointer + signed evidence bundles + JAK Shield local policy controls). 2,800+ blocking CI tests (unit + integration). Zero TypeScript errors under strict mode.
 
 **Enterprise SLA packaging, expanded observability, and production hardening are part of the post-challenge roadmap.** Specific items on that roadmap: live-hosted smoke tests, third-party security audit/certification, lawyer-reviewed ToS/DPA, pen test, AuditLog row chain-hashing, and incident-response runbook.
 
