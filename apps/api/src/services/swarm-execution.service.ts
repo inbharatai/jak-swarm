@@ -15,6 +15,8 @@ import type { ReconcileParams } from '../billing/credit-service.js';
 import { config } from '../config.js';
 import { Industry, ToolRiskClass, WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
+import { AutonomyLevel, HyperAgentMode } from '@jak-swarm/shared';
+import type { RepairBudget } from '@jak-swarm/shared';
 import { COMPANY_OS_INTENTS, INTENT_REQUIRED_CONTEXT, type CompanyOSIntent } from '@jak-swarm/agents';
 import { IntentRecordService } from './company-brain/intent-record.service.js';
 import { CompanyProfileService } from './company-brain/company-profile.service.js';
@@ -546,11 +548,31 @@ export class SwarmExecutionService extends EventEmitter {
       // signatures (function-param contravariance), so a precise boundary
       // cast is required. Runtime surface is identical.
       db: db as unknown as CheckpointPrismaClient,
+      // Phase 3: inject the learningRecord seam so the live learning node
+      // durably persists + the planner recalls PROMOTED learnings + runs
+      // bandit selection. The PrismaClient's learningRecord surface is
+      // structurally incompatible (same contravariance), so cast at the
+      // boundary. Reachable only when a run opts into HyperAgent (default
+      // OFF) — the deps object is harmless for legacy runs because the
+      // nodes that consume it are unreachable when hyperAgentActive=false.
+      hyperAgentDeps: {
+        learning: { db: db as unknown as import('@jak-swarm/swarm').LearningPersistPrismaClient },
+        planner: { db: db as unknown as import('@jak-swarm/swarm').LearningPersistPrismaClient },
+      },
     });
     // workflowRuntime is the same LangGraph runtime SwarmRunner uses
     // internally, exposed for swarm-execution callers that need the
     // direct WorkflowRuntime contract (start/resume/cancel/getState).
-    this.workflowRuntime = getWorkflowRuntime(this.runner, db as unknown as Parameters<typeof getWorkflowRuntime>[1]);
+    // Thread the same HyperAgent deps so a resumed run (approval pause →
+    // resume → validator → learning) also persists its learnings.
+    this.workflowRuntime = getWorkflowRuntime(
+      this.runner,
+      db as unknown as Parameters<typeof getWorkflowRuntime>[1],
+      {
+        learning: { db: db as unknown as import('@jak-swarm/swarm').LearningPersistPrismaClient },
+        planner: { db: db as unknown as import('@jak-swarm/swarm').LearningPersistPrismaClient },
+      },
+    );
     log.info({ runtime: this.workflowRuntime.name }, '[Swarm] WorkflowRuntime selected (LangGraph only)');
     this.workflowService = new WorkflowService(db, log);
     this.audit = new AuditLogger(db as unknown as AuditPrismaClient);
@@ -1078,6 +1100,49 @@ export class SwarmExecutionService extends EventEmitter {
         }
       }
 
+      // ─── Per-tenant HyperAgent enablement (Phase 3) ────────────────────────
+      // Source the run's HyperAgent config from the tenant's HyperAgentConfig
+      // row. Default OFF: no row (or hyperAgentEnabled=false) → undefined values
+      // → RunParams omits them → createInitialSwarmState defaults
+      // hyperAgentEnabled=false → the diagnosis/replanner/learning/recall nodes
+      // are never reached (legacy byte-for-byte). This is the plumbing the audit
+      // found missing: the live runtime never passed hyperAgentEnabled through
+      // to state, so even the already-wired repair half was unreachable live.
+      let hyperAgentEnabled: boolean | undefined;
+      let hyperAgentMode: HyperAgentMode | undefined;
+      let autonomyLevel: AutonomyLevel | undefined;
+      let repairBudget: RepairBudget | undefined;
+      let maxHyperAgentIterations: number | undefined;
+      try {
+        const cfg = await this.db.hyperAgentConfig.findUnique({ where: { tenantId } });
+        if (cfg && cfg.hyperAgentEnabled) {
+          hyperAgentEnabled = true;
+          hyperAgentMode = (String(cfg.hyperAgentMode) as HyperAgentMode) || HyperAgentMode.OBSERVE;
+          autonomyLevel = (String(cfg.autonomyLevel) as AutonomyLevel) || AutonomyLevel.L0;
+          maxHyperAgentIterations = cfg.maxHyperAgentIterations ?? undefined;
+          // RepairBudget from the tenant's unified budgets. Zero means "no
+          // budget of that kind" — leave the field undefined so the
+          // HyperAgent falls back to its DEFAULT_HYPERAGENT_BUDGET for any
+          // zeroed axis (a tenant who hasn't tuned budgets still gets safe
+          // defaults rather than a zero-budget that blocks all repair).
+          const budget: RepairBudget = {
+            maxExecutionRetries: cfg.maxExecutionRetries,
+            maxOutputRepairs: cfg.maxOutputRepairs,
+            maxPlanRepairs: cfg.maxPlanRepairs,
+            maxCapabilityRepairs: cfg.maxCapabilityRepairs,
+            maxTotalCostUsd: cfg.maxTotalCostUsd,
+            maxDurationMs: cfg.maxDurationMs,
+          };
+          repairBudget = budget;
+        }
+      } catch (haCfgErr) {
+        // HyperAgentConfig read failure must never block a workflow.
+        this.log.warn(
+          { tenantId, err: haCfgErr instanceof Error ? haCfgErr.message : String(haCfgErr) },
+          '[Swarm] Failed to read tenant HyperAgent config; HyperAgent stays OFF',
+        );
+      }
+
       // ── CEO mode with no connected data sources ──────────────────────────
       // When CEO mode is active and there are no connected integrations,
       // augment the goal so the planner produces a template/outline rather
@@ -1320,6 +1385,11 @@ export class SwarmExecutionService extends EventEmitter {
         ...(process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE']?.trim() ? { vertexAISearchDatastore: process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE'].trim() } : {}),
         // OpenAI web_search hosted tool (native search without Serper/Tavily)
         ...(process.env['OPENAI_WEB_SEARCH']?.trim() === '1' ? { openaiWebSearch: true } : {}),
+        ...(hyperAgentEnabled !== undefined ? { hyperAgentEnabled } : {}),
+        ...(hyperAgentMode !== undefined ? { hyperAgentMode } : {}),
+        ...(autonomyLevel !== undefined ? { autonomyLevel } : {}),
+        ...(repairBudget !== undefined ? { repairBudget } : {}),
+        ...(maxHyperAgentIterations !== undefined ? { maxHyperAgentIterations } : {}),
         onStateChange: async (wfId: string, stateData: unknown) => {
           try {
             const s = stateData as Record<string, unknown>;

@@ -46,7 +46,7 @@
  * Pure-core reuse only — no LLM, no Date.now (the caller stamps `now`).
  */
 import { LearningStatus } from '@jak-swarm/shared';
-import type { ContingencyTable, LearningCandidate } from '@jak-swarm/shared';
+import type { BanditArm, ContingencyTable, LearningCandidate } from '@jak-swarm/shared';
 import { gateLearning, mergeContingency, DEFAULT_GATE } from './learning-gate.js';
 
 /**
@@ -357,4 +357,95 @@ export async function persistLearningCandidates(
   }
 
   return outcomes;
+}
+
+// ─── Recall (Phase 3) ────────────────────────────────────────────────────────
+
+/**
+ * A recalled learning — a PROMOTED row projected to the fields the live
+ * execution path (planner recall + bandit selection) consumes. Carries the
+ * config dimension (agentRole + primaryTool) so the planner can match a
+ * recalled config against a planned task and the bandit can build arms.
+ */
+export interface RecalledLearning {
+  key: string;
+  kind: string;
+  taskType: string;
+  agentRole?: string;
+  primaryTool?: string;
+  summary: string;
+  confidence: number;
+  contingency: ContingencyTable;
+  mutualInformation: number;
+}
+
+export interface RecallLearningsInput {
+  db: LearningPersistPrismaClient;
+  tenantId: string;
+  /** Task types to recall PROMOTED WORKFLOW/POLICY learnings for (plan task ids' prefix). */
+  taskTypes: string[];
+  /** Cap on rows returned (defensive). Default 50. */
+  limit?: number;
+}
+
+/**
+ * Recall PROMOTED learnings for a set of task types. The live planner node
+ * (Phase 3) calls this after it has a plan, keyed by the plan's task-type
+ * prefixes, so prior promotions inform the replanner (`state.relevantLearnings`)
+ * and the bandit can select among competing configs of the same task type.
+ *
+ * Pure I/O — no clock, no LLM. Returns PROMOTED rows only (candidates haven't
+ * earned governing behaviour yet), sorted by mutual information descending so
+ * the strongest correlations surface first. Non-fatal callers wrap in try/catch.
+ */
+export async function recallLearnings(input: RecallLearningsInput): Promise<RecalledLearning[]> {
+  const { db, tenantId, taskTypes } = input;
+  const limit = input.limit ?? 50;
+  const out: RecalledLearning[] = [];
+  for (const taskType of new Set(taskTypes)) {
+    const prefix = `cfg:${taskType}:`;
+    const rows = (await db.learningRecord.findMany({
+      where: { tenantId, key: { startsWith: prefix } },
+    })) as LearningRecordRow[];
+    for (const r of rows) {
+      if (r.status !== LearningStatus.PROMOTED) continue;
+      const value = (r.value ?? {}) as { agentRole?: string; primaryTool?: string };
+      out.push({
+        key: r.key,
+        kind: r.kind,
+        taskType,
+        agentRole: value.agentRole,
+        primaryTool: value.primaryTool,
+        summary: r.summary,
+        confidence: r.confidence,
+        contingency: r.contingency ?? ZERO,
+        mutualInformation: r.mutualInformation ?? 0,
+      });
+    }
+  }
+  out.sort((a, b) => b.mutualInformation - a.mutualInformation);
+  return out.slice(0, limit);
+}
+
+/**
+ * Build bandit arms from recalled WORKFLOW learnings for one task type.
+ * Each PROMOTED config becomes one arm: successes = contingency.a (present +
+ * success), failures = contingency.b (present + failure). The arm id is the
+ * learning key; `configVersionId` is the `${agentRole}/${primaryTool}` string
+ * the planner matches against a planned task's current config. Pure.
+ *
+ * Only WORKFLOW learnings are config-arms (POLICY learnings are repair
+ * preferences the replanner recalls, not competing configs the bandit picks
+ * between). Returns arms in the order they were recalled (MI desc).
+ */
+export function armsForTaskType(recalled: ReadonlyArray<RecalledLearning>, taskType: string): BanditArm[] {
+  return recalled
+    .filter((r) => r.taskType === taskType && r.kind === 'WORKFLOW')
+    .map((r) => ({
+      id: r.key,
+      configVersionId: r.agentRole && r.primaryTool ? `${r.agentRole}/${r.primaryTool}` : undefined,
+      successes: r.contingency.a,
+      failures: r.contingency.b,
+      lastSelectedAt: null,
+    }));
 }

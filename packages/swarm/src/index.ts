@@ -220,3 +220,22 @@ export type {
   ShieldResponse,
   ShieldVerdictOutcome,
 } from './hyperagent/failure-injection.js';
+
+// ─── HyperAgent self-learning — live persist + recall + node deps ────────────
+// The durable I/O seam (learning-persist.ts) + the live graph node deps the
+// service layer injects to wire the self-learning half into the execution path.
+export {
+  persistLearningCandidates,
+  recallLearnings,
+  armsForTaskType,
+} from './hyperagent/learning-persist.js';
+export type {
+  LearningPersistPrismaClient,
+  LearningGateOverrides,
+  PersistLearningCandidatesInput,
+  PersistOutcome,
+  RecallLearningsInput,
+  RecalledLearning,
+} from './hyperagent/learning-persist.js';
+export type { LearningNodeDeps } from './graph/nodes/learning-node.js';
+export type { PlannerNodeDeps } from './graph/nodes/planner-node.js';

@@ -7,6 +7,7 @@
  */
 
 import type { WorkflowStatus } from '@jak-swarm/shared';
+import type { AutonomyLevel, HyperAgentMode, RepairBudget } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
 import type { SwarmResult } from '../runner/swarm-runner.js';
 import type { WorkflowLifecycleEmitter } from './lifecycle-events.js';
@@ -70,6 +71,22 @@ export interface StartContext {
   vertexAISearchDatastore?: string;
   /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
   openaiWebSearch?: boolean;
+
+  // ─── HyperAgent enablement (Phase 3 plumbing) ─────────────────────────────
+  // Sourced by the service layer from the tenant's HyperAgentConfig row (or env
+  // defaults — default OFF). All optional so a StartContext with no HyperAgent
+  // config produces a state with hyperAgentEnabled=false → the diagnosis /
+  // replanner / learning nodes are never reached (legacy byte-for-byte).
+  /** Whether the HyperAgent layer is enabled for this tenant run. */
+  hyperAgentEnabled?: boolean;
+  /** Tenant HyperAgent mode (OFF | OBSERVE | ASSISTED | AUTONOMOUS_SAFE). */
+  hyperAgentMode?: HyperAgentMode;
+  /** Tenant autonomy level (L0..L5). */
+  autonomyLevel?: AutonomyLevel;
+  /** Tenant repair budget for this run. */
+  repairBudget?: RepairBudget;
+  /** Ceiling on self-healing iterations. */
+  maxHyperAgentIterations?: number;
 }
 
 /**

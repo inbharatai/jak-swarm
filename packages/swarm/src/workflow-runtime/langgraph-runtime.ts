@@ -30,6 +30,7 @@ import {
   buildLangGraph,
   makeRunnableConfig,
   type CompiledLangGraph,
+  type BuildLangGraphParams,
 } from './langgraph-graph-builder.js';
 import type { CheckpointPrismaClient } from './postgres-checkpointer.js';
 import type {
@@ -51,7 +52,20 @@ export class LangGraphRuntime implements WorkflowRuntime {
   private readonly graph: CompiledLangGraph;
   private readonly runner: SwarmRunner;
 
-  constructor(runner: SwarmRunner, db: CheckpointPrismaClient) {
+  constructor(
+    runner: SwarmRunner,
+    db: CheckpointPrismaClient,
+    /**
+     * HyperAgent node deps (Phase 3+). When omitted, the diagnosis / replanner
+     * / learning nodes run with no injected I/O — evaluate/extract into state
+     * only, no durable persist, no recall — and the planner runs with no
+     * recall/bandit. Those nodes are only REACHABLE when the run has
+     * `hyperAgentMode !== OFF && hyperAgentEnabled` (edges.ts), so omitting
+     * this keeps legacy workflows byte-for-byte unchanged. The service layer
+     * injects the real Prisma learningRecord seam here.
+     */
+    hyperAgentDeps?: BuildLangGraphParams['hyperAgent'],
+  ) {
     this.runner = runner;
     // Wire cooperative cancel/pause flags from the SwarmRunner to the
     // graph's per-node wrappers. We reuse the SwarmRunner's flag sets
@@ -62,6 +76,7 @@ export class LangGraphRuntime implements WorkflowRuntime {
       db,
       shouldStop: (id) => runner.isCancelled(id),
       shouldPause: (id) => runner.isPaused(id),
+      ...(hyperAgentDeps ? { hyperAgent: hyperAgentDeps } : {}),
     });
   }
 
@@ -105,6 +120,18 @@ export class LangGraphRuntime implements WorkflowRuntime {
       ...(ctx.googleSearchGrounding !== undefined ? { googleSearchGrounding: ctx.googleSearchGrounding } : {}),
       ...(ctx.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: ctx.vertexAISearchDatastore } : {}),
       ...(ctx.openaiWebSearch !== undefined ? { openaiWebSearch: ctx.openaiWebSearch } : {}),
+      // HyperAgent enablement (Phase 3) — sourced from the tenant's
+      // HyperAgentConfig row by the service layer. All undefined →
+      // createInitialSwarmState defaults hyperAgentEnabled to false → the
+      // diagnosis/replanner/learning/recall nodes are unreachable (legacy
+      // byte-for-byte). This is the plumbing the audit found missing: the
+      // live runtime never passed hyperAgentEnabled through to state, so even
+      // the already-wired repair half was unreachable in a live run.
+      ...(ctx.hyperAgentEnabled !== undefined ? { hyperAgentEnabled: ctx.hyperAgentEnabled } : {}),
+      ...(ctx.hyperAgentMode !== undefined ? { hyperAgentMode: ctx.hyperAgentMode } : {}),
+      ...(ctx.autonomyLevel !== undefined ? { autonomyLevel: ctx.autonomyLevel } : {}),
+      ...(ctx.repairBudget !== undefined ? { repairBudget: ctx.repairBudget } : {}),
+      ...(ctx.maxHyperAgentIterations !== undefined ? { maxHyperAgentIterations: ctx.maxHyperAgentIterations } : {}),
     });
 
     const config = makeRunnableConfig(ctx.workflowId, ctx.tenantId);

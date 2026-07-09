@@ -12,6 +12,7 @@
 import type { SwarmRunner } from '../runner/swarm-runner.js';
 import type { WorkflowRuntime } from './workflow-runtime.js';
 import type { CheckpointPrismaClient } from './postgres-checkpointer.js';
+import type { BuildLangGraphParams } from './langgraph-graph-builder.js';
 import { LangGraphRuntime } from './langgraph-runtime.js';
 
 export {
@@ -60,6 +61,7 @@ let warnedAboutLegacyEnv = false;
 export function getWorkflowRuntime(
   runner: SwarmRunner,
   db: CheckpointPrismaClient,
+  hyperAgentDeps?: BuildLangGraphParams['hyperAgent'],
 ): WorkflowRuntime {
   const envFlag = process.env['JAK_WORKFLOW_RUNTIME']?.trim().toLowerCase();
   if (envFlag && envFlag !== 'langgraph' && !warnedAboutLegacyEnv) {
@@ -75,5 +77,5 @@ export function getWorkflowRuntime(
       '[getWorkflowRuntime] CheckpointPrismaClient is required (LangGraph PostgresCheckpointSaver dep).',
     );
   }
-  return new LangGraphRuntime(runner, db);
+  return new LangGraphRuntime(runner, db, hyperAgentDeps);
 }

@@ -192,6 +192,23 @@ export interface SwarmState {
   relevantLearnings?: Array<{ key: string; summary: string; confidence: number }>;
   /** Learnings promoted as a side effect of persisting this run's candidates. */
   promotedLearnings?: Array<{ key: string; mutualInformation: number }>;
+  /**
+   * Bandit config selections made by the Phase 3 planner recall+bandit step
+   * (one per task that had ≥1 PROMOTED config learning). `applied=true` means
+   * the task's agentRole + primary tool were overridden to the selected arm's
+   * config (only happens at ASSISTED+ autonomy, exploitation picks). Empty
+   * until the planner runs with HyperAgent ON + a recall db injected.
+   */
+  banditSelections?: Array<{
+    taskId: string;
+    taskType: string;
+    selectedKey: string;
+    selectedConfig: string | undefined;
+    applied: boolean;
+    strategy: string;
+    score: number;
+    reason: string;
+  }>;
 }
 
 export function createInitialSwarmState(params: {
@@ -287,6 +304,7 @@ export function createInitialSwarmState(params: {
     learningCandidates: [],
     relevantLearnings: [],
     promotedLearnings: [],
+    banditSelections: [],
   };
 }
 

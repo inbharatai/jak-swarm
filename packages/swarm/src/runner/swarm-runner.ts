@@ -20,7 +20,7 @@
 
 import { WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace, ApprovalRequest } from '@jak-swarm/shared';
-import type { ToolCategory } from '@jak-swarm/shared';
+import type { AutonomyLevel, HyperAgentMode, RepairBudget, ToolCategory } from '@jak-swarm/shared';
 import { createLogger } from '@jak-swarm/shared';
 import { generateId } from '@jak-swarm/shared';
 import type { SwarmState } from '../state/swarm-state.js';
@@ -93,6 +93,18 @@ export interface RunParams {
   vertexAISearchDatastore?: string;
   /** Enable OpenAI's hosted web_search tool. Falls back to env var. */
   openaiWebSearch?: boolean;
+
+  // ─── HyperAgent enablement (Phase 3) ─────────────────────────────────────
+  /** Whether the HyperAgent layer is enabled for this run. Default false. */
+  hyperAgentEnabled?: boolean;
+  /** Tenant HyperAgent mode. Default OFF (legacy routing). */
+  hyperAgentMode?: HyperAgentMode;
+  /** Tenant autonomy level. */
+  autonomyLevel?: AutonomyLevel;
+  /** Tenant repair budget. */
+  repairBudget?: RepairBudget;
+  /** Ceiling on self-healing iterations. */
+  maxHyperAgentIterations?: number;
 }
 
 export interface SwarmResult {
@@ -137,6 +149,16 @@ export interface SwarmRunnerOptions {
    * works identically.
    */
   db?: CheckpointPrismaClient;
+  /**
+   * HyperAgent node deps (Phase 3+): the learningRecord Prisma seam for the
+   * learning node's persist + the planner node's recall/bandit, plus any
+   * diagnosis/replanner overrides. When omitted, the HyperAgent nodes run
+   * with no injected I/O (and are only reachable when a run opts into
+   * HyperAgent via RunParams.hyperAgentEnabled — default OFF). The service
+   * layer injects the real Prisma client's learningRecord surface here so
+   * durable learnings persist + recall live in production runs.
+   */
+  hyperAgentDeps?: import('../workflow-runtime/langgraph-graph-builder.js').BuildLangGraphParams['hyperAgent'];
 }
 
 /**
@@ -212,7 +234,7 @@ export class SwarmRunner {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 20 * 60 * 1000;
     this.maxConcurrent = options.maxConcurrentWorkflows ?? 20;
     this.stateStore = options.stateStore ?? new InMemoryStateStore();
-    this.runtime = new LangGraphRuntime(this, options.db ?? makeInMemoryCheckpointDb());
+    this.runtime = new LangGraphRuntime(this, options.db ?? makeInMemoryCheckpointDb(), options.hyperAgentDeps);
   }
 
   pause(workflowId: string): void {
@@ -329,6 +351,11 @@ export class SwarmRunner {
           ...(params.googleSearchGrounding !== undefined ? { googleSearchGrounding: params.googleSearchGrounding } : {}),
           ...(params.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: params.vertexAISearchDatastore } : {}),
           ...(params.openaiWebSearch !== undefined ? { openaiWebSearch: params.openaiWebSearch } : {}),
+          ...(params.hyperAgentEnabled !== undefined ? { hyperAgentEnabled: params.hyperAgentEnabled } : {}),
+          ...(params.hyperAgentMode !== undefined ? { hyperAgentMode: params.hyperAgentMode } : {}),
+          ...(params.autonomyLevel !== undefined ? { autonomyLevel: params.autonomyLevel } : {}),
+          ...(params.repairBudget !== undefined ? { repairBudget: params.repairBudget } : {}),
+          ...(params.maxHyperAgentIterations !== undefined ? { maxHyperAgentIterations: params.maxHyperAgentIterations } : {}),
         }),
         timeoutMs,
         workflowId,

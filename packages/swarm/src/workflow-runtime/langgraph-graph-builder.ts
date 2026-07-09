@@ -56,6 +56,7 @@ import type { MissionBrief, RouteMap, GuardrailResult, VerificationResult } from
 import { applySummarizationIfNeeded } from '../context/context-summarizer.js';
 import { commanderNode } from '../graph/nodes/commander-node.js';
 import { plannerNode } from '../graph/nodes/planner-node.js';
+import type { PlannerNodeDeps } from '../graph/nodes/planner-node.js';
 import { routerNode } from '../graph/nodes/router-node.js';
 import { guardrailNode } from '../graph/nodes/guardrail-node.js';
 import { workerNode } from '../graph/nodes/worker-node.js';
@@ -254,6 +255,19 @@ export const SwarmStateAnnotation = Annotation.Root({
     reducer: lwwReducer,
     default: () => undefined,
   }),
+  // banditSelections: lww (single write by the Phase 3 planner recall+bandit step).
+  banditSelections: Annotation<
+    Array<{
+      taskId: string;
+      taskType: string;
+      selectedKey: string;
+      selectedConfig: string | undefined;
+      applied: boolean;
+      strategy: string;
+      score: number;
+      reason: string;
+    }> | undefined
+  >({ reducer: lwwReducer, default: () => undefined }),
 });
 
 export type SwarmAnnotationT = typeof SwarmStateAnnotation.State;
@@ -559,6 +573,8 @@ export interface BuildLangGraphParams {
     replanner?: ReplannerNodeDeps;
     /** Phase 5 self-learning node deps (persist seam + gate overrides). */
     learning?: LearningNodeDeps;
+    /** Phase 3 planner recall + bandit selection deps (recall db + bandit cfg). */
+    planner?: PlannerNodeDeps;
   };
 }
 
@@ -571,10 +587,11 @@ export function buildLangGraph(params: BuildLangGraphParams) {
   const failureDiagnosisDeps = params.hyperAgent?.failureDiagnosis ?? {};
   const replannerDeps = params.hyperAgent?.replanner ?? {};
   const learningDeps = params.hyperAgent?.learning ?? {};
+  const plannerDeps = params.hyperAgent?.planner ?? {};
 
   const builder = new StateGraph(SwarmStateAnnotation)
     .addNode('commander', wrapNode('commander', commanderNode, deps))
-    .addNode('planner', wrapNode('planner', plannerNode, deps))
+    .addNode('planner', wrapNode('planner', (s) => plannerNode(s, plannerDeps), deps))
     .addNode('router', wrapNode('router', routerNode, deps))
     .addNode('guardrail', wrapNode('guardrail', guardrailNode, deps))
     .addNode('worker', wrapNode('worker', workerNode, deps))

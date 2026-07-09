@@ -126,7 +126,11 @@ export async function replannerNode(
       durationMs: Math.max(0, budget.maxDurationMs),
     },
     autonomy,
-    relevantLearnings: [],
+    // Phase 3: prior PROMOTED learnings recalled for this run's task types are
+    // fed to the replanner so a known-good config / known-bad failure class
+    // informs the proposed repair. Empty until the planner recall step
+    // populates state.relevantLearnings (HyperAgent ON + recall db injected).
+    relevantLearnings: state.relevantLearnings ?? [],
     maxTasks: 50,
   };
 
