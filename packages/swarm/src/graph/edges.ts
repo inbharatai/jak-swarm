@@ -18,6 +18,22 @@ import {
   getCurrentVerificationResult,
 } from '../state/swarm-state.js';
 
+/**
+ * Single source of truth for the per-task same-input (R1/R2) retry ceiling.
+ *
+ * `verifier-node` reads `state.taskRetryCount[task.id]` and `afterVerifier`
+ * reads the same field against this same ceiling, so the verifier's retry
+ * decision and the edge's routing decision can never disagree. Previously
+ * the verifier tracked retries in `taskResults[${task.id}_retries]` under a
+ * MAX=2 ceiling while the edge read `taskRetryCount` under MAX=3 — two
+ * counters, two storages, two ceilings, with the 3-ceiling effectively dead
+ * (the verifier's 2 bound first). Unifying on `taskRetryCount` + this one
+ * constant removes the divergence. The richer typed `RepairBudget`
+ * (hyperagent.ts) governs the HyperAgent repair-budget auction, not this
+ * same-input loop.
+ */
+export const MAX_TASK_RETRIES = 2;
+
 export type NodeName =
   | 'commander'
   | 'planner'
@@ -107,7 +123,6 @@ export function afterVerifier(state: SwarmState): NodeName {
   // same-input retries" (needsRetry false OR the retry ceiling is hit).
   if (currentResult && !currentResult.passed && currentResult.needsRetry) {
     const task = getCurrentTask(state);
-    const MAX_TASK_RETRIES = 3;
     const retries = task ? (state.taskRetryCount[task.id] ?? 0) : MAX_TASK_RETRIES;
     if (retries < MAX_TASK_RETRIES) {
       return 'worker';

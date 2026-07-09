@@ -2,14 +2,15 @@
  * failure.ts — unified failure taxonomy + repair-state structs for the
  * HyperAgent self-healing layer.
  *
- * Why this exists (HyperAgent spec, Phase 2): the repo had TWO inconsistent
- * retry mechanisms (verifier-node.ts `MAX_RETRIES=2` on `${task.id}_retries`
- * inside taskResults vs edges.ts `MAX_TASK_RETRIES=3` on `taskRetryCount` in
- * state — different ceilings, different storage, the 3-ceiling effectively dead
- * code) and an 11-class `ErrorClass` in repair-service.ts that conflated several
- * distinct failure modes. This file replaces both with ONE typed taxonomy
- * (20 `FailureClass`es) and ONE `TaskRepairState` shape, governed by the
- * `RepairBudget` from hyperagent.ts.
+ * Why this exists (HyperAgent spec, Phase 2): the repo previously had TWO
+ * inconsistent retry mechanisms (verifier-node.ts `MAX_RETRIES=2` on
+ * `${task.id}_retries` inside taskResults vs edges.ts `MAX_TASK_RETRIES=3` on
+ * `taskRetryCount` — different ceilings, different storage, the 3-ceiling
+ * effectively dead code). The live same-input R1/R2 loop has since been
+ * unified on `taskRetryCount` + a single shared `MAX_TASK_RETRIES` ceiling
+ * (see edges.ts / verifier-node.ts); this file additionally provides ONE typed
+ * taxonomy (20 `FailureClass`es) and ONE `TaskRepairState` shape, governed by
+ * the `RepairBudget` from hyperagent.ts.
  *
  * RepairLevel maps to the spec's R1–R5:
  *   R1 execution retry · R2 output correction · R3 plan repair

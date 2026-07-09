@@ -6,13 +6,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { WorkflowStatus } from '../../../packages/shared/src/index.js';
+import { WorkflowStatus, HyperAgentMode } from '../../../packages/shared/src/index.js';
 import {
   afterCommander,
   afterPlanner,
   afterGuardrail,
   afterApproval,
   afterVerifier,
+  MAX_TASK_RETRIES,
 } from '../../../packages/swarm/src/graph/edges.js';
 import type { SwarmState } from '../../../packages/swarm/src/state/swarm-state.js';
 
@@ -112,5 +113,79 @@ describe('afterCommander', () => {
   it('routes to __clarification__ when clarification is needed', () => {
     const state = makeState({ clarificationNeeded: true });
     expect(afterCommander(state)).toBe('__clarification__');
+  });
+});
+
+// afterVerifier same-input (R1/R2) retry accounting. Previously the verifier
+// tracked retries in `taskResults[${id}_retries]` under MAX=2 while this edge
+// read `taskRetryCount` under MAX=3 — two counters, two ceilings, two storages.
+// Both now read `taskRetryCount` against the single shared `MAX_TASK_RETRIES`
+// ceiling, so the verifier's retry decision and the edge's routing decision
+// can never disagree. These tests pin that contract.
+describe('afterVerifier — unified retry accounting', () => {
+  // A failing verification result that still wants a same-input retry.
+  const failRetry = (): unknown => ({
+    passed: false,
+    issues: ['bad'],
+    confidence: 0.4,
+    needsRetry: true,
+  });
+
+  function makeVerifyingState(overrides: Partial<SwarmState> = {}): SwarmState {
+    return makeState({
+      plan: { tasks: [{ id: 't1', name: 'Task 1' }] } as unknown as SwarmState['plan'],
+      currentTaskIndex: 0,
+      status: WorkflowStatus.VERIFYING,
+      verificationResults: { t1: failRetry() as never },
+      ...overrides,
+    });
+  }
+
+  it('routes back to worker while the same-input retry budget remains', () => {
+    expect(afterVerifier(makeVerifyingState({ taskRetryCount: { t1: 0 } }))).toBe('worker');
+    expect(afterVerifier(makeVerifyingState({ taskRetryCount: { t1: 1 } }))).toBe('worker');
+  });
+
+  it('stops routing to worker once the shared retry ceiling is reached', () => {
+    // MAX_TASK_RETRIES is the single ceiling shared with verifier-node — the
+    // verifier and the edge agree on exactly when retries are exhausted.
+    const exhausted = makeVerifyingState({ taskRetryCount: { t1: MAX_TASK_RETRIES } });
+    expect(afterVerifier(exhausted)).not.toBe('worker');
+  });
+
+  it('advances to the next task (guardrail) when retries are exhausted and more tasks remain', () => {
+    const state = makeVerifyingState({
+      taskRetryCount: { t1: MAX_TASK_RETRIES },
+      plan: {
+        tasks: [{ id: 't1', name: 'Task 1' }, { id: 't2', name: 'Task 2' }],
+      } as unknown as SwarmState['plan'],
+    });
+    expect(afterVerifier(state)).toBe('guardrail');
+  });
+
+  it('routes to __end__ when retries are exhausted and no more tasks remain', () => {
+    const state = makeVerifyingState({ taskRetryCount: { t1: MAX_TASK_RETRIES } });
+    expect(afterVerifier(state)).toBe('__end__');
+  });
+
+  it('never routes to worker when the task passed', () => {
+    const state = makeVerifyingState({
+      taskRetryCount: { t1: 0 },
+      verificationResults: {
+        t1: { passed: true, issues: [], confidence: 1, needsRetry: false } as never,
+      },
+    });
+    expect(afterVerifier(state)).not.toBe('worker');
+  });
+
+  it('routes to diagnosis when HyperAgent is active and same-input retries are exhausted', () => {
+    const state = makeVerifyingState({
+      taskRetryCount: { t1: MAX_TASK_RETRIES },
+      hyperAgentEnabled: true,
+      hyperAgentMode: HyperAgentMode.OBSERVE,
+      hyperAgentIteration: 0,
+      maxHyperAgentIterations: 3,
+    });
+    expect(afterVerifier(state)).toBe('diagnosis');
   });
 });

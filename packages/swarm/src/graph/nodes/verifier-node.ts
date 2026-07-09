@@ -4,8 +4,7 @@ import type { VerifierInput, VerificationResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
-
-const MAX_RETRIES = 2;  // max worker retries per task before accepting the result as-is
+import { MAX_TASK_RETRIES } from '../edges.js';
 
 /**
  * Sprint 2.1 / Item K — `verification_completed` emit helper.
@@ -134,13 +133,16 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
   const result = await agent.execute(verifierInput, context) as VerificationResult;
   const traces = context.getTraces();
 
-  // Count how many times this task has been retried
-  const retryKey = `${task.id}_retries`;
-  const currentRetries = (state.taskResults[retryKey] as number | undefined) ?? 0;
+  // Same-input (R1/R2) retry budget — single source of truth: `taskRetryCount`
+  // on state, incremented by wrapVerifierNode when afterVerifier routes back to
+  // the worker. The verifier and the afterVerifier edge both read this field
+  // against the shared MAX_TASK_RETRIES ceiling, so their decisions agree.
+  const currentRetries = state.taskRetryCount[task.id] ?? 0;
 
-  if (!result.passed && result.needsRetry && currentRetries < MAX_RETRIES) {
+  if (!result.passed && result.needsRetry && currentRetries < MAX_TASK_RETRIES) {
     // Budget remaining — schedule a retry. Store the raw result (needsRetry:true)
-    // so afterVerifier() correctly routes back to the worker node.
+    // so afterVerifier() correctly routes back to the worker node (which then
+    // bumps taskRetryCount via wrapVerifierNode).
     // Sprint 2.1 / Item K: emit `verification_completed` with passed=false
     // so the cockpit reflects the retry trigger; the next verifier pass
     // will emit a fresh `verification_started` + `verification_completed`.
@@ -149,7 +151,6 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     });
     return {
       verificationResults: { [task.id]: result },
-      taskResults: { [retryKey]: currentRetries + 1 },
       traces,
       // Status stays VERIFYING so the graph goes back to worker
     };

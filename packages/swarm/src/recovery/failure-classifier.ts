@@ -170,7 +170,9 @@ export function freshTaskRepairState(taskId: string): TaskRepairState {
 /**
  * Decide whether a repair budget is exhausted for a given repair level.
  * Uses the unified RepairBudget (hyperagent.ts) — the single source of truth
- * that replaces the split MAX_RETRIES=2 / MAX_TASK_RETRIES=3 counters.
+ * for the HyperAgent repair-budget auction. (The live same-input R1/R2 loop
+ * is separately unified on `taskRetryCount` + the shared `MAX_TASK_RETRIES`
+ * ceiling in edges.ts / verifier-node.ts.)
  */
 export function isBudgetExhausted(
   state: TaskRepairState,

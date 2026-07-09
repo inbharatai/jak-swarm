@@ -109,9 +109,11 @@ export interface AutonomyDecision {
 }
 
 /**
- * Unified repair budgets — replaces the split retry counters
- * (`MAX_RETRIES=2` in verifier-node.ts vs `MAX_TASK_RETRIES=3` in edges.ts,
- * stored in different locations). One source of truth.
+ * Unified repair budgets for the HyperAgent repair-budget auction. The live
+ * same-input R1/R2 loop is now unified on `taskRetryCount` + a single shared
+ * `MAX_TASK_RETRIES` ceiling (edges.ts / verifier-node.ts); this `RepairBudget`
+ * is the richer model the auction uses to allocate finite budget across repair
+ * levels (R1 execution retry · R2 output correction · R3 plan repair · ...).
  */
 export interface RepairBudget {
   maxExecutionRetries: number;
