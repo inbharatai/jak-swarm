@@ -29,6 +29,7 @@ import {
   signDecision,
   verifyDecision,
   replayDecision,
+  canonicalizeSubject,
 } from './signed-decision.js';
 import type {
   ShieldDecisionSubject,
@@ -121,8 +122,19 @@ export class ShieldMcpClient {
       const raw = await this.transport.requestSignedDecision(subject, issuedAt);
       const v = verifyDecision(raw, this.verificationKey, now);
       if (!v.valid) throw new ShieldDecisionUnverifiableError(v.reason);
-      // The transport's signature is authoritative; refuse any decision whose id
-      // does not match the subject we asked about (defends against substitution).
+      // Substitution defense: the returned decision MUST bind the EXACT subject
+      // we asked about. verifyDecision only proves the decision is internally
+      // consistent + signed by the Shield — it does NOT prove the decision is
+      // ABOUT the requested subject. A compromised/stale transport could return
+      // a validly-signed decision for a DIFFERENT, previously-ALLOWed low-risk
+      // subject and have it mistaken for authorisation of this high-risk action.
+      // Compare the canonical subjects; reject on any mismatch. (The prior
+      // comment claimed this defence but the code never performed it.)
+      if (canonicalizeSubject(raw.subject) !== canonicalizeSubject(subject)) {
+        throw new ShieldDecisionUnverifiableError(
+          'subject mismatch — returned decision does not bind the requested subject (substitution defense)',
+        );
+      }
       return raw;
     }
     if (!this.signingKey || !this.verdictFor) {

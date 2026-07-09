@@ -216,6 +216,55 @@ describe('ShieldMcpClient — REMOTE transport mode', () => {
     });
     await expect(client.requestDecision(subject(), NOW)).rejects.toBeInstanceOf(ShieldDecisionUnverifiableError);
   });
+
+  it('REJECTS a validly-signed decision for a DIFFERENT subject (substitution defense — Bug 2)', async () => {
+    // The transport returns a decision that is genuinely signed by the Shield
+    // and internally consistent — but it is for a DIFFERENT subject (a
+    // previously-ALLOWed low-risk tool call, not the high-risk one we asked
+    // about). Before the fix, verifyDecision passed and the client returned
+    // the substituted decision, authorising the wrong action. The fix binds the
+    // returned decision to the requested subject and rejects on mismatch.
+    const lowRiskSubject = subject({ requestHash: 'low-risk-hash', runId: 'run-low' });
+    const transport: ShieldMcpTransport = {
+      async requestSignedDecision(_subj, issuedAt): Promise<ShieldSignedDecision> {
+        // Ignore the requested subject; hand back a validly-signed decision for
+        // the low-risk subject instead.
+        return signDecision(
+          {
+            verdict: ShieldDecisionVerdict.ALLOW,
+            subject: lowRiskSubject,
+            shieldId: 'shield-remote',
+            issuedAt,
+            expiresAt: new Date(Date.parse(issuedAt) + 5 * 60 * 1000).toISOString(),
+          },
+          shieldKeys.privateKeyPem,
+        );
+      },
+    };
+    const client = new ShieldMcpClient({
+      shieldId: 'shield-remote',
+      verificationKey: shieldKeys.publicKeyPem,
+      transport,
+    });
+    const requestedHighRisk = subject({ requestHash: 'high-risk-hash', runId: 'run-high' });
+    await expect(client.requestDecision(requestedHighRisk, NOW)).rejects.toThrow(
+      /substitution/,
+    );
+  });
+
+  it('accepts a decision whose subject matches exactly (requestHash + context)', async () => {
+    // Regression guard: the binding check must not reject a genuine, matching
+    // decision. Same subject object ⇒ same canonical string ⇒ accepted.
+    const client = new ShieldMcpClient({
+      shieldId: 'shield-remote',
+      verificationKey: shieldKeys.publicKeyPem,
+      transport: makeTransport(shieldKeys.privateKeyPem, ShieldDecisionVerdict.ALLOW),
+    });
+    const s = subject({ requestHash: 'exact-hash', runId: 'run-x' });
+    const d = await client.requestDecision(s, NOW);
+    expect(d.verdict).toBe(ShieldDecisionVerdict.ALLOW);
+    expect(d.subject.requestHash).toBe('exact-hash');
+  });
 });
 
 describe('ShieldMcpClient — public-key-only property', () => {
