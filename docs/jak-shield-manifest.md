@@ -138,7 +138,7 @@ See [`docs/EVOLUTION-PLAN.md`](EVOLUTION-PLAN.md) for the full phased implementa
 
 ## Honest gaps (not claimed as shipped)
 
-- **Tamper-evident audit log itself** — bundles are HMAC-signed, but the AuditLog table rows are not chain-hashed. A SYSTEM_ADMIN with DB access could rewrite a row. We document this here rather than claim "tamper-evident" across the board.
+- **AuditLog row-chain tamper-evidence is now implemented** (migration 117; per-tenant HMAC `rowHash`/`prevHash`/`chainSeq`; `verifyChain` detects tamper/reorder/delete). It is **fail-open-to-auditable**: when `EVIDENCE_SIGNING_SECRET` is unset the chain runs INACTIVE (`rowHash=null`) — rows are still written, just not tamper-evident — so an operator who hasn't provisioned the secret still gets full audit logging without the tamper-evidence guarantee. Residual open edges: the fetch-latest-then-write is a TOCTOU under concurrency (best-effort chaining shipped; a sequential per-tenant counter under a lock is the durable fix), and the live-Postgres round-trip is integration-proven, not production-proven.
 - **First-party defensive-review agent** — the boundary exists; the agent does not yet.
 - **JAK Shield MCP integration** — JAK Shield is a separate 10-stage MCP-native gateway. The `ShieldMcpClient` and `Agent Governance Overlay` that will call it are Phase 1 of the evolution plan. Today, security enforcement uses local policy logic in `packages/security`.
 - **Agent Governance Overlay** — agent profiles, memory scopes, and autonomy boundaries are roadmap items, not shipped.

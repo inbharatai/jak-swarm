@@ -89,7 +89,7 @@ Because a single bad-actor workflow can drain a 30-day budget in two hours. Per-
 2. No third-party security audit (no SOC 2 Type 1/2, no ISO 27001 certification). The control infrastructure is shipped (182 controls seeded, 108 operationally backed) but the certification audit itself has not happened.
 3. Lawyer-reviewed Terms of Service / Privacy Policy / DPA are not in place — required for B2B and EU-region sales.
 4. No third-party penetration test against the running system.
-5. AuditLog rows are not yet chain-hashed (bundles ARE HMAC-signed, but a SYSTEM_ADMIN with DB access could rewrite an individual log row — bundle-level tamper-evidence only).
+5. AuditLog rows are now per-tenant chain-hashed (migration 117; `verifyChain` detects tamper/reorder/delete), but the chain is **fail-open-to-auditable**: when `EVIDENCE_SIGNING_SECRET` is unset it runs INACTIVE (`rowHash=null`) — rows are still written, just not tamper-evident. Bundles remain HMAC-signed. Residual open edge: the fetch-latest-then-write is a TOCTOU under concurrency, and the live-Postgres round-trip is integration-proven, not production-proven.
 6. No incident-response runbook + on-call rotation.
 
 **Honest path to "ready to take money from strangers" is ~2-3 months for B2B small business, ~9-12 months for security-conscious enterprise.** Full beta scope and go/no-go checklist: [`docs/beta-release.md`](beta-release.md).

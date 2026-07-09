@@ -145,7 +145,7 @@ claimed as shipped on the landing page:
 |---|---|
 | First-party defensive-review agent | The Shield boundary blocks offensive requests; an actual "audit my repo" agent does not exist yet. JAK Shield card body says "supports defensive security work" — true (boundary allows it) but no purpose-built agent. |
 | Dedicated `/shield` dashboard tab | Shield state is currently visible at `/audit` + `/inbox`. Not yet a unified panel. |
-| Chain-hashed AuditLog rows | Bundles are HMAC-SHA256 signed; individual `AuditLog` rows are NOT yet chain-hashed (a SYSTEM_ADMIN with DB access could rewrite a row). |
+| Chain-hashed AuditLog rows | Bundles are HMAC-SHA256 signed; individual `AuditLog` rows are **now per-tenant chain-hashed** (migration 117; `rowHash`/`prevHash`/`chainSeq`; `verifyChain` detects tamper/reorder/delete via `timingSafeEqual`). Fail-open-to-auditable: when `EVIDENCE_SIGNING_SECRET` is unset the chain runs INACTIVE (`rowHash=null`) — rows are still written, just not tamper-evident. Open edge: the fetch-latest-then-write is a TOCTOU under concurrency (best-effort chaining shipped; live-Postgres round-trip is integration-proven, not production-proven). |
 | JAK Shield MCP integration | JAK Shield is a separate 10-stage MCP-native gateway ([github.com/inbharatai/jak-shield](https://github.com/inbharatai/jak-shield)). The `ShieldMcpClient` and Agent Governance Overlay are planned (Phase 1 of the evolution plan). Today, security enforcement uses local policy logic in `packages/security`. |
 | Agent Governance Overlay | Agent profiles, memory scopes, autonomy boundaries (L0–L5), and Ability Packs are planned, not shipped. |
 
