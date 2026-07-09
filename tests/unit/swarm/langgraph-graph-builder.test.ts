@@ -182,6 +182,9 @@ describe('buildLangGraph — graph compiles', () => {
     // can route to them. See langgraph-graph-builder.ts + edges.ts.
     expect(ids).toContain('diagnosis');
     expect(ids).toContain('replanner');
+    // HyperAgent Phase 5 self-learning node — only reachable when
+    // hyperAgentActive(state) AND the run is terminal (afterValidator).
+    expect(ids).toContain('learning');
   });
 
   it('wires the START → commander entry edge', () => {
@@ -200,6 +203,22 @@ describe('buildLangGraph — graph compiles', () => {
     const compiled = buildLangGraph({ db: stubDb() });
     const fromValidator = edges(compiled).filter((e) => e.source === 'validator');
     expect(fromValidator.some((e) => e.target === '__end__')).toBe(true);
+  });
+
+  it('validator → learning conditional edge exists (HyperAgent self-learning wiring)', () => {
+    // The validator terminal edge became conditional in Phase 5: a terminal run
+    // routes through the learning node when HyperAgent is ON, else END. Both
+    // branches must be in the topology so afterValidator can pick at runtime.
+    const compiled = buildLangGraph({ db: stubDb() });
+    const fromValidator = edges(compiled).filter((e) => e.source === 'validator');
+    expect(fromValidator.some((e) => e.target === 'learning')).toBe(true);
+    expect(fromValidator.some((e) => e.target === '__end__')).toBe(true);
+  });
+
+  it('learning → END edge exists (learning node is terminal)', () => {
+    const compiled = buildLangGraph({ db: stubDb() });
+    const fromLearning = edges(compiled).filter((e) => e.source === 'learning');
+    expect(fromLearning.some((e) => e.target === '__end__')).toBe(true);
   });
 });
 

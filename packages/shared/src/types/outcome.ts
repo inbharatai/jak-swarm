@@ -44,6 +44,18 @@ export interface TaskOutcome {
   /** Failure class from the deterministic classifier, when the task failed. */
   failureClass?: FailureClass;
   error?: string;
+  /**
+   * Agent role that executed the task (Phase 5 self-learning). Carried from
+   * WorkflowTask.agentRole so the learning extractor can dimension WORKFLOW
+   * learnings by config — without this, every success of a task type folds
+   * into one key (`cfg:<taskType>`) and the information-theoretic gate can
+   * never fire (no contrast between competing configs). Optional so legacy
+   * pure-core test inputs (which construct TaskOutcome by hand) keep
+   * producing the legacy `cfg:<taskType>` key.
+   */
+  agentRole?: string;
+  /** Primary tool the task was configured to use (toolsRequired[0]). */
+  primaryTool?: string;
 }
 
 /**

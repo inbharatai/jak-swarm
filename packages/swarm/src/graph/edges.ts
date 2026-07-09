@@ -45,20 +45,23 @@ export type NodeName =
   | 'validator'
   | 'diagnosis'
   | 'replanner'
+  | 'learning'
   | '__end__'
   | '__clarification__';
 
 /**
  * Is the HyperAgent self-healing layer active for this run?
  *
- * The new diagnosis/replanner routing is GATED on this so that a workflow
- * with `hyperAgentMode === OFF` (or the layer disabled) behaves byte-for-byte
- * like the legacy graph — it can never reach the diagnosis/replanner nodes.
- * OBSERVE counts as active: it runs diagnosis + proposes a replan, then the
- * replanner node applies it only if the autonomy decision permits (at L0/L1
- * it pauses for approval or just records, never mutates).
+ * The diagnosis/replanner routing AND the post-validator learning node are
+ * GATED on this so that a workflow with `hyperAgentMode === OFF` (or the
+ * layer disabled) behaves byte-for-byte like the legacy graph — it can never
+ * reach the diagnosis/replanner/learning nodes. OBSERVE counts as active: it
+ * runs diagnosis + proposes a replan, then the replanner node applies it only
+ * if the autonomy decision permits (at L0/L1 it pauses for approval or just
+ * records, never mutates). OBSERVE also runs the learning node so observations
+ * accrue even when autonomy blocks mutation.
  */
-function hyperAgentActive(state: SwarmState): boolean {
+export function hyperAgentActive(state: SwarmState): boolean {
   return (
     (state.hyperAgentEnabled ?? false) &&
     (state.hyperAgentMode ?? HyperAgentMode.OFF) !== HyperAgentMode.OFF
@@ -195,4 +198,27 @@ export function afterReplanner(state: SwarmState): NodeName {
   if (state.status === WorkflowStatus.EXECUTING) return 'guardrail';
   if (state.status === WorkflowStatus.AWAITING_APPROVAL) return '__end__';
   return 'validator';
+}
+
+/**
+ * Edge from the validator (the final outcome evaluator). The validator leaves
+ * the run terminal (COMPLETED or FAILED). When the HyperAgent layer is ON, a
+ * terminal run routes through the learning node FIRST so the outcome is
+ * evaluated + learning candidates are extracted + persisted, THEN the graph
+ * ends. When the HyperAgent layer is OFF (or disabled) this is a direct
+ * validator → END edge — legacy workflows are byte-for-byte unchanged.
+ *
+ * Learning from BOTH COMPLETED and FAILED terminal runs is intentional: a
+ * COMPLETED run yields WORKFLOW learnings (this config worked); a FAILED run
+ * yields POLICY learnings (this failure class hit this task type). Both are
+ * the honest information-theoretic signal the self-learning half exists to
+ * accrue. Runs that never reached the validator (CANCELLED, AWAITING_APPROVAL,
+ * blocked at the guardrail) bypass the learning node — they have no terminal
+ * validator outcome to learn from.
+ */
+export function afterValidator(state: SwarmState): NodeName {
+  const terminal =
+    state.status === WorkflowStatus.COMPLETED || state.status === WorkflowStatus.FAILED;
+  if (hyperAgentActive(state) && terminal) return 'learning';
+  return '__end__';
 }

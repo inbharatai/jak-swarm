@@ -99,27 +99,32 @@ function triageTask(
 ): TaskOutcome {
   const failureClass = failureClassByTask?.[task.id];
   const error = errorByTask?.[task.id] ?? task.error;
+  // Phase 5 self-learning: carry the config (agent role + primary tool) so the
+  // learning extractor can dimension WORKFLOW learnings by config and the
+  // information-theoretic gate has the contrast it needs to fire.
+  const agentRole = String(task.agentRole);
+  const primaryTool = task.toolsRequired[0];
 
   switch (task.status) {
     case TaskStatus.SKIPPED:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_SKIPPED, verified: false };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_SKIPPED, verified: false, agentRole, primaryTool };
     case TaskStatus.FAILED:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool };
     case TaskStatus.AWAITING_APPROVAL:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool };
     case TaskStatus.COMPLETED:
       if (verification) {
         return verification.passed
-          ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: true, verificationConfidence: verification.confidence }
-          : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: true, verificationConfidence: verification.confidence, failureClass, error: error ?? verification.issues.join('; ') };
+          ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: true, verificationConfidence: verification.confidence, agentRole, primaryTool }
+          : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: true, verificationConfidence: verification.confidence, failureClass, error: error ?? verification.issues.join('; '), agentRole, primaryTool };
       }
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: false };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: false, agentRole, primaryTool };
     case TaskStatus.PENDING:
     case TaskStatus.IN_PROGRESS:
     default:
       return runBlocked
-        ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error }
-        : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error };
+        ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool }
+        : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool };
   }
 }
 

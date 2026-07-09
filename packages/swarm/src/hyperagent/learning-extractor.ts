@@ -44,11 +44,34 @@ function singlePresent(success: boolean): ContingencyTable {
   return { a: success ? 1 : 0, b: success ? 0 : 1, c: 0, d: 0 };
 }
 
-/** Stable key for a "this config worked / failed for this task type" learning. */
+/**
+ * Stable key for a "this config worked / failed for this task type" learning.
+ *
+ * The key MUST dimension by config (agent role + primary tool) when available,
+ * so that competing configs of the same task type accrue into SEPARATE
+ * contingency tables — that contrast is what lets the information-theoretic
+ * gate (learning-gate.ts) measure mutual information and promote. Without the
+ * config dimension, every success of a task type folds into one key and the
+ * gate can never fire (no absent observations).
+ *
+ * For a FAILED task the failure class + counterfactual dimension are appended
+ * (the repair preference is scoped to that failure shape). For a PASSED task
+ * only the config is used — success of config X and failure of config X share
+ * the same `cfg:<taskType>:<agentRole>:<tool>` prefix, so a (present+success)
+ * and b (present+failure) accrue into one contingency table for that config.
+ *
+ * Legacy fallback: when the TaskOutcome carries no config (hand-constructed
+ * pure-core test inputs), the key is the original `cfg:<taskType>` form so
+ * those tests keep their pinned keys.
+ */
 function configKey(task: TaskOutcome, dimension?: string): string {
+  const taskType = task.taskId.split('_')[0];
   const dim = dimension ? `:${dimension}` : '';
   const fc = task.failureClass ? `:${task.failureClass}` : '';
-  return `cfg:${task.taskId.split('_')[0]}${fc}${dim}`;
+  if (task.agentRole && task.primaryTool) {
+    return `cfg:${taskType}:${task.agentRole}:${task.primaryTool}${fc}${dim}`;
+  }
+  return `cfg:${taskType}${fc}${dim}`;
 }
 
 /** Tags for a task-derived learning. */
@@ -76,17 +99,24 @@ export function extractLearnings(input: ExtractLearningsInput): LearningCandidat
   for (const task of outcome.taskOutcomes) {
     // PASSED + verified → a "this config worked" WORKFLOW learning.
     if (task.verdict === TaskVerdict.TASK_PASSED && task.verified) {
+      const taskType = task.taskId.split('_')[0];
+      const preferredConfig = task.agentRole && task.primaryTool ? `${task.agentRole}/${task.primaryTool}` : 'current';
       candidates.push({
         key: configKey(task),
         kind: LearningKind.WORKFLOW,
         source: LearningSource.OUTCOME,
         value: {
-          taskType: task.taskId.split('_')[0],
+          taskType,
           verdict: task.verdict,
-          preferredConfig: 'current',
+          preferredConfig,
+          agentRole: task.agentRole,
+          primaryTool: task.primaryTool,
           verificationConfidence: task.verificationConfidence,
         },
-        summary: `Config for task type '${task.taskId.split('_')[0]}' passed verification.`,
+        summary:
+          task.agentRole && task.primaryTool
+            ? `Config '${task.agentRole}/${task.primaryTool}' for task type '${taskType}' passed verification.`
+            : `Config for task type '${taskType}' passed verification.`,
         tags: taskTags(task),
         taskVerdict: task.verdict,
         contingency: singlePresent(true),

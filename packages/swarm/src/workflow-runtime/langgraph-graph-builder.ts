@@ -49,6 +49,8 @@ import type {
   RepairBudget,
   TaskRepairState,
   DiagnosisRecord,
+  LearningCandidate,
+  OutcomeEvaluation,
 } from '@jak-swarm/shared';
 import type { MissionBrief, RouteMap, GuardrailResult, VerificationResult } from '@jak-swarm/agents';
 import { applySummarizationIfNeeded } from '../context/context-summarizer.js';
@@ -64,6 +66,8 @@ import { failureDiagnosisNode } from '../graph/nodes/failure-diagnosis-node.js';
 import type { FailureDiagnosisNodeDeps } from '../graph/nodes/failure-diagnosis-node.js';
 import { replannerNode } from '../graph/nodes/replanner-node.js';
 import type { ReplannerNodeDeps } from '../graph/nodes/replanner-node.js';
+import { learningNode } from '../graph/nodes/learning-node.js';
+import type { LearningNodeDeps } from '../graph/nodes/learning-node.js';
 import {
   afterCommander,
   afterPlanner,
@@ -72,6 +76,7 @@ import {
   afterVerifier,
   afterDiagnosis,
   afterReplanner,
+  afterValidator,
   type NodeName,
 } from '../graph/edges.js';
 import {
@@ -233,6 +238,22 @@ export const SwarmStateAnnotation = Annotation.Root({
   hyperAgentIteration: Annotation<number>({ reducer: lwwReducer, default: () => 0 }),
   maxHyperAgentIterations: Annotation<number>({ reducer: lwwReducer, default: () => 3 }),
   pendingDiagnoses: Annotation<Record<string, DiagnosisRecord>>({ reducer: mergeReducer, default: () => ({}) }),
+
+  // ─── HyperAgent self-learning (Phase 5 live wiring) ───────────────────────
+  // outcomeEvaluation: lww (single write by the learning node per run).
+  // learningCandidates: lww (single write; the full candidate set for this run).
+  // relevantLearnings: lww (written once by Phase 3 recall before the planner).
+  // promotedLearnings: lww (written by the learning node as a persist side effect).
+  outcomeEvaluation: Annotation<OutcomeEvaluation | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  learningCandidates: Annotation<LearningCandidate[] | undefined>({ reducer: lwwReducer, default: () => undefined }),
+  relevantLearnings: Annotation<Array<{ key: string; summary: string; confidence: number }> | undefined>({
+    reducer: lwwReducer,
+    default: () => undefined,
+  }),
+  promotedLearnings: Annotation<Array<{ key: string; mutualInformation: number }> | undefined>({
+    reducer: lwwReducer,
+    default: () => undefined,
+  }),
 });
 
 export type SwarmAnnotationT = typeof SwarmStateAnnotation.State;
@@ -274,6 +295,12 @@ function replannerEdge(state: SwarmAnnotationT): 'guardrail' | 'validator' | 'en
   if (next === 'guardrail') return 'guardrail';
   if (next === 'validator') return 'validator';
   return 'end';
+}
+/** Validator terminal edge: route to the learning node when HyperAgent is ON
+ *  and the run is terminal (COMPLETED/FAILED), else straight to END. */
+function validatorEdge(state: SwarmAnnotationT): 'learning' | 'end' {
+  const next = afterValidator(state as unknown as SwarmState);
+  return next === 'learning' ? 'learning' : 'end';
 }
 
 // ─── Node wrappers ────────────────────────────────────────────────────────
@@ -519,16 +546,19 @@ export interface BuildLangGraphParams {
   shouldStop?: (workflowId: string) => boolean;
   shouldPause?: (workflowId: string) => boolean;
   /**
-   * HyperAgent node dependencies (Phase 4). When omitted, the diagnosis +
+   * HyperAgent node dependencies (Phase 4+). When omitted, the diagnosis +
    * replanner nodes run with no injected LLM / counterfactual re-executor —
-   * the deterministic classifier + deterministic proposer handle everything.
-   * The new nodes are only REACHABLE when the run has
+   * the deterministic classifier + deterministic proposer handle everything —
+   * and the learning node runs evaluate+extract into state only (no durable
+   * persist). The new nodes are only REACHABLE when the run has
    * `hyperAgentMode !== OFF && hyperAgentEnabled` (see edges.ts), so omitting
    * this keeps legacy workflows byte-for-byte unchanged.
    */
   hyperAgent?: {
     failureDiagnosis?: FailureDiagnosisNodeDeps;
     replanner?: ReplannerNodeDeps;
+    /** Phase 5 self-learning node deps (persist seam + gate overrides). */
+    learning?: LearningNodeDeps;
   };
 }
 
@@ -540,6 +570,7 @@ export function buildLangGraph(params: BuildLangGraphParams) {
   const checkpointer = new PostgresCheckpointSaver(params.db);
   const failureDiagnosisDeps = params.hyperAgent?.failureDiagnosis ?? {};
   const replannerDeps = params.hyperAgent?.replanner ?? {};
+  const learningDeps = params.hyperAgent?.learning ?? {};
 
   const builder = new StateGraph(SwarmStateAnnotation)
     .addNode('commander', wrapNode('commander', commanderNode, deps))
@@ -558,6 +589,12 @@ export function buildLangGraph(params: BuildLangGraphParams) {
     .addNode(
       'replanner',
       wrapNode('replanner', (s) => replannerNode(s, replannerDeps), deps),
+    )
+    // HyperAgent Phase 5 self-learning node — only reachable when
+    // hyperAgentActive(state) AND the run is terminal (afterValidator).
+    .addNode(
+      'learning',
+      wrapNode('learning', (s) => learningNode(s, learningDeps), deps),
     )
     .addEdge(START, 'commander')
     .addConditionalEdges('commander', commanderEdge, {
@@ -595,7 +632,14 @@ export function buildLangGraph(params: BuildLangGraphParams) {
       validator: 'validator',
       end: END,
     })
-    .addEdge('validator', END);
+    // Validator terminal: route through the learning node when HyperAgent is ON
+    // and the run is terminal, else straight to END (legacy byte-for-byte).
+    .addConditionalEdges('validator', validatorEdge, {
+      learning: 'learning',
+      end: END,
+    })
+    // The learning node is always terminal — after it accrues + persists, END.
+    .addEdge('learning', END);
 
   return builder.compile({ checkpointer });
 }

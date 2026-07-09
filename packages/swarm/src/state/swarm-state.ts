@@ -19,6 +19,8 @@ import type {
   RepairBudget,
   TaskRepairState,
   DiagnosisRecord,
+  LearningCandidate,
+  OutcomeEvaluation,
 } from '@jak-swarm/shared';
 
 export interface SwarmState {
@@ -174,6 +176,22 @@ export interface SwarmState {
   maxHyperAgentIterations?: number;
   /** Diagnoses awaiting the replanner, keyed by taskId. */
   pendingDiagnoses?: Record<string, DiagnosisRecord>;
+
+  // ─── HyperAgent self-learning (Phase 5 live wiring) ────────────────────────
+  // The learning node (reached after the validator when HyperAgent is ON)
+  // evaluates the finished run, extracts typed learning candidates, and
+  // persists them through learning-persist.ts. The recall half (Phase 3)
+  // populates `relevantLearnings` before the planner runs so prior promotions
+  // inform the next plan. All fields default safely so a workflow with
+  // HyperAgent OFF never touches them.
+  /** Outcome evaluation of the finished run (written by the learning node). */
+  outcomeEvaluation?: OutcomeEvaluation;
+  /** Learning candidates extracted from this run (written by the learning node). */
+  learningCandidates?: LearningCandidate[];
+  /** Promoted learnings recalled for this run (written by Phase 3 recall). */
+  relevantLearnings?: Array<{ key: string; summary: string; confidence: number }>;
+  /** Learnings promoted as a side effect of persisting this run's candidates. */
+  promotedLearnings?: Array<{ key: string; mutualInformation: number }>;
 }
 
 export function createInitialSwarmState(params: {
@@ -264,6 +282,11 @@ export function createInitialSwarmState(params: {
     hyperAgentIteration: 0,
     maxHyperAgentIterations: params.maxHyperAgentIterations ?? 3,
     pendingDiagnoses: {},
+    // Self-learning — empty until the learning node / recall populate them.
+    outcomeEvaluation: undefined,
+    learningCandidates: [],
+    relevantLearnings: [],
+    promotedLearnings: [],
   };
 }
 
