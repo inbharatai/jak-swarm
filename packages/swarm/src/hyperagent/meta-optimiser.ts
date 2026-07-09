@@ -204,7 +204,12 @@ export function privatizeArmSuccessRate(
   // Sensitivity of a success-rate over n pulls is 1/n (one run flips it by ≤1/n).
   const n = armPulls(arm);
   const sensitivity = n === 0 ? 1 : 1 / n;
-  const released = privatizeMetric(trueRate, epsilon, `${seed}:${arm.id}`);
+  // Pass the TRUE sensitivity (1/n) to privatizeMetric so the Laplace noise scale
+  // (sensitivity/ε) matches the bound we report. Previously privatizeMetric
+  // ignored the caller's sensitivity and hardcoded Laplace(1/ε) (sensitivity 1),
+  // so the published rate was n× over-privatised while the audit `sensitivity`
+  // field claimed 1/n — the metadata lied about how much privacy was applied.
+  const released = privatizeMetric(trueRate, epsilon, `${seed}:${arm.id}`, sensitivity);
   return { value: released.value, noise: released.noise, trueRate, sensitivity };
 }
 

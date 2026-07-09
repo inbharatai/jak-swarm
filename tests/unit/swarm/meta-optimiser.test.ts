@@ -33,6 +33,7 @@ import {
   armsFromHistory,
   metaOptimise,
 } from '../../../packages/swarm/src/hyperagent/meta-optimiser.js';
+import { laplace, makePrng } from '../../../packages/swarm/src/hyperagent/dp-noise.js';
 
 const NOW = '2026-07-08T12:00:00.000Z';
 
@@ -190,6 +191,25 @@ describe('privatizeArmSuccessRate — DP noise (innovation #8)', () => {
     expect(r.sensitivity).toBeCloseTo(0.1, 10);
     expect(typeof r.noise).toBe('number');
     expect(r.value).toBeCloseTo(r.trueRate + r.noise, 10);
+  });
+
+  it('noise scale MATCHES the reported sensitivity (1/n), not hardcoded 1 — Bug 8', () => {
+    // Before the fix, privatizeArmSuccessRate reported sensitivity=1/n but
+    // privatizeMetric hardcoded Laplace(1/ε) (sensitivity 1), so the published
+    // rate was n× over-privatised while the audit field claimed 1/n. Assert the
+    // released noise equals an independent laplace((1/n)/ε, seed) and NOT
+    // laplace(1/ε, seed).
+    const a = arm('a', 9, 1); // n=10 ⇒ sensitivity 0.1
+    const epsilon = 1.0;
+    const seed = 'seed-1';
+    const r = privatizeArmSuccessRate(a, epsilon, seed);
+    const n = armPulls(a);
+    const sens = 1 / n;
+    const expected = laplace(sens / epsilon, makePrng(`${seed}:${a.id}`));
+    expect(r.noise).toBeCloseTo(expected, 10);
+    // The buggy hardcoded-sensitivity-1 noise would have a different scale.
+    const buggy = laplace(1 / epsilon, makePrng(`${seed}:${a.id}`));
+    expect(r.noise).not.toBeCloseTo(buggy, 6);
   });
 });
 

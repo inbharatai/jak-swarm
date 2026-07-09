@@ -102,15 +102,27 @@ export function dpMean(input: Omit<DpSumInput, 'values'> & { values: number[] })
 }
 
 /**
- * Privatise a single bounded metric (sensitivity 1) with Laplace(1/ε).
- * Use when publishing a per-run metric into a cross-tenant learning aggregate.
+ * Privatise a single bounded metric with Laplace(sensitivity / ε) noise. Use
+ * when publishing a per-run metric into a cross-tenant learning aggregate.
+ *
+ * `sensitivity` defaults to 1 (the L1 sensitivity of a single bounded
+ * contribution in [0,1] or similar). Callers publishing a DERIVED quantity
+ * whose sensitivity is NOT 1 — e.g. a success rate over n pulls, where one run
+ * flips the rate by at most 1/n — MUST pass the true sensitivity so the noise
+ * scale matches the bound they advertise. Passing the wrong sensitivity here
+ * silently under- or over-privatises vs. the audit metadata.
  */
-export function privatizeMetric(value: number, epsilon: number, seed: string): {
+export function privatizeMetric(
+  value: number,
+  epsilon: number,
+  seed: string,
+  sensitivity = 1,
+): {
   value: number;
   noise: number;
 } {
   const prng = makePrng(seed);
-  const noise = laplace(1 / epsilon, prng);
+  const noise = laplace(sensitivity / epsilon, prng);
   return { value: value + noise, noise };
 }
 

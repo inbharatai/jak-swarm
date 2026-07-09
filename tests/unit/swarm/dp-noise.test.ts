@@ -114,6 +114,21 @@ describe('privatizeMetric', () => {
     expect(a).toEqual(b);
     expect(a.value).toBeCloseTo(42 + a.noise, 10);
   });
+
+  it('honours a caller-supplied sensitivity (Laplace(sensitivity/ε)) — Bug 8', () => {
+    // The noise scale MUST be sensitivity/ε, not the hardcoded 1/ε. Assert the
+    // released noise equals an independently-computed laplace(sensitivity/ε)
+    // with the same seed, for a non-unit sensitivity.
+    const sensitivity = 0.1;
+    const epsilon = 1.0;
+    const seed = 'metric-seed';
+    const r = privatizeMetric(42, epsilon, seed, sensitivity);
+    const expected = laplace(sensitivity / epsilon, makePrng(seed));
+    expect(r.noise).toBeCloseTo(expected, 10);
+    // And it is NOT the hardcoded-sensitivity-1 noise (the prior bug).
+    const buggy = laplace(1 / epsilon, makePrng(seed));
+    expect(r.noise).not.toBeCloseTo(buggy, 6);
+  });
 });
 
 describe('composeBudget', () => {
