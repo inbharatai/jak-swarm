@@ -45,33 +45,85 @@ function singlePresent(success: boolean): ContingencyTable {
 }
 
 /**
+ * Sorted, de-duplicated tool set joined by '+' — order-invariant. '' when no
+ * tools. Two tasks whose only difference is the ORDER of `toolsRequired` therefore
+ * produce the SAME key (the audit's "fragile keys" defect: the prior key used
+ * `toolsRequired[0]`, so reordering tools silently sharded a learning).
+ */
+export function normalizeToolSet(tools?: readonly string[]): string {
+  if (!tools || tools.length === 0) return '';
+  return [...new Set(tools.filter(Boolean))].sort().join('+');
+}
+
+export interface ConfigKeyDimensions {
+  taskType: string;
+  agentRole?: string;
+  toolSet?: readonly string[];
+  industry?: string;
+  modelFamily?: string;
+  riskLevel?: string;
+}
+
+/**
+ * Phase 7 composite learning key. Order-invariant (tool set sorted + de-duped)
+ * and dimensioned by industry / model family / risk level so learnings do not
+ * cross-generalise across configs, industries, models, or risk tiers they were
+ * not observed on.
+ *
+ * Format: `cfg:<taskType>:<agentRole>:<sortedTools>` + labelled extras
+ * `:industry=<x>:model=<y>:risk=<z>` appended only when present. The
+ * `cfg:<taskType>:` prefix is preserved so recall-by-prefix (learning-persist)
+ * and `cfgTaskType` keep working byte-for-byte.
+ *
+ * Human-readable + auditable by design. The plan suggested an opaque sha1; we
+ * deliberately keep the key readable because HyperAgent promotion decisions must
+ * be reproducible and INSPECTABLE — a hashed key hides which config a row tracks
+ * and would break the existing pinned-key fixtures without a correctness gain.
+ * The order-invariance + richer dimensioning (the actual defect) is what matters.
+ *
+ * `failureClass` and the counterfactual `dimension` are INTENTIONALLY NOT part
+ * of the key. They are candidate METADATA, not config dimensions. Keeping them
+ * out means a config's present-success (a) and present-failure (b) observations
+ * accrue into ONE contingency row, so the information-theoretic gate
+ * (learning-gate.ts) can measure a real DIRECTIONAL lift. Keying by failure
+ * class/dimension would shard a/b across rows (success has no dimension; failure
+ * does) and the gate could never fire — defeating the Phase 6 fix.
+ */
+export function composeConfigKey(dims: ConfigKeyDimensions): string {
+  const taskType = dims.taskType;
+  const role = dims.agentRole ?? '';
+  const tools = normalizeToolSet(dims.toolSet);
+  const segs = [role, tools].filter((s) => s !== '');
+  let key = `cfg:${taskType}`;
+  if (segs.length > 0) key += `:${segs.join(':')}`;
+  const extras: string[] = [];
+  if (dims.industry) extras.push(`industry=${dims.industry}`);
+  if (dims.modelFamily) extras.push(`model=${dims.modelFamily}`);
+  if (dims.riskLevel) extras.push(`risk=${dims.riskLevel}`);
+  if (extras.length > 0) key += `:${extras.join(':')}`;
+  return key;
+}
+
+/**
  * Stable key for a "this config worked / failed for this task type" learning.
  *
- * The key MUST dimension by config (agent role + primary tool) when available,
- * so that competing configs of the same task type accrue into SEPARATE
- * contingency tables — that contrast is what lets the information-theoretic
- * gate (learning-gate.ts) measure mutual information and promote. Without the
- * config dimension, every success of a task type folds into one key and the
- * gate can never fire (no absent observations).
- *
- * For a FAILED task the failure class + counterfactual dimension are appended
- * (the repair preference is scoped to that failure shape). For a PASSED task
- * only the config is used — success of config X and failure of config X share
- * the same `cfg:<taskType>:<agentRole>:<tool>` prefix, so a (present+success)
- * and b (present+failure) accrue into one contingency table for that config.
- *
- * Legacy fallback: when the TaskOutcome carries no config (hand-constructed
- * pure-core test inputs), the key is the original `cfg:<taskType>` form so
- * those tests keep their pinned keys.
+ * Dimensions by config (agent role + sorted tool set) so competing configs of
+ * the same task type accrue into SEPARATE contingency tables — that contrast
+ * is what lets the information-theoretic gate (learning-gate.ts) measure mutual
+ * information and promote. Industry / model family / risk level are appended as
+ * labelled extras when present so learnings don't cross-generalise across those
+ * tiers. `failureClass` / counterfactual `dimension` are candidate metadata,
+ * NOT key dimensions (see `composeConfigKey`).
  */
-function configKey(task: TaskOutcome, dimension?: string): string {
-  const taskType = task.taskId.split('_')[0];
-  const dim = dimension ? `:${dimension}` : '';
-  const fc = task.failureClass ? `:${task.failureClass}` : '';
-  if (task.agentRole && task.primaryTool) {
-    return `cfg:${taskType}:${task.agentRole}:${task.primaryTool}${fc}${dim}`;
-  }
-  return `cfg:${taskType}${fc}${dim}`;
+function configKey(task: TaskOutcome): string {
+  return composeConfigKey({
+    taskType: task.taskId.split('_')[0] ?? task.taskId,
+    agentRole: task.agentRole,
+    toolSet: task.toolSet ?? (task.primaryTool ? [task.primaryTool] : []),
+    industry: task.industry,
+    modelFamily: task.modelFamily,
+    riskLevel: task.riskLevel !== undefined ? String(task.riskLevel) : undefined,
+  });
 }
 
 /** Tags for a task-derived learning. */
@@ -131,7 +183,7 @@ export function extractLearnings(input: ExtractLearningsInput): LearningCandidat
       const dimension = diag?.evidence?.isolatedDimension as string | undefined;
       const failureClass = diag?.failureClass ?? task.failureClass ?? FailureClass.UNKNOWN;
       candidates.push({
-        key: configKey(task, dimension),
+        key: configKey(task),
         kind: LearningKind.POLICY,
         source: diag ? LearningSource.FAILURE_DIAGNOSIS : LearningSource.OUTCOME,
         value: {

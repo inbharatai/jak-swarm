@@ -49,6 +49,23 @@ import {
   recallLearnings,
   type LearningPersistPrismaClient,
 } from '../../packages/swarm/src/hyperagent/learning-persist.js';
+import { composeConfigKey } from '../../packages/swarm/src/hyperagent/learning-extractor.js';
+
+/**
+ * Phase 7: the learning key is now a composite, order-invariant, dimensioned by
+ * industry + risk level. Compute the expected key from the SAME dimensions the
+ * outcome evaluator stamps (plan.industry='TECHNOLOGY', task.riskLevel=LOW) so
+ * the assertions stay correct if the labelled-key format ever changes.
+ */
+function expectedKey(tool: string): string {
+  return composeConfigKey({
+    taskType: 'research',
+    agentRole: AgentRole.WORKER_RESEARCH,
+    toolSet: [tool],
+    industry: 'TECHNOLOGY',
+    riskLevel: 'LOW',
+  });
+}
 
 // ─── In-memory Prisma stub (learningRecord, full upsert-by-key) ─────────────
 
@@ -245,8 +262,8 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       await g2.invoke(failedState(AgentRole.WORKER_RESEARCH, 'ddg'));
     }
 
-    const webSearch = row(db, 'cfg:research:WORKER_RESEARCH:web_search');
-    const ddg = row(db, 'cfg:research:WORKER_RESEARCH:ddg');
+    const webSearch = row(db, expectedKey('web_search'));
+    const ddg = row(db, expectedKey('ddg'));
     expect(webSearch).toBeDefined();
     expect(ddg).toBeDefined();
 
@@ -270,14 +287,14 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       const g2 = buildGraph(db, failedState(AgentRole.WORKER_RESEARCH, 'ddg') as ReturnType<typeof completedState>);
       await g2.invoke(failedState(AgentRole.WORKER_RESEARCH, 'ddg'));
     }
-    expect(row(db, 'cfg:research:WORKER_RESEARCH:web_search')!.status).toBe('PROMOTED');
+    expect(row(db, expectedKey('web_search'))!.status).toBe('PROMOTED');
 
     // A subsequent run's planner recalls PROMOTED learnings for the plan's task
     // type + runs bandit selection. The plan asks for ddg; the bandit picks the
     // promoted web_search and (ASSISTED+) applies the override.
     const recalled = await recallLearnings({ db, tenantId: 'tenant-1', taskTypes: ['research'] });
     expect(recalled.length).toBe(1);
-    expect(recalled[0]!.key).toBe('cfg:research:WORKER_RESEARCH:web_search');
+    expect(recalled[0]!.key).toBe(expectedKey('web_search'));
 
     const ddgPlan = plan(AgentRole.WORKER_RESEARCH, 'ddg');
     const { plan: recalledPlan, selections } = applyBanditToPlan(ddgPlan, recalled, true);
@@ -302,7 +319,7 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       const g = buildGraph(db, failedState(AgentRole.WORKER_RESEARCH, 'serper') as ReturnType<typeof completedState>);
       await g.invoke(failedState(AgentRole.WORKER_RESEARCH, 'serper'));
     }
-    const serper = row(db, 'cfg:research:WORKER_RESEARCH:serper');
+    const serper = row(db, expectedKey('serper'));
     expect(serper).toBeDefined();
     expect(serper!.status).not.toBe('PROMOTED');
     // No sibling config was ever run, so serper has only present-failure (b=6)
@@ -333,7 +350,7 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       const g2 = buildGraph(db, ddg.failed as ReturnType<typeof completedState>);
       await g2.invoke(ddg.failed);
     }
-    const webSearch = row(db, 'cfg:research:WORKER_RESEARCH:web_search');
+    const webSearch = row(db, expectedKey('web_search'));
     expect(webSearch).toBeDefined();
     // The contingency is the SAME clearing table that promoted web_search under
     // AUTONOMOUS_SAFE above (present+success a=3, absent+failure d=3) — MI is

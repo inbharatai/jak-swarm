@@ -96,6 +96,7 @@ function triageTask(
   runBlocked: boolean,
   failureClassByTask?: Record<string, FailureClass>,
   errorByTask?: Record<string, string>,
+  industry?: string,
 ): TaskOutcome {
   const failureClass = failureClassByTask?.[task.id];
   const error = errorByTask?.[task.id] ?? task.error;
@@ -104,27 +105,33 @@ function triageTask(
   // information-theoretic gate has the contrast it needs to fire.
   const agentRole = String(task.agentRole);
   const primaryTool = task.toolsRequired[0];
+  // Phase 7: carry the full tool set + industry + risk level so the extractor's
+  // composite key is order-invariant and dimensioned by industry / risk tier
+  // (learnings do not cross-generalise across tool orderings, industries, or
+  // risk tiers they were not observed on).
+  const toolSet = task.toolsRequired;
+  const riskLevel = task.riskLevel;
 
   switch (task.status) {
     case TaskStatus.SKIPPED:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_SKIPPED, verified: false, agentRole, primaryTool };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_SKIPPED, verified: false, agentRole, primaryTool, toolSet, industry, riskLevel };
     case TaskStatus.FAILED:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool, toolSet, industry, riskLevel };
     case TaskStatus.AWAITING_APPROVAL:
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool, toolSet, industry, riskLevel };
     case TaskStatus.COMPLETED:
       if (verification) {
         return verification.passed
-          ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: true, verificationConfidence: verification.confidence, agentRole, primaryTool }
-          : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: true, verificationConfidence: verification.confidence, failureClass, error: error ?? verification.issues.join('; '), agentRole, primaryTool };
+          ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: true, verificationConfidence: verification.confidence, agentRole, primaryTool, toolSet, industry, riskLevel }
+          : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: true, verificationConfidence: verification.confidence, failureClass, error: error ?? verification.issues.join('; '), agentRole, primaryTool, toolSet, industry, riskLevel };
       }
-      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: false, agentRole, primaryTool };
+      return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_PASSED, verified: false, agentRole, primaryTool, toolSet, industry, riskLevel };
     case TaskStatus.PENDING:
     case TaskStatus.IN_PROGRESS:
     default:
       return runBlocked
-        ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool }
-        : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool };
+        ? { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_BLOCKED, verified: false, error, agentRole, primaryTool, toolSet, industry, riskLevel }
+        : { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool, toolSet, industry, riskLevel };
   }
 }
 
@@ -179,6 +186,7 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
       runBlocked,
       input.failureClassByTask,
       input.errorByTask,
+      input.plan.industry,
     ),
   );
 
