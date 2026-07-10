@@ -24,6 +24,7 @@ import {
   hasMoreTasks,
   getCurrentVerificationResult,
 } from '../state/swarm-state.js';
+import { ESCALATE_CLASSES } from '../hyperagent/replanner.js';
 
 /**
  * Single source of truth for the per-task same-input (R1/R2) retry ceiling.
@@ -264,6 +265,22 @@ export function afterDiagnosis(state: SwarmState): NodeName {
   const diag = pending.diagnosis;
   // Hard blocks never reach the replanner — they are terminal escalations.
   if (diag.recommendedRepairLevel !== RepairLevel.R3_PLAN_REPAIR) {
+    return 'validator';
+  }
+  // Security seal (Phase 3 Layer B). Even when the repair level is R3, a
+  // security/capability/credential/external-state diagnosis (ESCALATE_CLASSES)
+  // or any deterministic-block / quarantine must NEVER reach the replanner —
+  // the replanner would hand it to an LLM proposer that cannot be trusted to
+  // escalate a permission denial or prompt injection. Route to the validator
+  // (the final outcome evaluator + human-escalation path). This is defense-in-
+  // depth with the replanner's own pre-LLM guard (replanner.ts `replan()`).
+  // The seal fields are typed top-level fields on FailureDiagnosis (previously
+  // they were buried in the untyped `evidence` record and unreadable here).
+  if (
+    ESCALATE_CLASSES.has(diag.failureClass) ||
+    diag.deterministicBlock ||
+    diag.quarantine
+  ) {
     return 'validator';
   }
   // Budget exhausted mid-diagnosis → escalate rather than replan.

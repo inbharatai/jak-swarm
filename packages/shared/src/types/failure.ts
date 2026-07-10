@@ -126,6 +126,21 @@ export interface FailureDiagnosis {
   recommendedRepairLevel: RepairLevel;
   recommendedChanges: Record<string, unknown>;
   createdAt: string; // ISO
+  /**
+   * Security seal (Phase 3 hardening) — the deterministic-classifier security
+   * fields surfaced as TYPED top-level fields. Previously these lived only
+   * inside `evidence.deterministic` (an untyped `Record<string, unknown>`),
+   * so the graph edge (`afterDiagnosis`) and the replanner could not read
+   * them without an unsafe cast — a security-blocked diagnosis could reach the
+   * replanner. They are copied verbatim from the deterministic
+   * `ClassificationResult` by the diagnostician and are immutable once written
+   * (the LLM can never override a deterministic block).
+   */
+  requiresApproval: boolean;
+  quarantine: boolean;
+  /** True when the class is a hard security block (LLM cannot un-block). */
+  deterministicBlock: boolean;
+  externalSideEffectPossible: boolean;
 }
 
 /** Kinds of plan repair the Replanner may propose (Phase 4 consumes this). */

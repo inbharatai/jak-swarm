@@ -44,6 +44,7 @@ import { afterVerifier, afterDiagnosis, afterReplanner } from '../../../packages
 import { failureDiagnosisNode } from '../../../packages/swarm/src/graph/nodes/failure-diagnosis-node.js';
 import { replannerNode } from '../../../packages/swarm/src/graph/nodes/replanner-node.js';
 import { auctionRepairs, type RepairCandidate } from '../../../packages/swarm/src/hyperagent/repair-budget-auction.js';
+import { securityFieldsForClass } from '../../../packages/swarm/src/recovery/failure-classifier.js';
 
 function task(over: Partial<WorkflowTask> & { id: string }): WorkflowTask {
   return {
@@ -86,6 +87,9 @@ function diagnosis(cls: FailureClass, taskId = 'fail'): FailureDiagnosis {
     recommendedRepairLevel: RepairLevel.R3_PLAN_REPAIR,
     recommendedChanges: {},
     createdAt: '2026-01-01T00:00:00Z',
+    // Security seal (Phase 3) — derived from the class so the fixture's seal
+    // matches what the real diagnostician would surface.
+    ...securityFieldsForClass(cls),
   };
 }
 

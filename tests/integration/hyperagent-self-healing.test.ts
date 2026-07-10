@@ -52,12 +52,13 @@ import type {
   ConfigVersion,
   RolloutMetrics,
   CodeRepairProposal,
+  FailureDiagnosis,
 } from '@jak-swarm/shared';
 import { ShieldDecisionVerdict, evaluateForConfig } from '@jak-swarm/security';
 import { ShieldMcpClient } from '../../packages/security/src/shield-gateway/shield-mcp-client.js';
 import { generateShieldKeyPair } from '../../packages/security/src/shield-gateway/signed-decision.js';
 import type { ShieldDecisionSubject } from '../../packages/security/src/shield-gateway/signed-decision.js';
-import { classifyFailure } from '../../packages/swarm/src/recovery/failure-classifier.js';
+import { classifyFailure, securityFieldsForClass } from '../../packages/swarm/src/recovery/failure-classifier.js';
 import { diagnoseFailure } from '../../packages/swarm/src/hyperagent/failure-diagnostician.js';
 import type { CounterfactualReExecutor } from '../../packages/swarm/src/hyperagent/failure-diagnostician.js';
 import { replan } from '../../packages/swarm/src/hyperagent/replanner.js';
@@ -240,6 +241,17 @@ describe('Phase 14 integration — plan failure → task split (LLM propose, sym
       tenantId: 'tenant-1',
       now: NOW,
     });
+    // The classifier has no PLAN_DEPENDENCY signal, so diagnoseFailure classifies
+    // the raw message as UNKNOWN — and Phase 3's pre-LLM guard escalates
+    // ESCALATE_CLASSES (incl. UNKNOWN) before the LLM is ever consulted. This
+    // scenario is about LLM-proposal SYMBOLIC VALIDATION, so surface the
+    // PLAN_DEPENDENCY class the scenario is built around (with its security
+    // seal) to reach the LLM proposer + validator — the path under test.
+    const diagnosis: FailureDiagnosis = {
+      ...diag.diagnosis,
+      failureClass: FailureClass.PLAN_DEPENDENCY,
+      ...securityFieldsForClass(FailureClass.PLAN_DEPENDENCY),
+    };
 
     // LLM proposes splitting the over-large task into a research sub-task + the original action.
     const splitPlan = plan([
@@ -256,7 +268,7 @@ describe('Phase 14 integration — plan failure → task split (LLM propose, sym
       completedExternalTaskIds: [],
       failedTask: tBig,
       verifierIssues: [],
-      diagnosis: diag.diagnosis,
+      diagnosis,
       permittedAgents: [AgentRole.WORKER_CRM, AgentRole.WORKER_RESEARCH],
       permittedTools: ['web_search', 'crm_create_contact'],
       budgetRemaining: { planRepairs: 1, executionRetries: 2, outputRepairs: 2, costUsd: 5, durationMs: 60000 },
@@ -294,6 +306,15 @@ describe('Phase 14 integration — plan failure → task split (LLM propose, sym
       tenantId: 'tenant-1',
       now: NOW,
     });
+    // As above: diagnoseFailure classifies the raw message as UNKNOWN, which
+    // Phase 3's pre-LLM guard escalates without consulting the LLM. This test
+    // exercises the symbolic validator rejecting an LLM-proposed CYCLE, so
+    // surface the PLAN_DEPENDENCY class (non-ESCALATE) to reach the LLM + validator.
+    const diagnosis: FailureDiagnosis = {
+      ...diag.diagnosis,
+      failureClass: FailureClass.PLAN_DEPENDENCY,
+      ...securityFieldsForClass(FailureClass.PLAN_DEPENDENCY),
+    };
 
     // Malicious/negligent LLM: introduces a cycle (t_x depends on t_y, t_y depends on t_x).
     const cyclicPlan = plan([
@@ -309,7 +330,7 @@ describe('Phase 14 integration — plan failure → task split (LLM propose, sym
       completedExternalTaskIds: [],
       failedTask: tBig,
       verifierIssues: [],
-      diagnosis: diag.diagnosis,
+      diagnosis,
       permittedAgents: [AgentRole.WORKER_CRM],
       permittedTools: ['crm_create_contact'],
       budgetRemaining: { planRepairs: 1, executionRetries: 2, outputRepairs: 2, costUsd: 5, durationMs: 60000 },
@@ -380,6 +401,9 @@ describe('Phase 14 integration — negative learning (prompt injection) is quara
           failureClass: FailureClass.PROMPT_INJECTION, rootCause: 'jailbreak detected',
           evidence: {}, confidence: 1, recommendedRepairLevel: RepairLevel.R3_PLAN_REPAIR,
           recommendedChanges: {}, createdAt: NOW,
+          // Security seal (Phase 3) — PROMPT_INJECTION: approval-required,
+          // quarantined, deterministically blocked (LLM cannot un-block).
+          requiresApproval: true, quarantine: true, deterministicBlock: true, externalSideEffectPossible: false,
         },
       },
       now: NOW, tenantId: 'tenant-1',

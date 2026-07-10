@@ -32,6 +32,7 @@ import type {
   AutonomyDecision,
 } from '../../../packages/shared/src/index.js';
 import { replan } from '../../../packages/swarm/src/hyperagent/replanner.js';
+import { securityFieldsForClass } from '../../../packages/swarm/src/recovery/failure-classifier.js';
 
 function task(over: Partial<WorkflowTask> & { id: string }): WorkflowTask {
   return {
@@ -74,6 +75,9 @@ function diagnosis(cls: FailureClass): FailureDiagnosis {
     recommendedRepairLevel: RepairLevel.R3_PLAN_REPAIR,
     recommendedChanges: {},
     createdAt: '2026-01-01T00:00:00Z',
+    // Security seal (Phase 3) — derived from the class so the fixture's seal
+    // matches what the real diagnostician would surface.
+    ...securityFieldsForClass(cls),
   };
 }
 
