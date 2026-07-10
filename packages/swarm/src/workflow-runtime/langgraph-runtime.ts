@@ -112,6 +112,7 @@ export class LangGraphRuntime implements WorkflowRuntime {
       browserAutomationEnabled: ctx.browserAutomationEnabled,
       restrictedCategories: ctx.restrictedCategories as ToolCategory[] | undefined,
       disabledToolNames: ctx.disabledToolNames,
+      allowedToolNames: ctx.allowedToolNames,
       connectedProviders: ctx.connectedProviders,
       subscriptionTier: ctx.subscriptionTier,
       userRole: ctx.userRole,
