@@ -31,6 +31,8 @@
  */
 
 import type { FailureClass, OutcomeEvaluation } from '@jak-swarm/shared';
+import { AutonomyCapability, AutonomyLevel, HyperAgentMode } from '@jak-swarm/shared';
+import { evaluateForConfig } from '@jak-swarm/security';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { evaluateOutcome } from '../../hyperagent/outcome-evaluator.js';
 import { extractLearnings } from '../../hyperagent/learning-extractor.js';
@@ -105,6 +107,19 @@ export async function learningNode(
 
   // Durable persist — non-fatal. A DB error here never changes the run outcome.
   if (deps.db && candidates.length > 0) {
+    // Promotion is an L4 autonomy capability, and OBSERVE is read-only. The
+    // persist service still accrues candidates + measures MI when promotion is
+    // denied, but no row flips to PROMOTED/DEPRECATED. Before this gate the
+    // learning path promoted purely on MI, so a L0–L3 tenant (or OBSERVE) could
+    // promote — violating the L4 requirement and the OBSERVE read-only contract.
+    const promoteDecision = evaluateForConfig(
+      {
+        hyperAgentEnabled: state.hyperAgentEnabled ?? false,
+        hyperAgentMode: state.hyperAgentMode ?? HyperAgentMode.OFF,
+        autonomyLevel: state.autonomyLevel ?? AutonomyLevel.L0,
+      },
+      AutonomyCapability.PROMOTE_CONFIG,
+    );
     try {
       const outcomes = await persistLearningCandidates({
         db: deps.db,
@@ -112,6 +127,7 @@ export async function learningNode(
         candidates,
         now,
         gate: deps.gate,
+        promoteEnabled: promoteDecision.allowed,
       });
       // Surface promotions as state side-effect data (cockpit/audit), without
       // letting a persist error propagate.

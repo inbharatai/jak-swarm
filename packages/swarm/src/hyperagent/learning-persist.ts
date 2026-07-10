@@ -78,6 +78,14 @@ export interface PersistLearningCandidatesInput {
   now: string;
   /** Per-tenant gate thresholds; default DEFAULT_GATE. */
   gate?: LearningGateOverrides;
+  /**
+   * Whether promotion (and deprecation) is permitted this call. The live
+   * learning node sets this from `evaluateForConfig(..., PROMOTE_CONFIG)` so
+   * that a tenant below L4 — or OBSERVE mode, which is read-only — accrues
+   * candidates (CANDIDATE) and measures MI but never flips a row to PROMOTED
+   * or DEPRECATED. Default true (pure-core / tests preserve prior behaviour).
+   */
+  promoteEnabled?: boolean;
 }
 
 /** The per-candidate outcome the caller can observe (for audit + cockpit). */
@@ -147,6 +155,11 @@ export async function persistLearningCandidates(
 ): Promise<PersistOutcome[]> {
   const { db, tenantId, candidates, now } = input;
   const overrides = input.gate ?? {};
+  // When the autonomy policy denies PROMOTE_CONFIG (OBSERVE mode, or below L4),
+  // the caller sets promoteEnabled=false: candidates still accrue + MI is still
+  // measured, but no row flips to PROMOTED or DEPRECATED. OBSERVE is read-only;
+  // promotion is an L4 capability, not an MI-only side effect.
+  const canPromote = input.promoteEnabled !== false;
   const gateOpts = {
     threshold: overrides.miThreshold ?? DEFAULT_GATE.miThreshold,
     minSamples: overrides.minSamples ?? DEFAULT_GATE.minSamples,
@@ -225,9 +238,13 @@ export async function persistLearningCandidates(
 
       const wasPromoted = existing?.status === LearningStatus.PROMOTED;
       let status: LearningStatus;
-      if (promotion.promoted) {
+      if (promotion.promoted && canPromote) {
         status = LearningStatus.PROMOTED;
-      } else if (wasPromoted) {
+      } else if (wasPromoted && promotion.promoted) {
+        // Still above the gate — keep governing (canPromote only affects the
+        // CANDIDATE→PROMOTED flip, not an already-promoted row's tenure).
+        status = LearningStatus.PROMOTED;
+      } else if (wasPromoted && canPromote) {
         // Was promoted, but the accumulated MI has now collapsed below the gate.
         // MI-truth conflict resolution: deprecate, never silently keep governing.
         status = LearningStatus.DEPRECATED;
@@ -314,8 +331,9 @@ export async function persistLearningCandidates(
     const promotion = gateLearning({ key: candidate.key, contingency: merged, ...gateOpts });
     const wasPromoted = existing?.status === LearningStatus.PROMOTED;
     let status: LearningStatus;
-    if (promotion.promoted) status = LearningStatus.PROMOTED;
-    else if (wasPromoted) status = LearningStatus.DEPRECATED;
+    if (promotion.promoted && canPromote) status = LearningStatus.PROMOTED;
+    else if (wasPromoted && promotion.promoted) status = LearningStatus.PROMOTED;
+    else if (wasPromoted && canPromote) status = LearningStatus.DEPRECATED;
     else status = existing ? (existing.status as LearningStatus) : LearningStatus.CANDIDATE;
     const confidence = promotion.promoted ? promotion.mutualInformation : (existing?.confidence ?? candidate.confidence);
     const data = {

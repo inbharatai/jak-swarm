@@ -357,17 +357,21 @@ export function runFailureInjection(kind: FailureKind, ctx: FailureInjectionCont
   const shield = resolveShield(ctx, highRisk);
 
   // Action precedence (honest):
-  //   Shield fail-closed > quarantine > budget exhausted > approval required
-  //   (classifier or autonomy-blocked) > OBSERVE mode (never act, only report)
-  //   > map by repair level > inert when disabled > escalate.
-  //   OBSERVE mode sits ABOVE the retryable/level mapping so a safe retry is
-  //   reported, never auto-executed — the agent only acts when mode ≥ ASSISTED.
+  //   Shield fail-closed > quarantine > budget exhausted > OBSERVE mode
+  //   (never act, only report) > approval required (classifier or
+  //   autonomy-blocked) > map by repair level > inert when disabled > escalate.
+  //   OBSERVE mode sits ABOVE the autonomy-blocked approval check because the
+  //   autonomy policy denies every mutating capability in OBSERVE (read-only),
+  //   so `!autonomy.allowed` is always true in OBSERVE — without this ordering
+  //   OBSERVE would wrongly surface APPROVAL_REQUIRED (a pause) instead of
+  //   OBSERVE_ONLY (record + continue). Shield/quarantine/budget terminal
+  //   escalations still win over OBSERVE.
   let action: FailureAction;
   if (shield.failClosed) action = 'FAIL_CLOSED_SHIELD';
   else if (classified.quarantine) action = 'QUARANTINE';
   else if (exhausted) action = 'STOP_BUDGET';
-  else if (classified.requiresApproval || !autonomy.allowed) action = 'APPROVAL_REQUIRED';
   else if (ctx.config.hyperAgentMode === HyperAgentMode.OBSERVE) action = 'OBSERVE_ONLY';
+  else if (classified.requiresApproval || !autonomy.allowed) action = 'APPROVAL_REQUIRED';
   else if (classified.retryable) action = 'RETRY';
   else if (level === RepairLevel.R2_OUTPUT_CORRECTION) action = 'CORRECT_OUTPUT';
   else if (level === RepairLevel.R3_PLAN_REPAIR) action = 'REPLAN';

@@ -116,6 +116,27 @@ export function evaluateAutonomy(
     };
   }
 
+  // OBSERVE is read-only: the HyperAgent may *propose* repairs/learnings and
+  // report observations, but it must NOT mutate plan/state, correct output,
+  // promote learnings, or pause the workflow for approval (approval-pause is
+  // itself a side effect). Every mutating capability is denied with
+  // requiresApproval=false so the consumer nodes record an observation and
+  // CONTINUE rather than blocking. OBSERVE_REPORT stays allowed so observation
+  // and cockpit reporting still run. Before this, OBSERVE fell through to the
+  // normal levelAtLeast check, so OBSERVE+L3 mutated the plan, OBSERVE+L2
+  // corrected output, and OBSERVE+L4 promoted learnings — defeating the
+  // "observe only" contract. The only prior gate was failure-injection.ts:370
+  // (classifier-tier retry path), which the replanner graph node bypassed.
+  if (mode === HyperAgentMode.OBSERVE && capability !== AutonomyCapability.OBSERVE_REPORT) {
+    return {
+      capability,
+      level,
+      allowed: false,
+      requiresApproval: false,
+      reason: `HyperAgent mode is OBSERVE; observation only — no mutation.`,
+    };
+  }
+
   const minLevel = AUTONOMY_CAPABILITY_MATRIX[capability];
   if (minLevel === undefined) {
     // Unknown capability → fail closed. Never auto-allow an unlisted action.
