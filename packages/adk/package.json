@@ -9,6 +9,12 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./governance": {
+      "import": "./dist/orchestration/orchestration-router.js",
+      "types": "./dist/orchestration/orchestration-router.d.ts",
+      "require": "./dist/orchestration/orchestration-router.js",
+      "default": "./dist/orchestration/orchestration-router.js"
     }
   },
   "scripts": {

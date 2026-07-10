@@ -17,6 +17,14 @@ import { Industry, ToolRiskClass, WorkflowStatus } from '@jak-swarm/shared';
 import type { AgentTrace as SharedAgentTrace, ApprovalRequest as SharedApprovalRequest } from '@jak-swarm/shared';
 import { AutonomyLevel, HyperAgentMode } from '@jak-swarm/shared';
 import type { RepairBudget } from '@jak-swarm/shared';
+// Phase 5 — pure ADK/LangGraph governance router (no @google/adk import; the
+// deep `./governance` export keeps the lazy-load guarantee — @google/adk is
+// still only pulled when the ADK path dynamic-imports `runWithAdk` below).
+import {
+  chooseOrchestrationPath,
+  buildGovernedAdkParams,
+  buildAdkApprovalGate,
+} from '@jak-swarm/adk/governance';
 import { COMPANY_OS_INTENTS, INTENT_REQUIRED_CONTEXT, type CompanyOSIntent } from '@jak-swarm/agents';
 import { IntentRecordService } from './company-brain/intent-record.service.js';
 import { CompanyProfileService } from './company-brain/company-profile.service.js';
@@ -1306,11 +1314,66 @@ export class SwarmExecutionService extends EventEmitter {
         }
       };
 
-      if (process.env['JAK_ADK_MODE']?.trim() === '1') {
+      // ── Phase 5: unify ADK under LangGraph governance ───────────────────────
+      // LangGraph is the GOVERNED primary whenever HyperAgent is ON (diagnosis
+      // / replanner / learning / autonomy all apply on the LangGraph path). ADK
+      // is the opt-in legacy path (JAK_ADK_MODE=1); when HyperAgent is ON, ADK
+      // runs GOVERNED — the per-tool approval gate (and a Planner plan, when a
+      // plan provider is wired) is threaded via `buildGovernedAdkParams` so
+      // there is no ungoverned execution route. When HyperAgent is OFF, today's
+      // ADK-first behavior is byte-for-byte unchanged. The decision matrix lives
+      // in `@jak-swarm/adk/governance` (chooseOrchestrationPath — pure, no
+      // @google/adk import, so the lazy-load guarantee is preserved: @google/adk
+      // is still only pulled when `primary === 'adk'` below dynamic-imports it).
+      //
+      // The ONLY behavioral change vs the prior ADK-first code is the
+      // HyperAgent-ON + adkRequested-true cell: ungoverned ADK → governed ADK.
+      // HyperAgent-OFF is unchanged; HyperAgent-ON + adkRequested-false already
+      // ran LangGraph (the ADK block was gated on JAK_ADK_MODE==='1').
+      const orchestration = chooseOrchestrationPath({
+        hyperAgentEnabled: hyperAgentEnabled === true,
+        adkRequested: process.env['JAK_ADK_MODE']?.trim() === '1',
+      });
+
+      if (orchestration.primary === 'adk') {
         try {
           const { runWithAdk } = await import('@jak-swarm/adk');
           const { toolRegistry } = await import('@jak-swarm/tools');
           const jakToolMetadata = toolRegistry.list();
+
+          // Governed ADK: thread the approval gate so high-risk tools pause
+          // (recorded-for-review — ADK's `for await` loop has no interrupt(), so
+          // the gate cannot truly block for a human; it records the request and
+          // the tool does NOT execute, honest parity with LangGraph's per-tool
+          // gate within ADK's synchronous-event constraint). A Planner plan is
+          // threaded too when a plan provider is wired (full waved-pipeline
+          // parity); the default service has no plan pre-run, so `plannerPlan`
+          // is left unset and ADK derives roles from `workerRoles`/roleModes as
+          // before (non-regressing). Legacy ADK (HyperAgent OFF) omits both.
+          const governedParams = orchestration.adkGoverned
+            ? buildGovernedAdkParams({
+                approvalGate: buildAdkApprovalGate({
+                  createApprovalRequest: async (toolName, metadata) =>
+                    this.workflowService.createApprovalRequest({
+                      workflowId,
+                      tenantId,
+                      taskId: `adk:${toolName}`,
+                      agentRole: 'ADK',
+                      action: `tool:${toolName}`,
+                      rationale: String(metadata.description ?? 'Approval required.'),
+                      riskLevel:
+                        metadata.riskClass === ToolRiskClass.DESTRUCTIVE
+                          ? 'CRITICAL'
+                          : metadata.riskClass === ToolRiskClass.EXTERNAL_SIDE_EFFECT
+                            ? 'HIGH'
+                            : 'MEDIUM',
+                      proposedDataJson: { toolName, riskClass: metadata.riskClass },
+                      toolName,
+                    }),
+                }),
+              })
+            : {};
+
           const adkResult = await runWithAdk({
             workflowId,
             goal: effectiveGoal,
@@ -1340,6 +1403,10 @@ export class SwarmExecutionService extends EventEmitter {
             // mapAdkEventToActivities emits worker_started/worker_completed
             // shapes that this translator routes to step_started/step_completed.
             onAgentActivity,
+            // Phase 5 — governed-ADK seams (plannerPlan? + approvalGate?).
+            // Empty object for the legacy (HyperAgent-OFF) path — runWithAdk
+            // falls back to its non-regressing defaults.
+            ...governedParams,
           });
 
           result = {
@@ -1355,8 +1422,10 @@ export class SwarmExecutionService extends EventEmitter {
             completedAt: new Date(),
           };
 
-          this.log.info({ workflowId, provider: llmProvider ?? 'gemini', mode: 'adk' },
-            '[Swarm] Workflow completed via ADK orchestration');
+          this.log.info(
+            { workflowId, provider: llmProvider ?? 'gemini', mode: 'adk', governed: orchestration.adkGoverned },
+            '[Swarm] Workflow completed via ADK orchestration',
+          );
         } catch (adkErr) {
           this.log.error({ workflowId, err: adkErr instanceof Error ? adkErr.message : String(adkErr) },
             '[Swarm] ADK mode failed; falling back to LangGraph');
