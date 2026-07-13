@@ -164,7 +164,7 @@
 ## 15. Frontend product surfaces, README, landing, deployment
 
 - `/company/graph` route exists on the API (`routes.ts:27-31`); **`/company` + `/company/graph` are now reachable from the dashboard nav (PR E / Phase 11):** wired into the `CommandPalette` (Cmd+K) under a new `Brain` zone + the `ChatSidebar` zone rail (highlights on `/company/*`). This is the reachability half of the Phase 11 product-graph interface — the rich merge-comparison UI, evidence drawer, conflict queue, impact chains, and authority/confidence explanation remain roadmap.
-- README (73KB) + landing carry verbose historical/programme material; the truth-check gate (`pnpm check:truth`) keeps landing claims aligned to the live tool manifest. README/landing simplification + universal-claim correction is **Phase 12 target**.
+- README + landing: the landing was already simplified on 2026-04-28 (commit d7bbf71 — stat cards + integration chips removed; `product-truth.ts` is the lean canonical registry the truth-check pins). The README (996 lines) carried verbose duplicated programme material (a 600-word HyperAgent blockquote under "How It Works" that duplicated the "Long-Term Vision" `<details>` breakdown, plus a redundant GEPA/optimizer table-row pair + narrative) and several **stale claims that PR E made obsolete** — `ShieldMcpClient` "not yet instantiated in the live action path (deferred)" and `AuditLog` "fetch-latest-then-write TOCTOU under concurrency" as outstanding. **Phase 12 (PR F) closed:** the stale claims corrected to PR E reality (Shield live behind `SHIELD_MCP_CANARY=1` observational canary; TOCTOU closed via `appendChainedAuditRow` + `pg_advisory_xact_lock` + migration 122), the duplicated 600-word blockquote replaced with a 2-paragraph summary + pointer, the GEPA narrative condensed, the duplicate optimizer table rows merged, and the FAQ roadmap list updated (AuditLog row-chain-hashing removed — it is shipped). Pinned counts (122 tools / 38 agents / 22 connectors / `Classified_Tools-122` badge) preserved; `pnpm check:truth` + `pnpm lint:eslint` green.
 - **Deployment:** no `deploy.yml`; Cloud Run API deployment is documented (`docs/ARCHITECTURE.md:454` — `jak-swarm-api-…asia-south1.run.app`, `/ready` `/health` `/healthz` wired); worker NOT deployed. No production canary has run. **Phase 13 target** (and a named stop condition: production verification requires credentials not available in this session).
 
 ## 16. Red-flag sweep (first-hand, `apps/api/src`)
@@ -190,7 +190,7 @@ JAK Swarm has a **merged and live-wired Company Brain Graph V2** (ingestion → 
 9. Brain MCP surface (Phase 9 → PR E) — **DONE.**
 10. Audit-chain concurrency fix (Phase 10 → PR E) — **DONE.**
 11. Product graph interface (Phase 11 → PR E) — **reachability DONE** (nav wired); rich merge-comparison UI remains roadmap.
-12. README + landing simplification + universal-claim correction (Phase 12 → PR F).
+12. README + landing simplification + universal-claim correction (Phase 12 → PR F) — **DONE** (README stale-claim correction + de-duplication; landing already simplified 2026-04-28).
 13. Production canary + deployment evidence (Phase 13 → PR G) — **requires production credentials not available in this session; will stop at the canary plan + safe non-destructive dry-run and request owner input for the live canary.**
 
 ---
@@ -435,3 +435,26 @@ Every merge stamps `algorithmVersion='entity-resolver-v1'` + `matchingEvidence` 
 - The Phase 11 product-graph interface is REACHABILITY only — the rich merge-comparison UI (side-by-side entity diff, evidence drawer, conflict queue, impact chains, authority/confidence explanation) remains roadmap.
 - The Brain MCP live wiring is a CANARY (`BRAIN_MCP_SERVER=1`, default-off); the tool SPECS are always importable but the in-process server + registry registration only activate with the flag. No production canary has run.
 - `getContextPackage` exposure (agent-readable role-scoped context) is intentionally deferred — the agentRole-escalation guard stands until a safe role-bound surface is designed.
+
+## PR F — README truth-lock simplification + universal-claim correction (Phase 12)
+
+**Status:** implemented locally on `chore/readme-landing-truth-simplification` (off main `659065b` = PR E merged). Docs-only PR. Local gate green: `pnpm lint:eslint` 0 warnings, `pnpm check:truth` OK (122 tools, 0 unclassified). No code touched → api tsc / vitest / build unaffected (re-verified green from PR E baseline; no source files changed in this PR).
+
+**What this PR closes (Phase 12):**
+
+1. **Stale-claim correction (PR E made these obsolete):** the README carried three claims that PR E's closures contradicted —
+   - "the `ShieldMcpClient` is **not yet instantiated in the live action path** (deferred)" (Verified Evidence Safety row + the "How It Works" blockquote + the Long-Term Vision `🟡 Deferred` bullet + the Phase-narrative tail). All corrected: the ShieldMcpClient is now **live-instantiated behind `SHIELD_MCP_CANARY=1`** (observational canary — records signed Ed25519 decisions to the atomic audit chain, does not gate execution; external transport still roadmap).
+   - "the `AuditLog` chain's ... fetch-latest-then-write TOCTOU under concurrency" listed as outstanding (blockquote + the `🟡 Env-blocked` bullet). Corrected: the TOCTOU is **CLOSED (PR E)** via the atomic `appendChainedAuditRow` primitive + per-tenant `pg_advisory_xact_lock` + migration 122 partial-unique-seq backstop.
+   - The FAQ roadmap list included "AuditLog row chain-hashing" as a future item — it is shipped (migration 117 + PR E atomicity). Removed; replaced with the genuinely-pending items (live production canary of the HyperAgent learning loop + Brain/Shield MCP canaries).
+
+2. **De-duplication + simplification of verbose programme material:**
+   - The 600-word single-paragraph blockquote under the "How It Works" mermaid diagram (which duplicated the "Long-Term Vision" `<details>` wired-vs-pure-core breakdown verbatim) is replaced with a 2-paragraph concise summary + a pointer to the detailed section. This is the single largest readability win and also where two of the stale claims lived.
+   - The two redundant GEPA/optimizer rows in the Verified Evidence table (Agent Optimizer + Before/after optimization results — both repeated the 6/6 train + 4/4 val + p50 7.6s numbers) are merged into one "Agent Optimizer (GEPA)" row.
+   - The ~120-word GEPA narrative paragraph in "Optimization Story" (which restated the same numbers a third time) is condensed to 2 sentences pointing at `qa/benchmark-optimization-before-after.md`.
+
+3. **Truth-lock preservation:** the `pnpm check:truth` pins are untouched — `Classified_Tools-122` badge, the "122 classified tools" headline, "38 AI Agents", "22 connectors" all preserved. No prohibited phrase introduced (Hono / "no api keys required" / "Ducky Duck" / "Nx cheaper" / "Your Entire Company, Automated" / "autonomous multi-agent AI platform" / "production tools" all still absent). The landing page (`apps/web/src/app/page.tsx`) was already simplified on 2026-04-28 (commit d7bbf71 — stat cards + integration chips removed; `product-truth.ts` is the lean canonical registry the truth-check pins) and carries no stale ShieldMcp/TOCTOU claims, so no landing edits were warranted.
+
+**Honest limitations:**
+- This is a README honesty + readability pass, NOT a content audit of every linked doc. The detailed HyperAgent wired-vs-pure-core breakdown lives on in the "Long-Term Vision" `<details>` block (now with corrected claims); `docs/hyperagent-current-state-audit.md` and the per-PR sections of this doc remain the deepest source of truth.
+- README is still ~997 lines / ~72KB. The mandate's "simplification" is satisfied by removing the worst duplication + stale claims without gutting truthful feature/architecture/deployment content. A more aggressive restructure (extracting sections into separate docs) is a larger editorial effort outside this PR's focused scope.
+- The `check:truth` gate does NOT itself check for the "ShieldMcpClient not yet instantiated" string — the stale-claim correction was a manual honesty pass (the truth-check catches quantitative drift + prohibited overclaims, not prose-level staleness). This is a gap worth noting: prose staleness after a capability ships relies on the PR author updating the README, which PR F did for PR E's closures.
