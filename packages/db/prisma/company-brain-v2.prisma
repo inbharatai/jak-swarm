@@ -1,0 +1,141 @@
+/// Company Brain Graph V2 models.
+///
+/// These tables deliberately store ids as scalar strings instead of Prisma
+/// relations. The migration owns the database foreign keys, while the service
+/// performs tenant-scoped raw SQL joins. This avoids coupling the additive V2
+/// graph to the large legacy Tenant / CompanyArtifact / CompanyGraphEntity
+/// models and keeps the multi-file schema migration-safe.
+
+model CompanyArtifactPolicyV2 {
+  artifactId       String   @id
+  tenantId         String
+  visibility       String   @default("internal")
+  allowedAgentRoles String[] @default([])
+  sensitivity      String   @default("normal")
+  retentionUntil   DateTime?
+  processingState  String   @default("ingested")
+  processingAttempts Int    @default(0)
+  processingError  String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId, visibility])
+  @@index([tenantId, retentionUntil])
+  @@index([tenantId, processingState])
+  @@map("company_artifact_policies")
+}
+
+model CompanyEntityAliasV2 {
+  id               String   @id
+  tenantId         String
+  entityId         String
+  entityType       String
+  alias            String
+  normalizedAlias String
+  sourceArtifactId String?
+  confidence       Float    @default(1)
+  createdBy        String?
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, entityType, normalizedAlias])
+  @@index([entityId])
+  @@map("company_entity_aliases")
+}
+
+model CompanyClaimV2 {
+  id                String    @id
+  tenantId          String
+  subjectEntityId   String
+  predicate         String
+  objectEntityId    String?
+  objectValue       Json?
+  normalizedObject  String
+  fingerprint       String
+  status            String    @default("proposed")
+  confidence        Float     @default(0)
+  authorityScore    Float     @default(0)
+  validFrom         DateTime?
+  validTo           DateTime?
+  supersedesClaimId String?
+  createdBy         String?
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  reviewComment     String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([tenantId, fingerprint])
+  @@index([tenantId, subjectEntityId, predicate, status])
+  @@index([objectEntityId])
+  @@index([tenantId, updatedAt])
+  @@map("company_claims")
+}
+
+model CompanyClaimEvidenceV2 {
+  id              String   @id
+  tenantId        String
+  claimId         String
+  artifactId      String
+  excerpt         String?  @db.Text
+  sourceAuthority Float    @default(0)
+  observedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@unique([claimId, artifactId])
+  @@index([tenantId, artifactId])
+  @@map("company_claim_evidence")
+}
+
+model CompanyEdgeV2 {
+  id                  String   @id
+  tenantId            String
+  sourceEntityId      String
+  relationshipType    String
+  targetEntityId      String
+  status              String   @default("active")
+  confidence          Float    @default(0)
+  evidenceArtifactIds Json     @default("[]")
+  validFrom           DateTime?
+  validTo             DateTime?
+  supersedesEdgeId    String?
+  createdBy           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId, sourceEntityId, status])
+  @@index([tenantId, targetEntityId, status])
+  @@map("company_edges")
+}
+
+model CompanyEntityMergeV2 {
+  id             String   @id
+  tenantId       String
+  sourceEntityId String
+  targetEntityId String
+  reason         String   @db.Text
+  similarity     Float    @default(0)
+  mergedBy       String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("company_entity_merges")
+}
+
+model CompanyMemoryReviewV2 {
+  id            String   @id
+  tenantId      String
+  reviewType    String
+  resourceId    String
+  status        String   @default("open")
+  reason        String   @db.Text
+  payload       Json     @default("{}")
+  priority      String   @default("medium")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewComment String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, status, priority, createdAt])
+  @@map("company_memory_reviews")
+}
