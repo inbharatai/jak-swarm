@@ -117,10 +117,30 @@ interface Scenario {
   metrics?: Record<string, number>;
   /** Pre-classified failure class per failed task. */
   failureClassByTask?: Record<string, FailureClassType>;
+  /** Phase 6 — the run paused at an approval gate (no terminal plan). */
+  awaitingApproval?: boolean;
+  /** Phase 6 — the approval request id the run paused on. */
+  approvalRequestId?: string;
 }
 
 function stubRunPlan(scenario: Scenario = {}) {
   return async (input: RunPlanInput): Promise<FinishedRun> => {
+    // Phase 6 — approval pause: the run interrupted; return an AWAITING_APPROVAL
+    // FinishedRun (no terminal plan, no completedTaskIds) so the orchestrator
+    // surfaces awaitingApproval instead of a verdict.
+    if (scenario.awaitingApproval) {
+      return {
+        plan: input.plan,
+        verificationResults: {},
+        blocked: false,
+        artifacts: [],
+        metrics: {},
+        awaitingApproval: true,
+        ...(scenario.approvalRequestId ? { approvalRequestId: scenario.approvalRequestId } : {}),
+        startedAt: input.now,
+        completedAt: input.now,
+      };
+    }
     const plan: WorkflowPlan = {
       ...input.plan,
       tasks: input.plan.tasks.map((t) => {
@@ -323,5 +343,32 @@ describe('Phase 6 — executeApprovedSpec closed loop (integration)', () => {
     expect(a.workflowId).toBe('wf_spec_spec-1');
     expect(a.verdict).toBe(b.verdict);
     expect(a.acceptanceResults).toEqual(b.acceptanceResults);
+  });
+
+  // ── Phase 6: approval pause signal propagation ─────────────────────────
+  it('AWAITING_APPROVAL: a run that pauses at an approval gate surfaces awaitingApproval=true + the approvalRequestId, with UNVERIFIABLE verdict and empty acceptanceResults (no verdict reduced for an unfinished run)', async () => {
+    const s = spec({
+      tasks: [desc({ id: 't1', requiresApproval: true })],
+      acceptanceCriteria: [criterion({ id: 'c1', kind: AcceptanceCriterionKind.TASK_COMPLETED, taskId: 't1' })],
+    });
+    const r = await run(s, { awaitingApproval: true, approvalRequestId: 'apr-123' });
+    expect(r.awaitingApproval).toBe(true);
+    expect(r.approvalRequestId).toBe('apr-123');
+    // No verdict reduced — the run did not finish.
+    expect(r.verdict).toBe(AcceptanceVerdict.UNVERIFIABLE);
+    expect(r.acceptanceResults).toEqual([]);
+    expect(r.resolvedDrift.resolved).toBe(false);
+    // The outcome is a complete (honest, no-undefined-fields) empty evaluation.
+    expect(r.outcome.taskOutcomes).toEqual([]);
+    expect(r.outcome.taskTotal).toBe(0);
+    expect(r.outcome.summary).toMatch(/Awaiting human approval/);
+  });
+
+  it('AWAITING_APPROVAL: a run that pauses WITHOUT an approvalRequestId still surfaces awaitingApproval=true (approvalRequestId optional)', async () => {
+    const s = spec({ tasks: [desc({ id: 't1', requiresApproval: true })] });
+    const r = await run(s, { awaitingApproval: true });
+    expect(r.awaitingApproval).toBe(true);
+    expect(r.approvalRequestId).toBeUndefined();
+    expect(r.verdict).toBe(AcceptanceVerdict.UNVERIFIABLE);
   });
 });

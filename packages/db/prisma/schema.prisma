@@ -78,6 +78,8 @@ model Tenant {
   configRolloutEvents        ConfigRolloutEvent[]
   // Migration 116 — HyperAgent Phase 12 R5 code-repair proposals.
   codeRepairProposals        CodeRepairProposal[]
+  // Migration 121 — HyperAgent Phase 6 spec-execution attempts.
+  specExecutions             SpecExecution[]
 
   @@map("tenants")
 }
@@ -614,14 +616,21 @@ model WorkflowArtifact {
   // id, source dataset version, signing key id, etc.).
   metadata         Json?
   error            String?
+  // Phase 6 — provenance: the spec execution / agent trace / approval request
+  // that produced this artifact. All nullable + loose (SET NULL on delete) so
+  // the audit trail survives even if the origin row is pruned.
+  specExecutionId  String?
+  agentTraceId     String?
+  approvalRequestId String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   // Soft-delete marker. Hard-delete is reserved for retention sweeps.
   deletedAt        DateTime?
 
-  workflow    Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  parent      WorkflowArtifact?  @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
-  derivatives WorkflowArtifact[] @relation("ArtifactParent")
+  workflow     Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  parent       WorkflowArtifact?  @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
+  derivatives  WorkflowArtifact[] @relation("ArtifactParent")
+  specExecution SpecExecution?    @relation(fields: [specExecutionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, deletedAt])
   @@index([workflowId])
@@ -2096,11 +2105,23 @@ model ExecutionDriftFinding {
   detectedAt          DateTime  @default(now())
   resolvedAt          DateTime?
   metadata            Json?
+  // Phase 6 — resolution provenance + contradiction reopen.
+  resolvedBy            String?
+  resolutionSpecId      String?
+  resolutionWorkflowId  String?
+  resolutionVerdict     String? // 'met' | 'unmet' | 'unverifiable'
+  resolutionExecutionId String?
+  // A later non-MET execution for the same drift reopens it with evidence
+  // (status back to 'open') rather than the prior "still-a-candidate" no-op.
+  contradictedAt          DateTime?
+  contradictingExecutionId String?
+  lastResolutionAt        DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   specs  AgentExecutableSpec[]
+  specExecutions SpecExecution[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId, status, severity, detectedAt])
@@ -2135,12 +2156,66 @@ model AgentExecutableSpec {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
+  // Phase 6 — execution link: the last run that executed this spec.
+  executedAt        DateTime?
+  executedWorkflowId String?
+  lastVerdict       String? // 'met' | 'unmet' | 'unverifiable'
+  lastExecutionId   String? @unique
+  lastExecution     SpecExecution? @relation("SpecLastExecution", fields: [lastExecutionId], references: [id], onDelete: SetNull)
+
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   driftFinding ExecutionDriftFinding? @relation(fields: [driftFindingId], references: [id], onDelete: SetNull)
+  executions   SpecExecution[]        @relation("SpecExecutionSpec")
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, driftFindingId])
   @@map("agent_executable_specs")
+}
+
+// SpecExecution — one row per approved-spec execution ATTEMPT (Phase 6).
+// The `@@unique([tenantId, specId, attempt])` makes re-executing the same spec
+// idempotent per attempt: the service claims the next attempt number and an
+// INSERT ... ON CONFLICT DO NOTHING prevents a duplicate run. status transitions
+// running → awaiting_approval → completed | failed | cancelled; `verdict` is
+// null until the run finishes (met | unmet | unverifiable).
+model SpecExecution {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  specId              String
+  attempt             Int
+  workflowId          String
+  status              String   @default("running") // running | awaiting_approval | completed | failed | cancelled
+  verdict             String?  // met | unmet | unverifiable
+  awaitingApproval    Boolean  @default(false)
+  approvalRequestId   String?
+  failureClasses      Json?
+  driftFindingId      String?
+  driftResolved       Boolean  @default(false)
+  accumulatedCostUsd   Float    @default(0)
+  taskTotal           Int      @default(0)
+  taskPassed          Int      @default(0)
+  taskFailed          Int      @default(0)
+  taskBlocked         Int      @default(0)
+  startedAt           DateTime @default(now())
+  completedAt         DateTime?
+  createdBy           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Two relations to AgentExecutableSpec: the spec this execution runs
+  // (specId, CASCADE) and the back-reference from a spec's `lastExecution`
+  // (lastExecutionId, SET NULL). Named to disambiguate.
+  spec          AgentExecutableSpec    @relation("SpecExecutionSpec", fields: [specId], references: [id], onDelete: Cascade)
+  specLastFor   AgentExecutableSpec?   @relation("SpecLastExecution")
+  driftFinding  ExecutionDriftFinding? @relation(fields: [driftFindingId], references: [id], onDelete: SetNull)
+  artifacts     WorkflowArtifact[]
+
+  @@unique([tenantId, specId, attempt])
+  @@index([tenantId, specId, attempt])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, driftFindingId])
+  @@map("spec_executions")
 }
 
 // CompanyConnectorSyncState — per-tenant sync cursor + health state for

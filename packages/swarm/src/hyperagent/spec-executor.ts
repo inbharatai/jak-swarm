@@ -20,7 +20,7 @@
  * Pure + deterministic — no I/O, no LLM, no Date.now.
  */
 import { RiskLevel, TaskStatus } from '@jak-swarm/shared';
-import { AcceptanceVerdict } from '@jak-swarm/shared';
+import { AcceptanceVerdict, OutcomeVerdict } from '@jak-swarm/shared';
 import type {
   AcceptanceCriterionResult,
   AgentExecutableSpec,
@@ -216,6 +216,17 @@ export interface FinishedRun {
    *  run simply didn't classify). Optional — the real graph does not yet wire
    *  failure classification into the harvested run (open edge). */
   failureClassByTask?: Record<string, FailureClass>;
+  /**
+   * Phase 6 — approval pause signal. When the run hit an approval-gated task
+   * and interrupted for human review, the runtime sets this true and stops
+   * (no terminal plan, no completedTaskIds). The orchestrator returns
+   * AWAITING_APPROVAL instead of a verdict; the caller persists the execution
+   * row as `awaiting_approval` and resumes the SAME LangGraph thread after the
+   * decision (Command(resume) against the Postgres checkpoint).
+   */
+  awaitingApproval?: boolean;
+  /** The approval request id the run paused on (when awaitingApproval). */
+  approvalRequestId?: string;
   startedAt: Date;
   completedAt: Date;
 }
@@ -240,15 +251,23 @@ export interface ExecuteSpecInput {
 export interface ExecuteSpecResult {
   specId: string;
   workflowId: string;
-  /** Tri-state acceptance verdict over the wired criteria. */
+  /** Tri-state acceptance verdict over the wired criteria. When the run is
+   *  awaiting approval, this is UNVERIFIABLE (no verdict yet) and
+   *  `awaitingApproval` is true. */
   verdict: AcceptanceVerdict;
-  /** Per-criterion measurement (wired + satisfied, with evidence). */
+  /** Per-criterion measurement (wired + satisfied, with evidence). Empty while
+   *  awaiting approval (the run did not finish). */
   acceptanceResults: AcceptanceCriterionResult[];
-  /** The full outcome evaluation (task triage + counterfactual hints + summary). */
+  /** The full outcome evaluation (task triage + counterfactual hints + summary).
+   *  A no-op empty evaluation while awaiting approval. */
   outcome: OutcomeEvaluation;
   /** The drift finding the spec was generated to resolve, and whether the run
    *  MET it (so the caller can mark the drift resolved — a separate open edge). */
   resolvedDrift: { driftFindingId: string | null; resolved: boolean };
+  /** Phase 6 — true when the run paused at an approval gate (no verdict yet). */
+  awaitingApproval: boolean;
+  /** Phase 6 — the approval request id the run paused on (when awaiting). */
+  approvalRequestId?: string;
 }
 
 /**
@@ -275,6 +294,27 @@ export async function executeApprovedSpec(input: ExecuteSpecInput): Promise<Exec
   //    is deterministic from the spec id (no Date.now); a caller may override.
   const workflowId = input.workflowId ?? `wf_spec_${spec.id}`;
   const finished = await deps.runPlan({ plan, tenantId, userId, workflowId, now });
+
+  // 2a. Approval pause: when the run interrupted at an approval-gated task, the
+  //     closed loop returns AWAITING_APPROVAL — no verdict is reduced (the run
+  //     did not finish). The caller persists the execution row as
+  //     `awaiting_approval` and resumes the SAME LangGraph thread after the
+  //     human decision. The verdict is UNVERIFIABLE until resumed + completed.
+  if (finished.awaitingApproval) {
+    return {
+      specId: spec.id,
+      workflowId,
+      verdict: AcceptanceVerdict.UNVERIFIABLE,
+      acceptanceResults: [],
+      outcome: emptyOutcomeEvaluation(workflowId, tenantId),
+      resolvedDrift: {
+        driftFindingId: spec.driftFindingId ?? null,
+        resolved: false,
+      },
+      awaitingApproval: true,
+      ...(finished.approvalRequestId ? { approvalRequestId: finished.approvalRequestId } : {}),
+    };
+  }
 
   // 3. Harvest run evidence + measure acceptance in one pass. evaluateOutcome
   //    triages taskOutcomes from finished.plan + verificationResults, then
@@ -316,5 +356,29 @@ export async function executeApprovedSpec(input: ExecuteSpecInput): Promise<Exec
       driftFindingId: spec.driftFindingId ?? null,
       resolved: verdict === AcceptanceVerdict.MET,
     },
+    awaitingApproval: false,
+  };
+}
+
+/** A no-op outcome evaluation for the awaiting-approval path (the run did not
+ *  finish, so there is nothing to triage). Complete + honest — every required
+ *  field is present so the caller can rely on `outcome` without a null-check,
+ *  and no field is silently undefined. */
+function emptyOutcomeEvaluation(workflowId: string, tenantId: string): OutcomeEvaluation {
+  return {
+    workflowId,
+    tenantId,
+    verdict: OutcomeVerdict.OUTCOME_BLOCKED,
+    taskTotal: 0,
+    taskPassed: 0,
+    taskFailed: 0,
+    taskBlocked: 0,
+    taskSkipped: 0,
+    taskOutcomes: [],
+    acceptanceResults: [],
+    totalCostUsd: 0,
+    durationMs: 0,
+    counterfactualHints: [],
+    summary: 'Awaiting human approval — run paused at an approval gate.',
   };
 }

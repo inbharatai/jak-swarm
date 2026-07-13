@@ -68,5 +68,14 @@ const legacyRoutes: FastifyPluginAsync = async (fastify) => {
     try { return reply.send(ok({ execution: await legacy.executeSpec({ tenantId: request.user.tenantId, userId: request.user.userId, specId }) })); }
     catch (error_) { return fail(reply, error_, 'COMPANY_SPEC_EXECUTE_FAILED'); }
   });
+  // Phase 6 — resume a spec execution that paused at an approval gate. The
+  // executionId (not specId) is the resource: a spec may have multiple paused
+  // attempts; resume targets one. REVIEWER+ (same gate as execute).
+  fastify.post('/company/spec-executions/:executionId/resume', { preHandler: [fastify.authenticate, ...review] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { executionId } = request.params as { executionId: string };
+    if (!executionId || typeof executionId !== 'string') { return reply.status(400).send({ error: 'BAD_REQUEST', message: 'executionId required' }); }
+    try { return reply.send(ok({ execution: await legacy.resumeSpecExecution({ tenantId: request.user.tenantId, userId: request.user.userId, executionId }) })); }
+    catch (error_) { return fail(reply, error_, 'COMPANY_SPEC_RESUME_FAILED'); }
+  });
 };
 export default legacyRoutes;
