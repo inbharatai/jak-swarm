@@ -220,7 +220,12 @@ describe('Company Operating Layer route/client wiring (Migration 107)', () => {
   });
 
   it('exposes evidence -> graph -> drift -> spec endpoints from the route plugin', () => {
-    const routes = read('apps/api/src/routes/company-operating-layer.routes.ts');
+    // PR #137 split company-operating-layer.routes.ts into a thin assembly
+    // plus the legacy route definitions in company-operating-layer.legacy-routes.ts.
+    // The boot path still imports+registers company-operating-layer.routes.ts
+    // (asserted above); the endpoint strings themselves now live in the
+    // legacy-routes module that the assembly registers.
+    const routes = read('apps/api/src/routes/company-operating-layer.legacy-routes.ts');
     for (const path of [
       "/company/artifacts",
       "/company/artifacts/:id/extract",
