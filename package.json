@@ -39,9 +39,9 @@
     "automation:vercel-env": "bash scripts/automation/configure-vercel-env.sh"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
-    "@typescript-eslint/eslint-plugin": "^8.61.0",
-    "@typescript-eslint/parser": "^8.61.0",
+    "@types/node": "^22.20.1",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
     "eslint": "^9.39.4",
     "prettier": "^3.9.4",
     "prisma": "^6.19.3",
