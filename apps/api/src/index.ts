@@ -340,34 +340,32 @@ async function buildApp() {
     const { BaseAgent } = await import('@jak-swarm/agents');
     const { CompanyProfileService } = await import('./services/company-brain/company-profile.service.js');
     const { WorkflowTemplateService } = await import('./services/company-brain/workflow-template.service.js');
+    const { CompanyBrainV2Service } = await import('./services/company-brain/company-brain-v2.service.js');
+    const { createCompanyContextProvider } = await import('./services/company-brain/company-context-provider.factory.js');
     const profileSvc = new CompanyProfileService(fastify.db, fastify.log);
-    BaseAgent.companyContextProvider = {
-      getApprovedProfile: async (tenantId: string) => {
-        try {
-          const row = await profileSvc.getApproved(tenantId);
-          if (!row) return null;
-          return {
-            name: row.name,
-            industry: row.industry,
-            description: row.description,
-            productsServices: row.productsServices,
-            targetCustomers: row.targetCustomers,
-            brandVoice: row.brandVoice,
-            competitors: row.competitors,
-            pricing: row.pricing,
-            websiteUrl: row.websiteUrl,
-            goals: row.goals,
-            constraints: row.constraints,
-            preferredChannels: row.preferredChannels,
-          };
-        } catch {
-          // Schema may not be deployed yet (migration 16 pending). Return
-          // null so agents fall back to their default system prompt.
-          return null;
-        }
-      },
-    };
-    fastify.log.info('[CompanyBrain] CompanyContextProvider wired — agents will ground in approved CompanyProfile');
+    const brainSvc = new CompanyBrainV2Service(fastify.db, fastify.log);
+
+    // Probe Graph V2 availability so startup emits honest telemetry: is the
+    // governed brain actually queryable, or is migration 118 not deployed yet?
+    // Non-fatal either way — agents always ground in the approved CompanyProfile.
+    let graphV2Available = false;
+    try {
+      graphV2Available = await brainSvc.probeAvailability();
+    } catch (probeErr) {
+      fastify.log.warn({ err: probeErr instanceof Error ? probeErr.message : String(probeErr) }, '[CompanyBrain] Graph V2 availability probe threw');
+    }
+
+    BaseAgent.companyContextProvider = createCompanyContextProvider({
+      profileSvc,
+      brainSvc,
+      log: fastify.log,
+    });
+    fastify.log.info(
+      { graphV2Available },
+      graphV2Available
+        ? '[CompanyBrain] CompanyContextProvider wired — agents ground in approved CompanyProfile AND task-specific Graph V2 evidence'
+        : '[CompanyBrain] CompanyContextProvider wired — Graph V2 not migrated; agents ground in approved CompanyProfile only (task-specific brain context unavailable, observed non-blocking)',
+    );
 
     // Idempotent seed of system WorkflowTemplates. Best-effort — if the
     // schema isn't deployed, log + continue so the app still boots.

@@ -1,16 +1,7 @@
 import OpenAI from 'openai';
-import type { AgentRole } from '@jak-swarm/shared';
+import type { AgentRole, Logger } from '@jak-swarm/shared';
 import type { AgentContext } from './agent-context.js';
 import type { MemoryProvider, CompanyContextProvider } from './base-agent.js';
-
-interface TaskSpecificBrainProvider extends CompanyContextProvider {
-  getContextPackage?: (input: {
-    tenantId: string;
-    task: string;
-    agentRole: string;
-    tokenBudget?: number;
-  }) => Promise<{ contextText?: string } | null>;
-}
 
 function messageText(message: OpenAI.ChatCompletionMessageParam | undefined): string {
   if (!message) return '';
@@ -42,11 +33,16 @@ async function buildCompanyContextBlocks(input: {
   context: AgentContext;
   role: AgentRole;
   provider: CompanyContextProvider | null;
+  logger?: Logger | null;
 }): Promise<{ blocks: OpenAI.ChatCompletionMessageParam[]; fieldsUsed: string[] }> {
-  const provider = input.provider as TaskSpecificBrainProvider | null;
+  const provider = input.provider;
+  const log = input.logger;
   const blocks: OpenAI.ChatCompletionMessageParam[] = [];
   const fieldsUsed: string[] = [];
-  if (!provider || !input.context.tenantId) return { blocks, fieldsUsed };
+  if (!provider || !input.context.tenantId) {
+    log?.debug({ role: String(input.role), tenantId: input.context.tenantId ?? null }, '[company-brain] context unavailable — no provider or no tenant');
+    return { blocks, fieldsUsed };
+  }
 
   if (!hasBlock(input.messages, 'company_context')) {
     try {
@@ -86,7 +82,7 @@ async function buildCompanyContextBlocks(input: {
     }
   }
 
-  if (!hasBlock(input.messages, 'company_brain') && typeof provider.getContextPackage === 'function') {
+  if (!hasBlock(input.messages, 'company_brain')) {
     const task = latestUserTask(input.messages);
     if (task) {
       try {
@@ -103,10 +99,20 @@ async function buildCompanyContextBlocks(input: {
             role: 'system',
             content: `<company_brain>\nThis is task-specific, evidence-backed organisational context.\nTreat ACTIVE claims as current truth, flag DISPUTED claims, cite evidence ids when material, and never infer access to omitted information.\n\n${text.slice(0, 16_000)}\n</company_brain>`,
           });
+          log?.info(
+            { role: String(input.role), tenantId: input.context.tenantId, redacted: (brain?.omittedCount ?? 0) > 0, omittedCount: brain?.omittedCount ?? 0 },
+            '[company-brain] task context injected',
+          );
+        } else {
+          log?.info({ role: String(input.role), tenantId: input.context.tenantId }, '[company-brain] context empty — no relevant accessible evidence');
         }
-      } catch {
-        // Graph V2 may not be migrated yet. Agent execution must continue.
+      } catch (error) {
+        // Graph V2 may not be migrated yet, or retrieval failed. Agent
+        // execution must continue — but observably, not silently.
+        log?.warn({ role: String(input.role), tenantId: input.context.tenantId, err: error instanceof Error ? error.message : String(error) }, '[company-brain] context retrieval failed — continuing without task context');
       }
+    } else {
+      log?.debug({ role: String(input.role), tenantId: input.context.tenantId }, '[company-brain] context unavailable — no user task to ground');
     }
   }
   return { blocks, fieldsUsed };
@@ -153,6 +159,7 @@ export class PromptBuilder {
     private readonly role: AgentRole,
     private readonly memoryProviderGetter: () => MemoryProvider | null,
     private readonly companyContextProviderGetter: () => CompanyContextProvider | null,
+    private readonly logger?: Logger | null,
   ) {}
 
   async injectCompanyContext(
@@ -164,6 +171,7 @@ export class PromptBuilder {
       context,
       role: this.role,
       provider: this.companyContextProviderGetter(),
+      logger: this.logger,
     });
     if (blocks.length === 0) return { messages, fieldsUsed };
     const result = [...messages];
