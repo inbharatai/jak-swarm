@@ -31,7 +31,11 @@
  *   GET /shield         — Shield decisions (from audit log; dedicated store roadmap)
  */
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
+import { ConfigKind } from '@jak-swarm/shared';
+import type { ConfigKind as ConfigKindType, RolloutMetrics, RolloutThresholds } from '@jak-swarm/shared';
 import { ok, err } from '../types.js';
+import { ConfigLifecycleService } from '../services/company-brain/config-lifecycle.service.js';
 import {
   aggregateOverview,
   aggregateRuns,
@@ -59,12 +63,22 @@ import type { BenchmarkResultRow } from '@jak-swarm/shared';
 
 // REVIEWER+ may view the control centre. SYSTEM_ADMIN sees their own tenant.
 const REVIEWER_PLUS = ['REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN'] as const;
+// TENANT_ADMIN+ may advance/rollback/create experiments (operator-only —
+// advancing a versioned config through shadow→canary→promote changes live
+// behaviour, so it is gated above the read role).
+const ADMIN_PLUS = ['TENANT_ADMIN', 'SYSTEM_ADMIN'] as const;
 
 // Honest capability flags. Raised to true ONLY when the backing write/persist
 // path is wired. Until then the pure core surfaces an honest roadmap note.
 const BENCHMARKS_PERSISTED = false; // Phase 8 harness runs in-process; no benchmark_results table yet.
 const SHIELD_DECISIONS_PERSISTED = false; // Phase 8 signed-decision core + MCP client exist; no shield_decisions table yet.
-const EXPERIMENT_CONTROLS_WIRED = false; // display-only for now; advance/rollback write endpoint is roadmap.
+// Phase 4 — the config-lifecycle advance/rollback write endpoint is now WIRED
+// (ConfigLifecycleService). An operator can advance a versioned config through
+// the bounded, evidence-gated lifecycle + roll it back, fully audited. The
+// pure core refuses a fake advance on HOLD; PROMOTED AUTONOMY_POLICY /
+// REPAIR_BUDGET configs are applied to the live HyperAgentConfig. (Canary
+// traffic-percentage routing into the live graph is the remaining wire.)
+const EXPERIMENT_CONTROLS_WIRED = true;
 
 // Row caps — the control centre shows recent activity, not an unbounded dump.
 const LIST_LIMIT = 100;
@@ -292,6 +306,136 @@ const hyperagentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(500).send(err('HYPERAGENT_SHIELD_FAILED', e instanceof Error ? e.message : 'unknown'));
     }
   });
+
+  // ── Phase 4 — config-lifecycle LIVE caller (write endpoints) ───────────
+  // The pure core (`config-lifecycle.ts`) decides which transitions are legal
+  // and refuses a fake advance on HOLD. These routes make that gate reachable
+  // from runtime: an operator creates/advances/rolls back a versioned config,
+  // the gate enforces the decision, and every transition is durably audited.
+  // TENANT_ADMIN+ only (operator action — a PROMOTED AUTONOMY_POLICY /
+  // REPAIR_BUDGET config is applied to the live HyperAgentConfig).
+  const lifecycle = new ConfigLifecycleService(
+    fastify.db as unknown as import('../services/company-brain/config-lifecycle.service.js').ConfigLifecyclePrismaClient,
+    fastify.log,
+  );
+  const adminGate = [fastify.authenticate, ...(fastify.requireRole ? [fastify.requireRole(...ADMIN_PLUS)] : [])];
+
+  const createDraftBodySchema = z.object({
+    kind: z.enum([
+      ConfigKind.AUTONOMY_POLICY,
+      ConfigKind.REPAIR_BUDGET,
+      ConfigKind.LEARNING_GATE,
+      ConfigKind.GOVERNANCE_RULE,
+      ConfigKind.TOOL_POLICY,
+    ]),
+    spec: z.record(z.unknown()),
+    reason: z.string().max(2000).optional(),
+  });
+
+  fastify.post('/experiments', { preHandler: adminGate }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const parse = createDraftBodySchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parse.error.flatten()));
+    }
+    try {
+      const version = await lifecycle.createDraft({
+        tenantId: request.user!.tenantId,
+        kind: parse.data.kind as ConfigKindType,
+        spec: parse.data.spec,
+        reason: parse.data.reason,
+      });
+      return reply.status(201).send(ok(version));
+    } catch (e) {
+      return reply.status(400).send(err('CONFIG_LIFECYCLE_FAILED', e instanceof Error ? e.message : 'unknown'));
+    }
+  });
+
+  const advanceBodySchema = z.object({
+    metrics: z
+      .object({
+        samples: z.number(),
+        successRate: z.number(),
+        failureRate: z.number(),
+        meanCost: z.number().optional(),
+        safetyIncidentRate: z.number().optional(),
+      })
+      .optional(),
+    baseline: z
+      .object({
+        samples: z.number(),
+        successRate: z.number(),
+        failureRate: z.number(),
+        meanCost: z.number().optional(),
+        safetyIncidentRate: z.number().optional(),
+      })
+      .optional(),
+    thresholds: z
+      .object({
+        minSamples: z.number(),
+        minSuccessRate: z.number(),
+        maxFailureRate: z.number(),
+        maxSafetyIncidentRate: z.number(),
+        minLiftOverBaseline: z.number(),
+      })
+      .optional(),
+    reason: z.string().max(2000).optional(),
+  });
+
+  fastify.post(
+    '/experiments/:configVersionId/advance',
+    { preHandler: adminGate },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { configVersionId } = request.params as { configVersionId: string };
+      const parse = advanceBodySchema.safeParse(request.body ?? {});
+      if (!parse.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parse.error.flatten()));
+      }
+      try {
+        const result = await lifecycle.advance({
+          tenantId: request.user!.tenantId,
+          configVersionId,
+          metrics: parse.data.metrics as RolloutMetrics | undefined,
+          baseline: parse.data.baseline as RolloutMetrics | undefined,
+          thresholds: parse.data.thresholds as RolloutThresholds | undefined,
+          reason: parse.data.reason,
+        });
+        return reply.send(ok(result));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'unknown';
+        // An illegal transition / not-found / wrong-tenant → 409; other failures → 500.
+        const status = /not found|cannot advance|illegal/i.test(msg) ? 409 : 500;
+        return reply.status(status).send(err('CONFIG_LIFECYCLE_FAILED', msg));
+      }
+    },
+  );
+
+  const rollbackBodySchema = z.object({
+    reason: z.string().min(1).max(2000),
+  });
+
+  fastify.post(
+    '/experiments/:configVersionId/rollback',
+    { preHandler: adminGate },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { configVersionId } = request.params as { configVersionId: string };
+      const parse = rollbackBodySchema.safeParse(request.body ?? {});
+      if (!parse.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parse.error.flatten()));
+      }
+      try {
+        const result = await lifecycle.rollback({
+          tenantId: request.user!.tenantId,
+          configVersionId,
+          reason: parse.data.reason,
+        });
+        return reply.send(ok(result));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'unknown';
+        const status = /not found|not allowed/i.test(msg) ? 409 : 500;
+        return reply.status(status).send(err('CONFIG_LIFECYCLE_FAILED', msg));
+      }
+    },
+  );
 };
 
 export default hyperagentRoutes;

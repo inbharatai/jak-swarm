@@ -154,6 +154,31 @@ export async function replannerNode(
     };
   }
 
+  // OBSERVE is read-only: the autonomy policy denies REPLAN_WITHIN_APPROVED in
+  // OBSERVE (see autonomy-policy.ts), so `replan()` computes a proposal but
+  // marks it approval-required. We do NOT mutate the plan and do NOT pause for
+  // approval (approval-pause is itself a side effect). The proposed repair is
+  // recorded as an observation and the failed task stays failed — OBSERVE
+  // accrues "what I would have done" without healing. Routes to the validator
+  // (FAILED) so the terminal outcome is evaluated and the learning node can
+  // extract a POLICY candidate (persisted as CANDIDATE only; promotion is also
+  // denied in OBSERVE).
+  if (state.hyperAgentMode === HyperAgentMode.OBSERVE) {
+    return {
+      repairProposals: [result],
+      taskRepairState: {
+        [task.id]: {
+          ...repairState,
+          planRepairAttempts: repairState.planRepairAttempts + 1,
+          lastFailureClass: pending.diagnosis.failureClass,
+          lastDiagnosisId: pending.diagnosis.id,
+        },
+      },
+      status: WorkflowStatus.FAILED,
+      error: `HyperAgent observed task '${task.id}' failure in OBSERVE mode; proposed repair recorded, not applied. ${result.reason}`,
+    };
+  }
+
   // Approval required (autonomy not allowed) → pause for a human.
   if (result.requiresApproval) {
     return {

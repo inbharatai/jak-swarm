@@ -188,6 +188,20 @@ export {
   type SkillRiskLevel,
 };
 
+// Phase 8 — procedural skill compiler + fail-closed sandbox verdict core.
+export {
+  compilePlanToSkill,
+  maxRiskLevel,
+  resolveSandboxVerdict,
+  type CompiledSkillSpec,
+  type CompiledSkillStep,
+  type CompilePlanToSkillInput,
+  type PlanTaskInput,
+  type SandboxVerdict,
+  type SandboxVerdictInput,
+  type SandboxFinalStatus,
+} from './skill-compiler.js';
+
 // Re-exported for callers that want to detect (vs. swallow) traversal
 // rejections via instanceof.
 export type { CascadeOptions as SkillCascadeOptions };

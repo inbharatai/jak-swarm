@@ -33,6 +33,7 @@ import { describe, it, expect } from 'vitest';
 import { StateGraph, START, END } from '@langchain/langgraph';
 import {
   AgentRole,
+  AutonomyLevel,
   HyperAgentMode,
   RiskLevel,
   TaskStatus,
@@ -48,6 +49,23 @@ import {
   recallLearnings,
   type LearningPersistPrismaClient,
 } from '../../packages/swarm/src/hyperagent/learning-persist.js';
+import { composeConfigKey } from '../../packages/swarm/src/hyperagent/learning-extractor.js';
+
+/**
+ * Phase 7: the learning key is now a composite, order-invariant, dimensioned by
+ * industry + risk level. Compute the expected key from the SAME dimensions the
+ * outcome evaluator stamps (plan.industry='TECHNOLOGY', task.riskLevel=LOW) so
+ * the assertions stay correct if the labelled-key format ever changes.
+ */
+function expectedKey(tool: string): string {
+  return composeConfigKey({
+    taskType: 'research',
+    agentRole: AgentRole.WORKER_RESEARCH,
+    toolSet: [tool],
+    industry: 'TECHNOLOGY',
+    riskLevel: 'LOW',
+  });
+}
 
 // ─── In-memory Prisma stub (learningRecord, full upsert-by-key) ─────────────
 
@@ -141,8 +159,19 @@ function failedVerification(): VerificationResult {
   return { passed: false, issues: ['no results'], confidence: 0.2, needsRetry: false };
 }
 
-/** A terminal COMPLETED run: task config (agentRole/tool) verified-passed. */
-function completedState(agentRole: AgentRole, tool: string) {
+/**
+ * A terminal COMPLETED run: task config (agentRole/tool) verified-passed.
+ *
+ * Defaults to AUTONOMOUS_SAFE @ L4 — a promoting config — so the accrual loop
+ * can flip a row to PROMOTED. (Promotion is the L4 PROMOTE_CONFIG capability;
+ * OBSERVE denies it — see the OBSERVE read-only test at the end of this file.)
+ */
+function completedState(
+  agentRole: AgentRole,
+  tool: string,
+  mode: HyperAgentMode = HyperAgentMode.AUTONOMOUS_SAFE,
+  level = AutonomyLevel.L4,
+) {
   return {
     goal: 'research',
     tenantId: 'tenant-1',
@@ -159,12 +188,18 @@ function completedState(agentRole: AgentRole, tool: string) {
     outputs: [],
     status: WorkflowStatus.COMPLETED,
     hyperAgentEnabled: true,
-    hyperAgentMode: HyperAgentMode.OBSERVE,
+    hyperAgentMode: mode,
+    autonomyLevel: level,
   };
 }
 
 /** A terminal FAILED run: task config (agentRole/tool) verified-failed. */
-function failedState(agentRole: AgentRole, tool: string) {
+function failedState(
+  agentRole: AgentRole,
+  tool: string,
+  mode: HyperAgentMode = HyperAgentMode.AUTONOMOUS_SAFE,
+  level = AutonomyLevel.L4,
+) {
   const t = task('research_1', agentRole, tool);
   t.status = TaskStatus.FAILED;
   t.error = `${tool} returned nothing`;
@@ -184,7 +219,8 @@ function failedState(agentRole: AgentRole, tool: string) {
     outputs: [],
     status: WorkflowStatus.FAILED,
     hyperAgentEnabled: true,
-    hyperAgentMode: HyperAgentMode.OBSERVE,
+    hyperAgentMode: mode,
+    autonomyLevel: level,
   };
 }
 
@@ -226,8 +262,8 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       await g2.invoke(failedState(AgentRole.WORKER_RESEARCH, 'ddg'));
     }
 
-    const webSearch = row(db, 'cfg:research:WORKER_RESEARCH:web_search');
-    const ddg = row(db, 'cfg:research:WORKER_RESEARCH:ddg');
+    const webSearch = row(db, expectedKey('web_search'));
+    const ddg = row(db, expectedKey('ddg'));
     expect(webSearch).toBeDefined();
     expect(ddg).toBeDefined();
 
@@ -251,14 +287,14 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       const g2 = buildGraph(db, failedState(AgentRole.WORKER_RESEARCH, 'ddg') as ReturnType<typeof completedState>);
       await g2.invoke(failedState(AgentRole.WORKER_RESEARCH, 'ddg'));
     }
-    expect(row(db, 'cfg:research:WORKER_RESEARCH:web_search')!.status).toBe('PROMOTED');
+    expect(row(db, expectedKey('web_search'))!.status).toBe('PROMOTED');
 
     // A subsequent run's planner recalls PROMOTED learnings for the plan's task
     // type + runs bandit selection. The plan asks for ddg; the bandit picks the
     // promoted web_search and (ASSISTED+) applies the override.
     const recalled = await recallLearnings({ db, tenantId: 'tenant-1', taskTypes: ['research'] });
     expect(recalled.length).toBe(1);
-    expect(recalled[0]!.key).toBe('cfg:research:WORKER_RESEARCH:web_search');
+    expect(recalled[0]!.key).toBe(expectedKey('web_search'));
 
     const ddgPlan = plan(AgentRole.WORKER_RESEARCH, 'ddg');
     const { plan: recalledPlan, selections } = applyBanditToPlan(ddgPlan, recalled, true);
@@ -283,7 +319,7 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
       const g = buildGraph(db, failedState(AgentRole.WORKER_RESEARCH, 'serper') as ReturnType<typeof completedState>);
       await g.invoke(failedState(AgentRole.WORKER_RESEARCH, 'serper'));
     }
-    const serper = row(db, 'cfg:research:WORKER_RESEARCH:serper');
+    const serper = row(db, expectedKey('serper'));
     expect(serper).toBeDefined();
     expect(serper!.status).not.toBe('PROMOTED');
     // No sibling config was ever run, so serper has only present-failure (b=6)
@@ -293,18 +329,36 @@ describe('Phase 4 — measured learning impact at the live-graph integration lev
     expect(serper!.mutualInformation ?? 0).toBeLessThan(0.05);
   });
 
-  it('OBSERVE mode still accrues learnings (mutation not required for observation to persist)', async () => {
-    // The accrual + promotion above all ran under HyperAgentMode=OBSERVE, which
-    // mutates nothing in the plan but DOES persist + promote learnings. This
-    // pins that contract: observation is enough to learn; application requires
-    // ASSISTED+ (proven in the recall+bandit test via applyAllowed=true).
+  it('OBSERVE is read-only: the same 3+3 accrual that promotes under AUTONOMOUS_SAFE accrues a clearing contingency but stays CANDIDATE under OBSERVE', async () => {
+    // Promotion is the L4 PROMOTE_CONFIG capability, and OBSERVE is read-only at
+    // the autonomy-policy layer (Phase 2). The learning node consults
+    // evaluateForConfig(..., PROMOTE_CONFIG) before persist; OBSERVE denies it,
+    // so promoteEnabled=false. Candidates still accrue + MI is still measured,
+    // but no row flips to PROMOTED — even when the contingency would clear the
+    // gate. This is the integration-level proof of the same contract pinned in
+    // unit/swarm/observe-read-only.test.ts.
     const db = stubDb();
-    const g = buildGraph(db, completedState(AgentRole.WORKER_RESEARCH, 'web_search') as ReturnType<typeof completedState>);
-    const result = await g.invoke(completedState(AgentRole.WORKER_RESEARCH, 'web_search'));
-    // OBSERVE run still evaluated the outcome + persisted a candidate.
-    expect(result.outcomeEvaluation).toBeDefined();
-    expect(result.learningCandidates?.length).toBeGreaterThan(0);
-    expect(db.rows.size).toBe(1);
-    expect(row(db, 'cfg:research:WORKER_RESEARCH:web_search')!.status).toBe('CANDIDATE');
+    const observe = (ar: AgentRole, tool: string) => ({
+      completed: completedState(ar, tool, HyperAgentMode.OBSERVE, AutonomyLevel.L4),
+      failed: failedState(ar, tool, HyperAgentMode.OBSERVE, AutonomyLevel.L4),
+    });
+    for (let i = 0; i < 3; i++) {
+      const ws = observe(AgentRole.WORKER_RESEARCH, 'web_search');
+      const g1 = buildGraph(db, ws.completed as ReturnType<typeof completedState>);
+      await g1.invoke(ws.completed);
+      const ddg = observe(AgentRole.WORKER_RESEARCH, 'ddg');
+      const g2 = buildGraph(db, ddg.failed as ReturnType<typeof completedState>);
+      await g2.invoke(ddg.failed);
+    }
+    const webSearch = row(db, expectedKey('web_search'));
+    expect(webSearch).toBeDefined();
+    // The contingency is the SAME clearing table that promoted web_search under
+    // AUTONOMOUS_SAFE above (present+success a=3, absent+failure d=3) — MI is
+    // well above the gate — yet the row stays CANDIDATE because OBSERVE denied
+    // promotion. Read-only means read-only, including the learning DB.
+    expect(webSearch!.contingency).toEqual({ a: 3, b: 0, c: 0, d: 3 });
+    expect(webSearch!.mutualInformation).toBeGreaterThanOrEqual(0.05);
+    expect(webSearch!.status).toBe('CANDIDATE');
+    expect(webSearch!.promotedAt).toBeNull();
   });
 });

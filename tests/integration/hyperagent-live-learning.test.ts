@@ -33,7 +33,19 @@ import type { VerificationResult } from '../../packages/agents/src/index.js';
 import { SwarmStateAnnotation } from '../../packages/swarm/src/workflow-runtime/index.js';
 import { afterValidator } from '../../packages/swarm/src/graph/edges.js';
 import { learningNode } from '../../packages/swarm/src/graph/nodes/learning-node.js';
+import { composeConfigKey } from '../../packages/swarm/src/hyperagent/learning-extractor.js';
 import type { LearningPersistPrismaClient } from '../../packages/swarm/src/hyperagent/learning-persist.js';
+
+// Phase 7: the learning key is now a composite, order-invariant, dimensioned by
+// industry + risk level. Compute the expected key from the same dimensions the
+// evaluator stamps (plan.industry='TECHNOLOGY', task.riskLevel=LOW).
+const RESEARCH_KEY = composeConfigKey({
+  taskType: 'research',
+  agentRole: AgentRole.WORKER_RESEARCH,
+  toolSet: ['web_search'],
+  industry: 'TECHNOLOGY',
+  riskLevel: 'LOW',
+});
 
 // ─── In-memory Prisma stub (learningRecord only) ───────────────────────────
 
@@ -174,11 +186,11 @@ describe('Phase 2 — live learning-node wiring (OFF-gated, real annotation + ed
     expect(result.learningCandidates?.[0]?.kind).toBe('WORKFLOW');
 
     // The candidate was durably persisted (a row exists for the cfg key,
-    // dimensioned by config: cfg:<taskType>:<agentRole>:<primaryTool>).
+    // dimensioned by config + industry + risk: cfg:<taskType>:<agentRole>:<sortedTools>:industry=<x>:risk=<z>).
     expect(db.rows.size).toBe(1);
     const row = [...db.rows.values()][0]!;
     expect(row.tenantId).toBe('tenant-1');
-    expect(row.key).toBe('cfg:research:WORKER_RESEARCH:web_search');
+    expect(row.key).toBe(RESEARCH_KEY);
     // First observation — MI is 0 (no absent contrast yet); still CANDIDATE.
     expect(row.status).toBe('CANDIDATE');
     expect(row.contingency).toEqual({ a: 1, b: 0, c: 0, d: 0 });

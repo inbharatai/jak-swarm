@@ -16,6 +16,7 @@
 
 import type { AutonomyDecision } from './hyperagent.js';
 import type { FailureClass } from './failure.js';
+import type { RiskLevel } from './workflow.js';
 
 /** Overall verdict the HyperAgent reaches for a run. */
 export enum OutcomeVerdict {
@@ -56,6 +57,36 @@ export interface TaskOutcome {
   agentRole?: string;
   /** Primary tool the task was configured to use (toolsRequired[0]). */
   primaryTool?: string;
+  /**
+   * Phase 7 self-learning: the FULL tool set the task was configured to use
+   * (WorkflowTask.toolsRequired). The learning extractor sorts + de-dupes this
+   * into the composite key so a task whose tools were listed in a different
+   * order does not shard into a separate learning row. Falls back to
+   * `[primaryTool]` when unset (legacy pure-core test inputs).
+   */
+  toolSet?: string[];
+  /**
+   * Phase 7: industry the run was planned for (WorkflowPlan.industry). Stamped
+   * by the outcome evaluator so a learning's key is dimensioned by industry —
+   * learnings do not cross-generalise across industries they were not observed
+   * on. Optional; absent on hand-constructed pure-core test inputs.
+   */
+  industry?: string;
+  /**
+   * Phase 7: model family that executed the task, when known. Optional — the
+   * runtime does not yet thread the resolved model id onto the task outcome, so
+   * the evaluator leaves this unset and the key omits it. Future wiring (e.g.
+   * the llm-call service stamping `providerModel`) can populate it without a
+   * schema change; until then learnings are model-agnostic (honest: not
+   * over-claiming model-specificity we don't yet observe).
+   */
+  modelFamily?: string;
+  /**
+   * Phase 7: task risk level (WorkflowTask.riskLevel). Stamped by the evaluator
+   * so learnings are dimensioned by risk tier — a HIGH-risk config's behaviour
+   * should not govern a LOW-risk task of the same type.
+   */
+  riskLevel?: RiskLevel;
 }
 
 /**

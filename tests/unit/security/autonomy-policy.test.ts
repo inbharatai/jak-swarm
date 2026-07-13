@@ -106,6 +106,41 @@ describe('AutonomyPolicy — mode OFF', () => {
   });
 });
 
+describe('AutonomyPolicy — mode OBSERVE (read-only)', () => {
+  it('denies every mutating capability — even at L5 — without requiring approval', () => {
+    // OBSERVE is read-only: no plan mutation, no output correction, no learning
+    // promotion, no code patch. requiresApproval=false so consumers record an
+    // observation and CONTINUE rather than pausing the workflow (approval-pause
+    // is itself a side effect).
+    for (const c of [
+      AutonomyCapability.RETRY_SAFE_READONLY,
+      AutonomyCapability.CORRECT_OUTPUT,
+      AutonomyCapability.REPLAN_WITHIN_APPROVED,
+      AutonomyCapability.PROPOSE_CONFIG_CHANGE,
+      AutonomyCapability.SHADOW_EXPERIMENT,
+      AutonomyCapability.CANARY_EXPERIMENT,
+      AutonomyCapability.PROMOTE_CONFIG,
+      AutonomyCapability.CODE_PATCH_BRANCH,
+    ] as AutonomyCapability[]) {
+      const d = evaluateAutonomy(AutonomyLevel.L5, c, HyperAgentMode.OBSERVE);
+      expect(d.allowed, `${c} must be denied in OBSERVE`).toBe(false);
+      expect(d.requiresApproval, `${c} must not pause for approval in OBSERVE`).toBe(false);
+    }
+  });
+
+  it('still permits OBSERVE_REPORT so the cockpit can render state', () => {
+    expect(evaluateAutonomy(AutonomyLevel.L0, AutonomyCapability.OBSERVE_REPORT, HyperAgentMode.OBSERVE).allowed).toBe(true);
+  });
+
+  it('PROPOSE_REPAIRS + PROPOSE_LEARNINGS are denied in OBSERVE (propose ≠ observe-only at the policy layer)', () => {
+    // The replanner/learning nodes gate on REPLAN_WITHIN_APPROVED / PROMOTE_CONFIG
+    // (the mutate capabilities); PROPOSE_* are denied too so OBSERVE never flips a
+    // proposal into an applied mutation at any consumer that gates on them.
+    expect(evaluateAutonomy(AutonomyLevel.L5, AutonomyCapability.PROPOSE_REPAIRS, HyperAgentMode.OBSERVE).allowed).toBe(false);
+    expect(evaluateAutonomy(AutonomyLevel.L5, AutonomyCapability.PROPOSE_LEARNINGS, HyperAgentMode.OBSERVE).allowed).toBe(false);
+  });
+});
+
 describe('AutonomyPolicy — fail closed on unknown capability', () => {
   it('blocks + requires approval for a capability not in the matrix', () => {
     const d = evaluateAutonomy(AutonomyLevel.L5, 'NUKE_PRODUCTION' as AutonomyCapability);

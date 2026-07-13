@@ -4,12 +4,20 @@ import { ok, err } from '../types.js';
 import { AppError, NotFoundError, ForbiddenError } from '../errors.js';
 import type { SkillStatus } from '../types.js';
 
-// SkillTier in DB is Int: 1=BUILTIN, 2=COMMUNITY, 3=TENANT
+// SkillTier in DB is Int (canonical mapping, matches packages/shared SkillTier
+// enum + the schema.prisma comment): 1=BUILTIN, 2=GENERATED_PLAN, 3=PROPOSED.
+// A GENERATED_PLAN skill is compiled from an approved plan (Phase 8 producer);
+// a PROPOSED skill is tenant-authored, pending sandbox + approval.
 const TIER_MAP: Record<string, number> = {
   BUILTIN: 1,
-  COMMUNITY: 2,
-  TENANT: 3,
+  GENERATED_PLAN: 2,
+  PROPOSED: 3,
 };
+
+// REVIEWER+ may propose a skill (a worker should not self-install skills);
+// TENANT_ADMIN+ approve / sandbox / compile. SYSTEM_ADMIN sees their own tenant.
+const REVIEWER_PLUS = ['REVIEWER', 'TENANT_ADMIN', 'SYSTEM_ADMIN'] as const;
+const ADMIN_PLUS = ['TENANT_ADMIN', 'SYSTEM_ADMIN'] as const;
 
 const proposeSkillBodySchema = z.object({
   name: z.string().min(1).max(120),
@@ -152,7 +160,7 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     '/propose',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, ...(fastify.requireRole ? [fastify.requireRole(...REVIEWER_PLUS)] : [])] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = proposeSkillBodySchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -178,7 +186,7 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
             tenantId: request.user.tenantId,
             name,
             description,
-            tier: TIER_MAP['TENANT'],
+            tier: TIER_MAP['PROPOSED'],
             status: 'PROPOSED',
             riskLevel,
             inputSchemaJson: inputSchema as object,
@@ -255,6 +263,22 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
           return reply
             .status(409)
             .send(err('CONFLICT', `Cannot approve skill with status '${skill.status}'`));
+        }
+
+        // Risk-level gating: a HIGH or CRITICAL skill MUST have passed the
+        // sandbox before it may be approved — never approve an unsandboxed
+        // high-risk skill. (LOW/MEDIUM may be approved from PROPOSED, though
+        // sandbox is still recommended; the approver is TENANT_ADMIN.)
+        if (
+          (skill.riskLevel === 'HIGH' || skill.riskLevel === 'CRITICAL') &&
+          skill.status !== 'SANDBOX_PASSED'
+        ) {
+          return reply.status(409).send(
+            err(
+              'CONFLICT',
+              `Cannot approve ${skill.riskLevel}-risk skill without a sandbox pass — run /sandbox first`,
+            ),
+          );
         }
 
         const updated = await fastify.db.skill.update({
@@ -406,6 +430,9 @@ const skillsRoutes: FastifyPluginAsync = async (fastify) => {
         }
         const testResults: TestResult[] = [];
         let executionError: string | null = null;
+        // False when the sandbox adapter threw (no sandbox runtime available).
+        // Fail-closed: a coded skill whose sandbox is unavailable MUST NOT pass.
+        let sandboxAvailable = true;
 
         const hasCode = skill.implementation && typeof skill.implementation === 'string' && skill.implementation.trim().length > 0;
         const testCases = (skill.testCasesJson as Array<{ name: string; input: unknown; expectedOutput?: unknown }>) ?? [];
@@ -469,28 +496,41 @@ const testCases = ${JSON.stringify(testCases)};
               try { await sandbox.destroy(sandboxInfo.id); } catch { /* best-effort cleanup */ }
             }
           } catch (sandboxErr) {
-            // Sandbox infrastructure not available — fall back to schema-only validation
+            // Sandbox infrastructure not available — FAIL-CLOSED for coded
+            // skills. A skill with code MUST run its sandbox to pass; it does
+            // NOT silently degrade to a schema-only pass. (Codeless skills are
+            // unaffected — they never enter this branch.) The pure verdict
+            // core encodes the rule; we only record the unavailability here.
             request.log.warn({ skillId, error: sandboxErr instanceof Error ? sandboxErr.message : String(sandboxErr) },
-              'Sandbox execution unavailable, falling back to schema-only validation');
-            executionError = null; // Not a test failure — just no sandbox available
+              'Sandbox execution unavailable — coded skill will fail-closed (no schema-only pass)');
+            sandboxAvailable = false;
+            executionError = null; // not an execution error; the verdict core handles unavailability
           }
         }
 
-        // ── Phase 3: Determine result ─────────────────────────────────────
-        const allTestsPassed = testResults.length > 0
-          ? testResults.every((t) => t.passed)
-          : true; // No tests = schema-only pass
-        const passed = !executionError && allTestsPassed;
-        const finalStatus = passed ? 'SANDBOX_PASSED' : 'PROPOSED';
+        // ── Phase 3: Determine result (fail-closed pure core) ─────────────
+        const { resolveSandboxVerdict } = await import('@jak-swarm/skills');
+        const verdict = resolveSandboxVerdict({
+          hasCode: Boolean(hasCode),
+          testCasesCount: testCases.length,
+          testResults,
+          executionError,
+          sandboxAvailable,
+          schemaValid: validationErrors.length === 0,
+        });
+        const passed = verdict.passed;
+        const finalStatus = verdict.finalStatus;
 
         const fullResult = {
           passed,
-          phase: testResults.length > 0 ? 'execution' : 'validation',
+          phase: verdict.phase,
           schemaValid: validationErrors.length === 0,
           testResults: testResults.length > 0 ? testResults : undefined,
           executionError: executionError ?? undefined,
+          sandboxAvailable,
           testsRun: testResults.length,
           testsPassed: testResults.filter((t) => t.passed).length,
+          reason: verdict.reason,
         };
 
         const updated = await fastify.db.skill.update({
@@ -503,8 +543,118 @@ const testCases = ${JSON.stringify(testCases)};
           sandboxResult: fullResult,
           message: passed
             ? `Sandbox passed (${fullResult.testsPassed}/${fullResult.testsRun} tests passed)`
-            : `Sandbox failed: ${executionError ?? `${fullResult.testsRun - fullResult.testsPassed} test(s) failed`}`,
+            : `Sandbox failed: ${verdict.reason}`,
         }));
+      } catch (e) {
+        if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
+        throw e;
+      }
+    },
+  );
+
+  /**
+   * POST /skills/compile-from-spec
+   *
+   * Phase 8 — the Tier 2 GENERATED_PLAN producer. Compiles an APPROVED
+   * agent_executable_spec's plan into a versioned, executable skill (a
+   * procedure of ordered steps) at tier=GENERATED_PLAN, status=PROPOSED.
+   * The compilation is STRUCTURAL + deterministic (plan tasks → skill steps),
+   * NOT LLM codegen — so it is fully reviewable. The generated skill still
+   * requires sandbox validation + TENANT_ADMIN approval before it governs
+   * agent behaviour; a generated skill is never auto-approved.
+   *
+   * TENANT_ADMIN+ only (compiling a spec into a reusable skill is an operator
+   * action). Tenant-scoped: the source spec must belong to the caller's tenant.
+   */
+  const compileFromSpecBodySchema = z.object({
+    specId: z.string().min(1),
+  });
+
+  fastify.post(
+    '/compile-from-spec',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole(...ADMIN_PLUS)] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parseResult = compileFromSpecBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(422)
+          .send(err('VALIDATION_ERROR', 'Invalid request body', parseResult.error.flatten()));
+      }
+      const { specId } = parseResult.data;
+      const tenantId = request.user.tenantId;
+
+      try {
+        // `agentExecutableSpec` is the generated Prisma delegate for the
+        // AgentExecutableSpec model. Cast the returned row to the shape we read.
+        const spec = (await fastify.db.agentExecutableSpec.findUnique({ where: { id: specId } })) as {
+          tenantId: string;
+          title: string;
+          objective: string;
+          status: string;
+          agentTaskPlan: { tasks?: Array<{ id: string; name: string; description: string; agentRole?: string; toolsRequired?: string[]; riskLevel?: string }> };
+        } | null;
+
+        if (!spec) throw new NotFoundError('Spec', specId);
+        if (spec.tenantId !== tenantId && request.user.role !== 'SYSTEM_ADMIN') {
+          throw new ForbiddenError('Access to spec in another tenant is not allowed');
+        }
+        if (spec.status !== 'approved') {
+          return reply
+            .status(409)
+            .send(err('CONFLICT', `Cannot compile a spec with status '${spec.status}' — only approved specs may be compiled into skills`));
+        }
+        const tasks = spec.agentTaskPlan?.tasks ?? [];
+        if (tasks.length === 0) {
+          return reply
+            .status(409)
+            .send(err('CONFLICT', 'Cannot compile a spec with no plan tasks into a skill'));
+        }
+
+        const { compilePlanToSkill } = await import('@jak-swarm/skills');
+        const compiled = compilePlanToSkill({
+          sourceSpecId: specId,
+          sourceSpecTitle: spec.title,
+          goal: spec.objective,
+          tasks,
+          now: new Date().toISOString(),
+        });
+
+        // Provenance: the compiled procedure is the skill's input contract;
+        // the description carries the source spec id. A generated skill starts
+        // PROPOSED — sandbox + TENANT_ADMIN approval still required.
+        const skill = await fastify.db.skill.create({
+          data: {
+            tenantId,
+            name: compiled.name,
+            description: compiled.description,
+            tier: TIER_MAP['GENERATED_PLAN'],
+            status: 'PROPOSED',
+            riskLevel: compiled.riskLevel,
+            inputSchemaJson: {
+              kind: 'generated_plan',
+              steps: compiled.steps,
+              sourceSpecId: compiled.sourceSpecId,
+              sourceSpecTitle: compiled.sourceSpecTitle,
+              generatedAt: compiled.generatedAt,
+            } as object,
+            outputSchemaJson: { type: 'object' } as object,
+            permissions: [],
+            testCasesJson: [],
+          },
+        });
+
+        await fastify.auditLog(request, 'COMPILE_SKILL_FROM_SPEC', 'Skill', skill.id, {
+          specId,
+          tier: 'GENERATED_PLAN',
+          riskLevel: compiled.riskLevel,
+          steps: compiled.steps.length,
+        });
+        return reply.status(201).send(ok(skill));
       } catch (e) {
         if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
         throw e;
