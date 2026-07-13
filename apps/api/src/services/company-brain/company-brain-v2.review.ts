@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { CompanyBrainMemoryStore } from './company-brain-v2.memory.js';
 import {
   clamp01,
+  ENTITY_RESOLVER_ALGORITHM_VERSION,
   jsonStringArray,
-  uniqueStrings,
   type ClaimStatus,
   type CompanyArtifactV2Row,
   type CompanyClaimRow,
@@ -127,8 +127,25 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
     targetEntityId: string;
     reason: string;
     similarity?: number;
+    tier?: string;
+    algorithmVersion?: string;
+    matchingEvidence?: Record<string, unknown>;
   }): Promise<CompanyEntityV2Row> {
     if (input.sourceEntityId === input.targetEntityId) throw new Error('Cannot merge an entity into itself.');
+    // Read source/target for data (types, current artifact ids, summary). Our
+    // `query`/`execute` helpers run each statement in its own autocommit, so a
+    // per-statement `SELECT ... FOR UPDATE` would release its row lock the
+    // instant the SELECT returns — useless for serializing the multi-statement
+    // body. Instead we serialize with an atomic compare-and-swap UPDATE on the
+    // SOURCE row (below) and an atomic jsonb append on the TARGET row (later).
+    // `company_graph_entities.status` is free TEXT, so `merging` is a transient
+    // sentinel owned by the winning merge. This is the one authoritative owner
+    // of the merge mutation — no second queue framework, no in-memory running
+    // flag (the Phase 2 durable-queue rule applied to the merge path).
+    // Limitation: a crash between the CAS and the final soft-delete leaves the
+    // source in the transient `merging` status; full statement-transaction
+    // atomicity (wrapping the body + upsertClaim/upsertEdge in one tx) is the
+    // dedicated PR E audit-chain TOCTOU work and is out of scope here.
     const entities = await this.query<CompanyEntityV2Row>(
       `SELECT * FROM "company_graph_entities"
        WHERE "tenantId" = $1 AND "id" = ANY($2::TEXT[]) AND "deletedAt" IS NULL`,
@@ -141,10 +158,22 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
     if (source.entityType !== target.entityType) {
       throw new Error(`Cannot merge entity types ${source.entityType} and ${target.entityType}.`);
     }
+    // Atomic claim of the source: exactly one concurrent merge can transition
+    // it out of active/merging-able state. A concurrent merge that already
+    // won leaves status='merging'/'merged' → this UPDATE affects 0 rows → throw.
+    const claimed = await this.query<{ id: string }>(
+      `UPDATE "company_graph_entities"
+       SET "status" = 'merging', "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $1 AND "tenantId" = $2
+         AND "status" NOT IN ('merged', 'merging') AND "deletedAt" IS NULL
+       RETURNING "id"`,
+      source.id,
+      input.tenantId,
+    );
+    if (claimed.length === 0) {
+      throw new Error('Source company entity has already been merged or is being merged concurrently.');
+    }
 
-    const sourceArtifacts = jsonStringArray(source.sourceArtifactIds);
-    const targetArtifacts = jsonStringArray(target.sourceArtifactIds);
-    const mergedArtifacts = uniqueStrings([...targetArtifacts, ...sourceArtifacts]);
     const mergedSummary = target.summary.includes(source.summary)
       ? target.summary
       : `${target.summary}\n\nMerged evidence: ${source.summary}`.slice(0, 8000);
@@ -203,19 +232,31 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
       });
     }
 
-    await this.execute(
+    // Atomic append of the source's artifacts onto the target, conditional on
+    // the target still being active (a concurrent merge could have merged the
+    // TARGET into something else — in which case we abort this merge rather
+    // than mutate a now-stale target). `||` concatenates jsonb arrays in the
+    // CURRENT row value, so two concurrent merges of DIFFERENT sources into the
+    // same target both append without a lost update (duplicate ids are
+    // harmless — the access filter uses a Set).
+    const sourceArtifacts = jsonStringArray(source.sourceArtifactIds);
+    const updatedTarget = await this.query<{ id: string }>(
       `UPDATE "company_graph_entities"
        SET "summary" = $3,
-           "sourceArtifactIds" = $4::JSONB,
+           "sourceArtifactIds" = "sourceArtifactIds" || $4::JSONB,
            "confidence" = GREATEST("confidence", $5),
            "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $1 AND "tenantId" = $2`,
+       WHERE "id" = $1 AND "tenantId" = $2 AND "status" = 'active'
+       RETURNING "id"`,
       target.id,
       input.tenantId,
       mergedSummary,
-      JSON.stringify(mergedArtifacts),
+      JSON.stringify(sourceArtifacts),
       Math.max(source.confidence, target.confidence),
     );
+    if (updatedTarget.length === 0) {
+      throw new Error('Target company entity was merged concurrently; this merge was aborted.');
+    }
 
     const aliases = await this.query<{ alias: string; sourceArtifactId: string | null; confidence: number }>(
       `SELECT "alias", "sourceArtifactId", "confidence" FROM "company_entity_aliases"
@@ -260,8 +301,9 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
     );
     await this.execute(
       `INSERT INTO "company_entity_merges"
-        ("id", "tenantId", "sourceEntityId", "targetEntityId", "reason", "similarity", "mergedBy")
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        ("id", "tenantId", "sourceEntityId", "targetEntityId", "reason", "similarity", "mergedBy",
+         "algorithmVersion", "matchingEvidence")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::JSONB)`,
       randomUUID(),
       input.tenantId,
       source.id,
@@ -269,6 +311,8 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
       input.reason.slice(0, 2000),
       clamp01(input.similarity ?? 1),
       input.userId,
+      input.algorithmVersion ?? 'unknown',
+      JSON.stringify(input.matchingEvidence ?? {}),
     );
     await this.execute(
       `UPDATE "company_memory_reviews"
@@ -289,6 +333,70 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
     );
     if (!rows[0]) throw new Error('Merged target entity could not be reloaded.');
     return rows[0];
+  }
+
+  /**
+   * Human rejection of a proposed probabilistic merge (Phase 5). Records a
+   * `rejected` decision for the (source, candidate) pair — the resolver will
+   * never re-propose it ("never re-litigate settled identity") — and resolves
+   * the open `entity_merge` review for that exact candidate as `rejected`.
+   * Idempotent: a prior `deferred` row is escalated to `rejected`; a repeat
+   * call updates the reason/decider.
+   */
+  async rejectEntityMerge(input: {
+    tenantId: string;
+    userId: string;
+    sourceEntityId: string;
+    candidateEntityId: string;
+    reason?: string;
+  }): Promise<{ sourceEntityId: string; candidateEntityId: string; decision: 'rejected' }> {
+    if (input.sourceEntityId === input.candidateEntityId) {
+      throw new Error('Cannot reject a merge of an entity with itself.');
+    }
+    const rows = await this.query<{ id: string }>(
+      `SELECT "id" FROM "company_graph_entities"
+       WHERE "tenantId" = $1 AND "id" = ANY($2::TEXT[]) AND "deletedAt" IS NULL`,
+      input.tenantId,
+      [input.sourceEntityId, input.candidateEntityId],
+    );
+    if (rows.length !== 2) {
+      throw new Error('Source or candidate company entity not found in this tenant.');
+    }
+    const reason = (input.reason ?? 'Reviewer rejected the proposed merge.').slice(0, 2000);
+    await this.execute(
+      `INSERT INTO "company_entity_merge_rejections"
+         ("id", "tenantId", "sourceEntityId", "candidateEntityId", "decision",
+          "algorithmVersion", "tier", "similarity", "reason", "evidence", "decidedBy")
+       VALUES ($1, $2, $3, $4, 'rejected', $5, 'probabilistic_review', 0, $6, $7::JSONB, $8)
+       ON CONFLICT ("tenantId", "sourceEntityId", "candidateEntityId")
+       DO UPDATE SET "decision" = 'rejected',
+                     "reason" = EXCLUDED."reason",
+                     "decidedBy" = EXCLUDED."decidedBy",
+                     "algorithmVersion" = EXCLUDED."algorithmVersion"`,
+      randomUUID(),
+      input.tenantId,
+      input.sourceEntityId,
+      input.candidateEntityId,
+      ENTITY_RESOLVER_ALGORITHM_VERSION,
+      reason,
+      JSON.stringify({ reviewer: input.userId }),
+      input.userId,
+    );
+    // Resolve only the open review for THIS candidate (payload->>targetEntityId),
+    // so other open reviews for the same source are left untouched.
+    await this.execute(
+      `UPDATE "company_memory_reviews"
+       SET "status" = 'rejected', "reviewedBy" = $3, "reviewedAt" = CURRENT_TIMESTAMP,
+           "reviewComment" = $4, "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "tenantId" = $1 AND "reviewType" = 'entity_merge' AND "resourceId" = $2
+         AND "status" = 'open' AND ("payload"->>'targetEntityId') = $5`,
+      input.tenantId,
+      input.sourceEntityId,
+      input.userId,
+      reason.slice(0, 4000),
+      input.candidateEntityId,
+    );
+    return { sourceEntityId: input.sourceEntityId, candidateEntityId: input.candidateEntityId, decision: 'rejected' };
   }
 
   async getGraph(input: {

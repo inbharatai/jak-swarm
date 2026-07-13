@@ -35,7 +35,12 @@ const brainRoutes: FastifyPluginAsync = async (fastify) => {
     try { return reply.send(ok(await brain.getEntityDetail({ tenantId: request.user.tenantId, entityId }))); }
     catch (error_) { return fail(reply, error_, 'COMPANY_ENTITY_DETAIL_FAILED'); }
   });
-  fastify.post('/company/brain/context', { preHandler: [fastify.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  // Audit A6: `agentRole` is an UNTRUSTED request-body field. Gating behind the
+  // review role (REVIEWER/TENANT_ADMIN/SYSTEM_ADMIN) prevents a low-privilege
+  // authenticated tenant user from escalating to a privileged agentRole
+  // ("never trust tenant, user or agent role fields supplied by an untrusted
+  // request"). Operators legitimately preview any role; ordinary users do not.
+  fastify.post('/company/brain/context', { preHandler: [fastify.authenticate, ...review] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const data = body(z.object({ task: z.string().min(1).max(20_000), agentRole: z.string().min(1).max(120), tokenBudget: z.number().int().min(500).max(8000).optional() }).strict(), request, reply); if (!data) return;
     try { return reply.send(ok(await brain.getContextPackage({ tenantId: request.user.tenantId, ...data }))); }
     catch (error_) { return fail(reply, error_, 'COMPANY_CONTEXT_FAILED'); }
@@ -54,6 +59,11 @@ const brainRoutes: FastifyPluginAsync = async (fastify) => {
     const sourceEntityId = id(request, reply); if (!sourceEntityId) return; const data = body(z.object({ targetEntityId: z.string().min(1), reason: z.string().min(5).max(4000), similarity: z.number().min(0).max(1).optional() }).strict(), request, reply); if (!data) return;
     try { return reply.send(ok({ entity: await brain.mergeEntities({ tenantId: request.user.tenantId, userId: request.user.userId, sourceEntityId, ...data }) })); }
     catch (error_) { return fail(reply, error_, 'COMPANY_ENTITY_MERGE_FAILED'); }
+  });
+  fastify.post('/company/brain/entities/:id/reject-merge', { preHandler: [fastify.authenticate, ...review] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const sourceEntityId = id(request, reply); if (!sourceEntityId) return; const data = body(z.object({ candidateEntityId: z.string().min(1), reason: z.string().min(5).max(4000).optional() }).strict(), request, reply); if (!data) return;
+    try { return reply.send(ok({ rejection: await brain.rejectEntityMerge({ tenantId: request.user.tenantId, userId: request.user.userId, sourceEntityId, ...data }) })); }
+    catch (error_) { return fail(reply, error_, 'COMPANY_ENTITY_MERGE_REJECT_FAILED'); }
   });
 
   if (process.env['COMPANY_BRAIN_AUTO_PROCESS_ENABLED'] !== 'false') {
