@@ -142,6 +142,8 @@ export interface BrainContextPackage {
     excerpt: string;
     occurredAt: string | null;
   }>;
+  /** Sources filtered out by access policy (restricted/expired/role-not-allowed), for honest redaction telemetry. */
+  omittedCount: number;
   contextText: string;
 }
 

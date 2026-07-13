@@ -51,6 +51,24 @@ export interface CompanyContextProvider {
     constraints: string | null;
     preferredChannels: unknown;
   } | null>;
+  /**
+   * Task-specific, permission-filtered Company Brain Graph V2 context.
+   *
+   * The agent role and tenant are derived server-side from the trusted
+   * AgentContext (the agent's own role enum + the authenticated tenantId),
+   * never from an HTTP body. Returns null when Graph V2 is not migrated,
+   * unavailable, or has no relevant/accessible evidence — agents then ground
+   * in the approved CompanyProfile alone. `omittedCount` reports how many
+   * source artifacts were redacted out by access policy so the runtime can
+   * emit honest "redacted" telemetry; it is optional for providers that do
+   * not compute it.
+   */
+  getContextPackage(input: {
+    tenantId: string;
+    task: string;
+    agentRole: string;
+    tokenBudget?: number;
+  }): Promise<{ contextText: string; omittedCount?: number } | null>;
 }
 
 /**
@@ -189,6 +207,7 @@ export abstract class BaseAgent {
       this.role,
       () => BaseAgent.memoryProvider,
       () => BaseAgent.companyContextProvider,
+      this.logger,
     );
     this.toolExecutionService = new ToolExecutionService(
       this.llmCallService,

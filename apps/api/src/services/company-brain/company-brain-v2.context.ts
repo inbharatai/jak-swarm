@@ -26,7 +26,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
     if (!task) {
       return {
         task: '', agentRole: input.agentRole, generatedAt: new Date().toISOString(),
-        entities: [], claims: [], edges: [], conflicts: [], evidence: [], contextText: '',
+        entities: [], claims: [], edges: [], conflicts: [], evidence: [], omittedCount: 0, contextText: '',
       };
     }
     const tokens = contextTokens(task);
@@ -74,10 +74,14 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
         );
     const visibleArtifacts = artifacts.filter((artifact) => canAgentAccessArtifact(artifact, input.agentRole));
     const visibleArtifactIds = new Set(visibleArtifacts.map((artifact) => artifact.id));
-    entities = entities.filter((entity) => {
+    const entitiesBeforeAccessFilter = entities.length;
+    const accessFilteredEntities = entities.filter((entity) => {
       const sources = jsonStringArray(entity.sourceArtifactIds);
       return sources.length === 0 || sources.some((id) => visibleArtifactIds.has(id));
-    }).slice(0, 20);
+    });
+    const omittedCount = Math.max(0, artifacts.length - visibleArtifacts.length)
+      + Math.max(0, entitiesBeforeAccessFilter - accessFilteredEntities.length);
+    entities = accessFilteredEntities.slice(0, 20);
 
     const entityIds = entities.map((entity) => entity.id);
     const [claims, edges] = entityIds.length === 0
@@ -171,8 +175,24 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
       edges: visibleEdges,
       conflicts,
       evidence,
+      omittedCount,
       contextText: contextText.slice(0, maxChars),
     };
+  }
+
+  /**
+   * Lightweight boot probe: returns true when the Graph V2 tables exist and
+   * are queryable, false when migration 118 has not been deployed (or the DB
+   * is unreachable). Used to emit honest availability telemetry at startup —
+   * agents continue with the approved CompanyProfile alone when this is false.
+   */
+  async probeAvailability(): Promise<boolean> {
+    try {
+      await this.query<{ ok: number }>(`SELECT 1 AS "ok" FROM "company_graph_entities" LIMIT 1`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async markArtifactFailure(input: { tenantId: string; artifactId: string; error: unknown }): Promise<void> {
