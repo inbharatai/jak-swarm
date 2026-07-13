@@ -193,6 +193,44 @@ export const workerLastPollTimestamp = new client.Gauge({
   labelNames: ['instance_id'] as const,
 });
 
+// ─── Company Brain Jobs Metrics (migration 119 durable worker) ────────────
+
+export const companyBrainJobsPending = new client.Gauge({
+  name: 'jak_company_brain_jobs_pending',
+  help: 'Number of company_brain_jobs rows in PENDING or RETRY_WAIT state (backlog)',
+});
+
+export const companyBrainJobsProcessing = new client.Gauge({
+  name: 'jak_company_brain_jobs_processing',
+  help: 'Number of company_brain_jobs rows in LEASED or PROCESSING state (being worked)',
+});
+
+export const companyBrainJobsCompletedTotal = new client.Counter({
+  name: 'jak_company_brain_jobs_completed_total',
+  help: 'Total Company Brain jobs that finished COMPLETED',
+});
+
+export const companyBrainJobsRetryWaitTotal = new client.Counter({
+  name: 'jak_company_brain_jobs_retry_wait_total',
+  help: 'Total Company Brain jobs sent to RETRY_WAIT (will re-attempt after backoff)',
+});
+
+export const companyBrainJobsReviewRequiredTotal = new client.Counter({
+  name: 'jak_company_brain_jobs_review_required_total',
+  help: 'Total Company Brain jobs parked in REVIEW_REQUIRED (awaiting human review)',
+});
+
+export const companyBrainJobsPermanentlyFailedTotal = new client.Counter({
+  name: 'jak_company_brain_jobs_permanently_failed_total',
+  help: 'Total Company Brain jobs that exhausted retries → PERMANENTLY_FAILED',
+});
+
+export const companyBrainJobsReclaimedTotal = new client.Counter({
+  name: 'jak_company_brain_jobs_reclaimed_total',
+  help: 'Total Company Brain job leases reclaimed after their owner stopped heartbeating',
+  labelNames: ['reclaimer_instance'] as const,
+});
+
 // ─── Signal Bus Metrics ────────────────────────────────────────────────────
 
 export const workflowSignalTotal = new client.Counter({
@@ -298,6 +336,14 @@ export const metrics = {
   workerRunningJobs,
   workerHeartbeatFailuresTotal,
   workerLastPollTimestamp,
+  // Company Brain durable jobs (migration 119)
+  companyBrainJobsPending,
+  companyBrainJobsProcessing,
+  companyBrainJobsCompletedTotal,
+  companyBrainJobsRetryWaitTotal,
+  companyBrainJobsReviewRequiredTotal,
+  companyBrainJobsPermanentlyFailedTotal,
+  companyBrainJobsReclaimedTotal,
   // Signals
   workflowSignalTotal,
   // SSE

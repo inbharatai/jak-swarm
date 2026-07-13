@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CompanyOperatingLayerService } from '../services/company-brain/company-operating-layer.service.js';
 import { CompanyBrainV2Service } from '../services/company-brain/company-brain-v2.service.js';
+import { CompanyBrainWorker, backfillCompanyBrainJobs } from '../services/company-brain/company-brain-worker.service.js';
 import { ok } from '../types.js';
 import { body, fail, id, paging, query, reviewRoles, writeRoles } from './company-operating-layer.route-utils.js';
 import { createCompanyBrainProcessor } from './company-brain-v2.processing.js';
@@ -9,7 +10,7 @@ import { createCompanyBrainProcessor } from './company-brain-v2.processing.js';
 const brainRoutes: FastifyPluginAsync = async (fastify) => {
   const legacy = new CompanyOperatingLayerService(fastify.db, fastify.log);
   const brain = new CompanyBrainV2Service(fastify.db, fastify.log);
-  const processor = createCompanyBrainProcessor(legacy, brain, fastify.log);
+  const processor = createCompanyBrainProcessor(fastify.db, legacy, brain, fastify.log);
   const write = fastify.requireRole ? [fastify.requireRole(...writeRoles)] : [];
   const review = fastify.requireRole ? [fastify.requireRole(...reviewRoles)] : [];
 
@@ -56,17 +57,18 @@ const brainRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   if (process.env['COMPANY_BRAIN_AUTO_PROCESS_ENABLED'] !== 'false') {
-    const intervalMs = Math.max(15_000, Number.parseInt(process.env['COMPANY_BRAIN_AUTO_PROCESS_INTERVAL_MS'] ?? '60000', 10) || 60_000);
-    const batchSize = Math.max(1, Math.min(Number.parseInt(process.env['COMPANY_BRAIN_AUTO_PROCESS_BATCH_SIZE'] ?? '3', 10) || 3, 25));
-    let running = false;
-    const tick = async () => {
-      if (running) return; running = true;
-      try { for (const artifact of await brain.listPendingArtifacts({ limit: batchSize })) await processor.processArtifact({ tenantId: artifact.tenantId, userId: artifact.userId, artifactId: artifact.id }).catch((error_) => fastify.log.warn({ error_, artifactId: artifact.id }, '[company-brain-v2] sweep item failed')); }
-      catch (error_) { fastify.log.warn({ error_ }, '[company-brain-v2] processing sweep failed'); }
-      finally { running = false; }
-    };
-    const timer = setInterval(() => void tick(), intervalMs); timer.unref(); setImmediate(() => void tick());
-    fastify.addHook('onClose', async () => clearInterval(timer));
+    // Durable worker (migration 119). Replaces the API-local setInterval +
+    // in-memory `running` flag. Leader-election is unnecessary here because
+    // claiming is atomic (FOR UPDATE SKIP LOCKED): any number of worker
+    // instances can poll the same table without double-processing.
+    const worker = new CompanyBrainWorker(fastify.db, fastify.log, legacy, brain);
+    worker.start();
+    // One-time backfill of artifacts ingested before the durable worker
+    // existed (bounded, idempotent per artifact idempotency key).
+    void backfillCompanyBrainJobs(fastify.db, fastify.log).catch((error_) =>
+      fastify.log.warn({ error_ }, '[company-brain-v2] backfill failed (non-fatal)'),
+    );
+    fastify.addHook('onClose', async () => worker.stop());
   }
 };
 export default brainRoutes;

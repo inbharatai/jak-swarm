@@ -115,6 +115,28 @@ export abstract class CompanyBrainArtifactStore {
     }));
   }
 
+  /**
+   * Direct tenant-scoped artifact processing status (replaces the prior
+   * scan-and-find over the latest 200 artifacts). Returns whether the
+   * artifact exists in the tenant and whether entity extraction is still
+   * needed (no extractedAt, not already extracted/ready).
+   */
+  async getArtifactProcessingStatus(input: {
+    tenantId: string;
+    artifactId: string;
+  }): Promise<{ found: boolean; needsExtraction: boolean; ingestionStatus: string | null; extractedAt: Date | null }> {
+    const rows = await this.query<{ extractedAt: Date | null; ingestionStatus: string }>(
+      `SELECT "extractedAt", "ingestionStatus" FROM "company_artifacts"
+       WHERE "id" = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL LIMIT 1`,
+      input.artifactId,
+      input.tenantId,
+    ).catch(() => [] as Array<{ extractedAt: Date | null; ingestionStatus: string }>);
+    const row = rows[0];
+    if (!row) return { found: false, needsExtraction: false, ingestionStatus: null, extractedAt: null };
+    const needsExtraction = row.extractedAt === null && !['extracted', 'ready'].includes(row.ingestionStatus);
+    return { found: true, needsExtraction, ingestionStatus: row.ingestionStatus, extractedAt: row.extractedAt };
+  }
+
   async setArtifactProcessingState(input: {
     tenantId: string;
     artifactId: string;

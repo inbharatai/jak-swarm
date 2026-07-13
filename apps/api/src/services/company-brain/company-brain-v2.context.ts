@@ -1,182 +1,376 @@
-/** Permission-filtered task context engine for Company Brain V2. */
+/** Permission-filtered, measured-hybrid task context engine for Company Brain V2. */
 import {
   ARTIFACT_WITH_POLICY_SELECT,
+  buildContextText,
   canAgentAccessArtifact,
-  contextTokens,
+  compositeEntityScore,
+  contextPackageId,
+  COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION,
+  extractTaskIdentifiers,
   jsonStringArray,
-  stableJson,
+  normalizeEntityLabel,
   toIso,
   uniqueStrings,
-  type BrainContextPackage,
   type CompanyArtifactV2Row,
+  type CompanyBrainContextPackage,
   type CompanyClaimRow,
   type CompanyEdgeRow,
   type CompanyEntityV2Row,
+  type ContextClaim,
+  type ContextEdge,
+  type ContextEntity,
+  type ContextEvidence,
+  type ContextOmissions,
 } from './company-brain-v2.core.js';
 import { CompanyBrainReviewStore } from './company-brain-v2.review.js';
 
+interface CandidateEntity {
+  row: CompanyEntityV2Row;
+  signal: {
+    exactAlias: boolean;
+    identifier: boolean;
+    keywordRank: number;
+    graphNeighbor: boolean;
+  };
+}
+
 export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
+  /**
+   * Phase 1 hybrid retrieval:
+   *   exact canonical alias + stable-identifier match + PostgreSQL keyword
+   *   search (ts_rank) + 1-hop graph-neighborhood expansion, scored into a
+   *   composite, then permission-filtered (taint-safe source-AND) and
+   *   budget-allocated by COMPLETE items only.
+   *
+   * Rule: **No relevant result → empty governed context.** The previous
+   * "inject the 15 most-recent entities" recency fallback is removed.
+   *
+   * Error contract: an empty *result* returns an empty package (no recency
+   * fallback); a retrieval *error* (missing Graph V2 tables, DB failure)
+   * PROPAGATES — the provider factory catches it, logs a warn, and returns
+   * null so the agent degrades to the approved CompanyProfile alone. Per-query
+   * `.catch(() => [])` swallows are intentionally absent: silently turning a
+   * hard failure into an empty-but-quiet package would hide the failure
+   * ("never silently catch important failures"). The boot probe
+   * `probeAvailability` is the only deliberate catch (boolean → telemetry).
+   */
   async getContextPackage(input: {
     tenantId: string;
     task: string;
     agentRole: string;
     tokenBudget?: number;
-  }): Promise<BrainContextPackage> {
+    userId?: string;
+    workflowId?: string;
+    estimator?: (text: string) => number;
+  }): Promise<CompanyBrainContextPackage> {
+    const started = Date.now();
     const task = input.task.trim();
-    if (!task) {
-      return {
-        task: '', agentRole: input.agentRole, generatedAt: new Date().toISOString(),
-        entities: [], claims: [], edges: [], conflicts: [], evidence: [], omittedCount: 0, contextText: '',
-      };
+    const actor = { userId: input.userId, agentRole: input.agentRole, workflowId: input.workflowId };
+    const empty = (omissions: ContextOmissions = { restricted: 0, expired: 0, irrelevant: 0 }): CompanyBrainContextPackage => ({
+      id: contextPackageId({ tenantId: input.tenantId, task, agentRole: input.agentRole, generatedAt: new Date().toISOString() }),
+      tenantId: input.tenantId,
+      task,
+      actor,
+      scope: { projectIds: [], customerIds: [], entityIds: [] },
+      entities: [],
+      claims: [],
+      disputedClaims: [],
+      edges: [],
+      evidence: [],
+      omissions,
+      retrieval: { strategyVersion: COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION, candidateCount: 0, selectedCount: 0, latencyMs: Date.now() - started },
+      generatedAt: new Date().toISOString(),
+      contextText: '',
+      omittedCount: 0,
+    });
+    if (!task) return empty();
+
+    const ids = extractTaskIdentifiers(task);
+    const aliasTokens = uniqueStrings([
+      ...ids.tokens.map(normalizeEntityLabel),
+      ...ids.emails.map((e) => normalizeEntityLabel(e)),
+      ...ids.emails,
+      ...ids.urls.map((u) => u.toLowerCase()),
+      ...ids.ids.map((s) => s.toLowerCase()),
+    ].filter((s) => s && s.length >= 2));
+
+    // --- Candidate gathering (union, tagged with signal). -------------------
+    const byId = new Map<string, CandidateEntity>();
+    const addCandidates = (rows: CompanyEntityV2Row[], signal: Partial<CandidateEntity['signal']>) => {
+      for (const row of rows) {
+        const existing = byId.get(row.id);
+        if (existing) {
+          existing.signal.exactAlias ||= signal.exactAlias ?? false;
+          existing.signal.identifier ||= signal.identifier ?? false;
+          existing.signal.keywordRank = Math.max(existing.signal.keywordRank, signal.keywordRank ?? 0);
+          existing.signal.graphNeighbor ||= signal.graphNeighbor ?? false;
+        } else {
+          byId.set(row.id, {
+            row,
+            signal: {
+              exactAlias: signal.exactAlias ?? false,
+              identifier: signal.identifier ?? false,
+              keywordRank: signal.keywordRank ?? 0,
+              graphNeighbor: signal.graphNeighbor ?? false,
+            },
+          });
+        }
+      }
+    };
+
+    // (a) exact canonical alias match
+    if (aliasTokens.length > 0) {
+      const aliasRows = await this.query<CompanyEntityV2Row>(
+        `SELECT e.*
+           FROM "company_entity_aliases" a
+           JOIN "company_graph_entities" e ON e."id" = a."entityId" AND e."tenantId" = a."tenantId"
+          WHERE a."tenantId" = $1 AND e."deletedAt" IS NULL
+            AND a."normalizedAlias" = ANY($2::TEXT[])`,
+        input.tenantId,
+        aliasTokens,
+      );
+      addCandidates(aliasRows, { exactAlias: true });
     }
-    const tokens = contextTokens(task);
-    const search = tokens.join(' ');
-    let entities = await this.query<CompanyEntityV2Row>(
-      `SELECT *,
-          ts_rank(
+
+    // (b) stable-identifier match against entity properties (email/domain/crm-id/url …)
+    if (ids.emails.length > 0 || ids.urls.length > 0 || ids.ids.length > 0) {
+      const patterns = uniqueStrings([
+        ...ids.emails.map((e) => `%${e}%`),
+        ...ids.urls.map((u) => `%${u}%`),
+        ...ids.ids.map((s) => `%${s}%`),
+      ]);
+      const idRows = await this.query<CompanyEntityV2Row>(
+        `SELECT * FROM "company_graph_entities"
+          WHERE "tenantId" = $1 AND "deletedAt" IS NULL
+            AND "properties"::TEXT ILIKE ANY($2::TEXT[])
+          LIMIT 50`,
+        input.tenantId,
+        patterns,
+      );
+      addCandidates(idRows, { identifier: true });
+    }
+
+    // (c) PostgreSQL keyword search (ts_rank). No recency fallback on empty/throw.
+    const search = ids.tokens.join(' ');
+    if (search.length > 0) {
+      const ftsRows = await this.query<{ id: string; rank: number } & CompanyEntityV2Row>(
+        `SELECT *, ts_rank(
             to_tsvector('simple', COALESCE("title", '') || ' ' || COALESCE("summary", '')),
             websearch_to_tsquery('simple', $2)
           ) AS rank
-       FROM "company_graph_entities"
-       WHERE "tenantId" = $1 AND "deletedAt" IS NULL
-         AND to_tsvector('simple', COALESCE("title", '') || ' ' || COALESCE("summary", ''))
-             @@ websearch_to_tsquery('simple', $2)
-       ORDER BY rank DESC, "updatedAt" DESC
-       LIMIT 30`,
-      input.tenantId,
-      search || task,
-    ).catch(async () => this.query<CompanyEntityV2Row>(
-      `SELECT * FROM "company_graph_entities"
-       WHERE "tenantId" = $1 AND "deletedAt" IS NULL
-       ORDER BY "updatedAt" DESC LIMIT 20`,
-      input.tenantId,
-    ));
-
-    if (entities.length === 0) {
-      entities = await this.query<CompanyEntityV2Row>(
-        `SELECT * FROM "company_graph_entities"
+         FROM "company_graph_entities"
          WHERE "tenantId" = $1 AND "deletedAt" IS NULL
-         ORDER BY "updatedAt" DESC LIMIT 15`,
+           AND to_tsvector('simple', COALESCE("title", '') || ' ' || COALESCE("summary", ''))
+               @@ websearch_to_tsquery('simple', $2)
+         ORDER BY rank DESC, "updatedAt" DESC
+         LIMIT 30`,
         input.tenantId,
+        search,
       );
+      addCandidates(ftsRows.map((r) => ({ ...r })) as CompanyEntityV2Row[], { keywordRank: 1 });
+      // Re-apply the actual rank magnitude (ts_rank is tiny; normalize to [0,1]).
+      for (const r of ftsRows) {
+        const c = byId.get(r.id);
+        if (c) c.signal.keywordRank = Math.min(1, Math.max(c.signal.keywordRank, r.rank > 0 ? Math.min(1, r.rank * 16) : 0));
+      }
     }
 
-    const artifactIds = uniqueStrings(entities.flatMap((entity) => jsonStringArray(entity.sourceArtifactIds)));
+    if (byId.size === 0) {
+      // No relevant result → empty governed context. Never inject recency.
+      return empty({ restricted: 0, expired: 0, irrelevant: 0 });
+    }
+
+    // --- Score + relevance top-N. ------------------------------------------
+    // Keep only direct candidates with a positive relevance signal
+    // (exact alias / stable identifier / keyword rank). Graph neighbors are
+    // selected separately after expansion so they are never miscounted as
+    // irrelevant and never used as expansion seeds themselves.
+    const directSelected = [...byId.values()]
+      .filter((c) => c.signal.exactAlias || c.signal.identifier || c.signal.keywordRank > 0)
+      .sort((a, b) => compositeEntityScore(b.signal) - compositeEntityScore(a.signal))
+      .slice(0, 20);
+
+    // --- 1-hop graph-neighborhood expansion (scored lower). -----------------
+    const seedIds = directSelected.map((c) => c.row.id);
+    if (seedIds.length > 0) {
+      const neighborRows = await this.query<{ sourceEntityId: string; targetEntityId: string }>(
+        `SELECT "sourceEntityId", "targetEntityId" FROM "company_edges"
+          WHERE "tenantId" = $1 AND "status" IN ('active','disputed')
+            AND ("sourceEntityId" = ANY($2::TEXT[]) OR "targetEntityId" = ANY($2::TEXT[]))
+          LIMIT 60`,
+        input.tenantId,
+        seedIds,
+      );
+      // Collect the "other" endpoint for every edge touching a seed.
+      const seedSet = new Set(seedIds);
+      const neighborIds = new Set<string>();
+      for (const e of neighborRows) {
+        if (seedSet.has(e.sourceEntityId) && !seedSet.has(e.targetEntityId)) neighborIds.add(e.targetEntityId);
+        else if (seedSet.has(e.targetEntityId) && !seedSet.has(e.sourceEntityId)) neighborIds.add(e.sourceEntityId);
+      }
+      if (neighborIds.size > 0) {
+        const neighborEntities = await this.query<CompanyEntityV2Row>(
+          `SELECT * FROM "company_graph_entities"
+            WHERE "tenantId" = $1 AND "deletedAt" IS NULL AND "id" = ANY($2::TEXT[])
+            LIMIT 10`,
+          input.tenantId,
+          [...neighborIds],
+        );
+        addCandidates(neighborEntities, { graphNeighbor: true });
+      }
+    }
+
+    // Neighbors were added to byId AFTER direct selection; pick them up now as
+    // their own (lower-scored) tier, capped so direct matches always dominate.
+    const directIds = new Set(directSelected.map((c) => c.row.id));
+    const neighborSelected = [...byId.values()]
+      .filter((c) => !directIds.has(c.row.id) && c.signal.graphNeighbor)
+      .sort((a, b) => compositeEntityScore(b.signal) - compositeEntityScore(a.signal))
+      .slice(0, Math.max(0, 30 - directSelected.length));
+    const selected = [...directSelected, ...neighborSelected];
+
+    const candidateCount = byId.size;
+    const irrelevantCount = Math.max(0, candidateCount - selected.length);
+
+    // --- Access filter (taint-safe: source-AND on visibility). -------------
+    const candidateRows = selected.map((c) => c.row);
+    const artifactIds = uniqueStrings(candidateRows.flatMap((entity) => jsonStringArray(entity.sourceArtifactIds)));
     const artifacts = artifactIds.length === 0
       ? []
       : await this.query<CompanyArtifactV2Row>(
           `SELECT ${ARTIFACT_WITH_POLICY_SELECT}
-           FROM "company_artifacts" a
-           LEFT JOIN "company_artifact_policies" p ON p."artifactId" = a."id" AND p."tenantId" = a."tenantId"
-           WHERE a."tenantId" = $1 AND a."id" = ANY($2::TEXT[]) AND a."deletedAt" IS NULL`,
+            FROM "company_artifacts" a
+            LEFT JOIN "company_artifact_policies" p ON p."artifactId" = a."id" AND p."tenantId" = a."tenantId"
+            WHERE a."tenantId" = $1 AND a."id" = ANY($2::TEXT[]) AND a."deletedAt" IS NULL`,
           input.tenantId,
           artifactIds,
         );
-    const visibleArtifacts = artifacts.filter((artifact) => canAgentAccessArtifact(artifact, input.agentRole));
-    const visibleArtifactIds = new Set(visibleArtifacts.map((artifact) => artifact.id));
-    const entitiesBeforeAccessFilter = entities.length;
-    const accessFilteredEntities = entities.filter((entity) => {
-      const sources = jsonStringArray(entity.sourceArtifactIds);
-      return sources.length === 0 || sources.some((id) => visibleArtifactIds.has(id));
-    });
-    const omittedCount = Math.max(0, artifacts.length - visibleArtifacts.length)
-      + Math.max(0, entitiesBeforeAccessFilter - accessFilteredEntities.length);
-    entities = accessFilteredEntities.slice(0, 20);
+    const visibleArtifactIds = new Set<string>();
+    let restrictedDrops = 0;
+    let expiredDrops = 0;
+    for (const a of artifacts) {
+      const retained = !(a.retentionUntil && a.retentionUntil.getTime() < Date.now());
+      if (!retained) { expiredDrops += 1; continue; }
+      if (canAgentAccessArtifact(a, input.agentRole)) visibleArtifactIds.add(a.id);
+      else restrictedDrops += 1;
+    }
 
-    const entityIds = entities.map((entity) => entity.id);
-    const [claims, edges] = entityIds.length === 0
-      ? [[], []] as [CompanyClaimRow[], CompanyEdgeRow[]]
-      : await Promise.all([
-          this.query<CompanyClaimRow>(
-            `SELECT * FROM "company_claims"
-             WHERE "tenantId" = $1 AND "subjectEntityId" = ANY($2::TEXT[])
-               AND "status" IN ('active', 'disputed')
-             ORDER BY CASE "status" WHEN 'active' THEN 0 ELSE 1 END, "authorityScore" DESC, "updatedAt" DESC
-             LIMIT 80`,
-            input.tenantId,
-            entityIds,
-          ),
-          this.query<CompanyEdgeRow>(
-            `SELECT * FROM "company_edges"
-             WHERE "tenantId" = $1 AND "status" IN ('active', 'disputed')
-               AND ("sourceEntityId" = ANY($2::TEXT[]) OR "targetEntityId" = ANY($2::TEXT[]))
-             ORDER BY "confidence" DESC, "updatedAt" DESC
-             LIMIT 80`,
-            input.tenantId,
-            entityIds,
-          ),
-        ]);
+    const visibleEntities: ContextEntity[] = [];
+    for (const c of selected) {
+      const sources = jsonStringArray(c.row.sourceArtifactIds);
+      // No sources → no restriction → keep. Any source restricted/expired → drop (taint-safe).
+      if (sources.length === 0 || sources.every((id) => visibleArtifactIds.has(id))) {
+        const e = c.row;
+        visibleEntities.push({
+          id: e.id, entityType: e.entityType, title: e.title, summary: e.summary,
+          status: e.status, ownerName: e.ownerName, priority: e.priority, dueAt: toIso(e.dueAt),
+          score: compositeEntityScore(c.signal), sourceArtifactIds: sources,
+        });
+      }
+    }
+    const visibleEntityIdSet = new Set(visibleEntities.map((e) => e.id));
+    const selectedCount = visibleEntities.length;
 
-    const visibleEntityIdSet = new Set(entityIds);
-    const visibleClaims = claims.filter((claim) => !claim.objectEntityId || visibleEntityIdSet.has(claim.objectEntityId));
-    const visibleEdges = edges.filter((edge) => visibleEntityIdSet.has(edge.sourceEntityId) && visibleEntityIdSet.has(edge.targetEntityId));
+    // --- Claims (with preserved evidence ids) + edges. ---------------------
+    let claims: ContextClaim[] = [];
+    let edges: ContextEdge[] = [];
+    if (visibleEntityIdSet.size > 0) {
+      const visibleIds = [...visibleEntityIdSet];
+      const [claimRows, edgeRows, evidenceRows] = await Promise.all([
+        this.query<CompanyClaimRow>(
+          `SELECT * FROM "company_claims"
+            WHERE "tenantId" = $1 AND "subjectEntityId" = ANY($2::TEXT[])
+              AND "status" IN ('active','disputed')
+            ORDER BY CASE "status" WHEN 'active' THEN 0 ELSE 1 END, "authorityScore" DESC, "updatedAt" DESC
+            LIMIT 80`,
+          input.tenantId, visibleIds,
+        ),
+        this.query<CompanyEdgeRow>(
+          `SELECT * FROM "company_edges"
+            WHERE "tenantId" = $1 AND "status" IN ('active','disputed')
+              AND ("sourceEntityId" = ANY($2::TEXT[]) OR "targetEntityId" = ANY($2::TEXT[]))
+            ORDER BY "confidence" DESC, "updatedAt" DESC
+            LIMIT 80`,
+          input.tenantId, visibleIds,
+        ),
+        this.query<{ claimId: string; artifactId: string }>(
+          `SELECT "claimId", "artifactId" FROM "company_claim_evidence"
+            WHERE "tenantId" = $1 AND "claimId" IN (
+              SELECT "id" FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = ANY($2::TEXT[]) AND "status" IN ('active','disputed')
+            )`,
+          input.tenantId, visibleIds,
+        ),
+      ]);
 
-    const evidence = visibleArtifacts
+      const evidenceByClaim = new Map<string, string[]>();
+      for (const ev of evidenceRows) {
+        const arr = evidenceByClaim.get(ev.claimId) ?? [];
+        arr.push(ev.artifactId);
+        evidenceByClaim.set(ev.claimId, arr);
+      }
+
+      claims = claimRows
+        .filter((c) => visibleEntityIdSet.has(c.subjectEntityId) && (!c.objectEntityId || visibleEntityIdSet.has(c.objectEntityId)))
+        .map((c) => ({
+          id: c.id, subjectEntityId: c.subjectEntityId, predicate: c.predicate,
+          objectEntityId: c.objectEntityId, objectValue: c.objectValue, normalizedObject: c.normalizedObject,
+          status: c.status, confidence: c.confidence, authorityScore: c.authorityScore,
+          validFrom: toIso(c.validFrom), validTo: toIso(c.validTo),
+          evidenceIds: evidenceByClaim.get(c.id) ?? [],
+        }));
+      edges = edgeRows
+        .filter((e) => visibleEntityIdSet.has(e.sourceEntityId) && visibleEntityIdSet.has(e.targetEntityId))
+        .map((e) => ({
+          id: e.id, sourceEntityId: e.sourceEntityId, relationshipType: e.relationshipType,
+          targetEntityId: e.targetEntityId, status: e.status, confidence: e.confidence,
+          evidenceArtifactIds: jsonStringArray(e.evidenceArtifactIds),
+        }));
+    }
+    const disputedClaims = claims.filter((c) => c.status === 'disputed');
+
+    // --- Evidence drawer (only visible artifacts). -------------------------
+    const evidence: ContextEvidence[] = artifacts
+      .filter((a) => visibleArtifactIds.has(a.id))
       .sort((a, b) => (b.occurredAt ?? b.createdAt).getTime() - (a.occurredAt ?? a.createdAt).getTime())
       .slice(0, 12)
-      .map((artifact) => ({
-        id: artifact.id,
-        sourceType: artifact.sourceType,
-        artifactType: artifact.artifactType,
-        title: artifact.title,
-        excerpt: artifact.body.slice(0, 800),
-        occurredAt: toIso(artifact.occurredAt),
+      .map((a) => ({
+        id: a.id, sourceType: a.sourceType, artifactType: a.artifactType, title: a.title,
+        excerpt: a.body.slice(0, 800), occurredAt: toIso(a.occurredAt),
       }));
-    const conflicts = visibleClaims.filter((claim) => claim.status === 'disputed');
 
-    const entityById = new Map(entities.map((entity) => [entity.id, entity]));
-    const claimLines = visibleClaims.slice(0, 30).map((claim) => {
-      const subject = entityById.get(claim.subjectEntityId)?.title ?? claim.subjectEntityId;
-      const value = claim.objectEntityId
-        ? entityById.get(claim.objectEntityId)?.title ?? claim.objectEntityId
-        : typeof claim.objectValue === 'string' ? claim.objectValue : stableJson(claim.objectValue);
-      return `- ${subject} —${claim.predicate}→ ${value} [${claim.status}; authority ${claim.authorityScore.toFixed(2)}; confidence ${claim.confidence.toFixed(2)}]`;
+    // --- Scope derivation. -------------------------------------------------
+    const projectEntityTypes = new Set(['project', 'product']);
+    const customerEntityTypes = new Set(['customer', 'customer_signal']);
+    const scope = {
+      projectIds: visibleEntities.filter((e) => projectEntityTypes.has(e.entityType)).map((e) => e.id),
+      customerIds: visibleEntities.filter((e) => customerEntityTypes.has(e.entityType)).map((e) => e.id),
+      entityIds: visibleEntities.map((e) => e.id),
+    };
+
+    const omissions: ContextOmissions = { restricted: restrictedDrops, expired: expiredDrops, irrelevant: irrelevantCount };
+    const tokenBudget = input.tokenBudget ?? 2400;
+    const contextText = buildContextText({
+      entities: visibleEntities, claims, disputedClaims, edges, evidence,
+      agentRole: input.agentRole, tokenBudget, estimator: input.estimator,
     });
-    const edgeLines = visibleEdges.slice(0, 25).map((edge) => {
-      const source = entityById.get(edge.sourceEntityId)?.title ?? edge.sourceEntityId;
-      const target = entityById.get(edge.targetEntityId)?.title ?? edge.targetEntityId;
-      return `- ${source} —${edge.relationshipType}→ ${target} [confidence ${edge.confidence.toFixed(2)}]`;
-    });
-    const contextText = [
-      `Task-specific Company Brain context for ${input.agentRole}:`,
-      '',
-      'Relevant entities:',
-      ...entities.slice(0, 20).map((entity) => `- [${entity.entityType}] ${entity.title}: ${entity.summary}`),
-      '',
-      'Evidence-backed claims:',
-      ...(claimLines.length > 0 ? claimLines : ['- No approved claims matched.']),
-      '',
-      'Relationships:',
-      ...(edgeLines.length > 0 ? edgeLines : ['- No typed relationships matched.']),
-      ...(conflicts.length > 0
-        ? ['', 'Unresolved conflicts — do not silently choose a side:', ...conflicts.map((claim) => `- Claim ${claim.id}: ${claim.predicate} = ${stableJson(claim.objectValue)}`)]
-        : []),
-      '',
-      'Evidence references:',
-      ...evidence.map((item) => `- ${item.id} | ${item.sourceType}/${item.artifactType} | ${item.title}`),
-    ].join('\n');
-    const maxChars = Math.max(2000, Math.min((input.tokenBudget ?? 2400) * 4, 16000));
+    const generatedAt = new Date().toISOString();
 
     return {
+      id: contextPackageId({ tenantId: input.tenantId, task, agentRole: input.agentRole, generatedAt }),
+      tenantId: input.tenantId,
       task,
-      agentRole: input.agentRole,
-      generatedAt: new Date().toISOString(),
-      entities: entities.map((entity) => ({
-        id: entity.id,
-        entityType: entity.entityType,
-        title: entity.title,
-        summary: entity.summary,
-        status: entity.status,
-        ownerName: entity.ownerName,
-        priority: entity.priority,
-        dueAt: entity.dueAt,
-      })),
-      claims: visibleClaims,
-      edges: visibleEdges,
-      conflicts,
+      actor,
+      scope,
+      entities: visibleEntities,
+      claims,
+      disputedClaims,
+      edges,
       evidence,
-      omittedCount,
-      contextText: contextText.slice(0, maxChars),
+      omissions,
+      retrieval: { strategyVersion: COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION, candidateCount, selectedCount, latencyMs: Date.now() - started },
+      generatedAt,
+      contextText,
+      omittedCount: omissions.restricted + omissions.expired + omissions.irrelevant,
     };
   }
 

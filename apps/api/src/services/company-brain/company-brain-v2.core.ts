@@ -371,3 +371,266 @@ export function toIso(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 1 — typed, measured Company Brain context package.
+//
+// The retrieval pipeline returns this structured package. It deliberately
+// retains `contextText` + `omittedCount` so the wired agent-prompt path
+// (`PromptBuilder.injectCompanyContext` → `<company_brain>` block) and its
+// existing tests keep working unchanged: the richer fields are additive and
+// the agents-side `CompanyContextProvider.getContextPackage` contract only
+// reads `contextText` + `omittedCount`.
+// ---------------------------------------------------------------------------
+
+export const COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION = 'hybrid-v1';
+
+export interface ContextActor {
+  userId?: string;
+  agentRole: string;
+  workflowId?: string;
+}
+
+export interface ContextScope {
+  projectIds: string[];
+  customerIds: string[];
+  entityIds: string[];
+}
+
+export interface ContextOmissions {
+  /** Dropped because the source artifact is restricted and the actor's role is not on its allowedAgentRoles. */
+  restricted: number;
+  /** Dropped because the source artifact's retentionUntil has passed. */
+  expired: number;
+  /** Candidate entities that did not meet the relevance threshold for this task. */
+  irrelevant: number;
+}
+
+export interface ContextRetrievalMeta {
+  strategyVersion: string;
+  candidateCount: number;
+  selectedCount: number;
+  latencyMs: number;
+}
+
+export interface ContextEntity {
+  id: string;
+  entityType: string;
+  title: string;
+  summary: string;
+  status: string;
+  ownerName: string | null;
+  priority: string | null;
+  dueAt: string | null;
+  /** Composite relevance score in [0,1] from the hybrid retrieval. */
+  score: number;
+  sourceArtifactIds: string[];
+}
+
+export interface ContextClaim {
+  id: string;
+  subjectEntityId: string;
+  predicate: string;
+  objectEntityId: string | null;
+  objectValue: unknown;
+  normalizedObject: string;
+  status: ClaimStatus;
+  confidence: number;
+  authorityScore: number;
+  validFrom: string | null;
+  validTo: string | null;
+  /** Preserved evidence ids backing this claim (Phase 1 requirement). */
+  evidenceIds: string[];
+}
+
+export interface ContextEdge {
+  id: string;
+  sourceEntityId: string;
+  relationshipType: string;
+  targetEntityId: string;
+  status: ClaimStatus;
+  confidence: number;
+  evidenceArtifactIds: string[];
+}
+
+export interface ContextEvidence {
+  id: string;
+  sourceType: string;
+  artifactType: string;
+  title: string;
+  excerpt: string;
+  occurredAt: string | null;
+}
+
+export interface CompanyBrainContextPackage {
+  id: string;
+  tenantId: string;
+  task: string;
+  actor: ContextActor;
+  scope: ContextScope;
+  entities: ContextEntity[];
+  claims: ContextClaim[];
+  disputedClaims: ContextClaim[];
+  edges: ContextEdge[];
+  evidence: ContextEvidence[];
+  omissions: ContextOmissions;
+  retrieval: ContextRetrievalMeta;
+  generatedAt: string;
+  /** Rendered, budget-allocated text injected into `<company_brain>`. */
+  contextText: string;
+  /** Sum of omissions (restricted + expired + irrelevant) — telemetry continuity for the agents contract. */
+  omittedCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Pure retrieval helpers (unit-testable without a database).
+// ---------------------------------------------------------------------------
+
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const URL_RE = /https?:\/\/[^\s)'"]+/g;
+const IDISH_RE = /\b([A-Z][A-Z0-9_]*-[A-Z0-9-]+|\b[A-Z]{2,}_\d{2,}\b)/g;
+
+export interface TaskIdentifiers {
+  emails: string[];
+  urls: string[];
+  ids: string[];
+  /** Normalized search tokens (existing contextTokens output). */
+  tokens: string[];
+}
+
+export function extractTaskIdentifiers(task: string): TaskIdentifiers {
+  const text = task ?? '';
+  const emails = uniqueStrings([...text.matchAll(EMAIL_RE)].map((m) => m[0].toLowerCase()));
+  const urls = uniqueStrings([...text.matchAll(URL_RE)].map((m) => m[0]));
+  const ids = uniqueStrings([...text.matchAll(IDISH_RE)].map((m) => m[0]));
+  return { emails, urls, ids, tokens: contextTokens(text) };
+}
+
+/**
+ * Provider-aware token estimation. Without a real tokenizer bound, this is the
+ * standard chars/4 approximation; callers may inject a real tokenizer
+ * (e.g. tiktoken) by passing `estimator`. We do NOT fake tiktoken.
+ */
+export function estimateTokens(text: string, estimator?: (text: string) => number): number {
+  if (!text) return 0;
+  if (typeof estimator === 'function') return Math.max(1, Math.ceil(estimator(text)));
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+/** Signal weights for the hybrid composite score. */
+export const RETRIEVAL_WEIGHTS = {
+  exactAlias: 1.0,
+  identifier: 0.95,
+  keyword: 0.6,
+  graphNeighbor: 0.25,
+} as const;
+
+export interface RelevanceSignal {
+  exactAlias: boolean;
+  identifier: boolean;
+  /** ts_rank in [0,1] (caller normalizes by dividing by a small constant). */
+  keywordRank: number;
+  /** True if reached via a graph edge from another matched entity. */
+  graphNeighbor: boolean;
+}
+
+export function compositeEntityScore(signal: RelevanceSignal): number {
+  let score = 0;
+  if (signal.exactAlias) score += RETRIEVAL_WEIGHTS.exactAlias;
+  if (signal.identifier) score += RETRIEVAL_WEIGHTS.identifier;
+  if (signal.keywordRank > 0) score += RETRIEVAL_WEIGHTS.keyword * Math.min(1, signal.keywordRank);
+  if (signal.graphNeighbor) score += RETRIEVAL_WEIGHTS.graphNeighbor;
+  return Math.min(1, score);
+}
+
+export interface BudgetedItem {
+  text: string;
+}
+
+/**
+ * Allocate a token budget across complete items only. Iterates in priority
+ * order; an item is included only if it fits wholly. NEVER truncates an item
+ * mid-way (no mid-claim / mid-evidence-id slicing). Returns the selected
+ * items and the tokens consumed.
+ */
+export function allocateBudgetByCompleteItems<T extends BudgetedItem>(
+  items: T[],
+  budgetTokens: number,
+  estimator?: (text: string) => number,
+): { selected: T[]; consumed: number } {
+  const selected: T[] = [];
+  let consumed = 0;
+  for (const item of items) {
+    const cost = estimateTokens(item.text, estimator);
+    if (consumed + cost > budgetTokens) continue; // skip whole item; do not slice
+    selected.push(item);
+    consumed += cost;
+  }
+  return { selected, consumed };
+}
+
+/**
+ * Build the `<company_brain>` context text from complete items within budget.
+ * The header + section labels are added first (reserved); then entities,
+ * claims, edges, evidence are each allocated as whole items.
+ */
+export function buildContextText(input: {
+  entities: ContextEntity[];
+  claims: ContextClaim[];
+  disputedClaims: ContextClaim[];
+  edges: ContextEdge[];
+  evidence: ContextEvidence[];
+  agentRole: string;
+  tokenBudget: number;
+  estimator?: (text: string) => number;
+}): string {
+  const header = `Task-specific Company Brain context for ${input.agentRole}:`;
+  const headerCost = estimateTokens(header, input.estimator);
+  const budget = Math.max(0, input.tokenBudget - headerCost);
+  const sections: string[] = [header];
+
+  const entityLines = input.entities.map((e) => `- [${e.entityType}] ${e.title}: ${e.summary}` + (e.sourceArtifactIds.length ? ` (evidence: ${e.sourceArtifactIds.join(', ')})` : ''));
+  const claimLines = input.claims.map((c) => `- ${c.subjectEntityId} —${c.predicate}→ ${c.objectEntityId ? `entity:${c.objectEntityId}` : stableJson(c.objectValue)} [${c.status}; authority ${c.authorityScore.toFixed(2)}; confidence ${c.confidence.toFixed(2)}; evidence: ${c.evidenceIds.join(', ') || 'none'}]`);
+  const edgeLines = input.edges.map((e) => `- ${e.sourceEntityId} —${e.relationshipType}→ ${e.targetEntityId} [confidence ${e.confidence.toFixed(2)}]`);
+  const evidenceLines = input.evidence.map((ev) => `- ${ev.id} | ${ev.sourceType}/${ev.artifactType} | ${ev.title}`);
+  const disputeLines = input.disputedClaims.map((c) => `- Claim ${c.id}: ${c.predicate} = ${stableJson(c.objectValue)} (DISPUTED — do not silently choose a side)`);
+
+  const lineCost = (s: string) => estimateTokens(s, input.estimator);
+  // Reserve small labels for each present section.
+  let reserved = 0;
+  const labels: string[] = [];
+  if (entityLines.length) { labels.push('Relevant entities:'); reserved += lineCost('Relevant entities:'); }
+  if (claimLines.length) { labels.push('Evidence-backed claims:'); reserved += lineCost('Evidence-backed claims:'); }
+  if (edgeLines.length) { labels.push('Relationships:'); reserved += lineCost('Relationships:'); }
+  if (disputeLines.length) { labels.push('Unresolved conflicts:'); reserved += lineCost('Unresolved conflicts:'); }
+  if (evidenceLines.length) { labels.push('Evidence references:'); reserved += lineCost('Evidence references:'); }
+
+  const itemPool = [
+    ...entityLines.map((text) => ({ text, kind: 'entity' as const })),
+    ...claimLines.map((text) => ({ text, kind: 'claim' as const })),
+    ...edgeLines.map((text) => ({ text, kind: 'edge' as const })),
+    ...disputeLines.map((text) => ({ text, kind: 'dispute' as const })),
+    ...evidenceLines.map((text) => ({ text, kind: 'evidence' as const })),
+  ];
+
+  const usable = Math.max(0, budget - reserved);
+  const { selected } = allocateBudgetByCompleteItems(itemPool, usable, input.estimator);
+
+  // Re-group selected items by kind to keep sections readable.
+  const byKind = { entity: [] as string[], claim: [] as string[], edge: [] as string[], dispute: [] as string[], evidence: [] as string[] };
+  for (const item of selected) byKind[item.kind].push(item.text);
+
+  if (byKind.entity.length) { sections.push('', 'Relevant entities:', ...byKind.entity); }
+  if (byKind.claim.length) { sections.push('', 'Evidence-backed claims:', ...byKind.claim); }
+  if (byKind.edge.length) { sections.push('', 'Relationships:', ...byKind.edge); }
+  if (byKind.dispute.length) { sections.push('', 'Unresolved conflicts:', ...byKind.dispute); }
+  if (byKind.evidence.length) { sections.push('', 'Evidence references:', ...byKind.evidence); }
+  if (selected.length === 0) sections.push('', 'No relevant accessible evidence matched this task.');
+
+  return sections.join('\n');
+}
+
+/** Deterministic package id (no uuid dependency). */
+export function contextPackageId(input: { tenantId: string; task: string; agentRole: string; generatedAt: string }): string {
+  return sha256(`${input.tenantId}|${input.task}|${input.agentRole}|${input.generatedAt}`);
+}
+
