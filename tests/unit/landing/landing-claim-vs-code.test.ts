@@ -94,7 +94,12 @@ describe('Landing — Company OS wedge (YC thesis, beta-honest)', () => {
   });
 
   it('claims evidence -> graph -> drift -> spec, backed by real routes and service logic', () => {
-    const routes = read('apps/api/src/routes/company-operating-layer.routes.ts');
+    // PR #137 split company-operating-layer.routes.ts into a thin assembly
+    // (company-operating-layer.routes.ts) plus the legacy route definitions
+    // (company-operating-layer.legacy-routes.ts). The route paths the landing
+    // page claims still exist — they now live in the legacy-routes module that
+    // the assembly registers. Assert against the file that owns the paths.
+    const routes = read('apps/api/src/routes/company-operating-layer.legacy-routes.ts');
     const service = read('apps/api/src/services/company-brain/company-operating-layer.service.ts');
     expect(routes).toContain('/company/artifacts');
     expect(routes).toContain('/company/entities');
@@ -174,8 +179,9 @@ describe('Landing — ShowTheWork (4 outcome cards)', () => {
 
   it('Agent-executable product spec → spec generation + decision routes exist', () => {
     expect(contains(SHOW, /Agent-executable product spec/i)).toBe(true);
-    expect(contains('apps/api/src/routes/company-operating-layer.routes.ts', '/company/specs/generate')).toBe(true);
-    expect(contains('apps/api/src/routes/company-operating-layer.routes.ts', '/company/specs/:id/decide')).toBe(true);
+    // Routes live in the legacy-routes module after the PR #137 route split.
+    expect(contains('apps/api/src/routes/company-operating-layer.legacy-routes.ts', '/company/specs/generate')).toBe(true);
+    expect(contains('apps/api/src/routes/company-operating-layer.legacy-routes.ts', '/company/specs/:id/decide')).toBe(true);
   });
 
   it('Browser QA + source-linked fixes → browser operator exists', () => {

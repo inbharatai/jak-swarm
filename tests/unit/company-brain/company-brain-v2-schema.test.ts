@@ -1,13 +1,18 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+// Resolve from the test file location, not process.cwd(): vitest runs this
+// file from the @jak-swarm/tests package working directory, so cwd-relative
+// paths point at tests/packages/db/... which does not exist.
+const REPO_ROOT = join(__dirname, '../../..');
+
 const migration = readFileSync(
-  resolve(process.cwd(), 'packages/db/prisma/migrations/118_company_brain_graph_v2/migration.sql'),
+  join(REPO_ROOT, 'packages/db/prisma/migrations/118_company_brain_graph_v2/migration.sql'),
   'utf8',
 );
 const schema = readFileSync(
-  resolve(process.cwd(), 'packages/db/prisma/company-brain-v2.prisma'),
+  join(REPO_ROOT, 'packages/db/prisma/company-brain-v2.prisma'),
   'utf8',
 );
 
