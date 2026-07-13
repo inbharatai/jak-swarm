@@ -8,8 +8,9 @@
  *
  * Honest scope: the AuditLogger + chain primitives are exercised for real; the
  * only stub is the Prisma client (a tiny in-memory store). Live Postgres
- * round-trip is env-blocked here. The TOCTOU open edge (concurrent writes
- * branching the chain) is documented in audit-chain.ts and NOT tested here.
+ * round-trip is env-blocked here. The TOCTOU fix (concurrent same-tenant writes
+ * cannot branch the chain) is proven against real Postgres in
+ * audit-chain-concurrency.test.ts (PR E).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
@@ -39,37 +40,48 @@ interface StoredRow {
 
 function makeInMemoryDb(): AuditPrismaClient & { rows: StoredRow[] } {
   const rows: StoredRow[] = [];
-  const db: AuditPrismaClient = {
+  const doCreate = (args: { data: { id: string; action: string; tenantId: string; userId: string | null; resource: string; resourceId: string | null; details: Record<string, unknown>; ip: string | null; userAgent: string | null; severity: string; createdAt: Date; prevHash: string | null; rowHash: string | null; chainSeq: number } }): { id: string } => {
+    const d = args.data;
+    const stored: StoredRow = {
+      id: d.id,
+      action: d.action,
+      tenantId: d.tenantId,
+      userId: d.userId,
+      resource: d.resource,
+      resourceId: d.resourceId,
+      details: d.details,
+      ip: d.ip,
+      userAgent: d.userAgent,
+      severity: d.severity,
+      createdAt: d.createdAt,
+      prevHash: d.prevHash,
+      rowHash: d.rowHash,
+      chainSeq: d.chainSeq,
+    };
+    rows.push(stored);
+    return { id: stored.id };
+  };
+  // The transaction runner the atomic append path uses: lock is a noop
+  // (single-writer test), findFirst returns the latest SIGNED row by chainSeq.
+  const runner = {
+    $executeRawUnsafe: async () => [],
     auditLog: {
-      create: async (args) => {
-        const d = args.data;
-        const stored: StoredRow = {
-          id: d.id ?? crypto.randomUUID(),
-          action: d.action,
-          tenantId: d.tenantId,
-          userId: d.userId ?? null,
-          resource: d.resource,
-          resourceId: d.resourceId ?? null,
-          details: d.details,
-          ip: d.ip ?? null,
-          userAgent: d.userAgent ?? null,
-          severity: d.severity,
-          createdAt: d.createdAt,
-          prevHash: d.prevHash ?? null,
-          rowHash: d.rowHash ?? null,
-          chainSeq: d.chainSeq ?? 0,
-        };
-        rows.push(stored);
-        return { id: stored.id };
-      },
       findFirst: async (args: unknown) => {
-        const a = args as { where: { tenantId: string }; orderBy: { createdAt: string } };
-        const matching = rows.filter((r) => r.tenantId === a.where.tenantId);
+        const a = args as { where: { tenantId: string; rowHash?: { not: null } } };
+        let matching = rows.filter((r) => r.tenantId === a.where.tenantId);
+        if (a.where.rowHash) matching = matching.filter((r) => r.rowHash !== null);
         if (matching.length === 0) return null;
-        // orderBy createdAt desc → last inserted wins (createdAt is monotonic in this test)
-        const sorted = [...matching].sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime());
+        const sorted = [...matching].sort((x, y) => y.chainSeq - x.chainSeq);
         return { rowHash: sorted[0]!.rowHash, chainSeq: sorted[0]!.chainSeq };
       },
+      create: async (args: { data: Parameters<typeof doCreate>[0]['data'] }) => doCreate(args),
+    },
+  };
+  const db: AuditPrismaClient = {
+    $transaction: async (fn) => fn(runner as never),
+    auditLog: {
+      // Used by the INACTIVE / unsigned-fallback path (no transaction).
+      create: async (args: { data: Parameters<typeof doCreate>[0]['data'] }) => doCreate(args),
     },
   };
   return Object.assign(db, { rows });

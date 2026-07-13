@@ -13,6 +13,7 @@ import {
   type CompanyMemoryReviewRow,
   type ReviewStatus,
 } from './company-brain-v2.core.js';
+import { runInGraphTx } from './company-brain-v2.tx-context.js';
 
 export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
   async listReviews(input: {
@@ -132,207 +133,237 @@ export abstract class CompanyBrainReviewStore extends CompanyBrainMemoryStore {
     matchingEvidence?: Record<string, unknown>;
   }): Promise<CompanyEntityV2Row> {
     if (input.sourceEntityId === input.targetEntityId) throw new Error('Cannot merge an entity into itself.');
-    // Read source/target for data (types, current artifact ids, summary). Our
-    // `query`/`execute` helpers run each statement in its own autocommit, so a
-    // per-statement `SELECT ... FOR UPDATE` would release its row lock the
-    // instant the SELECT returns — useless for serializing the multi-statement
-    // body. Instead we serialize with an atomic compare-and-swap UPDATE on the
-    // SOURCE row (below) and an atomic jsonb append on the TARGET row (later).
-    // `company_graph_entities.status` is free TEXT, so `merging` is a transient
-    // sentinel owned by the winning merge. This is the one authoritative owner
-    // of the merge mutation — no second queue framework, no in-memory running
-    // flag (the Phase 2 durable-queue rule applied to the merge path).
-    // Limitation: a crash between the CAS and the final soft-delete leaves the
-    // source in the transient `merging` status; full statement-transaction
-    // atomicity (wrapping the body + upsertClaim/upsertEdge in one tx) is the
-    // dedicated PR E audit-chain TOCTOU work and is out of scope here.
-    const entities = await this.query<CompanyEntityV2Row>(
-      `SELECT * FROM "company_graph_entities"
-       WHERE "tenantId" = $1 AND "id" = ANY($2::TEXT[]) AND "deletedAt" IS NULL`,
-      input.tenantId,
-      [input.sourceEntityId, input.targetEntityId],
-    );
-    const source = entities.find((entity) => entity.id === input.sourceEntityId);
-    const target = entities.find((entity) => entity.id === input.targetEntityId);
-    if (!source || !target) throw new Error('Source or target company entity not found in this tenant.');
-    if (source.entityType !== target.entityType) {
-      throw new Error(`Cannot merge entity types ${source.entityType} and ${target.entityType}.`);
-    }
-    // Atomic claim of the source: exactly one concurrent merge can transition
-    // it out of active/merging-able state. A concurrent merge that already
-    // won leaves status='merging'/'merged' → this UPDATE affects 0 rows → throw.
-    const claimed = await this.query<{ id: string }>(
-      `UPDATE "company_graph_entities"
-       SET "status" = 'merging', "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $1 AND "tenantId" = $2
-         AND "status" NOT IN ('merged', 'merging') AND "deletedAt" IS NULL
-       RETURNING "id"`,
-      source.id,
-      input.tenantId,
-    );
-    if (claimed.length === 0) {
-      throw new Error('Source company entity has already been merged or is being merged concurrently.');
-    }
+    // PR E (Phase 10) — FULL SINGLE-TRANSACTION ATOMICITY. The entire body
+    // (read source/target → CAS claim source → migrate claims/edges/aliases
+    // onto target → append artifacts → hard-delete source rows → soft-delete +
+    // status='merged' source → insert merge-audit row → resolve open reviews →
+    // reload target) runs inside ONE `db.$transaction`. The transaction client
+    // is propagated to every `query`/`execute` (and the upsert helpers they
+    // back) via AsyncLocalStorage — see company-brain-v2.tx-context.ts — so a
+    // crash or throw anywhere in the body rolls the WHOLE merge back: the
+    // source is NOT left in the transient `merging` status, and no partial
+    // migration is left on the target. This closes the PR-B-deferred gap.
+    //
+    // Concurrency: the CAS UPDATE on the source row now holds a row-level lock
+    // for the duration of the tx (released at COMMIT), so a concurrent merge of
+    // the SAME source blocks until this tx commits, then sees status='merged'
+    // → 0 rows → throws (unchanged external behaviour, stronger guarantee). Two
+    // concurrent merges of DIFFERENT sources into the same target serialize on
+    // the target row lock but both succeed (jsonb `||` append, status='active').
+    return this.db.$transaction(
+      async (tx) =>
+        runInGraphTx(tx, async () => {
+          // Read BOTH rows with FOR UPDATE but WITHOUT the `deletedAt IS NULL`
+          // filter on the SOURCE: a concurrent merge that already committed
+          // will have soft-deleted + status='merged' the source, and we want
+          // the loser to find that row (under the row lock, so it blocks until
+          // the winner commits) and throw the informative "already been
+          // merged" — NOT a generic "not found". The target must still be
+          // active (checked below). FOR UPDATE serializes concurrent merges of
+          // the same source/target pair within the transaction.
+          const entities = await this.query<CompanyEntityV2Row>(
+            `SELECT * FROM "company_graph_entities"
+             WHERE "tenantId" = $1 AND "id" = ANY($2::TEXT[])
+             FOR UPDATE`,
+            input.tenantId,
+            [input.sourceEntityId, input.targetEntityId],
+          );
+          const source = entities.find((entity) => entity.id === input.sourceEntityId);
+          const target = entities.find((entity) => entity.id === input.targetEntityId);
+          if (!source) {
+            throw new Error('Source company entity not found in this tenant.');
+          }
+          if (source.deletedAt !== null || source.status === 'merged' || source.status === 'merging') {
+            throw new Error('Source company entity has already been merged or is being merged concurrently.');
+          }
+          if (!target || target.deletedAt !== null) {
+            throw new Error('Target company entity not found in this tenant.');
+          }
+          if (source.entityType !== target.entityType) {
+            throw new Error(`Cannot merge entity types ${source.entityType} and ${target.entityType}.`);
+          }
+          // Atomic claim of the source: the FOR UPDATE lock already serializes
+          // concurrent merges, but this CAS is the authoritative status guard
+          // (defense-in-depth — a row that slipped in as 'active' between the
+          // read and this UPDATE is rejected).
+          const claimed = await this.query<{ id: string }>(
+            `UPDATE "company_graph_entities"
+             SET "status" = 'merging', "updatedAt" = CURRENT_TIMESTAMP
+             WHERE "id" = $1 AND "tenantId" = $2
+               AND "status" NOT IN ('merged', 'merging') AND "deletedAt" IS NULL
+             RETURNING "id"`,
+            source.id,
+            input.tenantId,
+          );
+          if (claimed.length === 0) {
+            throw new Error('Source company entity has already been merged or is being merged concurrently.');
+          }
 
-    const mergedSummary = target.summary.includes(source.summary)
-      ? target.summary
-      : `${target.summary}\n\nMerged evidence: ${source.summary}`.slice(0, 8000);
+          const mergedSummary = target.summary.includes(source.summary)
+            ? target.summary
+            : `${target.summary}\n\nMerged evidence: ${source.summary}`.slice(0, 8000);
 
-    const sourceClaims = await this.query<CompanyClaimRow>(
-      `SELECT * FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = $2`,
-      input.tenantId,
-      source.id,
-    );
-    for (const claim of sourceClaims) {
-      const evidence = await this.query<{ artifactId: string; excerpt: string | null; sourceAuthority: number; observedAt: Date | null }>(
-        `SELECT "artifactId", "excerpt", "sourceAuthority", "observedAt"
-         FROM "company_claim_evidence" WHERE "tenantId" = $1 AND "claimId" = $2`,
-        input.tenantId,
-        claim.id,
-      );
-      if (evidence.length > 0) {
-        for (const item of evidence) {
-          await this.upsertClaim({
+          const sourceClaims = await this.query<CompanyClaimRow>(
+            `SELECT * FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = $2`,
+            input.tenantId,
+            source.id,
+          );
+          for (const claim of sourceClaims) {
+            const evidence = await this.query<{ artifactId: string; excerpt: string | null; sourceAuthority: number; observedAt: Date | null }>(
+              `SELECT "artifactId", "excerpt", "sourceAuthority", "observedAt"
+               FROM "company_claim_evidence" WHERE "tenantId" = $1 AND "claimId" = $2`,
+              input.tenantId,
+              claim.id,
+            );
+            if (evidence.length > 0) {
+              for (const item of evidence) {
+                await this.upsertClaim({
+                  tenantId: input.tenantId,
+                  subjectEntityId: target.id,
+                  predicate: claim.predicate,
+                  objectEntityId: claim.objectEntityId === source.id ? null : claim.objectEntityId,
+                  objectValue: claim.objectValue,
+                  confidence: claim.confidence,
+                  authorityScore: claim.authorityScore,
+                  validFrom: claim.validFrom,
+                  createdBy: input.userId,
+                  artifactId: item.artifactId,
+                  excerpt: item.excerpt,
+                  observedAt: item.observedAt,
+                });
+              }
+            }
+          }
+
+          const sourceEdges = await this.query<CompanyEdgeRow>(
+            `SELECT * FROM "company_edges"
+             WHERE "tenantId" = $1 AND ("sourceEntityId" = $2 OR "targetEntityId" = $2)`,
+            input.tenantId,
+            source.id,
+          );
+          for (const edge of sourceEdges) {
+            const nextSource = edge.sourceEntityId === source.id ? target.id : edge.sourceEntityId;
+            const nextTarget = edge.targetEntityId === source.id ? target.id : edge.targetEntityId;
+            if (nextSource === nextTarget) continue;
+            await this.upsertEdge({
+              tenantId: input.tenantId,
+              sourceEntityId: nextSource,
+              relationshipType: edge.relationshipType,
+              targetEntityId: nextTarget,
+              confidence: edge.confidence,
+              evidenceArtifactIds: jsonStringArray(edge.evidenceArtifactIds),
+              validFrom: edge.validFrom,
+              createdBy: input.userId,
+            });
+          }
+
+          // Atomic append of the source's artifacts onto the target,
+          // conditional on the target still being active (a concurrent merge
+          // could have merged the TARGET into something else — abort rather
+          // than mutate a now-stale target). `||` concatenates jsonb arrays in
+          // the CURRENT row value; duplicate ids are harmless (Set in the
+          // access filter). The row lock from `FOR UPDATE` serializes
+          // concurrent same-target merges.
+          const sourceArtifacts = jsonStringArray(source.sourceArtifactIds);
+          const updatedTarget = await this.query<{ id: string }>(
+            `UPDATE "company_graph_entities"
+             SET "summary" = $3,
+                 "sourceArtifactIds" = "sourceArtifactIds" || $4::JSONB,
+                 "confidence" = GREATEST("confidence", $5),
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE "id" = $1 AND "tenantId" = $2 AND "status" = 'active'
+             RETURNING "id"`,
+            target.id,
+            input.tenantId,
+            mergedSummary,
+            JSON.stringify(sourceArtifacts),
+            Math.max(source.confidence, target.confidence),
+          );
+          if (updatedTarget.length === 0) {
+            throw new Error('Target company entity was merged concurrently; this merge was aborted.');
+          }
+
+          const aliases = await this.query<{ alias: string; sourceArtifactId: string | null; confidence: number }>(
+            `SELECT "alias", "sourceArtifactId", "confidence" FROM "company_entity_aliases"
+             WHERE "tenantId" = $1 AND "entityId" = $2`,
+            input.tenantId,
+            source.id,
+          );
+          await this.ensureAlias({
             tenantId: input.tenantId,
-            subjectEntityId: target.id,
-            predicate: claim.predicate,
-            objectEntityId: claim.objectEntityId === source.id ? null : claim.objectEntityId,
-            objectValue: claim.objectValue,
-            confidence: claim.confidence,
-            authorityScore: claim.authorityScore,
-            validFrom: claim.validFrom,
+            entityId: target.id,
+            entityType: target.entityType,
+            alias: source.title,
+            sourceArtifactId: source.primaryArtifactId,
+            confidence: input.similarity ?? 1,
             createdBy: input.userId,
-            artifactId: item.artifactId,
-            excerpt: item.excerpt,
-            observedAt: item.observedAt,
           });
-        }
-      }
-    }
+          for (const alias of aliases) {
+            await this.ensureAlias({
+              tenantId: input.tenantId,
+              entityId: target.id,
+              entityType: target.entityType,
+              alias: alias.alias,
+              sourceArtifactId: alias.sourceArtifactId,
+              confidence: alias.confidence,
+              createdBy: input.userId,
+            });
+          }
 
-    const sourceEdges = await this.query<CompanyEdgeRow>(
-      `SELECT * FROM "company_edges"
-       WHERE "tenantId" = $1 AND ("sourceEntityId" = $2 OR "targetEntityId" = $2)`,
-      input.tenantId,
-      source.id,
-    );
-    for (const edge of sourceEdges) {
-      const nextSource = edge.sourceEntityId === source.id ? target.id : edge.sourceEntityId;
-      const nextTarget = edge.targetEntityId === source.id ? target.id : edge.targetEntityId;
-      if (nextSource === nextTarget) continue;
-      await this.upsertEdge({
-        tenantId: input.tenantId,
-        sourceEntityId: nextSource,
-        relationshipType: edge.relationshipType,
-        targetEntityId: nextTarget,
-        confidence: edge.confidence,
-        evidenceArtifactIds: jsonStringArray(edge.evidenceArtifactIds),
-        validFrom: edge.validFrom,
-        createdBy: input.userId,
-      });
-    }
+          await this.execute(`DELETE FROM "company_edges" WHERE "tenantId" = $1 AND ("sourceEntityId" = $2 OR "targetEntityId" = $2)`, input.tenantId, source.id);
+          await this.execute(`DELETE FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = $2`, input.tenantId, source.id);
+          await this.execute(`DELETE FROM "company_entity_aliases" WHERE "tenantId" = $1 AND "entityId" = $2`, input.tenantId, source.id);
+          await this.execute(
+            `UPDATE "company_graph_entities"
+             SET "deletedAt" = CURRENT_TIMESTAMP,
+                 "status" = 'merged',
+                 "properties" = COALESCE("properties", '{}'::JSONB) || jsonb_build_object('mergedIntoEntityId', $3),
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE "id" = $1 AND "tenantId" = $2`,
+            source.id,
+            input.tenantId,
+            target.id,
+          );
+          await this.execute(
+            `INSERT INTO "company_entity_merges"
+              ("id", "tenantId", "sourceEntityId", "targetEntityId", "reason", "similarity", "mergedBy",
+               "algorithmVersion", "matchingEvidence")
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::JSONB)`,
+            randomUUID(),
+            input.tenantId,
+            source.id,
+            target.id,
+            input.reason.slice(0, 2000),
+            clamp01(input.similarity ?? 1),
+            input.userId,
+            input.algorithmVersion ?? 'unknown',
+            JSON.stringify(input.matchingEvidence ?? {}),
+          );
+          await this.execute(
+            `UPDATE "company_memory_reviews"
+             SET "status" = 'resolved', "reviewedBy" = $3, "reviewedAt" = CURRENT_TIMESTAMP,
+                 "reviewComment" = $4, "updatedAt" = CURRENT_TIMESTAMP
+             WHERE "tenantId" = $1 AND "reviewType" = 'entity_merge'
+               AND "resourceId" = $2 AND "status" = 'open'`,
+            input.tenantId,
+            source.id,
+            input.userId,
+            input.reason.slice(0, 4000),
+          );
 
-    // Atomic append of the source's artifacts onto the target, conditional on
-    // the target still being active (a concurrent merge could have merged the
-    // TARGET into something else — in which case we abort this merge rather
-    // than mutate a now-stale target). `||` concatenates jsonb arrays in the
-    // CURRENT row value, so two concurrent merges of DIFFERENT sources into the
-    // same target both append without a lost update (duplicate ids are
-    // harmless — the access filter uses a Set).
-    const sourceArtifacts = jsonStringArray(source.sourceArtifactIds);
-    const updatedTarget = await this.query<{ id: string }>(
-      `UPDATE "company_graph_entities"
-       SET "summary" = $3,
-           "sourceArtifactIds" = "sourceArtifactIds" || $4::JSONB,
-           "confidence" = GREATEST("confidence", $5),
-           "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $1 AND "tenantId" = $2 AND "status" = 'active'
-       RETURNING "id"`,
-      target.id,
-      input.tenantId,
-      mergedSummary,
-      JSON.stringify(sourceArtifacts),
-      Math.max(source.confidence, target.confidence),
+          const rows = await this.query<CompanyEntityV2Row>(
+            `SELECT * FROM "company_graph_entities" WHERE "tenantId" = $1 AND "id" = $2 LIMIT 1`,
+            input.tenantId,
+            target.id,
+          );
+          if (!rows[0]) throw new Error('Merged target entity could not be reloaded.');
+          return rows[0];
+        }),
+      // Generous timeout: a merge of an entity with many claims/edges/aliases
+      // is a multi-statement body inside one tx. Default Prisma tx timeout is
+      // 5s; 30s covers large tenants without holding locks indefinitely.
+      { timeout: 30_000 },
     );
-    if (updatedTarget.length === 0) {
-      throw new Error('Target company entity was merged concurrently; this merge was aborted.');
-    }
-
-    const aliases = await this.query<{ alias: string; sourceArtifactId: string | null; confidence: number }>(
-      `SELECT "alias", "sourceArtifactId", "confidence" FROM "company_entity_aliases"
-       WHERE "tenantId" = $1 AND "entityId" = $2`,
-      input.tenantId,
-      source.id,
-    );
-    await this.ensureAlias({
-      tenantId: input.tenantId,
-      entityId: target.id,
-      entityType: target.entityType,
-      alias: source.title,
-      sourceArtifactId: source.primaryArtifactId,
-      confidence: input.similarity ?? 1,
-      createdBy: input.userId,
-    });
-    for (const alias of aliases) {
-      await this.ensureAlias({
-        tenantId: input.tenantId,
-        entityId: target.id,
-        entityType: target.entityType,
-        alias: alias.alias,
-        sourceArtifactId: alias.sourceArtifactId,
-        confidence: alias.confidence,
-        createdBy: input.userId,
-      });
-    }
-
-    await this.execute(`DELETE FROM "company_edges" WHERE "tenantId" = $1 AND ("sourceEntityId" = $2 OR "targetEntityId" = $2)`, input.tenantId, source.id);
-    await this.execute(`DELETE FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = $2`, input.tenantId, source.id);
-    await this.execute(`DELETE FROM "company_entity_aliases" WHERE "tenantId" = $1 AND "entityId" = $2`, input.tenantId, source.id);
-    await this.execute(
-      `UPDATE "company_graph_entities"
-       SET "deletedAt" = CURRENT_TIMESTAMP,
-           "status" = 'merged',
-           "properties" = COALESCE("properties", '{}'::JSONB) || jsonb_build_object('mergedIntoEntityId', $3),
-           "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $1 AND "tenantId" = $2`,
-      source.id,
-      input.tenantId,
-      target.id,
-    );
-    await this.execute(
-      `INSERT INTO "company_entity_merges"
-        ("id", "tenantId", "sourceEntityId", "targetEntityId", "reason", "similarity", "mergedBy",
-         "algorithmVersion", "matchingEvidence")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::JSONB)`,
-      randomUUID(),
-      input.tenantId,
-      source.id,
-      target.id,
-      input.reason.slice(0, 2000),
-      clamp01(input.similarity ?? 1),
-      input.userId,
-      input.algorithmVersion ?? 'unknown',
-      JSON.stringify(input.matchingEvidence ?? {}),
-    );
-    await this.execute(
-      `UPDATE "company_memory_reviews"
-       SET "status" = 'resolved', "reviewedBy" = $3, "reviewedAt" = CURRENT_TIMESTAMP,
-           "reviewComment" = $4, "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "tenantId" = $1 AND "reviewType" = 'entity_merge'
-         AND "resourceId" = $2 AND "status" = 'open'`,
-      input.tenantId,
-      source.id,
-      input.userId,
-      input.reason.slice(0, 4000),
-    );
-
-    const rows = await this.query<CompanyEntityV2Row>(
-      `SELECT * FROM "company_graph_entities" WHERE "tenantId" = $1 AND "id" = $2 LIMIT 1`,
-      input.tenantId,
-      target.id,
-    );
-    if (!rows[0]) throw new Error('Merged target entity could not be reloaded.');
-    return rows[0];
   }
 
   /**

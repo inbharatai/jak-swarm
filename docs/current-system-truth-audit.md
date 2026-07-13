@@ -131,10 +131,10 @@
 
 ## 9. Audit-chain concurrency
 
-**Status: `LIVE-RUNTIME-WIRED` + `UNIT-PROVEN` — but `PARTIAL` under concurrency (TOCTOU fork risk). Phase 10 target.**
+**Status: `LIVE-RUNTIME-WIRED` + `CONCURRENCY-PROVEN` — the TOCTOU fork risk is CLOSED (PR E / Phase 10).**
 
 - Migration 117 adds `audit_logs.prevHash`/`rowHash`/`chainSeq`; `(tenantId, chainSeq)` index. Per-tenant HMAC row-chain; `verifyChain` detects tamper/reorder/delete; **fail-open-to-auditable** when `EVIDENCE_SIGNING_SECRET` is unset (rows still written, `rowHash` null, `signing_unavailable` surfaced). Honestly reported. ✅
-- **TOCTOU** — the implementation fetches the latest row for a tenant (max `chainSeq`) then writes the new row with `prevHash = that.rowHash`, `chainSeq = that.chainSeq + 1`. Under two simultaneous tenant writes, both can read the same latest row and both write the same `chainSeq` → **duplicate sequence / fork**. There is no locked per-tenant chain-head row, no `pg_advisory_xact_lock`, no atomic `nextval` + locked previous hash. The ROADMAP itself flags this as env-blocked/not-concurrency-proven. **Phase 10 target** — implement one of: locked per-tenant chain-head row / `pg_advisory_xact_lock(hashtext(tenantId))` / atomic tenant sequence + locked previous hash. Prove with concurrent integration tests (no duplicate seq, no fork, reorder/delete/tamper detected, missing-secret honestly reported, key rotation versioned).
+- **TOCTOU — CLOSED (PR E).** The append path is now the atomic `appendChainedAuditRow` primitive: a single transaction that takes `pg_advisory_xact_lock(hashtext(tenantId))` (per-tenant serialisation), reads the chain head, and writes the next row with `prevHash`/`chainSeq = head + 1` inside the same tx. Two simultaneous tenant writes can no longer read the same head and fork — the second blocks on the advisory lock until the first commits. A migration 122 partial unique index `WHERE "rowHash" IS NOT NULL` on `(tenantId, chainSeq)` is a backstop that rejects any duplicate seq that ever escapes the lock. Proven against real Postgres by `tests/integration/audit-chain-concurrency.test.ts` (concurrent appenders → no duplicate seq, no fork, valid chain) + `tests/integration/audit-log-chain.test.ts` (tamper/reorder/delete detected, missing-secret fail-open honestly reported). `verifyChain` semantics unchanged. ✅
 
 ## 10. Hyperagent runtime, execution loop, approvals, learning, workflows/LangGraph
 
@@ -146,7 +146,10 @@
 
 ## 12. MCP surface, tools, sandboxing
 
-*(Filled from the parallel audit agent — appendix A. First-hand: `code_execute` (E2B) + `browser_evaluate_js` are sandboxed + autonomy-gated; `ShieldMcpClient` is local-embedded, built but NOT instantiated in the live action path; external JAK Shield MCP transport is roadmap. No `brain.*` MCP operation surface exists today — Phase 9 target.)*
+*(Filled from the parallel audit agent — appendix A. First-hand: `code_execute` (E2B) + `browser_evaluate_js` are sandboxed + autonomy-gated.)*
+
+- **`ShieldMcpClient` — LIVE-INSTANTIATED (PR E).** Previously "built but NOT instantiated in the live action path." `packages/security/src/shield-gateway/shield-mcp-live.ts` now instantiates it behind `SHIELD_MCP_CANARY=1` (default-off): `requestSignedInputScanDecision` runs the real `scanInput`, mints an Ed25519-signed `ShieldSignedDecision`, self-verifies it (fail-closed on a signature/key mismatch), and `recordShieldDecisionToAudit` writes a `SHIELD_DECISION_SIGNED` row into the atomic audit chain (severity WARN for BLOCK / INFO otherwise, `decisionId` as resourceId). The canary is wired into `swarm-execution.service.ts` after the existing `scanInput` call — it records signed decisions but does NOT gate execution (errors are caught + logged, never thrown). Fail-open-to-auditable when the keypair is absent. Proven against real Postgres by `tests/integration/shield-mcp-live-audit.test.ts` (ALLOW + BLOCK signed decisions chain-joined + verifiable; `requestHash` binds the scanned text). External JAK Shield MCP transport (stdio/SSE) is still roadmap — the `transport` seam on `ShieldMcpClient` is the hook.
+- **`brain.*` MCP surface — EXISTS (PR E / Phase 9).** Previously "no `brain.*` MCP operation surface exists today." `packages/tools/src/mcp/brain-mcp-tools.ts` + `brain-mcp-server.ts` are the first in-process MCP server in the repo: a real `@modelcontextprotocol/sdk` `Server` + `InMemoryTransport` pair exposing `brain_get_graph` / `brain_get_entity` (READ_ONLY, no approval) + `brain_merge_entities` (DESTRUCTIVE, approval) / `brain_decide_claim` (WRITE, approval). Tenant identity is NEVER a tool argument — it is carried in `params._meta.jakContext` (raw MCP path) or injected from the authenticated `ToolExecutionContext` (JAK registry path). A call without `jakContext` is REFUSED; a `tenantId` passed in arguments is ignored (cross-tenant escape blocked — proven by `tests/unit/tools/brain-mcp-server.test.ts`). `getContextPackage` (the `<company_brain>` injection) is deliberately NOT exposed (agentRole-escalation guard). Boot-wired behind `BRAIN_MCP_SERVER=1` (default-off).
 
 ## 13. Skills system
 
@@ -160,7 +163,7 @@
 
 ## 15. Frontend product surfaces, README, landing, deployment
 
-- `/company/graph` route exists on the API (`routes.ts:27-31`); the web product surface is **not yet the operating interface** the Phase 11 mandate describes (no merge comparison UI, evidence drawer, conflict queue, impact chains, authority/confidence explanation). **Phase 11 target.**
+- `/company/graph` route exists on the API (`routes.ts:27-31`); **`/company` + `/company/graph` are now reachable from the dashboard nav (PR E / Phase 11):** wired into the `CommandPalette` (Cmd+K) under a new `Brain` zone + the `ChatSidebar` zone rail (highlights on `/company/*`). This is the reachability half of the Phase 11 product-graph interface — the rich merge-comparison UI, evidence drawer, conflict queue, impact chains, and authority/confidence explanation remain roadmap.
 - README (73KB) + landing carry verbose historical/programme material; the truth-check gate (`pnpm check:truth`) keeps landing claims aligned to the live tool manifest. README/landing simplification + universal-claim correction is **Phase 12 target**.
 - **Deployment:** no `deploy.yml`; Cloud Run API deployment is documented (`docs/ARCHITECTURE.md:454` — `jak-swarm-api-…asia-south1.run.app`, `/ready` `/health` `/healthz` wired); worker NOT deployed. No production canary has run. **Phase 13 target** (and a named stop condition: production verification requires credentials not available in this session).
 
@@ -184,9 +187,9 @@ JAK Swarm has a **merged and live-wired Company Brain Graph V2** (ingestion → 
 6. Hyperagent real artifact harvesting + approval pause/resume + execution persistence + drift reopen + failure classes (Phase 6 → PR C).
 7. Governed learning (rollout stages, canary gate, invalidation) (Phase 7 → PR D).
 8. Procedural skill compiler (Phase 8 → PR D).
-9. Brain MCP surface (Phase 9 → PR E).
-10. Audit-chain concurrency fix (Phase 10 → PR E).
-11. Product graph interface (Phase 11 → PR E).
+9. Brain MCP surface (Phase 9 → PR E) — **DONE.**
+10. Audit-chain concurrency fix (Phase 10 → PR E) — **DONE.**
+11. Product graph interface (Phase 11 → PR E) — **reachability DONE** (nav wired); rich merge-comparison UI remains roadmap.
 12. README + landing simplification + universal-claim correction (Phase 12 → PR F).
 13. Production canary + deployment evidence (Phase 13 → PR G) — **requires production credentials not available in this session; will stop at the canary plan + safe non-destructive dry-run and request owner input for the live canary.**
 
@@ -396,3 +399,39 @@ Every merge stamps `algorithmVersion='entity-resolver-v1'` + `matchingEvidence` 
 - `LEARNING_GATE` / `GOVERNANCE_RULE` / `TOOL_POLICY` ConfigKinds are persisted + audited through the lifecycle but NOT applied to live behaviour (their live consumers are roadmap) — only `AUTONOMY_POLICY` + `REPAIR_BUDGET` reach live runtime via `HyperAgentConfig` today (integration-proven).
 - The procedural skill compiler is structural (plan tasks → skill steps), not LLM codegen — it does not author skill source code. A GENERATED_PLAN skill carries an ordered procedure in `inputSchemaJson`; its "execution" is the agent following the steps, not running JS. Sandbox for a codeless GENERATED_PLAN skill is schema-only validation (the appropriate level for a plan-skill); the real gate is human TENANT_ADMIN approval.
 - Advancing/promoting a config is a human operator action via the API (TENANT_ADMIN+), not the agent self-promoting — the agent may not self-advance a config. The canary stage is mandatory before promote (the lifecycle gate enforces SHADOW→CANARY→PROMOTED; no skip), respecting the "never enable self-learning globally without a canary" constraint.
+
+## PR E — Brain MCP surface + audit-chain concurrency + product graph interface (Phase 9 + Phase 10 + Phase 11)
+
+**Status:** implemented locally on `feat/brain-mcp-product-graph-audit-chain` (off main `961e4e6`). Local gate green: `pnpm lint:eslint` 0 warnings, `pnpm --filter @jak-swarm/api exec tsc --noEmit` 0, web tsc + eslint clean on `CommandPalette.tsx` + `ChatSidebar.tsx`, unit 2734 passed / 54 todo (2788), integration 423 passed / 101 skipped (runtimeUnavailable graceful — Docker up), build 15/15 turbo tasks successful, `pnpm check:truth` OK (122 tools registered, 0 unclassified). Four new test suites: `tests/unit/security/shield-mcp-live.test.ts` (13), `tests/integration/shield-mcp-live-audit.test.ts` (3, real Postgres testcontainer), `tests/unit/tools/brain-mcp-server.test.ts` (17), `tests/integration/audit-chain-concurrency.test.ts` (concurrent appenders), plus extensions to `tests/integration/audit-log-chain.test.ts` + `tests/unit/security/audit-chain.test.ts` and `tests/integration/company-brain-merge-atomicity.test.ts`.
+
+**What this PR closes:**
+
+### Phase 10 — audit-chain TOCTOU + merge atomicity + Shield live
+
+1. **Audit-chain TOCTOU (§9):** the append path is now the atomic `appendChainedAuditRow` primitive — a single transaction that takes `pg_advisory_xact_lock(hashtext(tenantId))` (per-tenant serialisation), reads the chain head, and writes the next row with `prevHash`/`chainSeq = head + 1` inside the same tx. Two simultaneous tenant writes can no longer read the same head and fork. Migration 122 adds a partial unique index `WHERE rowHash IS NOT NULL` on `(tenantId, chainSeq)` as a backstop that rejects any duplicate seq that escapes the lock. `verifyChain` semantics unchanged. Proven against real Postgres by `tests/integration/audit-chain-concurrency.test.ts` (concurrent appenders → no duplicate seq, no fork, valid chain) + `tests/integration/audit-log-chain.test.ts` (tamper/reorder/delete detected, missing-secret fail-open honestly reported).
+
+2. **mergeEntities single-transaction atomicity (PR B honest limitation, now closed):** `CompanyBrainV2Service.mergeEntities` runs the entire merge — source/target existence + tenant-scope checks, edge re-pointing, claim re-parenting, source-entity archival, review-record update, audit rows — inside ONE Postgres transaction via an `AsyncLocalStorage` tx-context (`company-brain-v2.tx-context.ts`). The store methods participate in the ambient tx when one is active, falling back to the prior single-statement behaviour when not (so existing callers + tests are unchanged). A `merging`-sentinel crash-recovery gap is no longer possible: either the whole merge commits or none of it does. Proven by `tests/integration/company-brain-merge-atomicity.test.ts` (atomic rollback on a mid-merge failure → no partial state).
+
+3. **ShieldMcpClient live instantiation + audit-chain routing (§12):** `packages/security/src/shield-gateway/shield-mcp-live.ts` instantiates the Shield MCP client behind `SHIELD_MCP_CANARY=1` (default-off). `requestSignedInputScanDecision` runs the real `scanInput`, mints an Ed25519-signed `ShieldSignedDecision` (verdictFromScan + subject{kind:input_scan, requestHash:sha256Hex(text)}), and self-verifies it — **fail-closed** on a signature/key mismatch (a tampered or mismatched-key decision is refused, not trusted). `recordShieldDecisionToAudit` writes a `SHIELD_DECISION_SIGNED` row into the atomic audit chain (severity WARN for BLOCK / INFO otherwise, `decisionId` as resourceId, never throws — a broken audit sink cannot take down a workflow). New `SHIELD_DECISION_SIGNED` `AuditAction`. The canary is wired into `swarm-execution.service.ts` after the existing `scanInput` of the workflow goal: it RECORDS signed decisions but does NOT gate execution (the canary is observational; errors are caught + logged at WARN, never thrown). Fail-open-to-auditable when the keypair is absent (no `SHIELD_SIGNING_KEY`/`SHIELD_VERIFICATION_KEY`). Proven against real Postgres by `tests/integration/shield-mcp-live-audit.test.ts` (ALLOW + BLOCK signed decisions chain-joined + `verifyChain` valid; `requestHash` binds the exact scanned text).
+
+### Phase 9 — Brain MCP surface (brain.*)
+
+4. **First in-process MCP server (§12):** `packages/tools/src/mcp/brain-mcp-tools.ts` defines 4 tool specs; `brain-mcp-server.ts` builds a real `@modelcontextprotocol/sdk` `Server` + `InMemoryTransport` pair exposing them:
+   - `brain_get_graph` (READ_ONLY, no approval) — tenant entity graph (query/entityType/limit).
+   - `brain_get_entity` (READ_ONLY, no approval) — one entity detail + evidence.
+   - `brain_merge_entities` (DESTRUCTIVE, requires approval) — governed entity merge.
+   - `brain_decide_claim` (WRITE, requires approval) — APPROVED/REJECTED claim decision.
+   - **Tenant identity is NEVER a tool argument.** No `brain_*` input schema accepts `tenantId`/`userId` (all `additionalProperties:false`). The tenant + actor are carried in `params._meta.jakContext` (raw MCP path) or injected from the authenticated `ToolExecutionContext` (JAK registry path). A call without `jakContext` (or missing userId) is REFUSED; a `tenantId` passed in arguments is ignored — cross-tenant escape is blocked (proven by `tests/unit/tools/brain-mcp-server.test.ts`, 17 tests incl. explicit cross-tenant-escape-blocked tests on both paths).
+   - `getContextPackage` (the `<company_brain>` prompt injection) is **deliberately NOT exposed** — it takes an `agentRole` and could be used to escalate; reads stay safe, the role-scoped context package is injected only by the trusted server-side `PromptBuilder`, never by an agent tool call.
+   - `registerBrainMcpToolsInRegistry` connects a `Client` to the server and registers each `brain_*` tool in the JAK `toolRegistry` with a context-aware executor (`provider:brain`), so they are REACHABLE FROM THE LIVE AGENT RUNTIME as first-class tools — not a placeholder. Boot-wired in `apps/api/src/index.ts` behind `BRAIN_MCP_SERVER=1` (default-off; non-test only); `disconnect()` is hooked into graceful shutdown.
+
+### Phase 11 — product graph interface (reachability)
+
+5. **Dashboard nav wired (§15):** `/company` (Company Brain — profile, ingestion, entity extraction) + `/company/graph` (Product Graph — entities, claims, edges, review queue) are now reachable from the dashboard: added to `CommandPalette.tsx` `PALETTE_ENTRIES` under a new `Brain` zone (with `Share2`/`Brain` icons + keyword sets) and to `ChatSidebar.tsx` `ZONES` (id `brain`, highlights on `/company/*`). `ZONE_ORDER` updated. This is the reachability half of the Phase 11 interface.
+
+**Honest limitations (NOT production-proven / not yet wired):**
+- The Brain MCP server is IN-PROCESS (`InMemoryTransport`); a standalone stdio/SSE JAK Shield-style deployment is roadmap. The `transport` option on `ShieldMcpClient` is the seam for a remote Shield; the Brain server has no remote-transport seam yet.
+- The Shield canary RECORDS signed decisions into the audit chain but does NOT GATE execution — it is observational by design (default-off, errors swallowed). Wiring a Shield BLOCK into the execution gate (refusing a blocked goal) is a deliberate later step that requires a fail-closed policy decision; this PR proves the signed-decision + audit-chain plumbing, not the gate.
+- The Phase 11 product-graph interface is REACHABILITY only — the rich merge-comparison UI (side-by-side entity diff, evidence drawer, conflict queue, impact chains, authority/confidence explanation) remains roadmap.
+- The Brain MCP live wiring is a CANARY (`BRAIN_MCP_SERVER=1`, default-off); the tool SPECS are always importable but the in-process server + registry registration only activate with the flag. No production canary has run.
+- `getContextPackage` exposure (agent-readable role-scoped context) is intentionally deferred — the agentRole-escalation guard stands until a safe role-bound surface is designed.

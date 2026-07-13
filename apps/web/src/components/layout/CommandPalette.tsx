@@ -30,6 +30,7 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  Brain,
   Calendar,
   CalendarDays,
   CreditCard,
@@ -43,6 +44,7 @@ import {
   Plug,
   ScrollText,
   Search,
+  Share2,
   ShieldCheck,
   Sparkles,
   X,
@@ -60,7 +62,7 @@ import { ProfileGateSkeleton } from '@/components/ui';
 // place. Role gates mirror the prior sidebar gates exactly so behavior is
 // preserved.
 
-type Zone = 'Chat' | 'Tasks' | 'Files' | 'Setup' | 'Audit';
+type Zone = 'Chat' | 'Tasks' | 'Files' | 'Brain' | 'Setup' | 'Audit';
 
 interface PaletteEntry {
   href: string;
@@ -92,6 +94,10 @@ export const PALETTE_ENTRIES: PaletteEntry[] = [
   // Files zone — knowledge + documents
   { href: '/files', label: 'Files', description: 'Documents, uploads, generated artifacts', icon: FileText, zone: 'Files', keywords: ['documents', 'uploads', 'artifacts'] },
   { href: '/knowledge', label: 'Knowledge', description: 'Knowledge base — briefs, ADRs, notes', icon: BookOpen, zone: 'Files', keywords: ['memory', 'docs'] },
+
+  // Brain zone — Company Brain (PR E Phase 10): the product graph interface
+  { href: '/company', label: 'Company Brain', description: 'Company profile, artifact ingestion, entity extraction', icon: Brain, zone: 'Brain', keywords: ['company', 'profile', 'ingest', 'extract', 'artifact'] },
+  { href: '/company/graph', label: 'Product Graph', description: 'Entity graph, claims, edges, and the review queue', icon: Share2, zone: 'Brain', keywords: ['graph', 'entities', 'claims', 'edges', 'merge', 'review'] },
 
   // Setup zone — configuration
   { href: '/integrations', label: 'Integrations', description: 'Connect Slack, Gmail, GitHub, Notion, ...', icon: Plug, zone: 'Setup', keywords: ['oauth', 'connect'] },
@@ -219,7 +225,7 @@ export function CommandPalette() {
 
   // Group filtered results by zone for readability. Order is deterministic
   // so the user's mental map stays stable even as filtering narrows the list.
-  const ZONE_ORDER: Zone[] = ['Chat', 'Tasks', 'Files', 'Setup', 'Audit'];
+  const ZONE_ORDER: Zone[] = ['Chat', 'Tasks', 'Files', 'Brain', 'Setup', 'Audit'];
   const grouped = ZONE_ORDER.map((zone) => ({
     zone,
     entries: filtered.filter((e) => e.zone === zone),

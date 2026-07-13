@@ -27,12 +27,15 @@
  * api → security circular import. The two copies are intentionally identical;
  * keep them in sync if the canonicalisation rule changes.
  *
- * Honest open edge: the "fetch latest row then write" sequence is a TOCTOU
- * under concurrency — two simultaneous writes can read the same latest row and
- * both chain off it, branching the chain. `verifyChain` would surface a
- * `broken_chain_link` for the loser. A sequential per-tenant counter under a
- * lock/transaction is the durable fix (separate, migration-gated). Best-effort
- * chaining is shipped here; the TOCTOU is documented, not silently ignored.
+ * Honest open edge (CLOSED in PR E for the live path): the "fetch latest row
+ * then write" sequence WAS a TOCTOU under concurrency — two simultaneous
+ * writes could read the same latest row and both chain off it, branching the
+ * chain. {@link appendChainedAuditRow} closes it: the fetch+compute+insert run
+ * inside one `pg_advisory_xact_lock(hashtext(tenantId))`-guarded transaction
+ * with a partial `UNIQUE (tenantId, chainSeq) WHERE rowHash IS NOT NULL`
+ * backstop (migration 122_audit_chain_unique_seq). The legacy
+ * {@link prepareAuditChainFields} (fetch-then-compute, no lock) is retained for
+ * unit tests of the pure decision; live writes use the atomic path.
  */
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 
@@ -110,10 +113,56 @@ export interface AuditChainRow {
   chainSeq?: number;
 }
 
-/** Minimal Prisma interface for the chain's "fetch latest row" + write. */
+/** Minimal Prisma interface for the chain's "fetch latest row" (pure-core path). */
 export interface AuditChainPrismaClient {
   auditLog: {
     findFirst: (args: unknown) => Promise<unknown>;
+  };
+}
+
+/**
+ * The create payload `appendChainedAuditRow` writes inside its transaction.
+ * Mirrors `AuditChainRow` minus the chain fields (which are computed) plus the
+ * normalized-to-stored representation (null for absent optionals) so the bytes
+ * hashed at write equal the bytes `verifyChain` recomputes from the read-back.
+ */
+export interface AuditChainCreateData {
+  id: string;
+  tenantId: string;
+  userId: string | null;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  details: unknown;
+  ip: string | null;
+  userAgent: string | null;
+  severity: string;
+  createdAt: Date | string;
+  prevHash: string | null;
+  rowHash: string | null;
+  chainSeq: number;
+}
+
+/** Transaction runner exposed inside `appendClient.$transaction(fn)`. */
+export interface AuditChainTxRunner {
+  $executeRawUnsafe: (sql: string, ...values: unknown[]) => Promise<unknown>;
+  auditLog: {
+    findFirst: (args: unknown) => Promise<unknown>;
+    create: (args: { data: AuditChainCreateData }) => Promise<{ id: string }>;
+  };
+}
+
+/**
+ * Client for the atomic append path: must expose an interactive `$transaction`
+ * whose runner can run raw SQL (the advisory lock) + findFirst + create on
+ * `auditLog`. Prisma's `PrismaClient` satisfies this; the loose typing keeps
+ * `packages/security` free of a `@jak-swarm/db` import (no circular dep).
+ */
+export interface AuditChainAppendClient {
+  $transaction: <R>(fn: (tx: AuditChainTxRunner) => Promise<R>) => Promise<R>;
+  /** Used only by the INACTIVE / fallback unsigned write path. */
+  auditLog: {
+    create: (args: { data: AuditChainCreateData }) => Promise<{ id: string }>;
   };
 }
 
@@ -147,40 +196,26 @@ export function computeRowHash(
 }
 
 /**
- * Build the chain fields for a NEW row given the previous row's hash + seq.
- * Fetches the tenant's latest row from the DB to chain off it. Returns
- * `{ id, prevHash: null, rowHash: null, chainSeq: 0 }` when the chain is
- * inactive (secret absent) — the caller still writes the row (auditable),
- * just without a hash. The TOCTOU open edge (concurrent writes branching the
- * chain) is documented in the file header.
+ * PURE core: build the chain fields for a NEW row given the previous row's
+ * `{ rowHash, chainSeq }` + the per-tenant key. No I/O, no clock, no process
+ * env. The deterministic gate both the atomic live path
+ * (`appendChainedAuditRow`) and the legacy `prepareAuditChainFields` enforce.
+ *
+ * `latest` is the tenant's most-recent SIGNED row (`rowHash` non-null) under
+ * the ordering the caller chose. `prevHash = latest.rowHash ?? null`,
+ * `chainSeq = (latest.chainSeq ?? 0) + 1`. Optional fields are NORMALIZED to
+ * their STORED representation (null for absent optionals, "INFO" for absent
+ * severity) so the bytes hashed at write equal the bytes `verifyChain`
+ * recomputes from the read-back row — the hash-over-stored-row invariant.
  */
-export async function prepareAuditChainFields(
-  db: AuditChainPrismaClient,
+export function buildChainFields(
   row: Omit<AuditChainRow, 'id' | 'prevHash' | 'rowHash' | 'chainSeq'>,
-): Promise<PreparedChainFields> {
-  const id = randomUUID();
-  const tenantKey = deriveAuditTenantKey(row.tenantId);
-  if (!tenantKey) {
-    // Chain INACTIVE — auditable, not tamper-evident.
-    return { id, prevHash: null, rowHash: null, chainSeq: 0 };
-  }
-  // Fetch the tenant's latest row to chain off it. orderBy createdAt desc picks
-  // the most recent; chainSeq disambiguates within a shared timestamp.
-  const latest = (await db.auditLog.findFirst({
-    where: { tenantId: row.tenantId },
-    orderBy: { createdAt: 'desc' },
-    take: 1,
-    select: { rowHash: true, chainSeq: true },
-  })) as { rowHash: string | null; chainSeq: number | null } | null;
+  latest: { rowHash: string | null; chainSeq: number | null } | null,
+  tenantKey: Buffer,
+  id: string = randomUUID(),
+): PreparedChainFields {
   const prevHash = latest?.rowHash ?? null;
   const prevSeq = latest?.chainSeq ?? 0;
-  // NORMALIZE optional fields to their STORED representation before hashing so
-  // the bytes hashed at write equal the bytes that verifyChain will recompute
-  // from the row read back. Prisma round-trips an absent optional as NULL and
-  // an absent severity as "INFO" (the column default) — so an `undefined` here
-  // MUST become `null` / "INFO" in the payload, not be dropped (canonicalJson
-  // drops undefined, which would diverge from the stored NULL and break the
-  // chain). This is the invariant: hash-over-stored-row, not hash-over-input.
   const normalized: AuditChainRow = {
     id,
     tenantId: row.tenantId,
@@ -196,6 +231,129 @@ export async function prepareAuditChainFields(
   };
   const rowHash = computeRowHash(normalized, prevHash, tenantKey);
   return { id, prevHash, rowHash, chainSeq: prevSeq + 1 };
+}
+
+/**
+ * LEGACY non-atomic chain-field builder (fetch latest then compute). Retained
+ * for unit tests of the pure decision + callers that cannot run an interactive
+ * transaction. Live writes MUST use {@link appendChainedAuditRow}, which wraps
+ * the fetch+compute+insert in one `pg_advisory_xact_lock`-guarded transaction
+ * so concurrent tenant writes cannot branch the chain. The TOCTOU open edge
+ * documented in the file header applies to THIS function, not the atomic path.
+ */
+export async function prepareAuditChainFields(
+  db: AuditChainPrismaClient,
+  row: Omit<AuditChainRow, 'id' | 'prevHash' | 'rowHash' | 'chainSeq'>,
+): Promise<PreparedChainFields> {
+  const tenantKey = deriveAuditTenantKey(row.tenantId);
+  if (!tenantKey) {
+    // Chain INACTIVE — auditable, not tamper-evident.
+    return { id: randomUUID(), prevHash: null, rowHash: null, chainSeq: 0 };
+  }
+  const latest = (await db.auditLog.findFirst({
+    where: { tenantId: row.tenantId },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { rowHash: true, chainSeq: true },
+  })) as { rowHash: string | null; chainSeq: number | null } | null;
+  return buildChainFields(row, latest, tenantKey);
+}
+
+/**
+ * Build the `auditLog.create` data payload from a row + prepared chain fields.
+ * Shared by the atomic path + the unsigned fallback so both write the SAME
+ * normalized-to-stored representation that was hashed (preserving the
+ * hash-over-stored-row invariant on both paths).
+ */
+export function buildAuditCreateData(
+  row: Omit<AuditChainRow, 'id' | 'prevHash' | 'rowHash' | 'chainSeq'>,
+  chain: PreparedChainFields,
+): AuditChainCreateData {
+  return {
+    id: chain.id,
+    tenantId: row.tenantId,
+    userId: row.userId ?? null,
+    action: row.action,
+    resource: row.resource,
+    resourceId: row.resourceId ?? null,
+    details: row.details ?? null,
+    ip: row.ip ?? null,
+    userAgent: row.userAgent ?? null,
+    severity: row.severity ?? 'INFO',
+    createdAt: row.createdAt,
+    prevHash: chain.prevHash,
+    rowHash: chain.rowHash,
+    chainSeq: chain.chainSeq,
+  };
+}
+
+/**
+ * ATOMIC append — the durable fix for the audit-chain TOCTOU. Appends one
+ * chained row to the tenant's chain inside a single interactive transaction
+ * that:
+ *   1. acquires `pg_advisory_xact_lock(hashtext(tenantId))` — a per-tenant
+ *      transaction-scoped lock that serializes concurrent writers for the SAME
+ *      tenant (released at COMMIT/ROLLBACK, so different tenants proceed in
+ *      parallel);
+ *   2. fetches the tenant's latest SIGNED row ordered by `chainSeq` desc
+ *      (deterministic — no `createdAt`-tie ambiguity);
+ *   3. computes the chain fields via the pure {@link buildChainFields};
+ *   4. inserts the row — all under the lock, so two concurrent appends for the
+ *      same tenant can never read the same latest row + both chain off it.
+ *
+ * The DB-side backstop is the partial `UNIQUE (tenantId, chainSeq) WHERE
+ * rowHash IS NOT NULL` index (migration 122) — if anything ever slips the lock,
+ * the second writer's insert hits a unique violation and the transaction
+ * aborts (caught here → unsigned fallback write, auditable, never silent).
+ *
+ * FAIL-OPEN-TO-AUDITABLE (NOT fail-closed): when `EVIDENCE_SIGNING_SECRET` is
+ * unset/short, the chain runs INACTIVE — the row is written unsigned
+ * (`rowHash=null`, `chainSeq=0`) with no lock/transaction. When the atomic
+ * append itself throws (unique violation, connection loss), the row is STILL
+ * written unsigned — audit logging must never break. `verifyChain` surfaces
+ * `signing_unavailable` for the inactive path so a reviewer knows.
+ *
+ * Returns the persisted row id.
+ */
+export async function appendChainedAuditRow(
+  db: AuditChainAppendClient,
+  row: Omit<AuditChainRow, 'id' | 'prevHash' | 'rowHash' | 'chainSeq'>,
+): Promise<string> {
+  const tenantKey = deriveAuditTenantKey(row.tenantId);
+  if (!tenantKey) {
+    // Chain INACTIVE — write unsigned directly (no lock/tx; the partial unique
+    // index excludes rowHash-null rows so chainSeq=0 never conflicts).
+    const chain: PreparedChainFields = { id: randomUUID(), prevHash: null, rowHash: null, chainSeq: 0 };
+    await db.auditLog.create({ data: buildAuditCreateData(row, chain) });
+    return chain.id;
+  }
+  try {
+    return await db.$transaction(async (tx) => {
+      // Per-tenant transaction-scoped advisory lock. hashtext(tenantId) → int4;
+      // the single-arg pg_advisory_xact_lock(int4) form. Different tenants may
+      // hash-collide (serialized unnecessarily, correctness preserved).
+      await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', row.tenantId);
+      const latest = (await tx.auditLog.findFirst({
+        where: { tenantId: row.tenantId, rowHash: { not: null } },
+        orderBy: [{ chainSeq: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: { rowHash: true, chainSeq: true },
+      })) as { rowHash: string | null; chainSeq: number | null } | null;
+      const chain = buildChainFields(row, latest, tenantKey);
+      await tx.auditLog.create({ data: buildAuditCreateData(row, chain) });
+      return chain.id;
+    });
+  } catch (err) {
+    // Atomic append failed (unique violation on the backstop index, connection
+    // loss, etc). FAIL-OPEN-TO-AUDITABLE: still write the row unsigned so audit
+    // logging never breaks. The partial unique index excludes rowHash-null rows
+    // so this fallback insert cannot itself conflict. NOT silent — verifyChain
+    // surfaces signing_unavailable for any null-hash row.
+    console.error('[audit-chain] atomic append failed (writing unsigned):', err);
+    const chain: PreparedChainFields = { id: randomUUID(), prevHash: null, rowHash: null, chainSeq: 0 };
+    await db.auditLog.create({ data: buildAuditCreateData(row, chain) });
+    return chain.id;
+  }
 }
 
 export type VerifyChainResult =

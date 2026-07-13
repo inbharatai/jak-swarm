@@ -209,6 +209,20 @@ export { MCP_PROVIDERS } from './mcp/mcp-providers.js';
 export { TenantMcpManager, getTenantMcpManager, clearTenantMcpManagers } from './mcp/tenant-mcp-manager.js';
 export type { McpProviderDef, McpServerConfig, ProviderCredentialField } from './mcp/mcp-providers.js';
 
+// PR E (Phase 10) — Brain MCP server: the in-process `brain_*` tool surface
+// over a real MCP Server + InMemoryTransport, registered in the JAK tool
+// registry with tenant-context-aware executors. The first MCP server in the
+// repo. Tenant + actor are sourced from the authenticated runtime context
+// (ToolExecutionContext / _meta.jakContext), NEVER from tool arguments.
+export {
+  BRAIN_MCP_TOOL_DEFS,
+  BRAIN_MCP_TOOL_NAMES,
+  JAK_CONTEXT_META_KEY,
+} from './mcp/brain-mcp-tools.js';
+export type { BrainMcpToolDef, BrainTenantContext, BrainToolName } from './mcp/brain-mcp-tools.js';
+export { createBrainMcpServer, registerBrainMcpToolsInRegistry } from './mcp/brain-mcp-server.js';
+export type { BrainMcpService, BrainMcpRegistration } from './mcp/brain-mcp-server.js';
+
 // Built-in tool registration
 export { registerBuiltinTools } from './builtin/index.js';
 
