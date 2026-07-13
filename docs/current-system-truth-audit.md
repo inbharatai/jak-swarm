@@ -306,3 +306,36 @@ Also dead: `BaseAgent.persistLearning`/`recallLearnings` (`base-agent.ts:635`/`6
 - `d620fc3` (directional/statistical promotion) + `d62f7d8` (composite learning keys) → **PR D** (Governed learning — Phase 7).
 - `53800a5` (OBSERVE read-only) → **PR D** (learning governance).
 Each cherry-pick will be followed by the full repo gate before merge; the read-only audit predicts no textual conflict but has not run the combined build.
+---
+
+## PR B — Entity identity (Phase 3) + access control (Phase 5)
+
+**Status:** implemented locally on `feat/company-brain-entity-access-control` (off main `4d20ddd`); local gate green (typecheck 0, lint `--max-warnings=0` exit 0, integration 375/0, unit 49/0). Pushed once as a focused draft PR after the full local matrix passed.
+
+**Migration 120** (`120_entity_merge_metadata_and_rejections`): adds `algorithmVersion` + `matchingEvidence` JSONB to `company_entity_merges`, and a new `company_entity_merge_rejections` table (UNIQUE per `(tenantId, sourceEntityId, candidateEntityId)`, `decision` ∈ {`deferred`, `rejected`}, cascade-delete from `company_graph_entities`).
+
+**Entity resolver — 6-tier identity hierarchy** (`company-brain-v2.entities.ts` `resolveEntity`): identity is established strictly, strongest evidence first —
+1. `provider_external_id` — same integration source + external record id (from `properties.provider` + `properties.externalId/crmId/…`)
+2. `verified_stable_identifier` — a shared, allowlisted durable identifier (email/domain/website/url/crmId/externalId/handle/linkedin/github) in `properties`
+3. `exact_alias` — exact canonical alias (aliases table)
+4. `deterministic_composite` — exact/near-exact (≥0.94) normalized title with **no conflicting identifier** (two "Acme" with different domains are NOT merged)
+5. `probabilistic_review` — 0.72–0.94 token similarity → human review
+6. `none` — separate entities
+
+Tiers 1–4 auto-merge (dispositive); tier 5 defers to a human. The candidate pool is tenant-scoped at the SQL boundary (`tenantId` + `entityType`), so a same-named entity in a different tenant is never matched (cross-tenant isolation enforced in the query, not by post-filtering). Pure classifier helpers (`extractStableIdentifiers`, `extractProviderExternalId`, `identifiersConflict`, `classifyEntityCandidate`) live in/over `company-brain-v2.core.ts` + `entities.ts` and are unit-tested without a DB.
+
+**Merge concurrency** (`company-brain-v2.review.ts` `mergeEntities`): the `query`/`execute` helpers run each statement in its own autocommit, so a per-statement `SELECT … FOR UPDATE` would release its row lock immediately and NOT serialize the multi-statement body. Instead the merge serializes via:
+- an atomic compare-and-swap `UPDATE … SET status='merging' … RETURNING` on the **source** row (free-TEXT `status` column; `merging` is a transient sentinel owned by the winning merge) — a concurrent merge of the same source affects 0 rows and throws;
+- an atomic jsonb `"sourceArtifactIds" || $sourceArtifacts` append on the **target**, conditional on the target still being `active` — two concurrent merges of different sources into the same target both append with no lost update; a concurrent merge of the target into something else aborts this merge.
+Every merge stamps `algorithmVersion='entity-resolver-v1'` + `matchingEvidence` (tier + matched identifier/similarity) on the `company_entity_merges` row.
+
+**Rejected/deferred-candidate preservation** (`rejectEntityMerge` + route `POST /company/brain/entities/:id/reject-merge`): a tier-5 review also writes a `deferred` `company_entity_merge_rejections` row (idempotent per pair). A human reject escalates the row to `rejected` and resolves the open review for that exact candidate. The resolver's tier-5 loop checks the rejection table and **never re-proposes a rejected pair** — this is the guarantee `createReview`'s open-status dedupe alone cannot provide (once a review is `rejected`, `createReview` would otherwise open a fresh one on the next extraction).
+
+**Access control hardening (audit A6):** `POST /company/brain/context` now requires a review role (`REVIEWER`/`TENANT_ADMIN`/`SYSTEM_ADMIN`). The `agentRole` body field is untrusted; gating prevents a low-privilege authenticated tenant user from escalating to a privileged agent role. The source-AND entity/claim/edge access filter (Phase 1) is reinforced with an adversarial test proving an edge to a restricted entity is dropped for a non-allowed role and the relationship never leaks through graph structure.
+
+**Honest limitations (NOT production-proven by these tests):**
+- The merge CAS uses a transient `merging` sentinel on the free-TEXT `status` column. A crash between the CAS and the final soft-delete leaves the source stuck in `merging` (un-mergeable until manual repair). Full single-statement-transaction atomicity — wrapping the entire `mergeEntities` body plus `upsertClaim`/`upsertEdge` in one `db.$transaction` with a tx-aware runner — is the dedicated PR E audit-chain TOCTOU work and is intentionally deferred.
+- `createReview` dedupes by `(resourceId, status='open')`, not by candidate. A source with two different tier-5 candidates keeps only one open review (the first); the rejection table tracks per-candidate state for the audit and the no-re-proposal guard, but the review UI does not multi-track candidates.
+- Two concurrent merges of the SAME source into DIFFERENT targets: the CAS lets one win and the other throws; the losing target is untouched (no partial re-parent), but the caller must retry the losing merge against the surviving target. No automatic re-targeting.
+- `properties` identifiers are untrusted tenant input; the allowlist (not `Object.keys`) bounds which keys can establish identity, but a tenant could still place a real email in a `notes`-style key that the resolver ignores (safe) or in an allowlisted key (treated as evidence — by design, the tenant owns its own graph).
+- Production concurrency (multi-process, real Postgres under load) is NOT proven here; the tests use a single testcontainer. The CAS + append are correct under Postgres row-lock semantics, but multi-tenant production contention is PR G canary work.

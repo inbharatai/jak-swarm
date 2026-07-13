@@ -17,6 +17,9 @@ export abstract class CompanyBrainArtifactStore {
     targetEntityId: string;
     reason: string;
     similarity?: number;
+    tier?: string;
+    algorithmVersion?: string;
+    matchingEvidence?: Record<string, unknown>;
   }): Promise<CompanyEntityV2Row>;
 
   constructor(

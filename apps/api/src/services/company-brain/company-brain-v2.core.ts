@@ -277,6 +277,176 @@ export function canAgentAccessArtifact(
   return artifact.allowedAgentRoles.some((allowed) => allowed.trim().toUpperCase() === role);
 }
 
+// ---------------------------------------------------------------------------
+// Entity resolver — Phase 3 canonical identity (6-tier hierarchy).
+//
+// The resolver decides, for a freshly extracted entity, whether it is the
+// SAME canonical thing as an existing entity in the tenant graph. Identity is
+// established strictly — never by fuzzy title alone — through a priority
+// hierarchy of evidence, strongest first:
+//
+//   1. provider_external_id        — same integration source + same external id
+//   2. verified_stable_identifier  — a shared, verifiable durable identifier
+//                                     (email, domain, website, url, crmId,
+//                                     externalId, handle, linkedin, github)
+//   3. exact_alias                  — exact canonical alias (aliases table)
+//   4. deterministic_composite      — exact normalized title AND no conflicting
+//                                     identifier (two "Acme" with different
+//                                     domains are NOT merged)
+//   5. probabilistic_review         — 0.72–0.94 token similarity → human review
+//   6. none                         — no reliable match → stay separate
+//
+// Tiers 1–4 are deterministic auto-merges (similarity 1.0) because the
+// evidence is dispositive; tier 5 defers to a human. The algorithm version is
+// stamped on every merge and on every deferred/rejected candidate so an audit
+// can reconstruct *why* two entities were considered the same.
+// ---------------------------------------------------------------------------
+
+/** Bumped only when the tier order, identifier keys or thresholds change. */
+export const ENTITY_RESOLVER_ALGORITHM_VERSION = 'entity-resolver-v1';
+
+export type EntityResolutionTier =
+  | 'provider_external_id'
+  | 'verified_stable_identifier'
+  | 'exact_alias'
+  | 'deterministic_composite'
+  | 'probabilistic_review'
+  | 'none';
+
+/**
+ * Property keys (case-insensitive, also matched against snake/camel variants)
+ * that hold a durable, verifiable identifier suitable for tier-2 identity.
+ * Free-form `properties` from the extractor is untrusted input, so an
+ * allowlist — not `Object.keys` — drives matching: a tenant cannot invent a
+ * new "identity" key that auto-merges two otherwise-unrelated entities.
+ */
+export const STABLE_IDENTIFIER_KEYS = [
+  'email',
+  'domain',
+  'website',
+  'url',
+  'crmid',
+  'externalid',
+  'handle',
+  'linkedin',
+  'github',
+] as const;
+
+const PROVIDER_KEYS = ['provider', 'source', 'integration', 'system'] as const;
+const EXTERNAL_ID_KEYS = ['externalid', 'external_id', 'crmid', 'id', 'remoteid', 'sourceid', 'recordid'] as const;
+
+/** Lowercase, trim, drop the scheme/www from URLs so two spellings of the same identifier match. */
+export function normalizeStableIdentifier(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') return null;
+  let s = String(value).trim().toLowerCase();
+  if (!s) return null;
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+  // Collapse mailto: / @ suffix noise on emails handled by the key being 'email'.
+  return s;
+}
+
+/** Read a property by any case/snake/camel spelling of `key` from a JSON object. */
+function pickProperty(properties: Record<string, unknown>, key: string): unknown {
+  // Allowlist keys carry no separators (e.g. `crmid`, `externalid`); normalize
+  // the input key to lowercase + underscore-stripped so `crm_id`, `crmId` and
+  // `CRMID` all resolve to `crmid`.
+  const want = key.toLowerCase().replace(/_/g, '');
+  for (const [k, v] of Object.entries(properties)) {
+    const norm = k.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase().replace(/_/g, '');
+    if (norm === want) return v;
+  }
+  return undefined;
+}
+
+export interface StableIdentifier {
+  key: string;
+  value: string;
+}
+
+/**
+ * Extract the verified-stable identifiers carried by an entity's `properties`
+ * JSONB. Returns a deduplicated, normalized list. Unknown keys are ignored
+ * (allowlist-driven). Used by tier 2 and to detect *conflicting* identifiers
+ * in tier 4.
+ */
+export function extractStableIdentifiers(properties: unknown): StableIdentifier[] {
+  const obj = jsonObject(properties);
+  const out: StableIdentifier[] = [];
+  const seen = new Set<string>();
+  for (const key of STABLE_IDENTIFIER_KEYS) {
+    const raw = pickProperty(obj, key);
+    if (Array.isArray(raw)) {
+      for (const item of raw) {
+        const v = normalizeStableIdentifier(item);
+        if (v && !seen.has(`${key}:${v}`)) {
+          seen.add(`${key}:${v}`);
+          out.push({ key, value: v });
+        }
+      }
+    } else {
+      const v = normalizeStableIdentifier(raw);
+      if (v && !seen.has(`${key}:${v}`)) {
+        seen.add(`${key}:${v}`);
+        out.push({ key, value: v });
+      }
+    }
+  }
+  return out;
+}
+
+export interface ProviderExternalId {
+  provider: string;
+  externalId: string;
+}
+
+/** Tier-1 evidence: the integration source + its durable external record id. */
+export function extractProviderExternalId(properties: unknown): ProviderExternalId | null {
+  const obj = jsonObject(properties);
+  let provider = '';
+  for (const key of PROVIDER_KEYS) {
+    const v = normalizeStableIdentifier(pickProperty(obj, key));
+    if (v) { provider = v; break; }
+  }
+  let externalId = '';
+  for (const key of EXTERNAL_ID_KEYS) {
+    const v = normalizeStableIdentifier(pickProperty(obj, key));
+    if (v) { externalId = v; break; }
+  }
+  if (!provider || !externalId) return null;
+  return { provider, externalId };
+}
+
+/**
+ * Tier-4 conflict check: two entities with the exact same normalized title may
+ * still be different canonical things if they carry *contradicting* stable
+ * identifiers (e.g. two companies named "Acme" with different domains). A
+ * shared identifier is fine (it is tier-2 evidence anyway); a *conflicting*
+ * identifier with no shared one blocks the deterministic merge.
+ */
+export function identifiersConflict(
+  a: StableIdentifier[],
+  b: StableIdentifier[],
+): boolean {
+  const byKeyA = new Map<string, Set<string>>();
+  for (const id of a) {
+    const set = byKeyA.get(id.key) ?? new Set<string>();
+    set.add(id.value);
+    byKeyA.set(id.key, set);
+  }
+  let anyShared = false;
+  let anyClash = false;
+  for (const id of b) {
+    const setA = byKeyA.get(id.key);
+    if (!setA) continue; // A has no value for this key — cannot clash
+    if (setA.has(id.value)) anyShared = true;
+    else anyClash = true;
+  }
+  // A clash blocks the deterministic merge ONLY when no identifier reconciles
+  // the two entities (a shared value is dispositive tier-2 evidence anyway).
+  return anyClash && !anyShared;
+}
+
 export function decideClaimTransition(
   candidate: Pick<ClaimCandidate, 'confidence' | 'authorityScore' | 'validFrom'>,
   existing?: Pick<CompanyClaimRow, 'id' | 'status' | 'authorityScore' | 'validFrom' | 'normalizedObject'>,
