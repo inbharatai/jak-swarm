@@ -33,7 +33,7 @@ import type {
 } from '@jak-swarm/shared';
 import type { CounterfactualReplayHint, CounterfactualReplayResult } from '@jak-swarm/shared';
 import type { AgentRole } from '@jak-swarm/shared';
-import { classifyFailure } from '../recovery/failure-classifier.js';
+import { classifyFailure, securityFieldsForClass } from '../recovery/failure-classifier.js';
 import type { ClassificationResult, FailureSignal } from '../recovery/failure-classifier.js';
 
 /**
@@ -100,12 +100,8 @@ export interface DiagnoseOutput {
 }
 
 /** The failure classes that constitute a deterministic security block. */
-const DETERMINISTIC_BLOCK_CLASSES: ReadonlySet<FailureClass> = new Set<FailureClass>([
-  FailureClass.PERMISSION_DENIED,
-  FailureClass.POLICY_BLOCK,
-  FailureClass.PROMPT_INJECTION,
-  FailureClass.UNKNOWN,
-]);
+// DETERMINISTIC_BLOCK_CLASSES now lives in failure-classifier.ts (single source
+// of truth) and is re-exported via `securityFieldsForClass` below.
 
 /**
  * Run the three single-variable counterfactual variants. Pure w.r.t. the
@@ -153,13 +149,12 @@ export async function runCounterfactualReplay(
 export async function diagnoseFailure(input: DiagnoseInput): Promise<DiagnoseOutput> {
   // 1. Deterministic classification — always runs, always wins on security.
   const deterministic = classifyFailure(input.signal);
-  // A deterministic block is sealed when the class is a hard security class OR
-  // the policy table requires approval / quarantine. The LLM can never un-block
-  // these; it may only refine rootCause text.
-  const deterministicBlock =
-    DETERMINISTIC_BLOCK_CLASSES.has(deterministic.errorClass) ||
-    deterministic.requiresApproval ||
-    deterministic.quarantine;
+  // The security seal surfaced as typed top-level fields on the diagnosis
+  // (Phase 3 hardening). `deterministicBlock` is sealed when the class is a
+  // hard security class OR the policy table requires approval / quarantine —
+  // the LLM can never un-block these; it may only refine rootCause text.
+  const seal = securityFieldsForClass(deterministic.errorClass);
+  const deterministicBlock = seal.deterministicBlock;
 
   // 2. Counterfactual replay (Innovation #1).
   const counterfactual = await runCounterfactualReplay(input.hint, input.reExecutor);
@@ -233,6 +228,13 @@ export async function diagnoseFailure(input: DiagnoseInput): Promise<DiagnoseOut
     recommendedRepairLevel: deterministic.recommendedRepairLevel, // never overridden by LLM
     recommendedChanges,
     createdAt: input.now,
+    // Security seal (Phase 3) — typed top-level fields copied from the
+    // deterministic classifier. The LLM can never override these; the graph
+    // edge + replanner read them directly to seal security-blocked diagnoses.
+    requiresApproval: seal.requiresApproval,
+    quarantine: seal.quarantine,
+    deterministicBlock: seal.deterministicBlock,
+    externalSideEffectPossible: seal.externalSideEffectPossible,
   };
 
   return { diagnosis, counterfactual, hint: input.hint, deterministicBlock };

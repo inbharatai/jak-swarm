@@ -12,18 +12,26 @@
  *     function is env-blocked without provider keys — the same bar as every
  *     live-graph HyperAgent seam. The closed-loop LOGIC that consumes this
  *     function's output is proven by the integration test with a STUB runPlan.
- *   - Artifact harvesting is an OPEN EDGE: the real graph does not yet extract
- *     artifact ids from `taskResults`, so `artifacts` is `[]` and an
+ *   - Approval-gated spec tasks (`requiresApproval: true`) interrupt the graph
+ *     via LangGraph's native `interrupt()`. This seam now CATCHES the
+ *     `GraphInterrupt` (previously it would throw — audit §A0 #1), reads the
+ *     pending approvals off the checkpoint, and returns a `FinishedRun` with
+ *     `awaitingApproval: true` + the `approvalRequestId`. The orchestrator
+ *     (`executeApprovedSpec`) then returns AWAITING_APPROVAL instead of a
+ *     verdict, and the service persists the execution row as
+ *     `awaiting_approval` for a later `resumeSpecExecution` (Command(resume)
+ *     against the SAME Postgres-checkpointed thread). The live interrupt +
+ *     resume E2E is env-blocked (no provider keys here); the signal
+ *     propagation is unit-tested with a stub `runPlan`.
+ *   - Artifact harvesting remains an OPEN EDGE: the real graph does not yet
+ *     extract artifact ids from `taskResults`, so `artifacts` is `[]` and an
  *     ARTIFACT_PRESENT criterion will be UNMET unless the run explicitly
  *     produces one. Metrics are limited to `accumulatedCostUsd` (the one
  *     metric SwarmState tracks). Wiring richer artifact/metric harvesting is a
  *     separate, migration/feature-gated step — not claimed here.
- *   - Approval-gated spec tasks (`requiresApproval: true`) interrupt the graph
- *     for human review; the closed loop would then return AWAITING_APPROVAL
- *     rather than a verdict. That path is NOT handled here — the default spec
- *     execution assumes non-approval tasks. (Open edge.)
  */
 import { WorkflowStatus } from '@jak-swarm/shared';
+import { GraphInterrupt, isInterrupted } from '@langchain/langgraph';
 import type { SwarmState } from '../state/swarm-state.js';
 import { createInitialSwarmState } from '../state/swarm-state.js';
 import {
@@ -43,7 +51,9 @@ export interface RunPlanViaLangGraphDeps {
 
 /**
  * Run a materialised spec plan through the REAL spec-execution graph and harvest
- * a `FinishedRun`. Env-blocked at every agent call (see file header).
+ * a `FinishedRun`. Env-blocked at every agent call (see file header). When the
+ * run interrupts at an approval gate, returns a `FinishedRun` with
+ * `awaitingApproval: true` (no terminal plan) instead of throwing.
  */
 export async function runPlanViaLangGraph(
   input: RunPlanInput,
@@ -75,10 +85,42 @@ export async function runPlanViaLangGraph(
   };
 
   const config = makeRunnableConfig(workflowId, tenantId, plan.tasks.length);
-  const finalState = (await graph.invoke(
-    initialState as Parameters<typeof graph.invoke>[0],
-    config,
-  )) as unknown as SwarmState;
+  let finalState: SwarmState;
+  try {
+    finalState = (await graph.invoke(
+      initialState as Parameters<typeof graph.invoke>[0],
+      config,
+    )) as unknown as SwarmState;
+  } catch (err) {
+    // GraphInterrupt → the run paused at an approval-gated task. Read the
+    // pending approvals off the checkpoint and surface an AWAITING_APPROVAL
+    // FinishedRun (do NOT throw — the closed loop returns a tri-state signal,
+    // never an exception, for an expected approval pause). Mirrors the
+    // LangGraphRuntime.runOrPause handling (langgraph-runtime.ts:211-244).
+    if (err instanceof GraphInterrupt || isInterrupted(err)) {
+      const snapshot = await graph.getState(config);
+      const state = ((snapshot?.values ?? {}) as unknown as SwarmState);
+      const pending = state.pendingApprovals ?? [];
+      const approvalRequestId = pending.length > 0 ? pending[0]?.id : undefined;
+      return {
+        plan: state.plan ?? plan,
+        verificationResults: state.verificationResults ?? {},
+        failedTaskIds: state.failedTaskIds,
+        completedTaskIds: state.completedTaskIds,
+        blocked: state.blocked,
+        artifacts: [],
+        metrics: { accumulatedCostUsd: state.accumulatedCostUsd ?? 0 },
+        accumulatedCostUsd: state.accumulatedCostUsd,
+        awaitingApproval: true,
+        ...(approvalRequestId ? { approvalRequestId } : {}),
+        startedAt: now,
+        completedAt: new Date(),
+      };
+    }
+    // Non-interrupt error: surface as a FAILED run (no verdict, the orchestrator
+    // turns a failed/empty run into UNMET/UNVERIFIABLE). Do not swallow.
+    throw err;
+  }
 
   return {
     plan: finalState.plan ?? plan,

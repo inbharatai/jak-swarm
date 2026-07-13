@@ -61,6 +61,43 @@ const POLICY: Readonly<Record<FailureClass, Omit<ClassificationResult, 'errorCla
 });
 
 /**
+ * The failure classes that constitute a deterministic security block (the LLM
+ * diagnostician can never un-block these). Surfaced as the single source of
+ * truth so the diagnostician, the graph edge, and tests derive the same
+ * `deterministicBlock` value.
+ */
+export const DETERMINISTIC_BLOCK_CLASSES: ReadonlySet<FailureClass> = new Set<FailureClass>([
+  FailureClass.PERMISSION_DENIED,
+  FailureClass.POLICY_BLOCK,
+  FailureClass.PROMPT_INJECTION,
+  FailureClass.UNKNOWN,
+]);
+
+/**
+ * The security fields surfaced onto a `FailureDiagnosis`, derived from the
+ * deterministic classifier policy for a failure class. Pure. Used by the
+ * diagnostician (to populate the typed top-level seal) and by tests (so a
+ * fixture's seal is consistent with its failureClass). `deterministicBlock` is
+ * true for the hard security classes OR any class the policy marks
+ * approval/quarantine — i.e. the LLM can never override it.
+ */
+export function securityFieldsForClass(cls: FailureClass): {
+  requiresApproval: boolean;
+  quarantine: boolean;
+  deterministicBlock: boolean;
+  externalSideEffectPossible: boolean;
+} {
+  const p = POLICY[cls];
+  return {
+    requiresApproval: p.requiresApproval,
+    quarantine: p.quarantine,
+    externalSideEffectPossible: p.externalSideEffectPossible,
+    deterministicBlock:
+      DETERMINISTIC_BLOCK_CLASSES.has(cls) || p.requiresApproval || p.quarantine,
+  };
+}
+
+/**
  * Map the legacy 11-class ErrorClass → the new 20-class FailureClass so the
  * existing safe RepairService can emit structured records without behaviour change.
  */

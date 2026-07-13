@@ -83,6 +83,25 @@ function pickAlternateAgent(ctx: ReplanContext, current: AgentRole): AgentRole |
 }
 
 /**
+ * The failure classes that must ESCALATE to a human rather than be repaired.
+ * Surfaced as a module-level + exported set so the graph edge (`afterDiagnosis`)
+ * can seal these diagnoses to the validator BEFORE the replanner is ever reached
+ * (Phase 3 Layer B), and the replanner's pre-LLM guard (Layer C) can short-
+ * circuit the LLM proposer for the same set. Every class here is also
+ * `deterministicBlock === true` in the classifier policy, so the two checks are
+ * defense-in-depth over the same source-of-truth table.
+ */
+export const ESCALATE_CLASSES: ReadonlySet<FailureClass> = new Set<FailureClass>([
+  FailureClass.PERMISSION_DENIED,
+  FailureClass.POLICY_BLOCK,
+  FailureClass.PROMPT_INJECTION,
+  FailureClass.UNKNOWN,
+  FailureClass.CAPABILITY_GAP,
+  FailureClass.MISSING_CREDENTIAL,
+  FailureClass.EXTERNAL_STATE_CHANGED,
+]);
+
+/**
  * REPLACE_AGENT: swap the failed task's agentRole to a permitted alternative.
  * Counterfactual-isolated agent-only failures route here.
  */
@@ -182,15 +201,8 @@ function proposeDeterministic(ctx: ReplanContext): {
   const iso = ctx.counterfactual?.isolatedDimension;
 
   // Security / capability / unknown / credential / external-state → escalate.
-  const ESCALATE_CLASSES: ReadonlySet<FailureClass> = new Set<FailureClass>([
-    FailureClass.PERMISSION_DENIED,
-    FailureClass.POLICY_BLOCK,
-    FailureClass.PROMPT_INJECTION,
-    FailureClass.UNKNOWN,
-    FailureClass.CAPABILITY_GAP,
-    FailureClass.MISSING_CREDENTIAL,
-    FailureClass.EXTERNAL_STATE_CHANGED,
-  ]);
+  // (ESCALATE_CLASSES is now module-level + exported; see the pre-LLM guard in
+  // `replan()` for why this deterministic-fallback check is kept as well.)
   if (ESCALATE_CLASSES.has(cls)) {
     return {
       repairType: 'ESCALATE',
@@ -288,6 +300,22 @@ export async function replan(ctx: ReplanContext, options: ReplanOptions): Promis
   // Budget guard — no plan repairs left → escalate immediately.
   if (ctx.budgetRemaining.planRepairs <= 0) {
     return escalate(ctx, 'Plan-repair budget exhausted.');
+  }
+
+  // Pre-LLM security seal (Phase 3 Layer C). A security/capability/credential/
+  // external-state failure is human-escalation only — it must NEVER be handed
+  // to an LLM proposer (an LLM cannot be trusted to ESCALATE rather than invent
+  // a "repair" for a permission denial or a prompt injection). Today production
+  // does not inject `replanner.llmPropose`, so the deterministic fallback's
+  // ESCALATE check catches this — but the seam exists (langgraph-graph-builder
+  // :621), so this guard is MANDATORY, not optional. Return ESCALATE without
+  // invoking the LLM. (`proposeDeterministic` keeps the same check as a
+  // defense-in-depth fallback for non-LLM callers.)
+  if (ESCALATE_CLASSES.has(ctx.diagnosis.failureClass)) {
+    return escalate(
+      ctx,
+      `Failure class ${ctx.diagnosis.failureClass} requires human escalation (security/capability/credential).`,
+    );
   }
 
   // Propose. Try the LLM first if injected; fall back to the deterministic proposer.

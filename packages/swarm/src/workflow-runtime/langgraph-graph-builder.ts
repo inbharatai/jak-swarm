@@ -212,6 +212,10 @@ export const SwarmStateAnnotation = Annotation.Root({
   browserAutomationEnabled: Annotation<boolean>({ reducer: lwwReducer, default: () => false }),
   restrictedCategories: Annotation<ToolCategory[]>({ reducer: lwwReducer, default: () => [] }),
   disabledToolNames: Annotation<string[]>({ reducer: lwwReducer, default: () => [] }),
+  // Standing Order tool whitelist — must be a declared channel or LangGraph's
+  // StateGraph strips the field set by createInitialSwarmState, leaving every
+  // node reading `undefined` and the registry chokepoint never enforcing it.
+  allowedToolNames: Annotation<string[]>({ reducer: lwwReducer, default: () => [] }),
   connectedProviders: Annotation<string[]>({ reducer: lwwReducer, default: () => [] }),
   subscriptionTier: Annotation<'free' | 'paid' | undefined>({ reducer: lwwReducer, default: () => undefined }),
 

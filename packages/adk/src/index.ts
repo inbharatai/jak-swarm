@@ -57,6 +57,16 @@ export {
   type ApprovalVerdict,
 } from './orchestration/adk-parity.js';
 
+// HyperAgent Phase 5 — unify ADK under LangGraph governance (routing + governed params)
+export {
+  chooseOrchestrationPath,
+  buildGovernedAdkParams,
+  buildAdkApprovalGate,
+  type OrchestrationDecision,
+  type GovernedAdkParams,
+  type ApprovalRequestCreator,
+} from './orchestration/orchestration-router.js';
+
 // Runner bridge
 export {
   runWithAdk,

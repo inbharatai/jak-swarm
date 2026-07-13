@@ -46,6 +46,10 @@ export interface StartContext {
   browserAutomationEnabled?: boolean;
   restrictedCategories?: unknown[];
   disabledToolNames?: string[];
+  /** Standing Order tool whitelist — the ONLY tools the run may invoke.
+   *  Mirrors disabledToolNames plumbing so the registry chokepoint
+   *  (TenantToolRegistry) actually receives a non-empty whitelist. */
+  allowedToolNames?: string[];
   connectedProviders?: string[];
   subscriptionTier?: 'free' | 'paid';
   userRole?: string;

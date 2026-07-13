@@ -4,6 +4,7 @@
  *
  * Routes:
  *   GET    /workflows/:workflowId/artifacts        — list artefacts for a workflow
+ *   POST   /artifacts                             — create an artefact (inline or bytes)
  *   GET    /artifacts/:id                          — fetch one (metadata only)
  *   POST   /artifacts/:id/download                 — request a signed download URL
  *                                                    (enforces approval gate)
@@ -87,6 +88,65 @@ const artifactsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send(ok({ artifacts: rows }));
       } catch (e) {
         return sendArtifactError(reply, e, 'ARTIFACT_LIST_FAILED');
+      }
+    },
+  );
+
+  // ── Create an artifact (inline content or binary bytes) ──────────────
+  // Phase 6 — wires the real ArtifactService.createArtifact to HTTP (audit
+  // §A0 #2 found the service existed but had no route, so artifact creation
+  // was unreachable). REVIEWER+ since it writes a workflow deliverable.
+  fastify.post(
+    '/artifacts',
+    {
+      preHandler: [
+        fastify.authenticate,
+        ...(fastify.requireRole ? [fastify.requireRole('TENANT_ADMIN', 'SYSTEM_ADMIN', 'REVIEWER')] : []),
+      ],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { tenantId, userId } = request.user;
+      const body = request.body as Record<string, unknown> | null;
+      if (!body || typeof body !== 'object') {
+        return reply.status(400).send(err('BAD_REQUEST', 'request body required'));
+      }
+      const workflowId = typeof body.workflowId === 'string' ? body.workflowId : null;
+      const artifactType = typeof body.artifactType === 'string' ? body.artifactType : null;
+      const fileName = typeof body.fileName === 'string' ? body.fileName : null;
+      const mimeType = typeof body.mimeType === 'string' ? body.mimeType : null;
+      if (!workflowId || !artifactType || !fileName || !mimeType) {
+        return reply.status(400).send(err('BAD_REQUEST', 'workflowId, artifactType, fileName, mimeType are required'));
+      }
+      const taskId = typeof body.taskId === 'string' ? body.taskId : undefined;
+      const approvalState = typeof body.approvalState === 'string' ? (body.approvalState as 'NOT_REQUIRED' | 'REQUIRES_APPROVAL') : undefined;
+      const parentArtifactId = typeof body.parentArtifactId === 'string' ? body.parentArtifactId : undefined;
+      const metadata = (body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata))
+        ? (body.metadata as Record<string, unknown>)
+        : undefined;
+      try {
+        // Exactly one of inlineContent / bytes (base64) must be provided.
+        let bytes: Uint8Array | undefined;
+        if (typeof body.bytesBase64 === 'string') {
+          bytes = Uint8Array.from(Buffer.from(body.bytesBase64, 'base64'));
+        }
+        const inlineContent = typeof body.inlineContent === 'string' ? body.inlineContent : undefined;
+        const row = await service.createArtifact({
+          tenantId,
+          workflowId,
+          ...(taskId ? { taskId } : {}),
+          producedBy: userId,
+          artifactType: artifactType as 'final_output',
+          fileName,
+          mimeType,
+          ...(inlineContent !== undefined ? { inlineContent } : {}),
+          ...(bytes ? { bytes } : {}),
+          ...(approvalState ? { approvalState } : {}),
+          ...(parentArtifactId ? { parentArtifactId } : {}),
+          ...(metadata ? { metadata } : {}),
+        });
+        return reply.status(201).send(ok({ artifact: row }));
+      } catch (e) {
+        return sendArtifactError(reply, e, 'ARTIFACT_CREATE_FAILED');
       }
     },
   );

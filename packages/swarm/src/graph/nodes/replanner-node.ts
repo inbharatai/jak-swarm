@@ -31,6 +31,7 @@ import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
 import { replan } from '../../hyperagent/replanner.js';
 import type { LlmProposeFn } from '../../hyperagent/replanner.js';
+import { getReadyTasks } from '../task-scheduler.js';
 
 /** Tools whose execution has an irreversible external side effect. */
 const EXTERNAL_TOOLS: ReadonlySet<string> = new Set([
@@ -162,10 +163,15 @@ export async function replannerNode(
     };
   }
 
-  // Apply the revised plan. Version it, rewind to the failed task, re-execute.
+  // Apply the revised plan. Version it, then set the execution cursor via
+  // dependency-aware scheduling (getReadyTasks) — NOT the failed task's old
+  // index. The failed task may now depend on a freshly-added prerequisite
+  // (ADD_PREREQUISITE), its original deps may have been invalidated and need to
+  // re-run first, or a SPLIT_TASK may have replaced the failed task with new
+  // sub-tasks (so its old id no longer exists in the plan). Rewinding to the
+  // old index in any of those cases points the cursor at a completed task or a
+  // task whose deps are not yet met, re-running unaffected downstream work.
   const newVersion = (state.activePlanVersion ?? 0) + 1;
-  const failedIndex = result.updatedPlan.tasks.findIndex((t) => t.id === task.id);
-  const replayIndex = failedIndex >= 0 ? failedIndex : 0;
   const updatedPlan: WorkflowPlan = {
     ...result.updatedPlan,
     // Mark invalidated/changed tasks back to PENDING so they re-execute;
@@ -180,6 +186,27 @@ export async function replannerNode(
       return t;
     }),
   };
+
+  // Dependency-aware cursor (Phase 4). A task is READY when all its deps are
+  // COMPLETED and it is neither completed/failed/skipped nor on a cycle. Prefer
+  // a ready task among the invalidated/changed set (the work this replan
+  // actually touched); fall back to the first ready task overall (e.g. an
+  // unmet dependency of the failed task that itself became ready). If nothing is
+  // runnable, the revised plan is recorded but the run goes to the validator —
+  // never silently rewind to a task that cannot legally execute next.
+  const completedIds = new Set(
+    updatedPlan.tasks.filter((t) => t.status === TaskStatus.COMPLETED).map((t) => t.id),
+  );
+  const failedIds = new Set(
+    updatedPlan.tasks.filter((t) => t.status === TaskStatus.FAILED).map((t) => t.id),
+  );
+  const readyTasks = getReadyTasks(updatedPlan, completedIds, failedIds);
+  const reExecuted = new Set([...result.changedTaskIds, ...result.invalidatedTaskIds]);
+  const cursorTask = readyTasks.find((t) => reExecuted.has(t.id)) ?? readyTasks[0];
+  const replayIndex = cursorTask
+    ? updatedPlan.tasks.findIndex((t) => t.id === cursorTask.id)
+    : -1;
+  const nothingReady = readyTasks.length === 0;
 
   return {
     plan: updatedPlan,
@@ -220,13 +247,16 @@ export async function replannerNode(
     taskRetryCount: Object.fromEntries(
       [...result.changedTaskIds, ...result.invalidatedTaskIds].map((id) => [id, 0]),
     ) as Record<string, number>,
-    // Rewind to the failed task so the guardrail re-executes only invalidated work.
-    // (The consumed pendingDiagnosis is left in place; the diagnosis node overwrites
-    //  it if the task fails again on the next pass.)
-    currentTaskIndex: replayIndex,
+    // Rewind to the first READY task (deps satisfied) — prefer one this replan
+    // touched — so the guardrail re-executes only invalidated work and never a
+    // task whose inputs are still pending. When nothing is runnable, leave the
+    // cursor and route to the validator (terminal).
+    currentTaskIndex: nothingReady ? (state.currentTaskIndex ?? 0) : replayIndex,
     hyperAgentIteration: (state.hyperAgentIteration ?? 0) + 1,
-    status: WorkflowStatus.EXECUTING,
-    error: undefined,
+    status: nothingReady ? WorkflowStatus.FAILED : WorkflowStatus.EXECUTING,
+    error: nothingReady
+      ? `Replan for task '${task.id}' left no ready tasks to execute (all remaining tasks are blocked or failed).`
+      : undefined,
   };
 }
 
