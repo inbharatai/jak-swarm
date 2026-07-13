@@ -263,3 +263,28 @@ export type {
 } from './hyperagent/spec-executor.js';
 export { runPlanViaLangGraph } from './hyperagent/spec-executor-runtime.js';
 export type { RunPlanViaLangGraphDeps } from './hyperagent/spec-executor-runtime.js';
+
+// ─── HyperAgent Phase 9 — versioned config lifecycle (pure core) ──────────
+// The bounded state machine + evidence-gated advancement. The LIVE caller is
+// `apps/api/src/services/company-brain/config-lifecycle.service.ts`; these
+// pure functions are the deterministic gate the caller enforces (no fake
+// advance on HOLD). Re-exported so the service + tests import from one surface.
+export {
+  ConfigLifecycleError,
+  canTransition,
+  assertTransition as assertConfigTransition,
+  createDraft as createDraftConfig,
+  proposeVersion,
+  startShadow,
+  startCanary,
+  promoteVersion,
+  rollbackVersion,
+  supersede,
+  nextRolloutPercent,
+  evaluateStage,
+  evaluateShadow,
+  evaluateCanary,
+  rampCanary,
+  recordEvent as recordConfigEvent,
+  withEvaluation,
+} from './hyperagent/config-lifecycle.js';

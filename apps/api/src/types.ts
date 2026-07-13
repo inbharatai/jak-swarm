@@ -40,7 +40,15 @@ export type SkillStatus =
 
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export type SkillTier = 'BUILTIN' | 'COMMUNITY' | 'TENANT';
+/**
+ * Skill tier (canonical mapping, matches `packages/shared` SkillTier enum +
+ * the schema.prisma comment): 1=BUILTIN, 2=GENERATED_PLAN, 3=PROPOSED.
+ * A GENERATED_PLAN skill is a procedural skill compiled from an approved plan
+ * (Phase 8 producer); a PROPOSED skill is a tenant-authored skill pending
+ * sandbox + approval. (Prior code labelled tier 2 COMMUNITY / tier 3 TENANT —
+ * that was a stale mismatch with the shared enum + schema, fixed in Phase 8.)
+ */
+export type SkillTier = 'BUILTIN' | 'GENERATED_PLAN' | 'PROPOSED';
 
 export type TenantStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED';
 
