@@ -12,17 +12,22 @@
  * test (audit-log-chain.integration.test.ts) proves the AuditLogger write path
  * chains rows end-to-end. Live DB round-trip remains env-blocked here.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   canonicalJson,
   getEvidenceSigningSecret,
   auditChainActive,
   deriveAuditTenantKey,
   computeRowHash,
+  buildChainFields,
+  buildAuditCreateData,
   prepareAuditChainFields,
+  appendChainedAuditRow,
   verifyChain,
   type AuditChainRow,
   type AuditChainPrismaClient,
+  type AuditChainAppendClient,
+  type AuditChainTxRunner,
 } from '../../../packages/security/src/audit/audit-chain.js';
 
 const SECRET = 'x'.repeat(48); // ≥16 bytes, well above the floor
@@ -154,6 +159,127 @@ describe('prepareAuditChainFields', () => {
     expect(f.rowHash).toBeNull();
     expect(f.prevHash).toBeNull();
     expect(f.chainSeq).toBe(0);
+  });
+});
+
+describe('buildChainFields (pure core)', () => {
+  it('chains off the supplied latest row without any I/O', () => {
+    const k = deriveAuditTenantKey(TENANT)!;
+    const f = buildChainFields(row({ action: 'A', resource: 'R' }), { rowHash: 'abc', chainSeq: 7 }, k);
+    expect(f.prevHash).toBe('abc');
+    expect(f.chainSeq).toBe(8);
+    expect(f.rowHash).not.toBeNull();
+  });
+  it('first row in a tenant: prevHash=null, chainSeq=1', () => {
+    const k = deriveAuditTenantKey(TENANT)!;
+    const f = buildChainFields(row({ action: 'A', resource: 'R' }), null, k);
+    expect(f.prevHash).toBeNull();
+    expect(f.chainSeq).toBe(1);
+  });
+  it('is deterministic given (row, latest, key) — same inputs → same hash + seq', () => {
+    const k = deriveAuditTenantKey(TENANT)!;
+    const r = row({ action: 'A', resource: 'R' });
+    const latest = { rowHash: 'abc', chainSeq: 7 };
+    const id = '00000000-0000-4000-8000-000000000010';
+    const a = buildChainFields(r, latest, k, id);
+    const b = buildChainFields(r, latest, k, id);
+    expect(a).toEqual(b);
+  });
+  it('honours the caller-supplied id (stable id known before persist)', () => {
+    const k = deriveAuditTenantKey(TENANT)!;
+    const id = '00000000-0000-4000-8000-0000000000aa';
+    const f = buildChainFields(row({ action: 'A', resource: 'R' }), null, k, id);
+    expect(f.id).toBe(id);
+  });
+});
+
+describe('buildAuditCreateData (hash-over-stored-row invariant)', () => {
+  it('normalizes absent optionals to null (matches what verifyChain recomputes)', () => {
+    const k = deriveAuditTenantKey(TENANT)!;
+    const f = buildChainFields({ tenantId: TENANT, action: 'A', resource: 'R', createdAt: new Date('2026-01-01T00:00:00.000Z') }, null, k);
+    const data = buildAuditCreateData({ tenantId: TENANT, action: 'A', resource: 'R', createdAt: new Date('2026-01-01T00:00:00.000Z') }, f);
+    expect(data.userId).toBeNull();
+    expect(data.resourceId).toBeNull();
+    expect(data.ip).toBeNull();
+    expect(data.userAgent).toBeNull();
+    expect(data.details).toBeNull();
+    expect(data.severity).toBe('INFO'); // absent severity → column default
+    expect(data.prevHash).toBeNull();
+    expect(data.rowHash).not.toBeNull();
+    expect(data.chainSeq).toBe(1);
+  });
+});
+
+describe('appendChainedAuditRow (atomic path — mocked transaction)', () => {
+  // A mock append client that records the lock call + the findFirst result +
+  // the create payload, so we can assert the atomic ordering WITHOUT a DB.
+  function makeAppendDb(opts: {
+    latest?: { rowHash: string | null; chainSeq: number | null } | null;
+    throwInTx?: Error;
+  }): { db: AuditChainAppendClient; events: string[]; created: AuditChainRow[] } {
+    const events: string[] = [];
+    const created: AuditChainRow[] = [];
+    const runner: AuditChainTxRunner = {
+      $executeRawUnsafe: async (sql: string, ...vals: unknown[]) => {
+        events.push(`lock:${sql}:${vals.join(',')}`);
+        return [];
+      },
+      auditLog: {
+        findFirst: async () => { events.push('findFirst'); return opts.latest ?? null; },
+        create: async (args) => { events.push('create'); created.push(args.data as unknown as AuditChainRow); return { id: args.data.id }; },
+      },
+    };
+    const db: AuditChainAppendClient = {
+      $transaction: async (fn) => {
+        events.push('tx-begin');
+        if (opts.throwInTx) throw opts.throwInTx;
+        const r = await fn(runner);
+        events.push('tx-commit');
+        return r;
+      },
+      auditLog: {
+        create: async (args) => { events.push('fallback-create'); created.push(args.data as unknown as AuditChainRow); return { id: args.data.id }; },
+      },
+    };
+    return { db, events, created };
+  }
+
+  it('ACTIVE path: lock → findFirst → create all inside one transaction, in that order', async () => {
+    const { db, events, created } = makeAppendDb({ latest: { rowHash: 'abc', chainSeq: 4 } });
+    const id = await appendChainedAuditRow(db, row({ action: 'A', resource: 'R' }));
+    expect(events).toEqual([
+      'tx-begin',
+      'lock:SELECT pg_advisory_xact_lock(hashtext($1)):' + 'tenant-1',
+      'findFirst',
+      'create',
+      'tx-commit',
+    ]);
+    expect(created).toHaveLength(1);
+    expect(created[0]!.chainSeq).toBe(5);
+    expect(created[0]!.prevHash).toBe('abc');
+    expect(created[0]!.rowHash).not.toBeNull();
+    expect(created[0]!.id).toBe(id);
+  });
+
+  it('INACTIVE path (secret unset): writes unsigned directly, no transaction/lock, chainSeq=0', async () => {
+    setSecret(undefined);
+    const { db, events, created } = makeAppendDb({});
+    await appendChainedAuditRow(db, row({ action: 'A', resource: 'R' }));
+    expect(events).toEqual(['fallback-create']);
+    expect(created[0]!.rowHash).toBeNull();
+    expect(created[0]!.chainSeq).toBe(0);
+  });
+
+  it('FAIL-OPEN-TO-AUDITABLE: a transaction failure → unsigned fallback write (auditable, never silent)', async () => {
+    const { db, events, created } = makeAppendDb({ throwInTx: new Error('unique violation') });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await appendChainedAuditRow(db, row({ action: 'A', resource: 'R' }));
+    errSpy.mockRestore();
+    expect(events).toContain('tx-begin');
+    expect(events).toContain('fallback-create');
+    expect(created).toHaveLength(1);
+    expect(created[0]!.rowHash).toBeNull();
+    expect(created[0]!.chainSeq).toBe(0);
   });
 });
 

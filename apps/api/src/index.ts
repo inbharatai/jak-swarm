@@ -112,6 +112,12 @@ import { validateConfigOnBoot } from './boot/validate-config.js';
 import { startMcpServersFromConfig } from './boot/mcp-autostart.js';
 import { spawnWhatsAppClient, stopWhatsAppClient, releaseWhatsAppAutoStartLock } from './whatsapp/whatsapp-spawner.js';
 
+// PR E (Phase 10) — Brain MCP server canary registration handle. Set when
+// `BRAIN_MCP_SERVER=1` boots the in-process brain_* MCP server + registers the
+// tools in the JAK toolRegistry; disconnected on graceful shutdown. Null when
+// the canary is off (default) so existing behaviour is unchanged.
+let brainMcpRegistration: { disconnect(): Promise<void>; toolNames: readonly string[] } | null = null;
+
 async function buildApp() {
   const fastify = Fastify({
     logger: {
@@ -367,6 +373,32 @@ async function buildApp() {
         : '[CompanyBrain] CompanyContextProvider wired — Graph V2 not migrated; agents ground in approved CompanyProfile only (task-specific brain context unavailable, observed non-blocking)',
     );
 
+    // PR E (Phase 10) — Brain MCP server CANARY. Default-OFF. When
+    // `BRAIN_MCP_SERVER=1`, boot the in-process brain_* MCP server (the first
+    // MCP server in the repo) over an in-memory transport and register its tools
+    // in the JAK toolRegistry with tenant-context-aware executors — so an agent
+    // can READ the product graph + perform GOVERNED writes (merge / claim
+    // decision) as first-class tools. Tenant + actor are sourced from the
+    // authenticated ToolExecutionContext, NEVER from tool arguments. Errors are
+    // caught + logged so a canary misconfiguration can never block boot; the
+    // tools are an ADDITIVE surface (no existing tool is replaced).
+    if (process.env['BRAIN_MCP_SERVER'] === '1' && process.env['NODE_ENV'] !== 'test') {
+      try {
+        const { registerBrainMcpToolsInRegistry } = await import('@jak-swarm/tools');
+        brainMcpRegistration = await registerBrainMcpToolsInRegistry(brainSvc);
+        fastify.log.info(
+          { toolCount: brainMcpRegistration.toolNames.length, tools: brainMcpRegistration.toolNames },
+          '[Brain MCP] Canary ON — brain_* tools registered in the JAK toolRegistry (tenant-scoped via ToolExecutionContext)',
+        );
+      } catch (brainMcpErr) {
+        fastify.log.warn(
+          { err: brainMcpErr instanceof Error ? brainMcpErr.message : String(brainMcpErr) },
+          '[Brain MCP] Canary failed to start (non-blocking; existing tool surface unchanged)',
+        );
+        brainMcpRegistration = null;
+      }
+    }
+
     // Idempotent seed of system WorkflowTemplates. Best-effort — if the
     // schema isn't deployed, log + continue so the app still boots.
     try {
@@ -577,6 +609,12 @@ async function main() {
   const gracefulShutdown = async (signal: string) => {
     fastify.log.info({ signal }, 'Received shutdown signal, closing server...');
     try {
+      // PR E — tear down the Brain MCP canary (close the in-memory transport +
+      // deregister the brain_* tools) before closing the server.
+      if (brainMcpRegistration) {
+        await brainMcpRegistration.disconnect().catch(() => {});
+        brainMcpRegistration = null;
+      }
       await stopWhatsAppClient(fastify.log);
       await releaseWhatsAppAutoStartLock(fastify.log, config.redisUrl ? fastify.redis : null);
       await fastify.close();

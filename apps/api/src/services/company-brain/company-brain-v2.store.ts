@@ -8,6 +8,7 @@ import {
   type CompanyArtifactV2Row,
   type CompanyEntityV2Row,
 } from './company-brain-v2.core.js';
+import { graphTxStorage } from './company-brain-v2.tx-context.js';
 
 export abstract class CompanyBrainArtifactStore {
   protected abstract mergeEntities(input: {
@@ -27,11 +28,22 @@ export abstract class CompanyBrainArtifactStore {
     protected readonly log?: FastifyBaseLogger,
   ) {}
 
+  /**
+   * Run a SELECT against the current graph tx runner when one is active
+   * (`mergeEntities`' `$transaction`), else against `this.db`. The tx runner is
+   * propagated via AsyncLocalStorage — see company-brain-v2.tx-context.ts. This
+   * is what makes the multi-statement merge body atomic without threading a
+   * `tx` param through every upsert helper.
+   */
   protected async query<T>(sql: string, ...values: unknown[]): Promise<T[]> {
+    const tx = graphTxStorage.getStore();
+    if (tx) return tx.$queryRawUnsafe<T[]>(sql, ...values);
     return this.db.$queryRawUnsafe<T[]>(sql, ...values);
   }
 
   protected async execute(sql: string, ...values: unknown[]): Promise<number> {
+    const tx = graphTxStorage.getStore();
+    if (tx) return tx.$executeRawUnsafe(sql, ...values);
     return this.db.$executeRawUnsafe(sql, ...values);
   }
 

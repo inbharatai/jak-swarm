@@ -1,4 +1,4 @@
-import { prepareAuditChainFields, type PreparedChainFields } from './audit-chain.js';
+import { appendChainedAuditRow, type AuditChainAppendClient } from './audit-chain.js';
 
 export enum AuditAction {
   USER_LOGIN = 'USER_LOGIN',
@@ -46,6 +46,13 @@ export enum AuditAction {
   /** Phase 6 — an approved spec was executed via the closed loop (materialise
    *  → run → harvest → acceptance verdict). The details carry the verdict. */
   AGENT_SPEC_EXECUTED = 'AGENT_SPEC_EXECUTED',
+  /** PR E (Phase 10) — a ShieldMcpClient signed, Ed25519-verifiable decision was
+   *  issued for a live input scan and recorded in the audit chain. The details
+   *  carry `decisionId` (resourceId), `verdict`, `shieldId`, the signed
+   *  `subject` (kind `input_scan` + `requestHash`), issue/expiry times, and the
+   *  scan's block reasons — enough to `replayDecision` the exact signed verdict
+   *  later. Severity WARN when the Shield blocked, INFO otherwise. */
+  SHIELD_DECISION_SIGNED = 'SHIELD_DECISION_SIGNED',
 }
 
 export interface AuditEvent {
@@ -68,32 +75,13 @@ export interface AuditLogEntry extends AuditEvent {
 /**
  * Minimal Prisma client interface for audit logging.
  * This allows using the AuditLogger without importing the full Prisma client.
+ *
+ * PR E — the live write path is the ATOMIC `appendChainedAuditRow`
+ * (per-tenant `pg_advisory_xact_lock` + partial-unique backstop), so this
+ * interface now requires `$transaction` + a raw-SQL-capable runner. The loose
+ * typing keeps `packages/security` free of a `@jak-swarm/db` import.
  */
-export interface AuditPrismaClient {
-  auditLog: {
-    create: (args: {
-      data: {
-        id?: string;
-        action: string;
-        tenantId: string;
-        userId?: string;
-        resource: string;
-        resourceId?: string;
-        details: Record<string, unknown>;
-        ip?: string;
-        severity: string;
-        createdAt: Date;
-        /** Phase 7 HMAC row-chain fields (nullable — null when the chain is
-         *  INACTIVE, i.e. EVIDENCE_SIGNING_SECRET is unset). */
-        prevHash?: string | null;
-        rowHash?: string | null;
-        chainSeq?: number;
-      };
-    }) => Promise<{ id: string }>;
-    /** Phase 7 — fetch the tenant's latest chained row to chain off it. */
-    findFirst: (args: unknown) => Promise<unknown>;
-  };
-}
+export interface AuditPrismaClient extends AuditChainAppendClient {}
 
 export class AuditLogger {
   private readonly db: AuditPrismaClient;
@@ -127,43 +115,24 @@ export class AuditLogger {
     };
 
     try {
-      // Phase 7 — compute the HMAC row-chain fields for this row. INACTIVE
-      // (rowHash=null, chainSeq=0) when EVIDENCE_SIGNING_SECRET is unset; the
-      // row is still written (auditable), just not tamper-evident. Errors in
-      // chain prep MUST NOT break the write — fall back to unsigned.
-      let chain: PreparedChainFields | null = null;
-      try {
-        chain = await prepareAuditChainFields(this.db, {
-          tenantId: entry.tenantId,
-          userId: entry.userId,
-          action: entry.action,
-          resource: entry.resource,
-          resourceId: entry.resourceId,
-          details: entry.details as unknown,
-          ip: entry.ip,
-          userAgent: entry.userAgent,
-          severity: entry.severity,
-          createdAt: entry.createdAt,
-        });
-      } catch (chainErr) {
-        // Chain prep failure is non-fatal — write unsigned below.
-        console.error('[AuditLogger] chain prep failed (writing unsigned):', chainErr);
-      }
-
-      await this.db.auditLog.create({
-        data: {
-          id: chain?.id ?? entry.id,
-          action: entry.action,
-          tenantId: entry.tenantId,
-          ...(entry.userId !== undefined && { userId: entry.userId }),
-          resource: entry.resource,
-          ...(entry.resourceId !== undefined && { resourceId: entry.resourceId }),
-          details: entry.details as Record<string, unknown>,
-          ...(entry.ip !== undefined && { ip: entry.ip }),
-          severity: entry.severity ?? 'INFO',
-          createdAt: entry.createdAt,
-          ...(chain ? { prevHash: chain.prevHash, rowHash: chain.rowHash, chainSeq: chain.chainSeq } : {}),
-        },
+      // PR E — ATOMIC append: the fetch-latest + chain-field compute + insert
+      // run inside one `pg_advisory_xact_lock(hashtext(tenantId))`-guarded
+      // transaction with a partial-unique backstop, so concurrent writers for
+      // the same tenant cannot branch the chain. INACTIVE (rowHash=null,
+      // chainSeq=0) when EVIDENCE_SIGNING_SECRET is unset; the atomic append
+      // also fail-opens to an unsigned write if the transaction itself throws
+      // (unique violation / connection loss). Audit logging MUST NOT break.
+      await appendChainedAuditRow(this.db, {
+        tenantId: entry.tenantId,
+        userId: entry.userId,
+        action: entry.action,
+        resource: entry.resource,
+        resourceId: entry.resourceId,
+        details: entry.details as unknown,
+        ip: entry.ip,
+        userAgent: entry.userAgent,
+        severity: entry.severity,
+        createdAt: entry.createdAt,
       });
     } catch (err) {
       // Never let audit logging failure break the main flow
@@ -198,10 +167,17 @@ export class AuditLogger {
  * Create a no-op audit logger for testing.
  */
 export function createNullAuditLogger(): AuditLogger {
+  const noopRunner = {
+    $executeRawUnsafe: async () => [],
+    auditLog: {
+      findFirst: async () => null,
+      create: async () => ({ id: crypto.randomUUID() }),
+    },
+  };
   const noopDb: AuditPrismaClient = {
+    $transaction: async (fn) => fn(noopRunner),
     auditLog: {
       create: async () => ({ id: crypto.randomUUID() }),
-      findFirst: async () => null,
     },
   };
   return new AuditLogger(noopDb, () => {});

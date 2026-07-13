@@ -68,20 +68,26 @@ export type {
   AuditPrismaClient,
 } from './audit/audit-log.js';
 
-// Audit Log HMAC Row-Chain (Phase 7 — tamper-evidence)
+// Audit Log HMAC Row-Chain (Phase 7 — tamper-evidence; PR E — atomic append)
 export {
   canonicalJson,
   getEvidenceSigningSecret,
   auditChainActive,
   deriveAuditTenantKey,
   computeRowHash,
+  buildChainFields,
+  buildAuditCreateData,
   prepareAuditChainFields,
+  appendChainedAuditRow,
   verifyChain,
   AUDIT_CHAIN_ALGO,
 } from './audit/audit-chain.js';
 export type {
   AuditChainRow,
   AuditChainPrismaClient,
+  AuditChainCreateData,
+  AuditChainTxRunner,
+  AuditChainAppendClient,
   PreparedChainFields,
   VerifyChainResult,
 } from './audit/audit-chain.js';
@@ -153,6 +159,23 @@ export type {
   ShieldMcpTransport,
   ShieldMcpClientOptions,
 } from './shield-gateway/shield-mcp-client.js';
+
+// PR E (Phase 10) — ShieldMcpClient LIVE instantiation in the action path +
+// routing signed Shield decisions through the audit chain. LOCAL embedded
+// keypair provisioned from env (fail-open-to-auditable when absent), env-gated
+// canary (SHIELD_MCP_CANARY=1). Default-off; the existing unsigned scanInput
+// block/allow behaviour is unchanged.
+export {
+  getShieldMcpConfig,
+  shieldMcpActive,
+  resetShieldMcpConfigCache,
+  requestSignedInputScanDecision,
+  recordShieldDecisionToAudit,
+} from './shield-gateway/shield-mcp-live.js';
+export type {
+  ShieldMcpConfig,
+  SignedInputScanResult,
+} from './shield-gateway/shield-mcp-live.js';
 
 // ─── Governance / Autonomy (HyperAgent Phase 1) ─────────────────────────────
 // Central, deterministic autonomy-policy evaluator. ONE place that decides what

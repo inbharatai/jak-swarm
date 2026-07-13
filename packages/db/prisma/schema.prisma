@@ -1047,6 +1047,13 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, userId])
   @@index([tenantId, chainSeq])
+  // PR E (Phase 10) — per-tenant atomic sequence backstop. A PARTIAL UNIQUE
+  // index on (tenantId, chainSeq) WHERE rowHash IS NOT NULL is created by
+  // migration 122_audit_chain_unique_seq (Prisma @@unique cannot model a
+  // partial predicate, so it is not declared here — it exists in the DB). It
+  // backs the pg_advisory_xact_lock-guarded atomic append in
+  // packages/security/src/audit/audit-chain.ts (appendChainedAuditRow), so
+  // concurrent same-tenant writers can no longer branch the chain.
   @@map("audit_logs")
 }
 

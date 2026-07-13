@@ -31,7 +31,7 @@ import { CompanyProfileService } from './company-brain/company-profile.service.j
 import { WorkflowTemplateService } from './company-brain/workflow-template.service.js';
 import { CEOOrchestratorService, type CEOPreFlightResult } from './ceo-orchestrator.service.js';
 import { getIndustryPack } from '@jak-swarm/industry-packs';
-import { AuditLogger, AuditAction, classifyToolRisk, getShieldGateway } from '@jak-swarm/security';
+import { AuditLogger, AuditAction, classifyToolRisk, getShieldGateway, shieldMcpActive, requestSignedInputScanDecision, recordShieldDecisionToAudit } from '@jak-swarm/security';
 import type { AuditPrismaClient } from '@jak-swarm/security';
 import { toolRegistry } from '@jak-swarm/tools';
 import { WorkflowService } from './workflow.service.js';
@@ -943,6 +943,37 @@ export class SwarmExecutionService extends EventEmitter {
       workflowId,
       source: 'workflow_goal',
     });
+    // PR E (Phase 10) — SIGNED Shield decision canary. Default-OFF. When
+    // `SHIELD_MCP_CANARY=1` AND the Shield keypair is provisioned (env
+    // SHIELD_SIGNING_KEY / SHIELD_VERIFICATION_KEY), request an Ed25519-SIGNED,
+    // content-addressed decision over this exact goal (`requestHash = sha256(goal)`)
+    // and route it through the ATOMIC audit chain (SHIELD_DECISION_SIGNED). The
+    // existing unsigned block/allow behaviour above is UNCHANGED — the signed
+    // decision is a layered, tamper-evident artifact an auditor can replay later.
+    // Errors are caught + logged so a canary misconfiguration can never break the
+    // run; the canary never gates execution (it records, it does not block).
+    if (shieldMcpActive()) {
+      try {
+        const signed = await requestSignedInputScanDecision({
+          text: goal,
+          context: { tenantId, userId, workflowId, source: 'workflow_goal' },
+          now: Date.now(),
+          scan: shieldScan,
+        });
+        if (signed) {
+          void recordShieldDecisionToAudit(this.audit, {
+            decision: signed.decision,
+            scan: signed.scan,
+            tenantId,
+            userId,
+            workflowId,
+            source: 'workflow_goal',
+          });
+        }
+      } catch (shieldErr) {
+        this.log.warn({ workflowId, err: String(shieldErr) }, '[Shield MCP canary] signed-decision path failed (canary does not gate execution)');
+      }
+    }
     const injectionResult = shieldScan.injection;
     if (injectionResult.detected && injectionResult.risk === 'HIGH') {
       this.log.warn({ workflowId, patterns: injectionResult.patterns }, '[Guardrail] Injection attempt detected in goal');

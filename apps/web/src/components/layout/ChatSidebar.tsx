@@ -63,7 +63,7 @@ import { useToast } from '@/components/ui/toast';
 // `/workspace` belongs to Chat even though it's also matched by other entries.
 
 interface Zone {
-  id: 'chat' | 'tasks' | 'files' | 'setup' | 'audit' | 'hyperagent';
+  id: 'chat' | 'tasks' | 'files' | 'brain' | 'setup' | 'audit' | 'hyperagent';
   label: string;
   href: string;
   icon: LucideIcon;
@@ -77,6 +77,10 @@ const ZONES: Zone[] = [
   { id: 'chat', label: 'Chat', href: '/workspace', icon: MessageSquare, match: ['/workspace', '/home', '/inbox', '/social'] },
   { id: 'tasks', label: 'Tasks', href: '/swarm', icon: Network, match: ['/swarm', '/traces', '/analytics', '/schedules', '/calendar'] },
   { id: 'files', label: 'Files', href: '/files', icon: FileText, match: ['/files', '/knowledge'] },
+  // PR E (Phase 10) — Company Brain zone: the product graph interface.
+  // `/company` is the profile/ingestion landing; `/company/graph` is the
+  // entity-graph + claims + review queue. Both highlight this zone.
+  { id: 'brain', label: 'Company Brain', href: '/company/graph', icon: Brain, match: ['/company'] },
   { id: 'setup', label: 'Setup', href: '/integrations', icon: Plug, match: ['/integrations', '/connectors', '/skills', '/builder', '/settings', '/billing'] },
   { id: 'hyperagent', label: 'HyperAgent', href: '/hyperagent', icon: Activity, match: ['/hyperagent'], gate: 'reviewerOrAdmin' },
   { id: 'audit', label: 'Audit', href: '/audit', icon: ScrollText, match: ['/audit', '/admin'], gate: 'reviewerOrAdmin' },
