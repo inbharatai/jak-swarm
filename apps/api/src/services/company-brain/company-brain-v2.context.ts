@@ -44,6 +44,15 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
    *
    * Rule: **No relevant result → empty governed context.** The previous
    * "inject the 15 most-recent entities" recency fallback is removed.
+   *
+   * Error contract: an empty *result* returns an empty package (no recency
+   * fallback); a retrieval *error* (missing Graph V2 tables, DB failure)
+   * PROPAGATES — the provider factory catches it, logs a warn, and returns
+   * null so the agent degrades to the approved CompanyProfile alone. Per-query
+   * `.catch(() => [])` swallows are intentionally absent: silently turning a
+   * hard failure into an empty-but-quiet package would hide the failure
+   * ("never silently catch important failures"). The boot probe
+   * `probeAvailability` is the only deliberate catch (boolean → telemetry).
    */
   async getContextPackage(input: {
     tenantId: string;
@@ -119,7 +128,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
             AND a."normalizedAlias" = ANY($2::TEXT[])`,
         input.tenantId,
         aliasTokens,
-      ).catch(() => [] as CompanyEntityV2Row[]);
+      );
       addCandidates(aliasRows, { exactAlias: true });
     }
 
@@ -137,7 +146,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
           LIMIT 50`,
         input.tenantId,
         patterns,
-      ).catch(() => [] as CompanyEntityV2Row[]);
+      );
       addCandidates(idRows, { identifier: true });
     }
 
@@ -157,7 +166,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
          LIMIT 30`,
         input.tenantId,
         search,
-      ).catch(() => [] as Array<{ id: string; rank: number } & CompanyEntityV2Row>);
+      );
       addCandidates(ftsRows.map((r) => ({ ...r })) as CompanyEntityV2Row[], { keywordRank: 1 });
       // Re-apply the actual rank magnitude (ts_rank is tiny; normalize to [0,1]).
       for (const r of ftsRows) {
@@ -191,7 +200,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
           LIMIT 60`,
         input.tenantId,
         seedIds,
-      ).catch(() => [] as Array<{ sourceEntityId: string; targetEntityId: string }>);
+      );
       // Collect the "other" endpoint for every edge touching a seed.
       const seedSet = new Set(seedIds);
       const neighborIds = new Set<string>();
@@ -206,7 +215,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
             LIMIT 10`,
           input.tenantId,
           [...neighborIds],
-        ).catch(() => [] as CompanyEntityV2Row[]);
+        );
         addCandidates(neighborEntities, { graphNeighbor: true });
       }
     }
@@ -275,7 +284,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
             ORDER BY CASE "status" WHEN 'active' THEN 0 ELSE 1 END, "authorityScore" DESC, "updatedAt" DESC
             LIMIT 80`,
           input.tenantId, visibleIds,
-        ).catch(() => [] as CompanyClaimRow[]),
+        ),
         this.query<CompanyEdgeRow>(
           `SELECT * FROM "company_edges"
             WHERE "tenantId" = $1 AND "status" IN ('active','disputed')
@@ -283,14 +292,14 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
             ORDER BY "confidence" DESC, "updatedAt" DESC
             LIMIT 80`,
           input.tenantId, visibleIds,
-        ).catch(() => [] as CompanyEdgeRow[]),
+        ),
         this.query<{ claimId: string; artifactId: string }>(
           `SELECT "claimId", "artifactId" FROM "company_claim_evidence"
             WHERE "tenantId" = $1 AND "claimId" IN (
               SELECT "id" FROM "company_claims" WHERE "tenantId" = $1 AND "subjectEntityId" = ANY($2::TEXT[]) AND "status" IN ('active','disputed')
             )`,
           input.tenantId, visibleIds,
-        ).catch(() => [] as Array<{ claimId: string; artifactId: string }>),
+        ),
       ]);
 
       const evidenceByClaim = new Map<string, string[]>();
