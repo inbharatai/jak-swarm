@@ -9,13 +9,13 @@ import { createCompanyBrainProcessor } from './company-brain-v2.processing.js';
 const legacyRoutes: FastifyPluginAsync = async (fastify) => {
   const legacy = new CompanyOperatingLayerService(fastify.db, fastify.log);
   const brain = new CompanyBrainV2Service(fastify.db, fastify.log);
-  const processor = createCompanyBrainProcessor(legacy, brain, fastify.log);
+  const processor = createCompanyBrainProcessor(fastify.db, legacy, brain, fastify.log);
   const write = fastify.requireRole ? [fastify.requireRole(...writeRoles)] : [];
   const review = fastify.requireRole ? [fastify.requireRole(...reviewRoles)] : [];
 
   fastify.post('/company/artifacts', { preHandler: [fastify.authenticate, ...write] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const data = body(createArtifactSchema, request, reply); if (!data) return;
-    try { const artifact = await legacy.createArtifact({ tenantId: request.user.tenantId, userId: request.user.userId, ...data }); processor.schedule(request.user.tenantId, request.user.userId, artifact.id); return reply.status(201).send(ok({ artifact })); }
+    try { const artifact = await legacy.createArtifact({ tenantId: request.user.tenantId, userId: request.user.userId, ...data }); void processor.schedule(request.user.tenantId, request.user.userId, artifact.id); return reply.status(201).send(ok({ artifact })); }
     catch (error_) { return fail(reply, error_, 'COMPANY_ARTIFACT_CREATE_FAILED'); }
   });
   fastify.get('/company/artifacts', { preHandler: [fastify.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
