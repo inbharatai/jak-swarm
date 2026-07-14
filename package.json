@@ -42,10 +42,10 @@
     "@types/node": "^22.20.1",
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.63.0",
-    "eslint": "^9.39.4",
-    "prettier": "^3.9.4",
+    "eslint": "^10.7.0",
+    "prettier": "^3.9.5",
     "prisma": "^6.19.3",
-    "turbo": "^2.10.3",
+    "turbo": "^2.10.5",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   },
