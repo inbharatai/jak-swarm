@@ -62,7 +62,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Commit regenerated lockfile back to the PR
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(deps): regenerate pnpm-lock.yaml for Vercel frozen-install parity"
           file_pattern: pnpm-lock.yaml
