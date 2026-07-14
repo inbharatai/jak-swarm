@@ -17,19 +17,31 @@ import type {
  * Minimal Prisma client subset required by the CRM adapter.
  * Avoids importing the full PrismaClient type (which lives in @jak-swarm/db).
  */
-interface CrmPrisma {
+export interface CrmPrisma {
   crmContact: {
     findMany: (args: any) => Promise<any[]>;
-    findUniqueOrThrow: (args: any) => Promise<any>;
+    // findFirstOrThrow (not findUniqueOrThrow) because tenant isolation pairs
+    // `id` with `tenantId`, and `[tenantId, id]` is NOT a @@unique — only
+    // `[tenantId, email]` is. findUniqueOrThrow cannot accept a non-unique
+    // composite, so every record-specific read goes through findFirstOrThrow
+    // with `where: { id, tenantId }`.
+    findFirstOrThrow: (args: any) => Promise<any>;
     update: (args: any) => Promise<any>;
+    updateMany: (args: any) => Promise<{ count: number }>;
   };
   crmNote: {
     create: (args: any) => Promise<any>;
   };
   crmDeal: {
     findMany: (args: any) => Promise<any[]>;
+    findFirstOrThrow: (args: any) => Promise<any>;
     update: (args: any) => Promise<any>;
+    updateMany: (args: any) => Promise<{ count: number }>;
   };
+  // Used by createNote to verify the parent contact's tenant AND attach the
+  // note + touch lastActivity atomically — so a cross-tenant contactId can
+  // never get a note pinned to it, even under concurrency.
+  $transaction: (fn: (tx: any) => Promise<any>) => Promise<any>;
 }
 
 function mapContact(row: any): CRMContact {
@@ -103,8 +115,12 @@ export class PrismaCRMAdapter implements CRMAdapter {
   }
 
   async getContact(id: string): Promise<CRMContact> {
-    const row = await this.db.crmContact.findUniqueOrThrow({
-      where: { id },
+    // Tenant-scoped read: a cross-tenant id matches 0 rows → throws
+    // `P2025` (findFirstOrThrow found no record). The error is identical to
+    // the one raised for a truly-absent id, so a caller cannot infer whether
+    // the record exists in another tenant (no existence oracle).
+    const row = await this.db.crmContact.findFirstOrThrow({
+      where: { id, tenantId: this.tenantId },
       include: { notes: true },
     });
     return mapContact(row);
@@ -141,9 +157,20 @@ export class PrismaCRMAdapter implements CRMAdapter {
     if (updates.assignedTo !== undefined) data.assignedTo = updates.assignedTo;
     data.lastActivity = new Date();
 
-    const row = await this.db.crmContact.update({
-      where: { id },
+    // Tenant-scoped mutation: updateMany with `where: { id, tenantId }` so a
+    // cross-tenant id matches 0 rows (count 0) instead of silently mutating
+    // another tenant's record. We then re-read through the same tenant-scoped
+    // filter to return the updated row — never a bare `update({ where: { id } })`,
+    // which would ignore the tenant boundary.
+    const result = await this.db.crmContact.updateMany({
+      where: { id, tenantId: this.tenantId },
       data,
+    });
+    if (result.count === 0) {
+      throw new Error(`CRM contact ${id} not found for tenant ${this.tenantId}`);
+    }
+    const row = await this.db.crmContact.findFirstOrThrow({
+      where: { id, tenantId: this.tenantId },
       include: { notes: true },
     });
     return mapContact(row);
@@ -155,15 +182,25 @@ export class PrismaCRMAdapter implements CRMAdapter {
     authorId: string,
     authorName: string,
   ): Promise<CRMNote> {
-    const row = await this.db.crmNote.create({
-      data: { contactId, content, authorId, authorName },
+    // CrmNote has NO tenantId column — its tenant is inherited from the parent
+    // CrmContact. So before attaching a note we MUST prove the parent contact
+    // belongs to THIS tenant, and do it in the SAME transaction as the note
+    // create + lastActivity touch. Without this, a cross-tenant contactId
+    // supplied by an untrusted caller would get a note pinned to another
+    // tenant's contact (an IDOR on the note relation).
+    return this.db.$transaction(async (tx) => {
+      await tx.crmContact.findFirstOrThrow({
+        where: { id: contactId, tenantId: this.tenantId },
+      });
+      const row = await tx.crmNote.create({
+        data: { contactId, content, authorId, authorName },
+      });
+      await tx.crmContact.update({
+        where: { id: contactId },
+        data: { lastActivity: new Date() },
+      });
+      return mapNote(row);
     });
-    // Touch the contact's lastActivity
-    await this.db.crmContact.update({
-      where: { id: contactId },
-      data: { lastActivity: new Date() },
-    });
-    return mapNote(row);
   }
 
   async listDeals(contactId?: string): Promise<CRMDeal[]> {
@@ -182,9 +219,18 @@ export class PrismaCRMAdapter implements CRMAdapter {
     const data: any = { stage };
     if (notes !== undefined) data.notes = notes;
 
-    const row = await this.db.crmDeal.update({
-      where: { id: dealId },
+    // Tenant-scoped mutation: CrmDeal carries its own tenantId, so updateMany
+    // with `where: { id, tenantId }` confines the write to this tenant. A
+    // cross-tenant dealId matches 0 rows → throw, no silent cross-tenant edit.
+    const result = await this.db.crmDeal.updateMany({
+      where: { id: dealId, tenantId: this.tenantId },
       data,
+    });
+    if (result.count === 0) {
+      throw new Error(`CRM deal ${dealId} not found for tenant ${this.tenantId}`);
+    }
+    const row = await this.db.crmDeal.findFirstOrThrow({
+      where: { id: dealId, tenantId: this.tenantId },
     });
     return mapDeal(row);
   }
