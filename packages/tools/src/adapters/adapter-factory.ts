@@ -71,6 +71,122 @@ export function hasRealAdapters(): boolean {
   return resolveGmailCredentials() !== null;
 }
 
+// ─── Per-tenant email/calendar credential resolution ──────────────────────
+// These replace the process-global module-singleton adapters
+// (`const emailAdapter = getEmailAdapter()` at builtin/index.ts:13) that
+// bound the WHOLE process to one tenant's Gmail/CalDAV credentials — a
+// rule-7 violation (process-global customer credentials in multi-tenant
+// mode). Each tool call now resolves its own adapter from the trusted
+// per-tenant context, mirroring {@link resolveCrmAdapterForContext}.
+
+/**
+ * Per-tenant IMAP/SMTP credentials carried on the tool execution context.
+ * The app-password shape that {@link GmailImapAdapter} consumes; resolved
+ * and decrypted by apps/api's credential service from the tenant's
+ * Integration row. Must never come from a process-global env var in a
+ * multi-tenant deployment.
+ */
+export interface TenantEmailCredentials {
+  email: string;
+  appPassword: string;
+}
+
+/**
+ * Per-tenant CalDAV credentials carried on the tool execution context.
+ * Same tenant-isolation contract as {@link TenantEmailCredentials}.
+ */
+export interface TenantCalendarCredentials {
+  email: string;
+  appPassword: string;
+}
+
+/**
+ * The minimal slice of {@link ToolExecutionContext} the email resolver reads.
+ * Kept structural so this factory stays decoupled from @jak-swarm/shared.
+ */
+export interface EmailResolutionContext {
+  /** Trusted tenant id, set by the workflow/auth layer — never from request input. */
+  tenantId: string;
+  /** Per-tenant decrypted Gmail credentials, when the tenant has connected them. */
+  emailCredentials?: TenantEmailCredentials;
+}
+
+/**
+ * The minimal slice of {@link ToolExecutionContext} the calendar resolver reads.
+ * Kept structural so this factory stays decoupled from @jak-swarm/shared.
+ */
+export interface CalendarResolutionContext {
+  /** Trusted tenant id, set by the workflow/auth layer — never from request input. */
+  tenantId: string;
+  /** Per-tenant decrypted CalDAV credentials, when the tenant has connected them. */
+  calendarCredentials?: TenantCalendarCredentials;
+}
+
+/**
+ * Resolve an email adapter for a single tool execution, scoped to the
+ * calling tenant. Replaces the process-global singleton `getEmailAdapter()`
+ * that previously bound the whole process to one tenant's Gmail.
+ *
+ * Resolution order:
+ *  1. **Per-tenant context credentials**: when the context carries the
+ *     tenant's decrypted Gmail app-password, build the GmailImapAdapter.
+ *  2. **Labelled single-tenant dev mode** (`JAK_EMAIL_SINGLE_TENANT_DEV=1`):
+ *     the env-keyed adapter (reads GMAIL_EMAIL/GMAIL_APP_PASSWORD). Explicit
+ *     opt-in for local scripts/tests ONLY — never the default in a
+ *     multi-tenant deployment, because env-keyed creds are shared across
+ *     all tenants (rule-7).
+ *  3. **Unconfigured**: a stub that throws on use — no silent fallthrough
+ *     to another tenant's credentials or to the operator's env Gmail.
+ *
+ * Security property: without the opt-in flag, process-env Gmail credentials
+ * are NEVER used. This prevents a multi-tenant deploy that forgot to
+ * populate `context.emailCredentials` for a tenant from silently sending
+ * email as the operator. Single-tenant dev that relies on env Gmail sets
+ * the flag (documented breaking change, justified by rule-7).
+ */
+export function resolveEmailAdapterForContext(context: EmailResolutionContext): EmailAdapter {
+  // 1. Per-tenant context credentials (decrypted by apps/api credential service).
+  const creds = context.emailCredentials;
+  if (creds?.email && creds?.appPassword) {
+    return new GmailImapAdapter(creds);
+  }
+
+  // 2. Labelled single-tenant dev mode (explicit opt-in).
+  if (process.env['JAK_EMAIL_SINGLE_TENANT_DEV'] === '1') {
+    const envCreds = resolveGmailCredentials();
+    if (envCreds) return new GmailImapAdapter(envCreds);
+  }
+
+  // 3. No tenant-specific Gmail configured — fail loudly, never fall back to
+  //    a process-global adapter that could send as another tenant.
+  return new UnconfiguredEmailAdapter();
+}
+
+/**
+ * Resolve a calendar adapter for a single tool execution, scoped to the
+ * calling tenant. Same resolution contract as
+ * {@link resolveEmailAdapterForContext} (per-tenant context → labelled
+ * single-tenant dev env opt-in `JAK_CALENDAR_SINGLE_TENANT_DEV=1` →
+ * Unconfigured stub that throws on use).
+ */
+export function resolveCalendarAdapterForContext(context: CalendarResolutionContext): CalendarAdapter {
+  // 1. Per-tenant context credentials (decrypted by apps/api credential service).
+  const creds = context.calendarCredentials;
+  if (creds?.email && creds?.appPassword) {
+    return new CalDAVCalendarAdapter(creds);
+  }
+
+  // 2. Labelled single-tenant dev mode (explicit opt-in).
+  if (process.env['JAK_CALENDAR_SINGLE_TENANT_DEV'] === '1') {
+    const envCreds = resolveGmailCredentials();
+    if (envCreds) return new CalDAVCalendarAdapter(envCreds);
+  }
+
+  // 3. No tenant-specific calendar configured — fail loudly, never fall back to
+  //    a process-global adapter that could act as another tenant.
+  return new UnconfiguredCalendarAdapter();
+}
+
 /**
  * Get a CRM adapter backed by Prisma/PostgreSQL.
  * Requires a Prisma client and tenant ID (for row-level isolation).
