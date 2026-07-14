@@ -125,7 +125,7 @@ Post-build production hardening roadmap:
 
 ## What JAK Swarm Does
 
-JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors** (13 external SaaS connectors in `INTEGRATIONS_CORE` + 9 infrastructure adapters in `INTEGRATIONS_INFRA`, each surfaced as a UI tile with an honest live status badge; 21 MCP providers auto-mapped at runtime, plus Remotion and Blender connector manifests).
+JAK Swarm is a Gemini-powered Agentic Business Operating Layer for product and engineering execution. It captures evidence from company artifacts, maps decisions / tasks / risks / owners / customer signals / code changes, detects execution drift, generates agent-executable specs, and routes approved work through **38 specialist agents** + **122 classified tools** + **22 connectors** (13 external SaaS connectors in `INTEGRATIONS_CORE` + 9 infrastructure adapters in `INTEGRATIONS_INFRA`, each surfaced as a UI tile with an honest live status badge; 21 MCP providers auto-mapped at runtime, plus Remotion and Blender connector manifests). Of those 22 connectors plus 3 adapters that ship without a UI tile, **9 are production-ready, 4 beta, 4 partial, and 8 placeholder** — see [`docs/integration-maturity-matrix.md`](docs/integration-maturity-matrix.md) for the per-connector breakdown.
 
 ### What's unique
 

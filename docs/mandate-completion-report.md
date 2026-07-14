@@ -1,4 +1,6 @@
-# JAK Swarm Production Mandate — Final Completion Report (24 items)
+# JAK Swarm Production Mandate — Integration Hardening Milestone Report (24 items)
+
+> **Report scope (renamed 2026-07-14):** this was titled "Final Completion Report." It is renamed to "Integration Hardening Milestone Report" because the mandate's P1 items remain open — the live production canary (Phase 13) is a named stop awaiting owner credentials, and several live-runtime seams (real artifact harvesting, failure-class wiring, live approval interrupt/resume E2E, external Shield transport) are integration-proven, not production-proven. This report documents a completed integration-hardening milestone, not a finished product.
 
 **Mandate:** finish JAK Swarm as a coherent production-grade Company Brain + Hyperagent OS — every capability reachable from live runtime, tenant-safe, transactionally correct, observable, evidence-backed, tested end-to-end, honestly documented, usable through the product UI. 14 phases (0–13) → 7 focused PRs (A–G).
 
@@ -8,7 +10,7 @@
 
 ## The 24 items
 
-**1. PR A — Company Brain retrieval correctness + durable worker (Phase 0 + 1 + 2) — MERGED (#146).** Phase 0 audit (`docs/current-system-truth-audit.md`); Phase 1 removed the recency fallback + built the measured hybrid retrieval pipeline + typed context package + provider-aware token budget + retrieval fixtures; Phase 2 replaced the API-local `setImmediate`/`setInterval`/in-memory `running` flag with a leased, idempotent, dead-lettering `company_brain_jobs` durable worker + killed the scan-200. Real-Postgres concurrency tests added.
+**1. PR A — Company Brain retrieval correctness + durable worker (Phase 0 + 1 + 2) — MERGED (#146).** Phase 0 audit (`docs/current-system-truth-audit.md`); Phase 1 removed the recency fallback + built the measured multi-signal lexical+graph retrieval pipeline (alias + stable-identifier ILIKE + ts_rank FTS + 1-hop graph expansion; no vector/embedding component) + typed context package + provider-aware token budget + retrieval fixtures; Phase 2 replaced the API-local `setImmediate`/`setInterval`/in-memory `running` flag with a leased, idempotent, dead-lettering `company_brain_jobs` durable worker + killed the scan-200. Real-Postgres concurrency tests added.
 
 **2. PR B — Entity identity + access control (Phase 3 + Phase 5) — MERGED (#147).** 6-tier entity identity hierarchy + rejected-candidate preservation + reviewer comparison surface; typed temporal claims + versioned predicate policies + claim reconciliation locking; access-control taint lineage + adversarial test matrix. The `mergeEntities` single-transaction atomicity was deferred to PR E (honestly flagged at the time).
 

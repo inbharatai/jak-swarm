@@ -21,7 +21,7 @@ tools layer without a dedicated UI tile.
 | Slack | production-ready | MCP + webhook verification in API | Signature verification and workflow bridging are implemented. |
 | GitHub | beta | MCP provider tools + REST fallback | Depends on MCP server/tool availability and provider-side contracts. |
 | Notion | beta | MCP provider tools | Depends on MCP server/tool availability and provider-side contracts. |
-| Google Drive | placeholder | UI tile only | No runtime adapter wired; do not rely on this for production. |
+| Google Drive | partial | Auto-sync ingestion job (`company-connector-sync`) | Auto-syncs on a 5-minute schedule (`COMPANY_SYNC_PROVIDERS = GITHUB, GMAIL, GOOGLE_DRIVE`); no generic tool adapter surfaced, so on-demand agent calls are not supported. |
 | Linear | placeholder | UI tile only | No runtime adapter wired. |
 | HubSpot | partial | Provider entry exists; adapter depth varies | Validate tenant-specific flows before production dependency. |
 | Stripe | placeholder | UI tile only | Billing flows use Stripe, but no generic tenant-connector is wired. |
@@ -30,6 +30,7 @@ tools layer without a dedicated UI tile.
 | ClickUp | placeholder | UI tile only | No runtime adapter wired. |
 | SendGrid | placeholder | UI tile only | Outbound email ships via Gmail IMAP/SMTP, not SendGrid. |
 | Discord | placeholder | UI tile only | No runtime adapter wired. |
+| WhatsApp | production-ready | Native bridge (not MCP) — `apps/api/src/routes/whatsapp.routes.ts` | Register / verify / send / receive via a bridge token; number verification is manual per tenant. |
 
 ### Infrastructure / MCP adapters and search backends
 
@@ -61,10 +62,10 @@ The first 9 rows below are the infrastructure adapters surfaced as UI tiles (`IN
 ## Summary counts (used by the landing page)
 
 - **22 Connectors** = 13 external SaaS connectors (`INTEGRATIONS_CORE`, includes WhatsApp native bridge) + 9 infrastructure adapters (`INTEGRATIONS_INFRA`). Most are UI tiles pending real adapters; only the subset marked `production-ready` or `beta` has a runtime path today.
-- **production-ready**: Slack, Gmail, Google Calendar, PostgreSQL, Puppeteer, Filesystem, Fetch, Memory (8)
+- **production-ready**: Slack, WhatsApp, Gmail, Google Calendar, PostgreSQL, Puppeteer, Filesystem, Fetch, Memory (9)
 - **beta**: GitHub, Notion, Brave Search, Sequential Thinking (4)
-- **partial**: HubSpot, Salesforce, CRM fallback (3)
-- **placeholder**: Google Drive, Linear, Stripe, Airtable, ClickUp, SendGrid, Discord, Supabase, Sentry (9)
+- **partial**: Google Drive (auto-sync ingestion only), HubSpot, Salesforce, CRM fallback (4)
+- **placeholder**: Linear, Stripe, Airtable, ClickUp, SendGrid, Discord, Supabase, Sentry (8)
 
 ## Policy
 - Do not label an integration as production-ready unless runtime behavior and adapter depth are validated.

@@ -161,4 +161,4 @@ To proceed past the §2 dry-run into §3, the owner must provide:
 3. **Go/no-go for Stage 5 specifically** — the self-learning canary is the highest-blast-radius step. The owner must explicitly approve a 1%-traffic, 7-day, human-promote-only canary on a named tenant before `hyperAgentEnabled` is set for that tenant.
 4. **A second pair of eyes on the Shield keypair** — the Ed25519 signing key is the tamper-evidence root for every `SHIELD_DECISION_SIGNED` row. The owner should generate + store it (not me), and confirm the public verification key is the one mounted.
 
-Until those are in hand, the live canary does not start. The §2 dry-run + this plan + the final completion report are the deliverables this session can produce for Phase 13.
+Until those are in hand, the live canary does not start. The §2 dry-run + this plan + the integration hardening milestone report (`docs/mandate-completion-report.md`) are the deliverables this session can produce for Phase 13.

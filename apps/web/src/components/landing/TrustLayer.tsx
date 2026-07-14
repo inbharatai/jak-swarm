@@ -26,7 +26,7 @@ interface TrustPoint {
 const POINTS: TrustPoint[] = [
   {
     title: 'Human approval gates',
-    body: 'Every external action — send, post, deploy, charge — pauses for an inline approval card. Replays with a different payload are rejected.',
+    body: 'Every approval-classified action — writes, sends, posts, deploys, charges — pauses for an inline approval card. Replays with a different payload are rejected.',
     proof: 'approval-node.ts · payload-bound',
     color: '#fbbf24',
     iconPath: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12z',
@@ -47,7 +47,7 @@ const POINTS: TrustPoint[] = [
   },
   {
     title: 'Tamper-evident audit trail',
-    body: 'Every workflow run, every approval decision, every external action emits an audit log row. Final evidence packs are HMAC-SHA256 signed.',
+    body: 'Every workflow run, every approval decision, every external action emits an audit log row. Final evidence packs are HMAC-SHA256 signed when an evidence signing key is configured.',
     proof: 'audit-log plugin · bundle.service.ts',
     color: '#fb923c',
     iconPath: 'M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z',
@@ -84,7 +84,7 @@ export default function TrustLayer() {
             Built for controlled autonomy.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-300 font-sans leading-relaxed">
-            Six guarantees, every one wired into the runtime. Not policies. Not promises. Code paths reviewers can grep.
+            Six guarantees — enforced, config-dependent, or observational — each backed by a code path reviewers can grep.
           </p>
         </div>
 
