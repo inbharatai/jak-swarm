@@ -9,7 +9,7 @@ import LandingNavClient from '@/components/landing/LandingNavClient';
 // code-split via next/dynamic (ssr:true default → still pre-rendered into the
 // static HTML for SEO, but each section's JS lands in its own chunk and loads
 // after hydration). Skeletons flash only during client-side navigation.
-const HeroCockpit = dynamic(() => import('@/components/landing/HeroCockpit'));
+const EngineDuo = dynamic(() => import('@/components/landing/EngineDuo'));
 const PainSection = dynamic(() => import('@/components/landing/PainSection'), { loading: () => <SectionSkeleton /> });
 const CompanyBrain = dynamic(() => import('@/components/landing/CompanyBrain'), { loading: () => <SectionSkeleton /> });
 const Hyperagent = dynamic(() => import('@/components/landing/Hyperagent'), { loading: () => <SectionSkeleton /> });
@@ -304,15 +304,14 @@ export default function HomePage() {
               JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through specialist agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
             </p>
 
-            {/* Capability strip. Names the two flagship engines (Company Brain +
-                 Hyperagent) alongside JAK Shield, the 38-agent runtime, and the
-                 approval + audit surfaces. Every term maps to real product code. */}
+            {/* Capability strip. Leads with the two flagship engines (Company
+                 Brain + Hyperagent) alongside JAK Shield and the approval +
+                 audit surfaces. Every term maps to real product code. */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
               {[
                 'Company Brain',
                 'Hyperagent',
                 'JAK Shield',
-                '38 Agents',
                 'Approvals',
                 'Audit Trail',
               ].map((pillar) => (
@@ -379,23 +378,22 @@ export default function HomePage() {
               Controlled beta · free for 30 days · daily caps to protect your budget · no credit card required
             </p>
 
-            {/* Hero cockpit mockup — shows the full loop (command → plan →
-                agents → approval → output → audit) so visitors see the
-                actual product, not generic abstract cards. */}
+            {/* The hero's primary visual: JAK's two flagship engines side by
+                side. Replaces the old single-pane cockpit typing demo so the
+                first viewport shows the actual IP — Company Brain and the
+                Hyperagent — each linked to its full section below. */}
             <div className="mt-12 sm:mt-16">
-              <HeroCockpit />
+              <EngineDuo />
               <p className="mt-4 text-[11px] sm:text-xs text-slate-500 font-mono tabular-nums">
-                Live preview of the cockpit · same surface every workflow runs through
+                Two engines — one closed loop. Explore each below.
               </p>
             </div>
           </div>
         </section>
 
-        {/* ── 2. Pain framing — why fragmented context breaks execution. */}
-        <PainSection />
-
-        {/* ── 3. Company Brain — Engine 01: evidence -> graph -> drift -> specs.
-             The first flagship engine, branded and linked to /company. */}
+        {/* ── 2. Company Brain — Engine 01: evidence -> graph -> drift -> specs.
+             The first flagship engine, branded and linked to /company. Now
+             the first content section after the hero — the engines lead. */}
         <CompanyBrain />
 
         {/* ── 3b. Hyperagent — Engine 02: self-healing re-plan + governed
@@ -416,6 +414,13 @@ export default function HomePage() {
 
         {/* ── 6. Outcomes (4 product-proof cards) ──────────────────────── */}
         <ShowTheWork />
+
+        {/* ── 6b. Pain framing — why fragmented context breaks execution.
+             Moved below the engines + outcomes so the page leads with what
+             JAK *is* (the two engines + proof) before the why-it-matters
+             framing. Kept (not deleted): the e2e QA gate expects this
+             section's aria-label + "Scattered context creates drift" copy. */}
+        <PainSection />
 
         {/* ── 7. Trust Layer — 6 grep-able guarantees ──────────────────── */}
         <TrustLayer />

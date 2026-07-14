@@ -152,6 +152,51 @@ describe('Landing — Hyperagent (Engine 02, integration-proven not production-p
   });
 });
 
+describe('Landing — EngineDuo (hero, the two engines lead the first viewport)', () => {
+  // EngineDuo replaced the old HeroCockpit typing demo as the hero's primary
+  // visual, so the first viewport shows JAK's actual IP (Company Brain +
+  // Hyperagent) instead of a generic workflow animation. This block pins that
+  // the hero leads with both engines, honestly, with real evidence paths.
+  const DUO = 'apps/web/src/components/landing/EngineDuo.tsx';
+
+  it('EngineDuo is exported and rendered in the hero on the live homepage', () => {
+    expect(contains('apps/web/src/components/landing/index.ts', /export \{ default as EngineDuo \}/)).toBe(true);
+    expect(contains('apps/web/src/app/page.tsx', /<EngineDuo\s*\/>/)).toBe(true);
+  });
+
+  it('names both engines and links each to its full section anchor', () => {
+    const src = read(DUO);
+    expect(src).toMatch(/Engine 01/);
+    expect(src).toMatch(/Engine 02/);
+    expect(src).toMatch(/Company Brain/);
+    expect(src).toMatch(/Hyperagent/);
+    // Anchor CTAs scroll to the engine sections below. The component stores
+    // the targets in its ENGINES data array (href: '#...') and renders them
+    // via href={engine.href}, so assert the data-array form.
+    expect(src).toMatch(/href: '#company-os'/);
+    expect(src).toMatch(/href: '#hyperagent'/);
+  });
+
+  it('is honest — no production-readiness overclaim, no banned autonomy phrasing', () => {
+    const src = read(DUO);
+    // Hyperagent half must carry the same honest qualifier as its full section.
+    expect(src).toMatch(/not production-proven|integration-proven|default-off/i);
+    // Company Brain half must state the no-vector retrieval truth.
+    expect(src).toMatch(/no vector\/embedding component/i);
+    // No banned autonomy overclaim.
+    expect(src).not.toMatch(/autonomous multi-agent AI platform/i);
+  });
+
+  it('both engine evidence paths exist on disk', () => {
+    const src = read(DUO);
+    const paths = Array.from(src.matchAll(/evidencePath:\s*'([^']+)'/g)).map((m) => m[1]!);
+    expect(paths.length).toBeGreaterThanOrEqual(2);
+    for (const p of paths) {
+      expect(exists(p), `evidencePath ${p} missing on disk`).toBe(true);
+    }
+  });
+});
+
 describe('Landing — HowItWorks (7-step pipeline)', () => {
   const HOW = 'apps/web/src/components/landing/HowItWorks.tsx';
 
@@ -374,6 +419,7 @@ describe('Landing — public marketing copy stays honest', () => {
       'apps/web/src/components/landing/JAKShield.tsx',
       'apps/web/src/components/landing/CompanyBrain.tsx',
       'apps/web/src/components/landing/Hyperagent.tsx',
+      'apps/web/src/components/landing/EngineDuo.tsx',
       'apps/web/src/components/landing/ShowTheWork.tsx',
       'apps/web/src/components/landing/TrustLayer.tsx',
       'apps/web/src/components/landing/PremiumCTA.tsx',

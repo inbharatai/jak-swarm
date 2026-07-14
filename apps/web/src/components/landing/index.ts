@@ -1,24 +1,26 @@
 // The set of components rendered on the homepage. The page leads with JAK's
 // two flagship engines — Company Brain and Hyperagent — then the 7-step
-// pipeline, cockpit, outcomes, trust, JAK Shield, audit, pricing, and CTA:
+// pipeline, cockpit, outcomes, pain framing, trust, JAK Shield, audit,
+// pricing, and CTA:
 //
-//   Hero (with HeroCockpit)
-//   PainSection          — why fragmented context breaks execution
-//   CompanyBrain         — Engine 01: evidence graph → drift → specs (was WhatJakDoes)
-//   Hyperagent           — Engine 02: self-healing re-plan + governed self-learning
-//   HowItWorks           — 7-step pipeline
-//   ProductCockpit       — premium dashboard mockup
-//   ShowTheWork          — 4 outcome proof cards
-//   TrustLayer           — 6 trust guarantees
-//   JAKShield            — security/trust layer brand
-//   Audit (in page.tsx)  — compliance, moved below the trust layer
+//   Hero (with EngineDuo)   — the two engines side by side as the hero visual
+//   CompanyBrain            — Engine 01: evidence graph → drift → specs (was WhatJakDoes)
+//   Hyperagent              — Engine 02: self-healing re-plan + governed self-learning
+//   HowItWorks              — 7-step pipeline
+//   ProductCockpit          — premium dashboard mockup (the /workspace surface)
+//   ShowTheWork             — 4 outcome proof cards
+//   PainSection             — why fragmented context breaks execution (moved below the engines)
+//   TrustLayer              — 6 trust guarantees
+//   JAKShield               — security/trust layer brand
+//   Audit (in page.tsx)     — compliance, moved below the trust layer
 //   Pricing (in page.tsx)
 //   PremiumCTA
 //
-// LiveDemo is intentionally NOT re-exported. CompanyBrain (renamed from
-// WhatJakDoes) is the evidence-backed Company Brain section rendered on the
-// homepage; it keeps the #company-os anchor for footer/nav compatibility.
-export { default as HeroCockpit } from './HeroCockpit';
+// EngineDuo replaces the old HeroCockpit typing demo so the first viewport
+// shows the actual IP (Company Brain + Hyperagent) instead of a generic
+// workflow animation. CompanyBrain (renamed from WhatJakDoes) keeps the
+// #company-os anchor for footer/nav compatibility.
+export { default as EngineDuo } from './EngineDuo';
 export { default as JAKShield } from './JAKShield';
 export { default as HowItWorks } from './HowItWorks';
 export { default as PainSection } from './PainSection';
