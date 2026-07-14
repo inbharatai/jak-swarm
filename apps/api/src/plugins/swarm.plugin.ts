@@ -27,6 +27,7 @@ import {
   type LockProvider,
 } from '../coordination/index.js';
 import { config } from '../config.js';
+import { decrypt as decryptCredentials } from '../utils/crypto.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -294,7 +295,7 @@ const swarmPlugin: FastifyPluginAsync = async (fastify) => {
         if (!providerDef || !integration.credentials?.accessTokenEnc) continue;
 
         try {
-          const creds = JSON.parse(integration.credentials.accessTokenEnc) as Record<string, string>;
+          const creds = JSON.parse(decryptCredentials(integration.credentials.accessTokenEnc)) as Record<string, string>;
           const config = providerDef.buildConfig(creds);
           // Use tenant-scoped MCP manager instead of global singleton
           const tenantMcp = getTenantMcpManager(integration.tenantId);

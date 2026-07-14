@@ -37,7 +37,7 @@ JAK Swarm is a working beta build (0.1.0-beta.0) of a Company Brain + Hyperagent
 
 Everything else — the 38 agents, 122 tools, 22 connectors, JAK Shield, the Google ADK/Gemini substrate — exists to carry those two engines safely into live work.
 
-> **Blunt beta truth.** This is a working beta build, not a finished enterprise product. Company Brain has the data model, API routes, dashboard surface, deterministic drift detector, agent spec generator, approval decision route, and audit foundation. Only GitHub, Gmail, and Google Drive auto-sync on a 5-minute schedule; the other 19 of 22 connectors are callable as agent tools but ingest evidence on-demand/manually. Hyperagent's self-healing core is integration-proven, but the live runtime seam still returns empty artifacts until it is wired (see the Hyperagent section). Enterprise SLA packaging, expanded observability, and the post-build production hardening roadmap remain open. API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle or provide free LLM API keys. See `docs/beta-release.md` for the full scope and go/no-go checklist.
+> **Blunt beta truth.** This is a working beta build, not a finished enterprise product. Company Brain has the data model, API routes, dashboard surface, deterministic drift detector, agent spec generator, approval decision route, and audit foundation. Only GitHub, Gmail, and Google Drive auto-sync on a 5-minute schedule; the other 19 of 22 connectors are callable as agent tools but ingest evidence on-demand/manually. Hyperagent's self-healing core is integration-proven, and the live runtime seam now harvests per-task failure classes + best-effort artifact ids (D1/D2 wired); the live LLM production canary remains the open stop (see the Hyperagent section). Enterprise SLA packaging, expanded observability, and the post-build production hardening roadmap remain open. API keys are required for external LLM providers (Gemini, OpenAI) — JAK does not bundle or provide free LLM API keys. See `docs/beta-release.md` for the full scope and go/no-go checklist.
 
 ---
 
@@ -77,7 +77,7 @@ The Hyperagent is the self-healing + self-learning layer on top of the swarm run
 | Component | Honest status |
 |---|---|
 | Pure-core spec executor (`spec-executor.ts`) | Shipped. Harvests artifacts with provenance; classifies failures; replans. Integration-proven with a deterministic stub `runPlan`. |
-| Live runtime seam (`spec-executor-runtime.ts`) | **OPEN EDGE.** Returns `artifacts: []`; `failureClassByTask` is not yet wired into `FinishedRun`. Integration-graph-proven at the live LangGraph level, **not production-proven.** Wiring this seam is the next code change that makes the Hyperagent honestly live. |
+| Live runtime seam (`spec-executor-runtime.ts`) | **D1/D2 WIRED.** Harvests per-task failure classes (`failureClassByTask`) from `state.failureDiagnoses` and best-effort artifact ids workers emit into `taskResults` via a pure `harvestRunEvidence` helper, spread into `FinishedRun`. Integration-graph-proven at the live LangGraph level, **not production-proven.** Full worker artifact emission + the live LLM canary remain open. |
 | `executeApprovedSpec` closed loop | REVIEWER-gated API route + service exist. The live LangGraph + LLM round-trip is env-blocked. |
 | AuditLog per-tenant HMAC row-chain | Shipped. |
 | `ShieldMcpClient` (Ed25519 signed decisions) | Live-instantiated behind `SHIELD_MCP_CANARY=1` — **observational canary: records signed decisions to the audit chain, does NOT gate execution.** |

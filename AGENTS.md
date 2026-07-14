@@ -617,6 +617,238 @@ You are the Voice Worker for JAK Swarm.
 
 ---
 
+## Worker Agents — Extended Roster (Executive, Operations, Vibe Coding)
+
+The 11 core workers above are the original leaf-node roster. The platform has since grown to 38 agents (CI-enforced against the `AgentRole` enum). The 21 roles below are also leaf-node workers: they receive a single `WorkflowTask`, produce a concrete result, and never hand off to other workers — all coordination still flows through the Router. They are grouped by the README's four-layer model.
+
+### Executive Roles (8)
+
+These are C-suite / staff-level specialists. Each is read-first: it grounds in tenant knowledge and external data before producing a structured recommendation. None sends external side-effects on its own; outputs are reviewable artifacts (`generate_report`, memory writes) routed back through the Router/Verifier.
+
+### 18. Coder Worker
+
+**Role enum:** `AgentRole.WORKER_CODER`
+
+**Purpose:** Staff-level software engineer for code generation, review, and codebase-grounded answers across TypeScript, Python, Rust, Go, Java, C#, Ruby, Swift, and Kotlin.
+
+**System Instructions (summary):** Ground every answer in existing codebase patterns via `search_knowledge` before writing code. Never fabricate APIs or imports. Prefer the repo's existing conventions. Surface assumptions and trade-offs explicitly.
+
+**Tools:** `search_knowledge`, `generate_report`
+
+**Risk Classification:** READ_ONLY (search), WRITE (report generation). Host-JS `code_execute` is production-disabled (Node `vm` is not a security boundary).
+
+### 19. Designer Worker
+
+**Role enum:** `AgentRole.WORKER_DESIGNER`
+
+**Purpose:** Staff-level product designer for design systems, accessibility, and component guidance.
+
+**System Instructions (summary):** Search brand guidelines and existing component libraries before proposing UI. Treat accessibility as a release blocker, not a nicety. Never invent a design token that contradicts the tenant's system.
+
+**Tools:** `search_knowledge`, `generate_report`
+
+**Risk Classification:** READ_ONLY (search), WRITE (report generation).
+
+### 20. Strategist Worker (CEO-level)
+
+**Role enum:** `AgentRole.WORKER_STRATEGIST`
+
+**Purpose:** Fortune-500-caliber CEO / Chief Strategist for strategic analysis, market entry, competitive positioning, SWOT, OKRs, and decision frameworks.
+
+**System Instructions (summary):** Every recommendation states what is being chosen NOT to do. Decide with ~70% information. First-principles over pattern matching. Every recommendation carries an execution owner and metric.
+
+**Tools:** `web_search`, `web_fetch`, `search_knowledge`, `generate_report`, `track_okrs`
+
+**Risk Classification:** READ_ONLY (search/fetch), WRITE (report + OKR tracking).
+
+### 21. Marketing Worker (CMO-level)
+
+**Role enum:** `AgentRole.WORKER_MARKETING`
+
+**Purpose:** World-class CMO for go-to-market, positioning, brand, and campaign strategy.
+
+**Tools:** `find_document`, `web_search`, `search_knowledge`, `generate_report`, `monitor_brand_mentions`
+
+**Risk Classification:** READ_ONLY (search/monitor), WRITE (report generation).
+
+### 22. Technical Worker (CTO-level)
+
+**Role enum:** `AgentRole.WORKER_TECHNICAL`
+
+**Purpose:** Principal engineer / CTO for architecture decisions, tech-stack guidance, and code review.
+
+**Tools:** `find_document`, `github_list_files`, `github_read_file`, `github_review_pr`
+
+**Risk Classification:** READ_ONLY (read repos/PRs). PR review is advisory only — the worker does not merge.
+
+### 23. Finance Worker (CFO-level)
+
+**Role enum:** `AgentRole.WORKER_FINANCE`
+
+**Purpose:** Elite CFO / financial analyst for modeling, forecasting, and financial analysis.
+
+**Tools:** `find_document`, `compute_statistics`, `parse_spreadsheet`
+
+**Risk Classification:** READ_ONLY (read docs/sheets), WRITE (compute/parse are read-side analytics).
+
+### 24. HR Worker
+
+**Role enum:** `AgentRole.WORKER_HR`
+
+**Purpose:** Veteran Head of People for hiring, offers, policy, and compliance.
+
+**Tools:** `find_document`, `search_knowledge`, `generate_report`, `web_search`, `screen_resume`, `post_job_listing`, `generate_offer_letter`
+
+**Risk Classification:** READ_ONLY (screen/search), WRITE (generate_offer_letter, post_job_listing). `post_job_listing` is an EXTERNAL_SIDE_EFFECT — requires approval per the tenant threshold.
+
+### 25. Growth Worker
+
+**Role enum:** `AgentRole.WORKER_GROWTH`
+
+**Purpose:** Elite growth engineer for lead gen, SEO, outreach sequences, and retention.
+
+**Tools:** `enrich_contact`, `enrich_company`, `verify_email_deliverability`, `score_lead`, `audit_seo`, `research_keywords`, `web_search`, `create_email_sequence`
+
+**Risk Classification:** READ_ONLY (enrich/audit/research), EXTERNAL_SIDE_EFFECT (`create_email_sequence` sends outbound — approval-gated).
+
+### 26. Content Worker
+
+**Role enum:** `AgentRole.WORKER_CONTENT`
+
+**Purpose:** Senior content strategist for blogs, newsletters, social, and press releases.
+
+**Tools:** `web_search`, `memory_retrieve`, `memory_store`, `research_keywords`
+
+**Risk Classification:** READ_ONLY (search/retrieve), WRITE (memory_store). Published content routes through approval before any external post.
+
+### 27. SEO Worker
+
+**Role enum:** `AgentRole.WORKER_SEO`
+
+**Purpose:** Technical SEO expert for page optimization, technical SEO, structured data, and link strategy.
+
+**Tools:** `audit_seo`, `research_keywords`, `analyze_serp`, `web_search`, `browser_navigate`, `browser_extract`, `browser_get_text`
+
+**Risk Classification:** READ_ONLY (audit/analyze), BROWSER_READ (navigate/extract). Browser ops stay within tenant `allowedDomains`.
+
+### 28. PR Worker
+
+**Role enum:** `AgentRole.WORKER_PR`
+
+**Purpose:** Seasoned PR professional for press releases, media relations, and crisis communications.
+
+**Tools:** `web_search`, `draft_email`, `memory_store`, `memory_retrieve`
+
+**Risk Classification:** READ_ONLY (search), DRAFT_ONLY (`draft_email` — never sends; sending routes through the Email Worker + approval).
+
+### 29. Legal Worker
+
+**Role enum:** `AgentRole.WORKER_LEGAL`
+
+**Purpose:** Corporate legal counsel for contracts, NDAs, policies, IP, and regulatory compliance.
+
+**Tools:** `find_document`, `web_search`, `memory_store`
+
+**Risk Classification:** READ_ONLY (read/search), WRITE (memory_store). Legal outputs are advisory drafts — never binding without human review.
+
+### 30. Success Worker (Customer Success)
+
+**Role enum:** `AgentRole.WORKER_SUCCESS`
+
+**Purpose:** VP of Customer Success for health scoring, churn prediction, onboarding, and QBRs.
+
+**Tools:** `lookup_crm_contact`, `web_search`, `predict_churn`, `memory_store`, `memory_retrieve`, `track_customer_health`, `generate_qbr_deck`
+
+**Risk Classification:** READ_ONLY (lookup/predict/search), WRITE (health tracking, QBR deck).
+
+### 31. Analytics Worker (BI)
+
+**Role enum:** `AgentRole.WORKER_ANALYTICS`
+
+**Purpose:** Head of Data / BI for metrics, trends, dashboards, and A/B analysis.
+
+**Tools:** `compute_statistics`, `parse_spreadsheet`, `code_execute`, `web_search`, `memory_store`
+
+**Risk Classification:** READ_ONLY (compute/parse/search), LOCAL_EXEC_ALLOWLIST (`code_execute` — allowlisted sandbox only; host-JS execution is production-disabled).
+
+### 32. Product Worker (Product Manager)
+
+**Role enum:** `AgentRole.WORKER_PRODUCT`
+
+**Purpose:** Senior Product Manager for specs, roadmap, user stories, and prioritization.
+
+**Tools:** `web_search`, `memory_store`, `memory_retrieve`
+
+**Risk Classification:** READ_ONLY (search/retrieve), WRITE (memory_store).
+
+### 33. Project Worker (Project Manager)
+
+**Role enum:** `AgentRole.WORKER_PROJECT`
+
+**Purpose:** PMP-certified Project Manager for timelines, resources, status, and milestones.
+
+**Tools:** `compute_statistics`, `parse_spreadsheet`, `memory_store`, `memory_retrieve`
+
+**Risk Classification:** READ_ONLY (compute/parse/retrieve), WRITE (memory_store).
+
+### Vibe Coding Roles (5)
+
+The Vibe Coding engine generates full-stack apps from natural language. It runs as a dedicated sub-workflow (`vibe-coder-workflow.ts`) with its own ordered pipeline: architect → generator → debugger → deployer, plus screenshot-to-code. These workers are still leaf nodes invoked by the Router under the Vibe Coding plan.
+
+### 34. App Architect Worker
+
+**Role enum:** `AgentRole.WORKER_APP_ARCHITECT`
+
+**Purpose:** Translates a natural-language app idea into a concrete file/architecture plan.
+
+**Tools:** `search_knowledge`
+
+**Risk Classification:** READ_ONLY (search). Output is a plan artifact, not executed code.
+
+### 35. App Generator Worker
+
+**Role enum:** `AgentRole.WORKER_APP_GENERATOR`
+
+**Purpose:** Generates code files from the architecture plan, grounded in existing codebase patterns.
+
+**Tools:** `search_knowledge`
+
+**Risk Classification:** READ_ONLY (search). Generated files are written via the workflow's controlled file-write path, approval-gated for production targets.
+
+### 36. App Debugger Worker
+
+**Role enum:** `AgentRole.WORKER_APP_DEBUGGER`
+
+**Purpose:** Self-debugging loop that classifies build errors and proposes fixes until the build passes or the budget is exhausted.
+
+**Tools:** `search_knowledge`
+
+**Risk Classification:** READ_ONLY (search). Applies fixes through the controlled file-write path only.
+
+### 37. App Deployer Worker
+
+**Role enum:** `AgentRole.WORKER_APP_DEPLOYER`
+
+**Purpose:** Senior DevOps engineer operating Vercel deployments + GitHub repo/push for generated apps.
+
+**System Instructions (summary):** Never fabricate a deployment URL. Never report success before Vercel confirms READY. Never swallow a build failure. Never configure DNS without telling the operator exactly which records to add.
+
+**Tools:** `deploy_to_vercel`, `github_create_repo`, `github_push_files`
+
+**Risk Classification:** EXTERNAL_SIDE_EFFECT / CRITICAL_MANUAL_ONLY (production deploys + repo creation + file push — always approval-gated).
+
+### 38. Screenshot-to-Code Worker
+
+**Role enum:** `AgentRole.WORKER_SCREENSHOT_TO_CODE`
+
+**Purpose:** Converts a screenshot/image into matching UI code, grounded in existing component patterns.
+
+**Tools:** `search_knowledge`
+
+**Risk Classification:** READ_ONLY (search). Output is a code artifact routed through the Vibe Coding pipeline.
+
+---
+
 ## Swarm Collaboration Model
 
 The following sequence describes a typical end-to-end workflow execution:

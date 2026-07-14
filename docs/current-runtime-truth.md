@@ -385,8 +385,8 @@
 | C4 Typed claims + policy | `PARTIAL` | untyped JSONB; one universal threshold; no per-predicate policy |
 | C5 Source authority | `UNIT_PROVEN` | global hardcoded constants; not per-tenant/per-predicate |
 | C6 Accuracy benchmark | `ROADMAP` | none exists |
-| D1 Artifact harvesting | `LIVE_RUNTIME_WIRED` / `PARTIAL` | pure core harvests; live seam returns `artifacts: []` |
-| D2 Failure-class propagation | `ROADMAP` | computed in graph, never surfaced to `FinishedRun` |
+| D1 Artifact harvesting | `LIVE_RUNTIME_WIRED` / `PARTIAL` | pure `harvestRunEvidence` helper harvests best-effort artifact ids from `taskResults`; full worker artifact emission still open |
+| D2 Failure-class propagation | `LIVE_RUNTIME_WIRED` | `failureClassByTask` now derived from `state.failureDiagnoses` and spread into `FinishedRun` (D2 wired); not production-proven |
 | D3 Metrics | `PARTIAL` | only `accumulatedCostUsd` |
 | D4 Approval interrupt/resume | `LIVE_RUNTIME_WIRED` (wiring) / `ROADMAP` (E2E) | real checkpointer+409 wiring; no live-LLM E2E (env-blocked) |
 | D5 Learning canary | `LIVE_RUNTIME_WIRED` (behind gate) | wired + MI gate; never run vs managed Postgres + real LLM |
