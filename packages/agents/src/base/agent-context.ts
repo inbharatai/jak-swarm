@@ -226,6 +226,31 @@ export interface AgentContextParams {
    */
   llmApiKey?: string;
   /**
+   * Per-tenant decrypted Gmail (IMAP/SMTP) app-password credentials,
+   * resolved by apps/api's credential service from the tenant's
+   * Integration row and forwarded via the tenant-credential side-channel
+   * registry (never through serialized SwarmState). When set, the email
+   * tool resolver builds a tenant-scoped GmailImapAdapter instead of the
+   * Unconfigured stub. Undefined = tenant hasn't connected Gmail (or
+   * connected via OAuth, which the IMAP adapter can't drive yet).
+   */
+  emailCredentials?: { email: string; appPassword: string };
+  /**
+   * Per-tenant decrypted Google Calendar (CalDAV basic-auth) app-password
+   * credentials. Same side-channel + tenant-isolation contract as
+   * {@link emailCredentials}; the CalDAV adapter is Google-specific and
+   * uses the same app-password as Gmail.
+   */
+  calendarCredentials?: { email: string; appPassword: string };
+  /**
+   * Per-tenant decrypted CRM OAuth credentials (Salesforce today: the
+   * access token + instance URL read from the tenant's Integration row).
+   * Same side-channel + tenant-isolation contract as
+   * {@link emailCredentials}. When set, the CRM tool resolver builds a
+   * tenant-scoped SalesforceCRMAdapter instead of falling through.
+   */
+  crmCredentials?: { salesforce?: { accessToken: string; instanceUrl: string } };
+  /**
    * Enable Google Search grounding for Gemini (adds { googleSearch: {} } to tools).
    * Only effective when llmProvider='gemini'. Ignored for OpenAI.
    * Falls back to GEMINI_GOOGLE_SEARCH_GROUNDING env var when unset.
@@ -266,6 +291,9 @@ export class AgentContext {
   readonly onActivity: AgentActivityEmitter | undefined;
   readonly llmProvider: 'openai' | 'gemini' | undefined;
   readonly llmApiKey: string | undefined;
+  readonly emailCredentials: { email: string; appPassword: string } | undefined;
+  readonly calendarCredentials: { email: string; appPassword: string } | undefined;
+  readonly crmCredentials: { salesforce?: { accessToken: string; instanceUrl: string } } | undefined;
   readonly googleSearchGrounding: boolean | undefined;
   readonly vertexAISearchDatastore: string | undefined;
   readonly openaiWebSearch: boolean | undefined;
@@ -292,6 +320,9 @@ export class AgentContext {
     this.onActivity = params.onActivity;
     this.llmProvider = params.llmProvider;
     this.llmApiKey = params.llmApiKey;
+    this.emailCredentials = params.emailCredentials;
+    this.calendarCredentials = params.calendarCredentials;
+    this.crmCredentials = params.crmCredentials;
     this.googleSearchGrounding = params.googleSearchGrounding;
     this.vertexAISearchDatastore = params.vertexAISearchDatastore;
     this.openaiWebSearch = params.openaiWebSearch;
@@ -355,6 +386,9 @@ export class AgentContext {
       ...(this.onActivity ? { onActivity: this.onActivity } : {}),
       ...(this.llmProvider ? { llmProvider: this.llmProvider } : {}),
       ...(this.llmApiKey ? { llmApiKey: this.llmApiKey } : {}),
+      ...(this.emailCredentials ? { emailCredentials: this.emailCredentials } : {}),
+      ...(this.calendarCredentials ? { calendarCredentials: this.calendarCredentials } : {}),
+      ...(this.crmCredentials ? { crmCredentials: this.crmCredentials } : {}),
       ...(this.googleSearchGrounding !== undefined ? { googleSearchGrounding: this.googleSearchGrounding } : {}),
       ...(this.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: this.vertexAISearchDatastore } : {}),
       ...(this.openaiWebSearch !== undefined ? { openaiWebSearch: this.openaiWebSearch } : {}),

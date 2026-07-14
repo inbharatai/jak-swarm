@@ -38,6 +38,11 @@ import { WorkflowService } from './workflow.service.js';
 import { DbWorkflowStateStore } from './db-state-store.js';
 import { QueueWorker } from './queue-worker.js';
 import type { WorkflowJobRow, WorkerHealth } from './queue-worker.js';
+// Per-tenant connector credential resolution — the single source of truth
+// that turns a tenant's connected integrations into the decrypted
+// { emailCredentials, calendarCredentials, crmCredentials } bundle the
+// swarm runtime registers in the tenant-credential side-channel.
+import { resolveTenantConnectorCredentials } from './tenant-connector-credentials.js';
 
 /**
  * Strip non-JSON-serializable values from a deep object graph.
@@ -1086,6 +1091,36 @@ export class SwarmExecutionService extends EventEmitter {
       });
       const connectedProviders = connectedIntegrations.map((i) => i.provider).filter((p): p is string => Boolean(p));
 
+      // ─── Per-tenant connector credentials ──────────────────────────────────
+      // Resolve the tenant's decrypted connector credentials (Gmail
+      // app-password + Salesforce OAuth) via the single source of truth
+      // (tenant-connector-credentials.ts). These populate the
+      // tenant-credential side-channel registry (keyed by workflowId), NOT
+      // SwarmState — a decrypted app-password / access token must never land
+      // in the stateJson DB checkpoint. Worker nodes look them up by
+      // state.workflowId; the ADK path receives them on the toolContext
+      // object threaded via AsyncLocalStorage. Resolution failure must
+      // never block the workflow — the resolver returns its Unconfigured
+      // stub (which throws on use), never another tenant's creds.
+      let emailCredentials: { email: string; appPassword: string } | undefined;
+      let calendarCredentials: { email: string; appPassword: string } | undefined;
+      let crmCredentials: { salesforce?: { accessToken: string; instanceUrl: string } } | undefined;
+      try {
+        const connectorCreds = await resolveTenantConnectorCredentials(tenantId, this.db);
+        emailCredentials = connectorCreds.emailCredentials;
+        calendarCredentials = connectorCreds.calendarCredentials;
+        crmCredentials = connectorCreds.crmCredentials;
+      } catch (connectorCredErr) {
+        // Connector credential resolution failure must never block the
+        // workflow. The tools the tenant hasn't (or couldn't) connect
+        // resolve to Unconfigured and surface a clear "not configured"
+        // error at tool-call time; other tools proceed normally.
+        this.log.warn(
+          { tenantId, err: connectorCredErr instanceof Error ? connectorCredErr.message : String(connectorCredErr) },
+          '[Swarm] Failed to resolve tenant connector credentials; affected tools will be Unconfigured',
+        );
+      }
+
       const user = await this.db.user.findUnique({ where: { id: userId }, select: { role: true } });
 
       // ─── Per-tenant LLM provider preference ────────────────────────────────
@@ -1421,6 +1456,15 @@ export class SwarmExecutionService extends EventEmitter {
               // bridge builds a tenant-scoped registry with correct provider
               // gating (mirrors the LangGraph path's AgentContext.connectedProviders).
               connectedProviders,
+              // Per-tenant connector credentials (decrypted above). The ADK
+              // tool bridge threads this ToolExecutionContext via
+              // AsyncLocalStorage, so these reach the email/calendar/CRM
+              // tool resolvers exactly as the LangGraph path's do. They
+              // never touch serialized state (the ADK path holds its state
+              // in ADK's own runner, not in SwarmState's stateJson checkpoint).
+              ...(emailCredentials ? { emailCredentials } : {}),
+              ...(calendarCredentials ? { calendarCredentials } : {}),
+              ...(crmCredentials ? { crmCredentials } : {}),
             },
             workerRoles: params.roleModes?.length ? params.roleModes : undefined,
             // Google Search grounding is ON by default in ADK mode; opt out
@@ -1480,6 +1524,13 @@ export class SwarmExecutionService extends EventEmitter {
         ...(this.circuitBreakerFactory ? { circuitBreakerFactory: this.circuitBreakerFactory } : {}),
         ...(llmProvider ? { llmProvider } : {}),
         ...(llmApiKey ? { llmApiKey } : {}),
+        // Per-tenant connector credentials travel via the tenant-credential
+        // side-channel registry (keyed by workflowId), NOT SwarmState —
+        // see the resolution block above. The runner registers them; worker
+        // nodes look them up by state.workflowId.
+        ...(emailCredentials ? { emailCredentials } : {}),
+        ...(calendarCredentials ? { calendarCredentials } : {}),
+        ...(crmCredentials ? { crmCredentials } : {}),
         // Google grounding config (Gemini-only; read from env vars per-tenant future)
         ...(process.env['GEMINI_GOOGLE_SEARCH_GROUNDING']?.trim() === '1' ? { googleSearchGrounding: true } : {}),
         ...(process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE']?.trim() ? { vertexAISearchDatastore: process.env['GEMINI_VERTEX_AI_SEARCH_DATASTORE'].trim() } : {}),
