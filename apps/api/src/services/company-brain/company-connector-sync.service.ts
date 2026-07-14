@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { config } from '../../config.js';
 import { decrypt as decryptCredentials, encrypt as encryptCredentials } from '../../utils/crypto.js';
 import { CompanyOperatingLayerService } from './company-operating-layer.service.js';
+import { enqueueCompanyBrainJob } from './company-brain-worker.service.js';
 import { CompanyBrainSchemaUnavailableError } from './company-profile.service.js';
 import {
   COMPANY_SYNC_PROVIDERS,
@@ -286,6 +287,29 @@ export class CompanyConnectorSyncService {
     return normalized;
   }
 
+  /**
+   * B4: ingest a connector artifact and auto-enqueue Company Brain processing,
+   * so deep evidence reaches the graph without a manual trigger. The artifact
+   * is persisted first; a Brain enqueue failure never rolls back ingestion
+   * (the boot backfill sweep re-enqueues stranded artifacts, and enqueue is
+   * idempotent by `artifact:<id>`).
+   */
+  private async ingestAndEnqueue(
+    args: Parameters<CompanyOperatingLayerService['createArtifact']>[0],
+  ): Promise<void> {
+    const artifact = await this.companyOperatingLayer.createArtifact(args);
+    this.enqueueBrainProcessing(args.tenantId, args.userId, artifact.id);
+  }
+
+  private enqueueBrainProcessing(tenantId: string, userId: string, artifactId: string): void {
+    void enqueueCompanyBrainJob(this.db, { tenantId, artifactId, userId })
+      .then((res) => {
+        if (res.created) this.log?.info({ artifactId, tenantId }, '[company-sync] Enqueued Company Brain processing');
+      })
+      .catch((err: unknown) => {
+        this.log?.warn({ artifactId, tenantId, err: err instanceof Error ? err.message : String(err) }, '[company-sync] Brain enqueue failed (artifact still ingested)');
+      });
+  }
   private async findConnectedIntegration(tenantId: string, provider: CompanySyncProvider): Promise<IntegrationRow | null> {
     const providerAliases = getIntegrationProviderAliases(provider);
     return this.db.integration.findFirst({
@@ -782,7 +806,7 @@ export class CompanyConnectorSyncService {
       ].join('\n');
 
       try {
-        await this.companyOperatingLayer.createArtifact({
+        await this.ingestAndEnqueue({
           tenantId: input.tenantId,
           userId: input.userId,
           sourceType: companySyncProviderToArtifactSource(input.provider),
@@ -937,7 +961,7 @@ export class CompanyConnectorSyncService {
       ].join('\n');
 
       try {
-        await this.companyOperatingLayer.createArtifact({
+        await this.ingestAndEnqueue({
           tenantId: input.tenantId,
           userId: input.userId,
           sourceType: companySyncProviderToArtifactSource(input.provider),
@@ -1073,7 +1097,7 @@ export class CompanyConnectorSyncService {
       ].join('\n');
 
       try {
-        await this.companyOperatingLayer.createArtifact({
+        await this.ingestAndEnqueue({
           tenantId: input.tenantId,
           userId: input.userId,
           sourceType: companySyncProviderToArtifactSource(input.provider),
