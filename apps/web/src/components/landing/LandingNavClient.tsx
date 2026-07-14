@@ -47,6 +47,7 @@ export default function LandingNavClient() {
             <span className="font-semibold">JAK Shield</span>
           </a>
           <a href="#company-os" className="hover:text-white focus-visible:text-white transition-colors duration-200">Company OS</a>
+          <a href="#hyperagent" className="hover:text-white focus-visible:text-white transition-colors duration-200">Hyperagent</a>
           <a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors duration-200">Proof</a>
           <a href="#trust" className="hover:text-white focus-visible:text-white transition-colors duration-200">Trust</a>
           <a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors duration-200">Pricing</a>
@@ -94,6 +95,7 @@ export default function LandingNavClient() {
             JAK Shield
           </a>
           <a href="#company-os" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Company OS</a>
+          <a href="#hyperagent" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Hyperagent</a>
           <a href="#outcomes" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Proof</a>
           <a href="#trust" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Trust</a>
           <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>

@@ -17,10 +17,10 @@
  *
  * Layout (mobile): stacks left → center → right → bottom.
  *
- * Difference from HeroCockpit: HeroCockpit is a single-pane animated
- * loop in the hero. ProductCockpit is a wider, multi-panel dashboard
- * that mirrors the actual cockpit at /workspace — left rail with the
- * conversation, center with the live agent graph, right with the
+ * Difference from the hero visual: the hero now renders EngineDuo (the two
+ * flagship engines side by side). ProductCockpit is a wider, multi-panel
+ * dashboard that mirrors the actual cockpit at /workspace — left rail with
+ * the conversation, center with the live agent graph, right with the
  * approval card, audit ribbon at the bottom.
  *
  * No fake numbers. Every label maps to a real cockpit or Company OS
