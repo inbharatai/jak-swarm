@@ -204,6 +204,16 @@ export interface ToolExecutionContext {
   connectedProviders?: string[];
   db?: Record<string, unknown>;
   /**
+   * Per-tenant CRM credentials, decrypted by apps/api's credential service
+   * from the tenant's Integration row and forwarded on the execution context.
+   * Used by the CRM tool resolver to build a tenant-scoped Salesforce adapter
+   * (never read from process env in a multi-tenant deployment). Structurally
+   * compatible with @jak-swarm/tools' `TenantCrmCredentials`.
+   */
+  crmCredentials?: {
+    salesforce?: { accessToken: string; instanceUrl: string };
+  };
+  /**
    * Coarse plan tier for gating paid external services. Populated from the
    * tenant's Subscription at workflow creation. Undefined = no gate (permissive).
    */

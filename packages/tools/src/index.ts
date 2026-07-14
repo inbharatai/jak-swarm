@@ -138,7 +138,8 @@ export { UnconfiguredCalendarAdapter } from './adapters/unconfigured.js';
 export { CalDAVCalendarAdapter } from './adapters/calendar/caldav-calendar.adapter.js';
 
 // Adapter factory
-export { getEmailAdapter, getCalendarAdapter, getCRMAdapter, getCRMAdapterFromEnv, getSalesforceCRMAdapterForTenant, hasRealAdapters } from './adapters/adapter-factory.js';
+export { getEmailAdapter, getCalendarAdapter, getCRMAdapter, getCRMAdapterFromEnv, getSalesforceCRMAdapterForTenant, resolveCrmAdapterForContext, hasRealAdapters } from './adapters/adapter-factory.js';
+export type { TenantCrmCredentials, CrmResolutionContext } from './adapters/adapter-factory.js';
 
 // CRM adapter
 export type {

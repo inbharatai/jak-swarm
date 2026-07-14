@@ -1,9 +1,8 @@
 import { ToolCategory, ToolRiskClass, openAIChatTokenLimitParam } from '@jak-swarm/shared';
 import type { ToolExecutionContext } from '@jak-swarm/shared';
 import { toolRegistry } from '../registry/tool-registry.js';
-import { UnconfiguredCRMAdapter } from '../adapters/unconfigured.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
-import { getEmailAdapter, getCalendarAdapter, getCRMAdapterFromEnv, hasRealAdapters } from '../adapters/adapter-factory.js';
+import { getEmailAdapter, getCalendarAdapter, resolveCrmAdapterForContext, hasRealAdapters } from '../adapters/adapter-factory.js';
 import {
   searchStrategyChain,
   searchDuckDuckGoLegacy as searchDuckDuckGo,
@@ -13,7 +12,10 @@ import {
 
 const emailAdapter = getEmailAdapter();
 const calendarAdapter = getCalendarAdapter();
-const crmAdapter = getCRMAdapterFromEnv() ?? new UnconfiguredCRMAdapter();
+// NOTE: there is deliberately NO module-level CRM adapter. CRM is resolved
+// per tool execution via resolveCrmAdapterForContext(context) so every call
+// is scoped to the trusted context.tenantId — never a process-global
+// singleton that would bind the whole process to one tenant's CRM data.
 
 // Boot diagnostic — fires once per process. Suppressed in test runs
 // because vitest workers re-import this module on every spawn and the
@@ -279,9 +281,9 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { contacts: { type: 'array' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { query } = input as { query: string };
-      return crmAdapter.searchContacts(query);
+      return resolveCrmAdapterForContext(context).searchContacts(query);
     },
   );
 
@@ -308,8 +310,12 @@ export function registerBuiltinTools(): void {
     },
     async (input: unknown, context: ToolExecutionContext) => {
       const { contactId, updates } = input as { contactId: string; updates: Record<string, unknown> };
-      const updated = await crmAdapter.updateContact(contactId, updates);
-      await crmAdapter.createNote(
+      // Resolve a single tenant-scoped adapter for this execution and use it
+      // for both the update and the audit note, so both share the same
+      // context.tenantId boundary.
+      const adapter = resolveCrmAdapterForContext(context);
+      const updated = await adapter.updateContact(contactId, updates);
+      await adapter.createNote(
         contactId,
         `Record updated via workflow ${context.workflowId}`,
         context.userId,
