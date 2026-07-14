@@ -3,6 +3,8 @@
 **Commit audited:** `27583a4` (main, 2026-07-14)
 **Method:** Every capability below was traced against executable source on `main` at `27583a4` by three read-only passes over the live runtime path (HTTP route → service → worker → agent → tool → DB → UI → audit). Old audit documents (`docs/current-system-truth-audit.md` at `59db931`, mandate-completion-report, external-audit notes) were NOT copied — every file:line below was re-read against current source. A class, interface, migration, prompt, MCP provider definition, or test mock is NOT counted as a working feature unless the live runtime calls it.
 
+**Status refresh (post-audit, this commit):** Sections A1/A2/A4/A5/A6 + the summary-table and remediation-order rows were reclassified after the audit commit to reflect PR 1 (#159, `f619629`) and PR 2 (#160, `45d0f1b`), which both merged on `main` after `27583a4`. The reclassification is forward-progress only — no capability was demoted; the `27583a4` audit's gap verdicts for A1/A2/A4/A5/A6 are superseded by the PR 1/PR 2 paragraphs now in those sections. All other sections (A3, A7–A9, B–G) remain at their `27583a4` audit verdicts. No `PRODUCTION_PROVEN` label was introduced — PR 1/PR 2 are `LIVE_RUNTIME_WIRED` / `INTEGRATION_PROVEN` only (named stops F3 / PR 14, rule 10).
+
 ## Classification legend
 
 | Class | Meaning |
@@ -20,20 +22,20 @@
 
 ## A. Connector credential backbone
 
-### A1. Email (Gmail) adapter — `CONFIGURATION_DEPENDENT` (process-global, not per-tenant)
+### A1. Email (Gmail) adapter — `LIVE_RUNTIME_WIRED` (per-tenant resolver + live population; NOT production-proven)
 
-- `packages/tools/src/builtin/index.ts:13` — `const emailAdapter = getEmailAdapter();` constructed at **module-import time**, one instance for the whole process, shared by every tenant.
-- `packages/tools/src/adapters/adapter-factory.ts:42-50` — `getEmailAdapter()` reads `process.env.GMAIL_EMAIL`/`GMAIL_APP_PASSWORD` via `resolveGmailCredentials()` (`:26-35`), constructs `new GmailImapAdapter(creds)` or `UnconfiguredEmailAdapter`.
-- `packages/shared/src/types/tool.ts:189-221` — `ToolExecutionContext` has **no `emailCredentials` field**. There is **no `resolveEmailAdapterForContext`** anywhere in the repo.
-- Unconfigured → `UnconfiguredEmailAdapter` throws on use (explicit failure, no silent empty). 
-- **Verdict:** process-global env-keyed; never resolves per-tenant; no context-carried credential path. Violates rule 7 (no process-global customer credentials in multi-tenant mode) the moment a second tenant is onboarded.
+- **PR 1 (#159, `f619629`) closed the rule-7 violation.** The process-global module singleton (`const emailAdapter = getEmailAdapter()` at the old `builtin/index.ts:13`) is removed. Each email tool call now resolves its own adapter from the trusted per-tenant context via `resolveEmailAdapterForContext(context)` (`packages/tools/src/adapters/adapter-factory.ts`), mirroring the CRM resolver.
+- `ToolExecutionContext.emailCredentials?: { email; appPassword }` (`packages/shared/src/types/tool.ts`) is now declared and **populated live** (see A2/A6).
+- Resolution order: per-tenant context creds → labelled single-tenant dev opt-in (`JAK_EMAIL_SINGLE_TENANT_DEV=1`) → `UnconfiguredEmailAdapter` (throws on use). Without the opt-in flag, process-env Gmail creds are NEVER used (no cross-tenant env bleed).
+- **PR 2 (#160, `45d0f1b`) wired live population:** `apps/api/src/services/tenant-connector-credentials.ts` resolves the tenant's Gmail app-password via `credential.service.resolveCredentials(..., { allowEnvFallback: false })`, registers it in the `tenant-credential-registry` side-channel keyed by `workflowId`, `worker-node` looks it up by `state.workflowId` into the `AgentContext`, and `tool-execution.service` forwards it into the `ToolExecutionContext`. Secret never touches serialized SwarmState (mirrors the `llmApiKey` side-channel — see A6).
+- **Honest label:** `LIVE_RUNTIME_WIRED` + `INTEGRATION_PROVEN` (resolver + forwarding seam + population all exercised by unit/integration tests in PR 1/PR 2). **NOT `PRODUCTION_PROVEN`** — no real Gmail IMAP response was asserted (named stop F3 / PR 14, gated on owner production provider creds, rule 10). An OAuth-access-token Gmail connection is NOT IMAP-driveable yet → left unset → Unconfigured (never another tenant's creds).
 
-### A2. Calendar (CalDAV) adapter — `CONFIGURATION_DEPENDENT` (process-global, not per-tenant)
+### A2. Calendar (CalDAV) adapter — `LIVE_RUNTIME_WIRED` (per-tenant resolver + live population; NOT production-proven)
 
-- `packages/tools/src/builtin/index.ts:14` — `const calendarAdapter = getCalendarAdapter();` module-import singleton.
-- `packages/tools/src/adapters/adapter-factory.ts:57-65` — `getCalendarAdapter()` reads process env, constructs `CalDAVCalendarAdapter` or `UnconfiguredCalendarAdapter`.
-- No `calendarCredentials` on `ToolExecutionContext`; no `resolveCalendarAdapterForContext`. 
-- **Verdict:** same as A1 — process-global, not per-tenant.
+- **PR 1 (#159, `f619629`) closed the rule-7 violation.** The process-global module singleton (`const calendarAdapter = getCalendarAdapter()` at the old `builtin/index.ts:14`) is removed; each calendar tool call now resolves its own adapter via `resolveCalendarAdapterForContext(context)` (`packages/tools/src/adapters/adapter-factory.ts`).
+- `ToolExecutionContext.calendarCredentials?: { email; appPassword }` is declared and **populated live** (PR 2 #160). The `CalDAVCalendarAdapter` is Google-specific and authenticates with the SAME Gmail app-password (basic auth), so calendar is driveable iff the tenant connected Gmail via app-password — `tenant-connector-credentials.ts` populates `calendarCredentials` from the same Gmail resolution as `emailCredentials`.
+- Resolution order mirrors A1: per-tenant context → `JAK_CALENDAR_SINGLE_TENANT_DEV=1` opt-in → `UnconfiguredCalendarAdapter` (throws on use). Same side-channel transport as A1 (no SwarmState secret-leak).
+- **Honest label:** `LIVE_RUNTIME_WIRED` + `INTEGRATION_PROVEN`, **NOT `PRODUCTION_PROVEN`** (no real CalDAV response asserted — named stop F3 / PR 14).
 
 ### A3. Deployment tools (Vercel / GitHub-native) — `CONFIGURATION_DEPENDENT` (process-global, inline)
 
@@ -42,32 +44,36 @@
 - **No `DeploymentAdapter` interface or factory exists.** No `deploymentCredentials` on `ToolExecutionContext`; no `resolveDeploymentAdapterForContext`. 
 - **Verdict:** every call reads process env directly; no per-tenant path at all.
 
-### A4. CRM adapter — `LIVE_RUNTIME_WIRED` (resolver reached) but per-tenant Salesforce branch is `DEAD_OR_DUPLICATE`
+### A4. CRM adapter — `LIVE_RUNTIME_WIRED` (resolver reached; per-tenant Salesforce branch now REACHABLE via PR 2; NOT production-proven)
 
-- `packages/tools/src/adapters/adapter-factory.ts:198-221` — `resolveCrmAdapterForContext(context)` exists, priority chain:
+- `packages/tools/src/adapters/adapter-factory.ts` — `resolveCrmAdapterForContext(context)` priority chain:
   1. `JAK_CRM_SINGLE_TENANT_DEV=1` → `getCRMAdapterFromEnv(tenantId)` (env-keyed dev opt-in).
-  2. Per-tenant Salesforce when `context.crmCredentials?.salesforce.{accessToken,instanceUrl}` present → `getSalesforceCRMAdapterForTenant(sf)` (`:141-150`).
-  3. Per-tenant Prisma → `new PrismaCRMAdapter(db, context.tenantId)` (`:213-216`).
+  2. Per-tenant Salesforce when `context.crmCredentials?.salesforce.{accessToken,instanceUrl}` present → `getSalesforceCRMAdapterForTenant(sf)`.
+  3. Per-tenant Prisma → `new PrismaCRMAdapter(db, context.tenantId)`.
   4. `UnconfiguredCRMAdapter` (throws on use).
-- Live tool call sites: `builtin/index.ts:286` and `:316` call `resolveCrmAdapterForContext(context)` — the resolver IS reached.
-- **But step 2 is `DEAD_OR_DUPLICATE`:** `context.crmCredentials` is declared (`packages/shared/src/types/tool.ts:213-215`) but **never populated** by any live API path (see A5). `getSalesforceCRMAdapterForTenant` (`:141`) has zero live callers. The resolver always falls through to step 3 (Prisma) or step 4 (Unconfigured).
-- **Verdict:** resolver live + reached; per-tenant Salesforce branch dead; Prisma-tenant branch live (CRM tenant-isolation security fix from PR #154 is `INTEGRATION_PROVEN` via `tests/integration/crm-tenant-isolation.integration.test.ts`).
+- Live tool call sites: `builtin/index.ts` email/calendar/CRM tools call the resolver — it IS reached.
+- **PR 2 (#160, `45d0f1b`) made step 2 REACHABLE live.** Previously `context.crmCredentials` was declared but never populated (the branch was `DEAD_OR_DUPLICATE`). PR 2 populates `context.crmCredentials.salesforce` from the tenant's CONNECTED Integration row: `tenant-connector-credentials.ts` reads the Integration, decrypts the raw access token from `IntegrationCredential.accessTokenEnc`, reads `salesforceInstanceUrl` from `Integration.metadata`, and registers the bundle in the side-channel registry → `worker-node` → `AgentContext` → `ToolExecutionContext` (same secure transport as A1/A2). `getSalesforceCRMAdapterForTenant` now has a live caller path.
+- **Honest label:** resolver `LIVE_RUNTIME_WIRED`; per-tenant Salesforce branch now `LIVE_RUNTIME_WIRED` + `INTEGRATION_PROVEN` (PR 2 unit tests cover decrypt + instanceUrl + tenant-scoping + malformed-row resilience); Prisma-tenant branch `INTEGRATION_PROVEN` (CRM tenant-isolation from PR #154 via `tests/integration/crm-tenant-isolation.integration.test.ts`). **None `PRODUCTION_PROVEN`** — no real Salesforce API response asserted (named stop F3 / PR 14, rule 10).
 
-### A5. `context.crmCredentials` population — `ROADMAP` (declared, never written)
+### A5. `context.crmCredentials` / `emailCredentials` / `calendarCredentials` population — `LIVE_RUNTIME_WIRED` (PR 2; NOT production-proven)
 
-- `apps/api/src/services/swarm-execution.service.ts:1408-1441` builds the ADK `toolContext` with only `{ tenantId, userId, workflowId, runId, connectedProviders }` — **no `crmCredentials`, no `db`**.
-- `:1468-1554` LangGraph runner call passes `allowedDomains`, `connectedProviders`, `subscriptionTier` — **no `crmCredentials`**. `WorkflowExecuteParams`/`AgentContextParams` (`packages/agents/src/base/agent-context.ts:179-247`) do not declare `crmCredentials`.
-- `packages/agents/src/base/tool-execution.service.ts:194-203` constructs the `ToolExecutionContext` handed to tools: `{ tenantId, userId, workflowId, runId, approvalId, idempotencyKey, allowedDomains, subscriptionTier }` — **no `crmCredentials`, no `db`, no `connectedProviders`**.
-- Grep for `crmCredentials` across `apps/api/src` returns zero writes. `swarm-execution.service.ts:1084` reads connected Integrations for `connectedProviders` only — never reads the Salesforce access token/instanceUrl from the Integration row.
-- **Verdict:** the apps/api → `context.crmCredentials.salesforce` seam (PR #154 follow-up, Workstream A3) is **not wired**. This is the open edge that makes the A4 Salesforce branch dead.
+- **PR 2 (#160, `45d0f1b`) wired the apps/api → context credential seam for email/calendar/CRM-salesforce together** (the three share the deep SwarmState/AgentContext/ADK threading). Previously this was `ROADMAP` — declared but never written, which made the A4 Salesforce branch dead.
+- Population site: `apps/api/src/services/tenant-connector-credentials.ts` (`resolveTenantConnectorCredentials(tenantId, db)`) is called from `swarm-execution.service.ts` at workflow start. The resolved bundle is threaded into:
+  - the LangGraph `runner.run` params (new `emailCredentials` / `calendarCredentials` / `crmCredentials` on `RunParams`), and
+  - the ADK `toolContext` object (`swarm-execution.service.ts`, threaded via AsyncLocalStorage by the ADK tool bridge).
+- Secure transport (the critical constraint): secrets travel via a NEW side-channel registry `packages/swarm/src/supervisor/tenant-credential-registry.ts` keyed by `workflowId` — `swarm-runner` registers them and **deliberately omits them from the `runtime.start` spread** that builds SwarmState (so they never land in the `stateJson` DB checkpoint = no secret-leak). `worker-node` looks them up by `state.workflowId` into the per-node `AgentContext`; `tool-execution.service.ts` forwards them `AgentContext → ToolExecutionContext`. Cleared in the runner `finally`.
+- `AgentContextParams`/`AgentContext` now declare the three fields (and `clone()` preserves them).
+- **Honest label:** `LIVE_RUNTIME_WIRED` + `INTEGRATION_PROVEN` (registry, population, and forwarding-seam unit tests in PR 2). **NOT `PRODUCTION_PROVEN`** — no real Gmail/Salesforce response asserted (named stop F3 / PR 14, rule 10).
 
-### A6. `credential.service.ts` — `DEAD_OR_DUPLICATE` (zero live callers)
+### A6. `credential.service.ts` — `LIVE_RUNTIME_WIRED` (PR 2 made it live-reachable; partial consolidation; NOT the complete single source of truth yet)
 
-- `apps/api/src/services/credential.service.ts` exports `resolveCredentials(tenantId, provider, db, opts?)` (`:170-252`) and `listConnectedProviders(tenantId, db)` (`:345`). Internally `ensureFreshOAuthToken` (`:266`) for Gmail OAuth PKCE refresh.
-- **No `getDecryptedToken` exists** anywhere in the repo (only in doc comments describing intent).
-- Caller grep: only `tests/unit/services/credential.service.test.ts:75` imports it. **No production module imports `credential.service.ts`.** 
-- Live per-tool paths bypass it entirely: Gmail/CalDAV read `process.env` directly; Vercel/GitHub-native read `process.env['VERCEL_TOKEN']`/`['GITHUB_PAT']` inline; CRM reads `context.crmCredentials` (never set); Company Brain ingestion (`company-connector-sync.service.ts:1007-1085`) has its own `resolveGitHubAccessToken`/`resolveGoogleAccessToken` calling `decryptCredentials` (`apps/api/src/utils/crypto.ts`) directly.
-- **Verdict:** the intended single source of truth for credentials is dead code. Every connector has its own ad-hoc credential path. Workstream A2 (make `credential.service` the single source of truth) is the unblock.
+- `apps/api/src/services/credential.service.ts` exports `resolveCredentials(tenantId, provider, db, opts?)` and `listConnectedProviders(tenantId, db)`. Internally `ensureFreshOAuthToken` for Gmail OAuth PKCE refresh.
+- **PR 2 (#160, `45d0f1b`) made `credential.service` live-reachable for the first time** (previously `DEAD_OR_DUPLICATE` — zero production callers, only its own test imported it). `apps/api/src/services/tenant-connector-credentials.ts` calls `resolveCredentials(tenantId, 'GMAIL', db, { allowEnvFallback: false })` to populate `emailCredentials`/`calendarCredentials` (Workstream A2, partially done).
+- **Partial consolidation — NOT the complete single source of truth yet:**
+  - Salesforce is NOT a `BYOProvider` in `credential.service` (`BYOProvider = 'GMAIL' | 'VERCEL' | 'CALDAV' | 'GITHUB'`). PR 2 reads the Salesforce Integration row + decrypts the token directly in `tenant-connector-credentials.ts` (using `decrypt` from `crypto.ts`). Consolidating Salesforce into `credential.service` (adding a `SALESFORCE` case) is a follow-up.
+  - `Vercel`/`GITHUB` (`BYOProvider`) are still NOT called by any live tool path — deployment tools still read `process.env` inline (see A3). `CALDAV` is structurally covered by the Gmail app-password path (the adapter is Google-specific).
+  - Company Brain ingestion (`company-connector-sync.service.ts`) still has its own `resolveGitHubAccessToken`/`resolveGoogleAccessToken` calling `decryptCredentials` directly — NOT routed through `credential.service`.
+- **Honest label:** `LIVE_RUNTIME_WIRED` (Gmail resolution path now called live). Workstream A2 is **partially closed**; completing it (Salesforce + Vercel + GitHub + Company Brain consolidation into `credential.service`) is a follow-up PR.
 
 ### A7. MCP reconnect — `PARTIAL` → **broken at runtime**
 
@@ -360,12 +366,12 @@
 
 | Capability | Class | One-line |
 |---|---|---|
-| A1 Email adapter | `CONFIGURATION_DEPENDENT` | process-global module singleton; no per-tenant resolver |
-| A2 Calendar adapter | `CONFIGURATION_DEPENDENT` | process-global module singleton; no per-tenant resolver |
-| A3 Deployment tools | `CONFIGURATION_DEPENDENT` | read `process.env` inline; no per-tenant path |
-| A4 CRM resolver | `LIVE_RUNTIME_WIRED` | resolver reached; Salesforce branch dead (creds never set) |
-| A5 `context.crmCredentials` | `ROADMAP` | declared, never written by any live API path |
-| A6 `credential.service.ts` | `DEAD_OR_DUPLICATE` | zero live callers; only unit test imports it |
+| A1 Email adapter | `LIVE_RUNTIME_WIRED` / `INTEGRATION_PROVEN` | per-tenant resolver (PR 1) + live side-channel population (PR 2); NOT production-proven |
+| A2 Calendar adapter | `LIVE_RUNTIME_WIRED` / `INTEGRATION_PROVEN` | per-tenant resolver (PR 1) + live population from Gmail app-password (PR 2); NOT production-proven |
+| A3 Deployment tools | `CONFIGURATION_DEPENDENT` | read `process.env` inline; no per-tenant path (still open — deferred from PR 1) |
+| A4 CRM resolver | `LIVE_RUNTIME_WIRED` / `INTEGRATION_PROVEN` | resolver reached; Salesforce branch now REACHABLE live (PR 2 populates creds); NOT production-proven |
+| A5 `context.{email,calendar,crm}Credentials` | `LIVE_RUNTIME_WIRED` / `INTEGRATION_PROVEN` | PR 2 wires apps/api → side-channel → context (no SwarmState secret-leak); NOT production-proven |
+| A6 `credential.service.ts` | `LIVE_RUNTIME_WIRED` (partial) | PR 2 makes Gmail resolution live-reachable; Salesforce/Vercel/GitHub/Company-Brain consolidation still follow-up |
 | A7 MCP reconnect | `PARTIAL` (broken) | `JSON.parse` on AES-GCM ciphertext → throws → NEEDS_REAUTH |
 | A8 Connector health | `PARTIAL` | no unified contract; only GitHub/Gmail/Drive sync-status |
 | A9 Sync atomicity | `PARTIAL` | non-atomic claim; manual+scheduled can race per tenant/provider |
@@ -407,8 +413,8 @@ Code + local/contract-test proof for the above can be built; the `PRODUCTION_PRO
 
 This truth doc drives the 14-PR sequence. The order below respects the dependency graph surfaced by the trace (each PR's prerequisite is the seam it writes into):
 
-1. **PR 1 — Tenant credential backbone (A1/A2/A3/A5/A6).** Add `emailCredentials`/`calendarCredentials`/`deploymentCredentials` to `ToolExecutionContext`; add `resolveEmailAdapterForContext`/`resolveCalendarAdapterForContext`/`resolveDeploymentAdapterForContext`; make `credential.service.resolveCredentials` the single source of truth; wire apps/api to populate `context.crmCredentials.salesforce` from the Integration row (unblocks A4 Salesforce branch). Replaces process-global adapters.
-2. **PR 2 — CRM live OAuth wiring (A4 follow-up).** Now that A5 is wired, make `getSalesforceCRMAdapterForTenant` reachable from a live path + HubSpot per-tenant factory.
+1. **PR 1 — DONE #159 (`f619629`).** Per-tenant email+calendar resolver BACKBONE: added `resolveEmailAdapterForContext`/`resolveCalendarAdapterForContext` (mirror CRM), `ToolExecutionContext.emailCredentials?/calendarCredentials?`, removed the process-global module singletons in `builtin/index.ts`, 9 resolver unit tests. Deployment tools (`deploymentCredentials` / `resolveDeploymentAdapterForContext`) deferred to a later PR — they need a new `DeploymentAdapter` interface and signature changes on tools that don't yet accept a context param.
+2. **PR 2 — DONE #160 (`45d0f1b`).** Live population: `tenant-connector-credentials.ts` resolves Gmail app-password (via `credential.service`, `allowEnvFallback:false`) → `emailCredentials`+`calendarCredentials`; reads+decrypts the Salesforce Integration row → `crmCredentials.salesforce`; carries them to resolvers via a NEW side-channel registry keyed by `workflowId` (mirrors `llmApiKey` — deliberately omitted from `runtime.start` so no secret lands in the `stateJson` checkpoint). Makes `credential.service` live-reachable (Workstream A2 partial) and the per-tenant Salesforce factory reachable live. HubSpot per-tenant factory still deferred.
 3. **PR 3 — MCP reconnect hardening (A7).** Decrypt through `crypto.ts`/`credential.service` before `JSON.parse`; add a reconnect contract test.
 4. **PR 4 — Connector-sync atomicity (A9/B4).** Advisory-lock claim (or conditional `UPDATE WHERE status='idle'` + unique index on `(tenantId, provider, running)`); auto-enqueue Brain processing on connector ingest (B4).
 5. **PR 5 — Deep Gmail/Drive/GitHub ingestion (B1/B2/B3).** Full body/threads/attachments/labels; Drive content export + pagination; GitHub repos/issues/PRs/reviews/commits/releases/webhooks.
