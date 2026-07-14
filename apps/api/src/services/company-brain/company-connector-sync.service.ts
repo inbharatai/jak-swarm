@@ -86,6 +86,7 @@ type DbWithConnectorSync = PrismaClient & {
     findMany: (args: unknown) => Promise<SyncStateRow[]>;
     upsert: (args: unknown) => Promise<SyncStateRow>;
     update: (args: unknown) => Promise<SyncStateRow>;
+    updateMany: (args: unknown) => Promise<{ count: number }>;
   };
   companyConnectorSyncRun: {
     create: (args: unknown) => Promise<SyncRunRow>;
@@ -192,6 +193,78 @@ function rethrowIfSyncSchemaMissing(err: unknown): never {
     throw schemaErr;
   }
   throw err instanceof Error ? err : new Error(msg);
+}
+
+/**
+ * Base64url -> utf8 (Gmail encodes payload body data as unpadded base64url).
+ * Returns null on malformed input so the caller can fall back to the snippet.
+ */
+export function base64UrlToUtf8(data: unknown): string | null {
+  if (typeof data !== 'string' || data.length === 0) return null;
+  try {
+    const normalized = data.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return Buffer.from(padded, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+export interface GmailAttachmentMeta {
+  filename: string;
+  mimeType: string;
+  size: number | null;
+  attachmentId: string | null;
+}
+
+/**
+ * Walk a Gmail `format=full` payload and extract the inline text/plain (preferred),
+ * text/html, and attachment metadata (filename / mimeType / size / attachmentId).
+ * Pure + recursive -- no I/O. Used by syncGmail to build a real evidence body.
+ */
+export function extractGmailTextAndAttachments(payload: unknown): {
+  text: string;
+  html: string | null;
+  attachments: GmailAttachmentMeta[];
+} {
+  const textParts: string[] = [];
+  const htmlParts: string[] = [];
+  const attachments: GmailAttachmentMeta[] = [];
+
+  const walk = (part: unknown) => {
+    if (!part || typeof part !== 'object') return;
+    const p = part as Record<string, unknown>;
+    const mimeType = asNonEmptyString(p['mimeType']) ?? '';
+    const body = safeRecord(p['body']);
+    const filename = asNonEmptyString(p['filename']);
+    const attachmentId = asNonEmptyString(body?.['attachmentId']);
+    const sizeRaw = body?.['size'];
+    const size = typeof sizeRaw === 'number' ? sizeRaw : (typeof sizeRaw === 'string' ? Number(sizeRaw) : null);
+    if ((filename || attachmentId) && mimeType && !String(mimeType).startsWith('multipart/')) {
+      attachments.push({
+        filename: filename ?? '(unnamed)',
+        mimeType,
+        size: Number.isFinite(size as number) ? (size as number) : null,
+        attachmentId: attachmentId ?? null,
+      });
+    }
+    if (mimeType === 'text/plain' || mimeType === 'text/html') {
+      const decoded = base64UrlToUtf8(body?.['data']);
+      if (decoded) {
+        if (mimeType === 'text/plain') textParts.push(decoded);
+        else htmlParts.push(decoded);
+      }
+    }
+    const sub = Array.isArray(p['parts']) ? p['parts'] : null;
+    if (sub) for (const child of sub) walk(child);
+  };
+
+  walk(payload);
+  return {
+    text: textParts.join('\n').trim(),
+    html: htmlParts.join('\n').trim() || null,
+    attachments,
+  };
 }
 
 export class CompanyConnectorSyncService {
@@ -345,15 +418,31 @@ export class CompanyConnectorSyncService {
       },
     }).catch((err: unknown) => rethrowIfSyncSchemaMissing(err));
 
-    if (state.status === 'running') {
-      throw new Error(`Provider ${provider} sync is already running.`);
-    }
     if (state.status === 'disabled') {
       throw new Error(`Provider ${provider} sync is disabled. Enable it before triggering.`);
     }
 
     const cursorBefore = input.forceFull ? null : safeRecord(state.cursorJson);
     const startedAt = Date.now();
+
+    // Atomic claim (truth-doc A9): flip the state to 'running' with a single
+    // conditional UPDATE that only matches when the state is NOT already
+    // running. This closes the scheduled-vs-manual and manual-vs-manual race
+    // (the old read-check-then-write was two separate statements, so two
+    // concurrent triggers could both read 'idle' and both ingest the same
+    // cursor window). The manual trigger no longer bypasses the guard -- it
+    // uses the same atomic claim as the scheduler.
+    const claimed = await this.db.companyConnectorSyncState.updateMany({
+      where: { id: state.id, status: { not: 'running' } },
+      data: {
+        integrationProvider: integration.provider,
+        status: 'running',
+      },
+    }).catch((err: unknown) => rethrowIfSyncSchemaMissing(err));
+
+    if (!claimed || claimed.count === 0) {
+      throw new Error(`Provider ${provider} sync is already running.`);
+    }
 
     const run = await this.db.companyConnectorSyncRun.create({
       data: {
@@ -363,14 +452,6 @@ export class CompanyConnectorSyncService {
         trigger: input.forceFull ? 'manual_full' : 'manual',
         status: 'running',
         cursorBeforeJson: cursorBefore,
-      },
-    }).catch((err: unknown) => rethrowIfSyncSchemaMissing(err));
-
-    await this.db.companyConnectorSyncState.update({
-      where: { id: state.id },
-      data: {
-        integrationProvider: integration.provider,
-        status: 'running',
       },
     }).catch((err: unknown) => rethrowIfSyncSchemaMissing(err));
 
@@ -792,10 +873,10 @@ export class CompanyConnectorSyncService {
       }
 
       const detailUrl = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`);
-      detailUrl.searchParams.set('format', 'metadata');
-      detailUrl.searchParams.append('metadataHeaders', 'Subject');
-      detailUrl.searchParams.append('metadataHeaders', 'From');
-      detailUrl.searchParams.append('metadataHeaders', 'Date');
+      // B1: full payload (not metadata-only) so we capture the real body,
+      // all recipients, and attachment metadata -- the brain no longer feeds
+      // on a truncated snippet.
+      detailUrl.searchParams.set('format', 'full');
 
       const detailRes = await fetch(detailUrl.toString(), {
         headers: {
@@ -828,16 +909,31 @@ export class CompanyConnectorSyncService {
 
       const subject = headerMap.get('subject') ?? `Email ${messageId}`;
       const from = headerMap.get('from') ?? undefined;
+      const to = headerMap.get('to') ?? undefined;
+      const cc = headerMap.get('cc') ?? undefined;
+      const bcc = headerMap.get('bcc') ?? undefined;
       const dateHeaderIso = toDateIso(headerMap.get('date'));
       const occurredAtIso = Number.isFinite(internalDateMs) && internalDateMs > 0
         ? new Date(internalDateMs).toISOString()
         : dateHeaderIso;
-      const snippet = asNonEmptyString(detailJson['snippet']) ?? 'No preview text available.';
+      const snippet = asNonEmptyString(detailJson['snippet']) ?? '';
+
+      // B1: decode the real body (text/plain preferred, html fallback) and
+      // collect attachment metadata from the full payload.
+      const { text: fullText, html, attachments } = extractGmailTextAndAttachments(detailJson['payload']);
+      const bodyText = fullText.length > 0 ? fullText : (snippet || 'No body content available.');
+      const MAX_BODY = 20_000;
+      const bodyTruncated = bodyText.length > MAX_BODY;
+      const bodyBody = bodyTruncated ? bodyText.slice(0, MAX_BODY) + '\n…[truncated]' : bodyText;
 
       const body = [
         `Subject: ${subject}`,
         `From: ${from ?? 'Unknown sender'}`,
-        `Snippet: ${snippet}`,
+        ...(to ? [`To: ${to}`] : []),
+        ...(cc ? [`Cc: ${cc}`] : []),
+        `Date: ${headerMap.get('date') ?? ''}`,
+        '',
+        bodyBody,
       ].join('\n');
 
       try {
@@ -856,6 +952,20 @@ export class CompanyConnectorSyncService {
             threadId: asNonEmptyString(detailJson['threadId']),
             labelIds: Array.isArray(detailJson['labelIds']) ? detailJson['labelIds'] : [],
             integrationProvider: input.integration.provider,
+            to,
+            cc,
+            bcc,
+            hasHtml: html !== null,
+            htmlLength: html ? html.length : 0,
+            bodyCharCount: bodyBody.length,
+            bodyTruncated,
+            attachmentCount: attachments.length,
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              mimeType: a.mimeType,
+              size: a.size,
+              attachmentId: a.attachmentId,
+            })),
           },
         });
         ingestedCount += 1;
