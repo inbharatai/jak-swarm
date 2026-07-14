@@ -374,17 +374,17 @@
 | A6 `credential.service.ts` | `LIVE_RUNTIME_WIRED` (partial) | PR 2 makes Gmail resolution live-reachable; Salesforce/Vercel/GitHub/Company-Brain consolidation still follow-up |
 | A7 MCP reconnect | `PARTIAL` (broken) | `JSON.parse` on AES-GCM ciphertext → throws → NEEDS_REAUTH |
 | A8 Connector health | `PARTIAL` | no unified contract; only GitHub/Gmail/Drive sync-status |
-| A9 Sync atomicity | `PARTIAL` | non-atomic claim; manual+scheduled can race per tenant/provider |
-| B1 Gmail ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | metadata-only (snippet); no body/threads/attachments |
-| B2 Drive ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | metadata-only; no content export; pagination capped at 100 |
-| B3 GitHub ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | user-events stream only; no repos/issues/PRs/webhooks |
-| B4 Ingest→Brain enqueue | `ROADMAP` | connector path never auto-enqueues processing |
+| A9 Sync atomicity | `LIVE_RUNTIME_WIRED` | atomic conditional updateMany claim (where status != running); manual + scheduled share the guard; unit-tested |
+| B1 Gmail ingestion | `LIVE_RUNTIME_WIRED` | format=full: decoded body (text/plain preferred, html fallback), To/CC/BCC, attachment metadata, 20k cap; unit-tested |
+| B2 Drive ingestion | `LIVE_RUNTIME_WIRED` | paginated across nextPageToken (cap 500); exports Docs/Sheets/text content; unit-tested |
+| B3 GitHub ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | event stream + repositories (paginated via Link header); issues/PRs/reviews/commits still open |
+| B4 Ingest→Brain enqueue | `LIVE_RUNTIME_WIRED` | connector ingest auto-enqueues Company Brain processing (idempotent, fire-and-forget); unit-tested |
 | C1 Provenance states | `PARTIAL` | no `human_approved`/`evidence_backed`/`expired` artifact state; source-less V2 entity can enter context |
 | C2 Stable identifiers | `ROADMAP` | no `CompanyEntityIdentifier`; `properties::TEXT ILIKE '%...%'` |
 | C3 Retrieval | `LIVE_RUNTIME_WIRED` / `PARTIAL` | alias+ILIKE+ts_rank+graph, additive weighted; no vector/temporal/authority/confidence |
 | C4 Typed claims + policy | `PARTIAL` | untyped JSONB; one universal threshold; no per-predicate policy |
 | C5 Source authority | `UNIT_PROVEN` | global hardcoded constants; not per-tenant/per-predicate |
-| C6 Accuracy benchmark | `ROADMAP` | none exists |
+| C6 Accuracy benchmark | `LIVE_RUNTIME_WIRED` | pure entity-resolver + deterministic trap corpus (name collision, source scoping, cross-tenant, missed-merge) scored by precision/recall/F1/false-merge/missed-merge; CI-gated (F1=1.000) |
 | D1 Artifact harvesting | `LIVE_RUNTIME_WIRED` / `PARTIAL` | pure `harvestRunEvidence` helper harvests best-effort artifact ids from `taskResults`; full worker artifact emission still open |
 | D2 Failure-class propagation | `LIVE_RUNTIME_WIRED` | `failureClassByTask` now derived from `state.failureDiagnoses` and spread into `FinishedRun` (D2 wired); not production-proven |
 | D3 Metrics | `PARTIAL` | only `accumulatedCostUsd` |
