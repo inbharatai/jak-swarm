@@ -2,7 +2,7 @@ import { ToolCategory, ToolRiskClass, openAIChatTokenLimitParam } from '@jak-swa
 import type { ToolExecutionContext } from '@jak-swarm/shared';
 import { toolRegistry } from '../registry/tool-registry.js';
 import { getMemoryAdapter } from '../adapters/memory/db-memory.adapter.js';
-import { getEmailAdapter, getCalendarAdapter, resolveCrmAdapterForContext, hasRealAdapters } from '../adapters/adapter-factory.js';
+import { resolveCrmAdapterForContext, resolveEmailAdapterForContext, resolveCalendarAdapterForContext, hasRealAdapters } from '../adapters/adapter-factory.js';
 import {
   searchStrategyChain,
   searchDuckDuckGoLegacy as searchDuckDuckGo,
@@ -10,12 +10,15 @@ import {
   fetchPageContent,
 } from '../adapters/search/index.js';
 
-const emailAdapter = getEmailAdapter();
-const calendarAdapter = getCalendarAdapter();
-// NOTE: there is deliberately NO module-level CRM adapter. CRM is resolved
-// per tool execution via resolveCrmAdapterForContext(context) so every call
-// is scoped to the trusted context.tenantId — never a process-global
-// singleton that would bind the whole process to one tenant's CRM data.
+// NOTE: there is deliberately NO module-level adapter for email, calendar,
+// or CRM. All three are resolved PER tool execution via
+// resolveEmailAdapterForContext(context) / resolveCalendarAdapterForContext
+// (context) / resolveCrmAdapterForContext(context) so every call is scoped
+// to the trusted context.tenantId — never a process-global singleton that
+// would bind the whole process to one tenant's email/calendar/CRM data
+// (rule-7). getEmailAdapter/getCalendarAdapter/hasRealAdapters remain
+// exported from adapter-factory for boot diagnostics + the security
+// guardrail test, but are NOT used as shared singletons by the tools.
 
 // Boot diagnostic — fires once per process. Suppressed in test runs
 // because vitest workers re-import this module on every spawn and the
@@ -133,9 +136,9 @@ export function registerBuiltinTools(): void {
       },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
-      const { filter } = (input as { filter?: Parameters<typeof emailAdapter.listMessages>[0] }) ?? {};
-      return emailAdapter.listMessages(filter ?? {});
+    async (input: unknown, context: ToolExecutionContext) => {
+      const { filter } = (input as { filter?: Parameters<ReturnType<typeof resolveEmailAdapterForContext>['listMessages']>[0] }) ?? {};
+      return resolveEmailAdapterForContext(context).listMessages(filter ?? {});
     },
   );
 
@@ -163,9 +166,9 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { draft: { type: 'object' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { to, subject, body, cc } = input as { to: string[]; subject: string; body: string; cc?: string[] };
-      return emailAdapter.createDraft(to, subject, body, cc);
+      return resolveEmailAdapterForContext(context).createDraft(to, subject, body, cc);
     },
   );
 
@@ -190,9 +193,9 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { success: { type: 'boolean' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
+    async (input: unknown, context: ToolExecutionContext) => {
       const { draftId } = input as { draftId: string };
-      await emailAdapter.sendDraft(draftId);
+      await resolveEmailAdapterForContext(context).sendDraft(draftId);
       return { success: true, draftId, sentAt: new Date().toISOString() };
     },
   );
@@ -222,9 +225,9 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { events: { type: 'array' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
-      const filter = input as Parameters<typeof calendarAdapter.listEvents>[0] ?? {};
-      return calendarAdapter.listEvents(filter);
+    async (input: unknown, context: ToolExecutionContext) => {
+      const filter = input as Parameters<ReturnType<typeof resolveCalendarAdapterForContext>['listEvents']>[0] ?? {};
+      return resolveCalendarAdapterForContext(context).listEvents(filter);
     },
   );
 
@@ -254,8 +257,8 @@ export function registerBuiltinTools(): void {
       outputSchema: { type: 'object', properties: { event: { type: 'object' } } },
       version: '1.0.0',
     },
-    async (input: unknown, _context: ToolExecutionContext) => {
-      return calendarAdapter.createEvent(input as Parameters<typeof calendarAdapter.createEvent>[0]);
+    async (input: unknown, context: ToolExecutionContext) => {
+      return resolveCalendarAdapterForContext(context).createEvent(input as Parameters<ReturnType<typeof resolveCalendarAdapterForContext>['createEvent']>[0]);
     },
   );
 

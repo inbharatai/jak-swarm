@@ -214,6 +214,29 @@ export interface ToolExecutionContext {
     salesforce?: { accessToken: string; instanceUrl: string };
   };
   /**
+   * Per-tenant Gmail (IMAP/SMTP) credentials, decrypted by apps/api's
+   * credential service from the tenant's Integration row and forwarded on
+   * the execution context. Used by the email tool resolver to build a
+   * tenant-scoped GmailImapAdapter (never read from process env in a
+   * multi-tenant deployment). Carries the app-password shape that
+   * GmailImapAdapter consumes; an OAuth-access-token Gmail connection is
+   * NOT driveable by the IMAP adapter yet and is left unset (tool resolves
+   * to Unconfigured rather than silently using another tenant's creds).
+   */
+  emailCredentials?: {
+    email: string;
+    appPassword: string;
+  };
+  /**
+   * Per-tenant CalDAV calendar credentials, decrypted by apps/api's
+   * credential service and forwarded on the execution context. Same
+   * tenant-isolation contract as {@link crmCredentials} / {@link emailCredentials}.
+   */
+  calendarCredentials?: {
+    email: string;
+    appPassword: string;
+  };
+  /**
    * Coarse plan tier for gating paid external services. Populated from the
    * tenant's Subscription at workflow creation. Undefined = no gate (permissive).
    */
