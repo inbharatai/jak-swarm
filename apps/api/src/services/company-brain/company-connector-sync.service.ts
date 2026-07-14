@@ -223,6 +223,19 @@ export interface GmailAttachmentMeta {
  * text/html, and attachment metadata (filename / mimeType / size / attachmentId).
  * Pure + recursive -- no I/O. Used by syncGmail to build a real evidence body.
  */
+/**
+ * Pure decision: can a Drive file be exported as inline text for the brain,
+ * and via which mechanism? Google Docs/Sheets -> export endpoint; plain
+ * text/json -> alt=media. Binary / Slides / unknown -> null (metadata only).
+ * Exported so the content decision is unit-testable without HTTP.
+ */
+export function driveExportPlan(mimeType: string): { kind: 'export_text' | 'media' } | null {
+  if (mimeType === 'application/vnd.google-apps.document') return { kind: 'export_text' };
+  if (mimeType === 'application/vnd.google-apps.spreadsheet') return { kind: 'export_text' };
+  if (mimeType.startsWith('text/')) return { kind: 'media' };
+  if (mimeType === 'application/json') return { kind: 'media' };
+  return null;
+}
 export function extractGmailTextAndAttachments(payload: unknown): {
   text: string;
   html: string | null;
@@ -1027,30 +1040,42 @@ export class CompanyConnectorSyncService {
       throw new Error('Google Drive integration is connected but no usable access token was found. Reconnect Drive.');
     }
 
-    const listUrl = new URL('https://www.googleapis.com/drive/v3/files');
-    listUrl.searchParams.set('q', 'trashed=false');
-    listUrl.searchParams.set('orderBy', 'modifiedTime desc');
-    listUrl.searchParams.set('pageSize', '100');
-    listUrl.searchParams.set(
-      'fields',
-      'files(id,name,mimeType,modifiedTime,webViewLink,owners(displayName),size),nextPageToken',
-    );
+    // B2: unbounded pagination across nextPageToken (the old single request capped
+    // at 100 files and silently dropped the rest). Cap at a sane 500 to avoid a
+    // runaway sync, but no longer loses pages.
+    const MAX_DRIVE_FILES = 500;
+    const files: Array<Record<string, unknown>> = [];
+    let pageToken: string | null = null;
+    let pages = 0;
+    do {
+      const listUrl = new URL('https://www.googleapis.com/drive/v3/files');
+      listUrl.searchParams.set('q', 'trashed=false');
+      listUrl.searchParams.set('orderBy', 'modifiedTime desc');
+      listUrl.searchParams.set('pageSize', '100');
+      listUrl.searchParams.set(
+        'fields',
+        'files(id,name,mimeType,modifiedTime,webViewLink,owners(displayName),size),nextPageToken',
+      );
+      if (pageToken) listUrl.searchParams.set('pageToken', pageToken);
 
-    const listRes = await fetch(listUrl.toString(), {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!listRes.ok) {
-      const body = await listRes.text().catch(() => '');
-      throw new Error(`Google Drive API failed (${listRes.status}): ${body.slice(0, 300)}`);
-    }
-
-    const listJson = await listRes.json() as { files?: Array<Record<string, unknown>> };
-    const files = Array.isArray(listJson.files)
-      ? listJson.files.filter((file) => Boolean(safeRecord(file))) as Array<Record<string, unknown>>
-      : [];
+      const listRes = await fetch(listUrl.toString(), {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!listRes.ok) {
+        const body = await listRes.text().catch(() => '');
+        throw new Error(`Google Drive API failed (${listRes.status}): ${body.slice(0, 300)}`);
+      }
+      const listJson = await listRes.json() as { files?: Array<Record<string, unknown>>; nextPageToken?: string };
+      const pageFiles = Array.isArray(listJson.files)
+        ? listJson.files.filter((file) => Boolean(safeRecord(file))) as Array<Record<string, unknown>>
+        : [];
+      for (const f of pageFiles) {
+        files.push(f);
+        if (files.length >= MAX_DRIVE_FILES) break;
+      }
+      pageToken = asNonEmptyString(listJson.nextPageToken) ?? null;
+      pages += 1;
+    } while (pageToken && files.length < MAX_DRIVE_FILES && pages < 20);
 
     const previousModifiedIso = asNonEmptyString(input.cursor?.['lastModifiedAtIso']);
     const previousModifiedMs = previousModifiedIso ? Date.parse(previousModifiedIso) : 0;
@@ -1089,11 +1114,35 @@ export class CompanyConnectorSyncService {
         ? asNonEmptyString((safeRecord(owners[0]) ?? {})['displayName']) ?? undefined
         : undefined;
 
+      // B2: export the real content for text-editable files (Docs/Sheets/plain
+      // text). Binary/non-exportable files keep metadata only. Best-effort: a
+      // content-export failure degrades to metadata-only, never fails the sync.
+      const plan = driveExportPlan(mimeType);
+      let exportedText = '';
+      let contentTruncated = false;
+      if (plan) {
+        try {
+          const exportUrl = plan.kind === 'export_text'
+            ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text%2Fplain`
+            : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
+          const exportRes = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (exportRes.ok) {
+            const raw = await exportRes.text();
+            const MAX = 20_000;
+            contentTruncated = raw.length > MAX;
+            exportedText = contentTruncated ? raw.slice(0, MAX) + '\n…[truncated]' : raw;
+          }
+        } catch {
+          exportedText = '';
+        }
+      }
+
       const body = [
         `Google Drive file: ${name}`,
         `Mime type: ${mimeType}`,
         `Modified: ${modifiedTime}`,
         `Open: ${webViewLink ?? 'N/A'}`,
+        ...(exportedText ? ['', exportedText] : []),
       ].join('\n');
 
       try {
@@ -1113,6 +1162,9 @@ export class CompanyConnectorSyncService {
             size: asNonEmptyString(file['size']) ?? null,
             integrationProvider: input.integration.provider,
             owners,
+            exportedContent: exportedText.length > 0,
+            contentCharCount: exportedText.length,
+            contentTruncated,
           },
         });
         ingestedCount += 1;
