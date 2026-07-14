@@ -40,6 +40,10 @@ import {
   clearLLMApiKey,
 } from '../supervisor/llm-key-registry.js';
 import {
+  registerTenantCredentials,
+  clearTenantCredentials,
+} from '../supervisor/tenant-credential-registry.js';
+import {
   registerLifecycleEmitter,
   clearLifecycleEmitter,
 } from '../workflow-runtime/lifecycle-registry.js';
@@ -87,6 +91,17 @@ export interface RunParams {
   llmProvider?: 'openai' | 'gemini';
   /** Per-tenant decrypted API key for the selected provider (side-channel only). */
   llmApiKey?: string;
+  /**
+   * Per-tenant decrypted connector credentials (side-channel only — never
+   * persisted to SwarmState). Resolved by apps/api's credential service
+   * from the tenant's Integration rows and registered in the
+   * tenant-credential registry keyed by workflowId; worker nodes look
+   * them up by state.workflowId. Each field optional: a tenant may have
+   * connected Gmail but not Salesforce, etc.
+   */
+  emailCredentials?: { email: string; appPassword: string };
+  calendarCredentials?: { email: string; appPassword: string };
+  crmCredentials?: { salesforce?: { accessToken: string; instanceUrl: string } };
   /** Enable Google Search grounding for Gemini. Falls back to env var. */
   googleSearchGrounding?: boolean;
   /** Vertex AI Search datastore path for Gemini. Falls back to env var. */
@@ -322,6 +337,23 @@ export class SwarmRunner {
       registerLLMApiKey(workflowId, params.llmApiKey);
     }
 
+    // Per-tenant connector credentials side-channel. Same contract as
+    // the LLM key above: a Gmail app-password / Salesforce access token
+    // must never be threaded through SwarmState (which is serialized to
+    // the stateJson DB checkpoint), so decrypted connector creds travel
+    // via this in-memory registry keyed by workflowId. Worker nodes look
+    // them up by state.workflowId when building the AgentContext. Cleared
+    // in the finally block below. Deliberately NOT forwarded into
+    // runtime.start (which builds SwarmState) — only the registry carries
+    // the secret.
+    if (params.emailCredentials || params.calendarCredentials || params.crmCredentials) {
+      registerTenantCredentials(workflowId, {
+        ...(params.emailCredentials ? { emailCredentials: params.emailCredentials } : {}),
+        ...(params.calendarCredentials ? { calendarCredentials: params.calendarCredentials } : {}),
+        ...(params.crmCredentials ? { crmCredentials: params.crmCredentials } : {}),
+      });
+    }
+
     const timeoutMs = params.timeoutMs ?? this.defaultTimeoutMs;
 
     try {
@@ -464,6 +496,7 @@ export class SwarmRunner {
       clearActivityEmitter(workflowId);
       clearLifecycleEmitter(workflowId);
       clearLLMApiKey(workflowId);
+      clearTenantCredentials(workflowId);
       cleanupSignals({ cancelled: this.cancelledWorkflows, paused: this.pausedWorkflows }, workflowId);
     }
   }

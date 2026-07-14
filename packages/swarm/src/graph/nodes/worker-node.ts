@@ -6,6 +6,7 @@ import { getCircuitBreaker, CircuitOpenError } from '../../supervisor/circuit-br
 import { getBreakerFactory } from '../../supervisor/breaker-registry.js';
 import { getActivityEmitter } from '../../supervisor/activity-registry.js';
 import { getLLMApiKey } from '../../supervisor/llm-key-registry.js';
+import { getTenantCredentials } from '../../supervisor/tenant-credential-registry.js';
 import { createWorkerAgent } from './worker/agent-factory.js';
 import { buildTaskInput } from './worker/task-input-builders.js';
 import {
@@ -92,6 +93,12 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
     ...(state.llmProvider && getLLMApiKey(state.workflowId)
       ? { llmApiKey: getLLMApiKey(state.workflowId) }
       : {}),
+    // Per-tenant connector credentials from the side-channel registry
+    // (never persisted to SwarmState — a Gmail app-password / Salesforce
+    // access token must not land in the stateJson DB checkpoint). The
+    // registry is keyed by workflowId, which is already on state, so the
+    // lookup carries no secret through the persisted state.
+    ...(getTenantCredentials(state.workflowId) ?? {}),
     // Google grounding config (Gemini-only; ignored by OpenAI)
     ...(state.googleSearchGrounding !== undefined ? { googleSearchGrounding: state.googleSearchGrounding } : {}),
     ...(state.vertexAISearchDatastore !== undefined ? { vertexAISearchDatastore: state.vertexAISearchDatastore } : {}),

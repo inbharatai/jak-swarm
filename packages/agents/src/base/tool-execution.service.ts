@@ -200,6 +200,15 @@ export class ToolExecutionService {
       idempotencyKey: context.idempotencyKey,
       allowedDomains: context.allowedDomains,
       subscriptionTier: context.subscriptionTier,
+      // Forward per-tenant connector credentials from the in-memory
+      // AgentContext (populated from the tenant-credential side-channel
+      // registry, never from serialized SwarmState) so the email/calendar/
+      // CRM tool resolvers can build tenant-scoped adapters. Undefined when
+      // the tenant hasn't connected a provider → resolver returns its
+      // Unconfigured stub (which throws on use), never another tenant's creds.
+      ...(context.emailCredentials ? { emailCredentials: context.emailCredentials } : {}),
+      ...(context.calendarCredentials ? { calendarCredentials: context.calendarCredentials } : {}),
+      ...(context.crmCredentials ? { crmCredentials: context.crmCredentials } : {}),
     };
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
