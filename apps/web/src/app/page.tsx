@@ -11,7 +11,8 @@ import LandingNavClient from '@/components/landing/LandingNavClient';
 // after hydration). Skeletons flash only during client-side navigation.
 const HeroCockpit = dynamic(() => import('@/components/landing/HeroCockpit'));
 const PainSection = dynamic(() => import('@/components/landing/PainSection'), { loading: () => <SectionSkeleton /> });
-const WhatJakDoes = dynamic(() => import('@/components/landing/WhatJakDoes'), { loading: () => <SectionSkeleton /> });
+const CompanyBrain = dynamic(() => import('@/components/landing/CompanyBrain'), { loading: () => <SectionSkeleton /> });
+const Hyperagent = dynamic(() => import('@/components/landing/Hyperagent'), { loading: () => <SectionSkeleton /> });
 const HowItWorks = dynamic(() => import('@/components/landing/HowItWorks'), { loading: () => <SectionSkeleton /> });
 const ProductCockpit = dynamic(() => import('@/components/landing/ProductCockpit'), { loading: () => <SectionSkeleton /> });
 const ShowTheWork = dynamic(() => import('@/components/landing/ShowTheWork'), { loading: () => <SectionSkeleton /> });
@@ -233,7 +234,7 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'SoftwareApplication',
             name: 'JAK Swarm',
-            description: 'The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
+            description: 'Two engines — a Company Brain and a Hyperagent — that turn company evidence into approved, self-healing agent work. 38 specialist agents, 122 classified tools, human approvals on every high-risk action.',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',
             offers: [
@@ -243,6 +244,8 @@ export default function HomePage() {
               { '@type': 'Offer', price: '249', priceCurrency: 'USD', name: 'Enterprise' },
             ],
             featureList: [
+              'Company Brain — evidence graph, drift detection, executable specs',
+              'Hyperagent — self-healing re-plan loop and governed self-learning',
               '38 specialist agents',
               '122 classified tools',
               '22 integrations',
@@ -301,17 +304,16 @@ export default function HomePage() {
               JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through specialist agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
             </p>
 
-            {/* Capability strip. Every term below maps to real product code:
-                 CompanyArtifact/CompanyGraphEntity/ExecutionDriftFinding/
-                 AgentExecutableSpec plus the JAK Shield approval and audit
-                 surfaces. */}
+            {/* Capability strip. Names the two flagship engines (Company Brain +
+                 Hyperagent) alongside JAK Shield, the 38-agent runtime, and the
+                 approval + audit surfaces. Every term maps to real product code. */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
               {[
-                'Evidence Graph',
-                'Drift Detection',
-                'Executable Specs',
-                'Approvals',
+                'Company Brain',
+                'Hyperagent',
                 'JAK Shield',
+                '38 Agents',
+                'Approvals',
                 'Audit Trail',
               ].map((pillar) => (
                 <span
@@ -392,8 +394,14 @@ export default function HomePage() {
         {/* ── 2. Pain framing — why fragmented context breaks execution. */}
         <PainSection />
 
-        {/* ── 3. Company OS wedge — evidence -> graph -> drift -> specs. */}
-        <WhatJakDoes />
+        {/* ── 3. Company Brain — Engine 01: evidence -> graph -> drift -> specs.
+             The first flagship engine, branded and linked to /company. */}
+        <CompanyBrain />
+
+        {/* ── 3b. Hyperagent — Engine 02: self-healing re-plan + governed
+             self-learning. Honest: integration-proven, default-off, not
+             production-proven. Linked to /hyperagent. */}
+        <Hyperagent />
 
         {/* ── 4. How It Works — 7-step pipeline (Command → Plan → Route →
              Execute → Approve → Verify → Deliver). Replaces the prior

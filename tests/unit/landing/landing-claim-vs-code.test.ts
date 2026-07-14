@@ -75,12 +75,14 @@ describe('Landing — Hero', () => {
   });
 });
 
-describe('Landing — Company OS wedge (YC thesis, beta-honest)', () => {
-  const COMPANY = 'apps/web/src/components/landing/WhatJakDoes.tsx';
+describe('Landing — Company Brain (Engine 01, beta-honest)', () => {
+  // Renamed from WhatJakDoes.tsx → CompanyBrain.tsx so the engine has a name
+  // on the landing page. The #company-os anchor is preserved for nav/footer.
+  const COMPANY = 'apps/web/src/components/landing/CompanyBrain.tsx';
 
-  it('WhatJakDoes is exported and rendered on the live homepage', () => {
-    expect(contains('apps/web/src/components/landing/index.ts', /export \{ default as WhatJakDoes \}/)).toBe(true);
-    expect(contains('apps/web/src/app/page.tsx', /<WhatJakDoes\s*\/>/)).toBe(true);
+  it('CompanyBrain is exported and rendered on the live homepage', () => {
+    expect(contains('apps/web/src/components/landing/index.ts', /export \{ default as CompanyBrain \}/)).toBe(true);
+    expect(contains('apps/web/src/app/page.tsx', /<CompanyBrain\s*\/>/)).toBe(true);
     expect(contains(COMPANY, /id="company-os"/)).toBe(true);
   });
 
@@ -118,6 +120,35 @@ describe('Landing — Company OS wedge (YC thesis, beta-honest)', () => {
     expect(src).toMatch(/Connector sync is setup-dependent/i);
     expect(src).toMatch(/still needs deeper connector auto-sync/i);
     expect(src).not.toMatch(/complete company-wide operating system/i);
+  });
+});
+
+describe('Landing — Hyperagent (Engine 02, integration-proven not production-proven)', () => {
+  const HYPER = 'apps/web/src/components/landing/Hyperagent.tsx';
+
+  it('Hyperagent is exported and rendered on the live homepage', () => {
+    expect(contains('apps/web/src/components/landing/index.ts', /export \{ default as Hyperagent \}/)).toBe(true);
+    expect(contains('apps/web/src/app/page.tsx', /<Hyperagent\s*\/>/)).toBe(true);
+  });
+
+  it('names the self-healing loop and is honest it is not production-proven', () => {
+    const src = read(HYPER);
+    expect(src).toMatch(/self-healing/i);
+    expect(src).toMatch(/re-plan/i);
+    // Must NOT overclaim live production status.
+    expect(src).toMatch(/not production-proven|integration-proven/i);
+    expect(src).toMatch(/default-off|artifacts: \[\]|Open edge/i);
+    // No banned autonomy overclaim.
+    expect(src).not.toMatch(/autonomous multi-agent AI platform/i);
+  });
+
+  it('hyperagent evidence paths exist on disk', () => {
+    const src = read(HYPER);
+    const paths = Array.from(src.matchAll(/evidencePath:\s*'([^']+)'/g)).map((m) => m[1]!);
+    expect(paths.length).toBeGreaterThanOrEqual(2);
+    for (const p of paths) {
+      expect(exists(p), `evidencePath ${p} missing on disk`).toBe(true);
+    }
   });
 });
 
@@ -341,7 +372,8 @@ describe('Landing — public marketing copy stays honest', () => {
     const sources = [
       'apps/web/src/app/page.tsx',
       'apps/web/src/components/landing/JAKShield.tsx',
-      'apps/web/src/components/landing/WhatJakDoes.tsx',
+      'apps/web/src/components/landing/CompanyBrain.tsx',
+      'apps/web/src/components/landing/Hyperagent.tsx',
       'apps/web/src/components/landing/ShowTheWork.tsx',
       'apps/web/src/components/landing/TrustLayer.tsx',
       'apps/web/src/components/landing/PremiumCTA.tsx',
