@@ -146,6 +146,7 @@ export type ArtifactType =
   | 'support_ticket'
   | 'email'
   | 'decision_note'
+  | 'repository'
   | 'other';
 
 const EntityTypeSchema = z.enum([

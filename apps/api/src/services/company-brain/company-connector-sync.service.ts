@@ -229,6 +229,21 @@ export interface GmailAttachmentMeta {
  * text/json -> alt=media. Binary / Slides / unknown -> null (metadata only).
  * Exported so the content decision is unit-testable without HTTP.
  */
+/**
+ * Parse a GitHub Link header and return the rel="next" URL (or null).
+ * GitHub paginates repos/events via the Link header, not a JSON field.
+ * Exported so pagination is unit-testable without HTTP.
+ */
+export function parseGitHubNextLink(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(',')) {
+    if (part.includes('rel="next"')) {
+      const m = part.match(/<([^>]+)>/);
+      return m ? (m[1] ?? null) : null;
+    }
+  }
+  return null;
+}
 export function driveExportPlan(mimeType: string): { kind: 'export_text' | 'media' } | null {
   if (mimeType === 'application/vnd.google-apps.document') return { kind: 'export_text' };
   if (mimeType === 'application/vnd.google-apps.spreadsheet') return { kind: 'export_text' };
@@ -743,6 +758,13 @@ export class CompanyConnectorSyncService {
       throw new Error('GitHub integration is connected but no usable access token was found. Reconnect GitHub.');
     }
 
+    const repoErrors: string[] = [];
+    // B3: ingest the user's repositories (real repo evidence), not just the
+    // activity stream. Best-effort -- a repo-list failure degrades to events-only.
+    const repoResult = await this.syncGitHubRepos(input, token).catch((err: unknown) => {
+      repoErrors.push(err instanceof Error ? err.message : String(err));
+      return { fetched: 0, ingested: 0, skipped: 0, errors: [] as string[] };
+    });
     const res = await fetch('https://api.github.com/user/events?per_page=50', {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -781,6 +803,7 @@ export class CompanyConnectorSyncService {
     let invalidCount = 0;
     let newestEventIso = cursorEventIso ?? null;
     const perItemErrors: string[] = [];
+    perItemErrors.push(...repoErrors, ...repoResult.errors);
 
     for (const candidate of candidates) {
       const event = candidate.event;
@@ -847,10 +870,10 @@ export class CompanyConnectorSyncService {
       }
     }
 
-    const skippedCount = (events.length - candidates.length) + invalidCount + perItemErrors.length;
+    const skippedCount = repoResult.skipped + (events.length - candidates.length) + invalidCount + perItemErrors.length;
     return {
-      fetchedCount: events.length,
-      ingestedCount,
+      fetchedCount: repoResult.fetched + events.length,
+      ingestedCount: repoResult.ingested + ingestedCount,
       skippedCount,
       cursor: newestEventIso ? { lastEventAtIso: newestEventIso } : input.cursor,
       metadata: perItemErrors.length > 0
@@ -1028,6 +1051,85 @@ export class CompanyConnectorSyncService {
     };
   }
 
+  /**
+   * B3: ingest the user's GitHub repositories (real repo metadata +
+   * description + topics + language + stars), not just the activity stream.
+   * Paginates via the Link header (cap 50 / 5 pages). Best-effort: a repo-list
+   * failure degrades to events-only, never fails the whole sync.
+   */
+  private async syncGitHubRepos(
+    input: { tenantId: string; userId: string; provider: CompanySyncProvider; integration: IntegrationRow },
+    token: string,
+  ): Promise<{ fetched: number; ingested: number; skipped: number; errors: string[] }> {
+    const errors: string[] = [];
+    const fetched: Array<Record<string, unknown>> = [];
+    let nextUrl: string | null = 'https://api.github.com/user/repos?per_page=100&sort=updated&direction=desc';
+    let pages = 0;
+    const MAX_REPOS = 50;
+    while (nextUrl && pages < 5 && fetched.length < MAX_REPOS) {
+      const res = await fetch(nextUrl, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'jak-company-sync' },
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        errors.push(`repos list ${res.status}: ${body.slice(0, 160)}`);
+        break;
+      }
+      const arr = await res.json() as unknown;
+      const page = Array.isArray(arr) ? arr.filter((i) => Boolean(safeRecord(i))) as Array<Record<string, unknown>> : [];
+      for (const r of page) { fetched.push(r); if (fetched.length >= MAX_REPOS) break; }
+      nextUrl = parseGitHubNextLink(res.headers.get('link'));
+      pages += 1;
+    }
+
+    let ingested = 0;
+    let skipped = 0;
+    for (const repo of fetched) {
+      const repoId = asNonEmptyString(repo['id'] != null ? String(repo['id']) : null);
+      const fullName = asNonEmptyString(repo['full_name']) ?? asNonEmptyString(repo['name']) ?? 'unknown/repo';
+      const updatedAt = asNonEmptyString(repo['updated_at']);
+      if (!repoId) { skipped += 1; continue; }
+      const description = asNonEmptyString(repo['description']) ?? '';
+      const language = asNonEmptyString(repo['language']) ?? null;
+      const stars = typeof repo['stargazers_count'] === 'number' ? repo['stargazers_count'] : null;
+      const topics = Array.isArray(repo['topics']) ? repo['topics'] : [];
+      const defaultBranch = asNonEmptyString(repo['default_branch']) ?? null;
+      const htmlUrl = asNonEmptyString(repo['html_url']) ?? undefined;
+      const owner = safeRecord(repo['owner']);
+      const ownerLogin = asNonEmptyString(owner?.['login']) ?? undefined;
+      const isPrivate = repo['private'] === true;
+      const body = [
+        `GitHub repository: ${fullName}`,
+        `Description: ${description || '(none)'}`,
+        `Language: ${language ?? 'unknown'}`,
+        `Stars: ${stars ?? 0}`,
+        `Default branch: ${defaultBranch ?? 'unknown'}`,
+        `Private: ${isPrivate}`,
+        `Topics: ${Array.isArray(topics) ? topics.join(', ') : ''}`,
+        `Updated: ${updatedAt ?? 'unknown'}`,
+      ].join('\n');
+      try {
+        await this.ingestAndEnqueue({
+          tenantId: input.tenantId,
+          userId: input.userId,
+          sourceType: companySyncProviderToArtifactSource(input.provider),
+          artifactType: 'repository',
+          title: fullName,
+          body,
+          externalId: repoId,
+          sourceUrl: htmlUrl,
+          authorName: ownerLogin,
+          occurredAt: updatedAt ?? undefined,
+          metadata: { fullName, language, stars, topics, defaultBranch, private: isPrivate, integrationProvider: input.integration.provider },
+        });
+        ingested += 1;
+      } catch (err) {
+        skipped += 1;
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    return { fetched: fetched.length, ingested, skipped, errors };
+  }
   private async syncGoogleDrive(input: {
     tenantId: string;
     userId: string;
