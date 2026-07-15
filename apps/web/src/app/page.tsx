@@ -248,7 +248,7 @@ export default function HomePage() {
               'Hyperagent — self-healing re-plan loop and governed self-learning',
               '38 specialist agents',
               '122 classified tools',
-              '22 integrations',
+              '15 connectors',
               'Human approval gates',
               'Audit trail',
               'Audit-ready SOC 2 evidence',
