@@ -377,11 +377,11 @@
 | A9 Sync atomicity | `LIVE_RUNTIME_WIRED` | atomic conditional updateMany claim (where status != running); manual + scheduled share the guard; unit-tested |
 | B1 Gmail ingestion | `LIVE_RUNTIME_WIRED` | format=full: decoded body (text/plain preferred, html fallback), To/CC/BCC, attachment metadata, 20k cap; unit-tested |
 | B2 Drive ingestion | `LIVE_RUNTIME_WIRED` | paginated across nextPageToken (cap 500); exports Docs/Sheets/text content; unit-tested |
-| B3 GitHub ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | event stream + repositories (paginated via Link header); issues/PRs/reviews/commits still open |
+| B3 GitHub ingestion | `LIVE_RUNTIME_WIRED` | event stream + repositories + recent issues/PRs (top 5 repos, /issues endpoint, PR classified via pull_request field); reviews/commits still open |
 | B4 Ingest→Brain enqueue | `LIVE_RUNTIME_WIRED` | connector ingest auto-enqueues Company Brain processing (idempotent, fire-and-forget); unit-tested |
 | C1 Provenance states | `LIVE_RUNTIME_WIRED` (gate) / `PARTIAL` (state enum) | provenance gate drops source-less V2 entities from agent context (hasEntityProvenance, unit-tested); artifact state enum (human_approved/evidence_backed/expired) still open |
 | C2 Stable identifiers | `ROADMAP` | no `CompanyEntityIdentifier`; `properties::TEXT ILIKE '%...%'` |
-| C3 Retrieval | `LIVE_RUNTIME_WIRED` / `PARTIAL` | alias+ILIKE+ts_rank+graph, additive weighted; no vector/temporal/authority/confidence |
+| C3 Retrieval | `LIVE_RUNTIME_WIRED` | alias+ILIKE+ts_rank+graph + temporal recency + entity confidence signals (compositeEntityScore), RRF primitive exported; vector/embedding half still open |
 | C4 Typed claims + policy | `LIVE_RUNTIME_WIRED` (policy) / `PARTIAL` (typed value) | per-predicate activation policy (CLAIM_ACTIVATION_POLICY + claimActivationThreshold) raises the bar for high-stakes predicates (deadline/owner/revenue); typed value discriminator still open |
 | C5 Source authority | `UNIT_PROVEN` | global hardcoded constants; not per-tenant/per-predicate |
 | C6 Accuracy benchmark | `LIVE_RUNTIME_WIRED` | pure entity-resolver + deterministic trap corpus (name collision, source scoping, cross-tenant, missed-merge) scored by precision/recall/F1/false-merge/missed-merge; CI-gated (F1=1.000) |

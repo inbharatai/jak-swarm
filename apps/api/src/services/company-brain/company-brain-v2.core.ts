@@ -742,6 +742,10 @@ export const RETRIEVAL_WEIGHTS = {
   identifier: 0.95,
   keyword: 0.6,
   graphNeighbor: 0.25,
+  // C3: temporal + confidence signals (small boosts so a recent high-confidence
+  // entity edges out an old low-confidence one among ties).
+  recency: 0.10,
+  confidence: 0.08,
 } as const;
 
 export interface RelevanceSignal {
@@ -751,6 +755,10 @@ export interface RelevanceSignal {
   keywordRank: number;
   /** True if reached via a graph edge from another matched entity. */
   graphNeighbor: boolean;
+  /** C3: temporal recency in [0,1] (1 = most recent). */
+  recency?: number;
+  /** C3: entity extraction confidence in [0,1]. */
+  confidence?: number;
 }
 
 export function compositeEntityScore(signal: RelevanceSignal): number {
@@ -759,7 +767,36 @@ export function compositeEntityScore(signal: RelevanceSignal): number {
   if (signal.identifier) score += RETRIEVAL_WEIGHTS.identifier;
   if (signal.keywordRank > 0) score += RETRIEVAL_WEIGHTS.keyword * Math.min(1, signal.keywordRank);
   if (signal.graphNeighbor) score += RETRIEVAL_WEIGHTS.graphNeighbor;
+  if (signal.recency) score += RETRIEVAL_WEIGHTS.recency * clamp01(signal.recency);
+  if (signal.confidence) score += RETRIEVAL_WEIGHTS.confidence * clamp01(signal.confidence);
   return Math.min(1, score);
+}
+
+/** C3: entity recency in [0,1] with a half-year linear decay from occurredAt (falls back to updatedAt). Pure. */
+export function entityRecencyScore(row: { occurredAt?: Date | string | null; updatedAt?: Date | string }, now: Date = new Date()): number {
+  const t = row.occurredAt ?? row.updatedAt;
+  if (!t) return 0;
+  const ms = t instanceof Date ? t.getTime() : Date.parse(String(t));
+  if (!Number.isFinite(ms)) return 0;
+  const ageDays = Math.max(0, (now.getTime() - ms) / 86_400_000);
+  return clamp01(1 - ageDays / 180);
+}
+
+/**
+ * Reciprocal Rank Fusion (truth-doc C3): combine multiple ranked lists into a
+ * single score by summing 1/(k + rank) per list. Pure + deterministic. Ready to
+ * wire as the retrieval fusion once per-channel ranked lists are surfaced; the
+ * live path currently uses additive scoring enriched with recency/confidence.
+ */
+export function reciprocalRankFusion<T>(rankedLists: T[][], k = 60): Map<T, number> {
+  const scores = new Map<T, number>();
+  for (const list of rankedLists) {
+    for (let rank = 0; rank < list.length; rank++) {
+      const item = list[rank]!;
+      scores.set(item, (scores.get(item) ?? 0) + 1 / (k + rank + 1));
+    }
+  }
+  return scores;
 }
 
 export interface BudgetedItem {

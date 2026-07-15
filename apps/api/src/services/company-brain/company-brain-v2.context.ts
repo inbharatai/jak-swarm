@@ -3,7 +3,10 @@ import {
   ARTIFACT_WITH_POLICY_SELECT,
   buildContextText,
   canAgentAccessArtifact,
+  clamp01,
+  entityRecencyScore,
   hasEntityProvenance,
+  type RelevanceSignal,
   compositeEntityScore,
   contextPackageId,
   COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION,
@@ -27,12 +30,7 @@ import { CompanyBrainReviewStore } from './company-brain-v2.review.js';
 
 interface CandidateEntity {
   row: CompanyEntityV2Row;
-  signal: {
-    exactAlias: boolean;
-    identifier: boolean;
-    keywordRank: number;
-    graphNeighbor: boolean;
-  };
+  signal: RelevanceSignal;
 }
 
 export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
@@ -105,6 +103,8 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
           existing.signal.identifier ||= signal.identifier ?? false;
           existing.signal.keywordRank = Math.max(existing.signal.keywordRank, signal.keywordRank ?? 0);
           existing.signal.graphNeighbor ||= signal.graphNeighbor ?? false;
+          existing.signal.recency = Math.max(existing.signal.recency ?? 0, entityRecencyScore(row));
+          existing.signal.confidence = Math.max(existing.signal.confidence ?? 0, clamp01(row.confidence ?? 0.5));
         } else {
           byId.set(row.id, {
             row,
@@ -113,6 +113,8 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
               identifier: signal.identifier ?? false,
               keywordRank: signal.keywordRank ?? 0,
               graphNeighbor: signal.graphNeighbor ?? false,
+              recency: entityRecencyScore(row),
+              confidence: clamp01(row.confidence ?? 0.5),
             },
           });
         }

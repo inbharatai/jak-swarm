@@ -234,6 +234,14 @@ export interface GmailAttachmentMeta {
  * GitHub paginates repos/events via the Link header, not a JSON field.
  * Exported so pagination is unit-testable without HTTP.
  */
+/**
+ * B3: classify a GitHub /issues item as a pull_request or an issue. The
+ * /issues endpoint returns BOTH issues and PRs; PRs carry a `pull_request`
+ * object. Pure + exported so the classification is unit-testable.
+ */
+export function githubIssueArtifactType(item: Record<string, unknown>): 'pull_request' | 'issue' {
+  return safeRecord(item['pull_request']) ? 'pull_request' : 'issue';
+}
 export function parseGitHubNextLink(linkHeader: string | null): string | null {
   if (!linkHeader) return null;
   for (const part of linkHeader.split(',')) {
@@ -1128,7 +1136,78 @@ export class CompanyConnectorSyncService {
         errors.push(err instanceof Error ? err.message : String(err));
       }
     }
-    return { fetched: fetched.length, ingested, skipped, errors };
+
+    // B3 remainder: for the 5 most-recently-updated repos, ingest recent
+    // issues + PRs (the /issues endpoint returns both; a `pull_request` field
+    // marks PRs). Capped at 5 repos x 20 items so the sync stays bounded.
+    let issueFetched = 0;
+    let issueIngested = 0;
+    let issueSkipped = 0;
+    const topRepos = fetched
+      .map((r) => ({ fullName: asNonEmptyString(r['full_name']) ?? asNonEmptyString(r['name']) ?? '', updatedAt: asNonEmptyString(r['updated_at']) ?? null }))
+      .filter((r) => r.fullName.length > 0)
+      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+      .slice(0, 5);
+    for (const repo of topRepos) {
+      try {
+        const issuesRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(repo.fullName)}/issues?state=all&sort=updated&direction=desc&per_page=20`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'jak-company-sync' },
+        });
+        if (!issuesRes.ok) {
+          const bdy = await issuesRes.text().catch(() => '');
+          errors.push(`issues ${repo.fullName} ${issuesRes.status}: ${bdy.slice(0, 120)}`);
+          continue;
+        }
+        const arr = await issuesRes.json() as unknown;
+        const items = Array.isArray(arr) ? arr.filter((i) => Boolean(safeRecord(i))) as Array<Record<string, unknown>> : [];
+        issueFetched += items.length;
+        for (const item of items) {
+          const number = typeof item['number'] === 'number' ? String(item['number']) : asNonEmptyString(item['number']);
+          if (!number) { issueSkipped += 1; continue; }
+          const title = asNonEmptyString(item['title']) ?? `#${number}`;
+          const state = asNonEmptyString(item['state']) ?? 'open';
+          const issueBody = asNonEmptyString(item['body']) ?? '';
+          const htmlUrl = asNonEmptyString(item['html_url']) ?? undefined;
+          const user = safeRecord(item['user']);
+          const author = asNonEmptyString(user?.['login']) ?? undefined;
+          const updatedAt = asNonEmptyString(item['updated_at']) ?? undefined;
+          const artifactType = githubIssueArtifactType(item);
+          const externalId = `${repo.fullName}#${number}`;
+          const cappedBody = issueBody.length > 4000 ? issueBody.slice(0, 4000) + '\n…[truncated]' : (issueBody || '(no body)');
+          const body = [
+            `GitHub ${artifactType} ${repo.fullName}#${number}: ${title}`,
+            `State: ${state}`,
+            `Author: ${author ?? 'unknown'}`,
+            `Updated: ${updatedAt ?? 'unknown'}`,
+            '',
+            cappedBody,
+          ].join('\n');
+          try {
+            await this.ingestAndEnqueue({
+              tenantId: input.tenantId,
+              userId: input.userId,
+              sourceType: companySyncProviderToArtifactSource(input.provider),
+              artifactType,
+              title: `${repo.fullName}#${number} ${title}`,
+              body,
+              externalId,
+              sourceUrl: htmlUrl,
+              authorName: author,
+              occurredAt: updatedAt,
+              metadata: { repo: repo.fullName, number, state, artifactType, integrationProvider: input.integration.provider },
+            });
+            issueIngested += 1;
+          } catch (err) {
+            issueSkipped += 1;
+            errors.push(err instanceof Error ? err.message : String(err));
+          }
+        }
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    return { fetched: fetched.length + issueFetched, ingested: ingested + issueIngested, skipped: skipped + issueSkipped, errors };
   }
   private async syncGoogleDrive(input: {
     tenantId: string;
