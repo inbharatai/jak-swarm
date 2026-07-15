@@ -436,6 +436,55 @@ const hyperagentRoutes: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+  // ── PUT /config — operator-gated enable/disable of the HyperAgent ───────
+  // The single switch that turns the self-healing + governed-learning layer ON
+  // for this tenant (default OFF; default workflows stay byte-for-byte
+  // unchanged). The swarm-execution service reads hyperAgentConfig on every
+  // run, so this is what unblocks the HyperAgent for live work. TENANT_ADMIN+
+  // only — enabling autonomous repair changes live behaviour.
+  const hyperAgentConfigBodySchema = z.object({
+    hyperAgentEnabled: z.boolean(),
+    hyperAgentMode: z.enum(['OFF', 'OBSERVE', 'ASSISTED', 'AUTONOMOUS_SAFE']).optional(),
+    autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4', 'L5']).optional(),
+    maxExecutionRetries: z.number().int().min(0).max(5).optional(),
+    maxOutputRepairs: z.number().int().min(0).max(5).optional(),
+    maxPlanRepairs: z.number().int().min(0).max(3).optional(),
+    maxCapabilityRepairs: z.number().int().min(0).max(3).optional(),
+    maxTotalCostUsd: z.number().min(0).max(1000).optional(),
+    maxDurationMs: z.number().int().min(0).max(3_600_000).optional(),
+    allowShadowOptimization: z.boolean().optional(),
+    allowCanaryOptimization: z.boolean().optional(),
+    allowCodePatchProposal: z.boolean().optional(),
+  });
+
+  fastify.put(
+    '/config',
+    { preHandler: adminGate },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = request.user!.tenantId;
+      const parse = hyperAgentConfigBodySchema.safeParse(request.body ?? {});
+      if (!parse.success) {
+        return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid request body', parse.error.flatten()));
+      }
+      const body = parse.data;
+      try {
+        const config = await fastify.db.hyperAgentConfig.upsert({
+          where: { tenantId },
+          create: { tenantId, ...body },
+          update: { ...body },
+        });
+        await fastify.auditLog(request, 'HYPERAGENT_CONFIG_UPDATED', 'HyperAgentConfig', config.id, {
+          hyperAgentEnabled: config.hyperAgentEnabled,
+          hyperAgentMode: config.hyperAgentMode,
+          autonomyLevel: config.autonomyLevel,
+        });
+        return reply.send(ok({ config }));
+      } catch (e) {
+        return reply.status(500).send(err('HYPERAGENT_CONFIG_UPDATE_FAILED', e instanceof Error ? e.message : 'unknown'));
+      }
+    },
+  );
+
 };
 
 export default hyperagentRoutes;
