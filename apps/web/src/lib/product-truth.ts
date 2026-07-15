@@ -40,10 +40,10 @@ export const STATS = [
   // real / heuristic / llm_passthrough / config_dependent / experimental —
   // CI-enforced against the live registry.
   { value: 122, label: 'Classified Tools', suffix: '' },
-  // 22 = 13 external SaaS connectors (incl. WhatsApp native bridge) + 9
-  // infrastructure/MCP adapters surfaced in the UI. Only a subset are
+  // 15 = 7 external SaaS connectors (incl. WhatsApp native bridge) + 8
+  // infrastructure/MCP adapters surfaced in the UI. Every connector has a real
   // production-ready runtime paths — see docs/integration-maturity-matrix.md.
-  { value: 22, label: 'Connectors', suffix: '' },
+  { value: 15, label: 'Connectors', suffix: '' },
   { value: 1, label: 'Agent Runtime', suffix: '' },
 ] as const;
 
@@ -80,14 +80,8 @@ export const INTEGRATIONS_CORE = [
   { name: 'GitHub', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
   { name: 'Notion', color: '#FFFFFF', bg: 'rgba(255,255,255,0.08)' },
   { name: 'Google Drive', color: '#4285F4', bg: 'rgba(66,133,244,0.1)' },
-  { name: 'Linear', color: '#5E6AD2', bg: 'rgba(94,106,210,0.1)' },
   { name: 'HubSpot', color: '#FF7A59', bg: 'rgba(255,122,89,0.1)' },
-  { name: 'Stripe', color: '#635BFF', bg: 'rgba(99,91,255,0.1)' },
   { name: 'Salesforce', color: '#00A1E0', bg: 'rgba(0,161,224,0.1)' },
-  { name: 'Airtable', color: '#18BFFF', bg: 'rgba(24,191,255,0.1)' },
-  { name: 'ClickUp', color: '#7B68EE', bg: 'rgba(123,104,238,0.1)' },
-  { name: 'SendGrid', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
-  { name: 'Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.1)' },
   // WhatsApp: native bridge (not MCP) — apps/api/src/routes/whatsapp.routes.ts.
   // Register number, verify, send command, receive via the bridge token.
   // CI invariant (scripts/check-docs-truth.ts): if the route exists with > 1KB
@@ -96,7 +90,6 @@ export const INTEGRATIONS_CORE = [
 ] as const;
 
 export const INTEGRATIONS_INFRA = [
-  { name: 'Supabase', color: '#3ECF8E', bg: 'rgba(62,207,142,0.1)' },
   // Sentry MCP: JAK agents can query your Sentry projects via the official
   // Sentry MCP server. NOT the Sentry SDK for error reporting from this API
   // — that would require wiring @sentry/node, which is deliberately not

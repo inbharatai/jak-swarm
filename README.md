@@ -7,10 +7,10 @@
 [![JAK Shield](https://img.shields.io/badge/JAK_Shield-Defensive_Only-ef4444?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/jak-shield-manifest.md)
 [![Agents](https://img.shields.io/badge/AI_Agents-38-blue?style=for-the-badge&logo=robot&logoColor=white)](#-agent-roster--38-agents)
 [![Tools](https://img.shields.io/badge/Classified_Tools-122-green?style=for-the-badge&logo=playwright&logoColor=white)](#-tool-inventory-122-registered)
-[![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#connectors--honest-maturity)
+[![Connectors](https://img.shields.io/badge/Connectors-15-blue?style=for-the-badge&logo=zapier&logoColor=white)](#connectors--honest-maturity)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-2800%2B_unit_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2800%2B_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -134,12 +134,11 @@ There are 122 classified tools in the registry — run `GET /tools/manifest` for
 
 ## Connectors — honest maturity
 
-22 Connectors = 13 external SaaS connectors + 9 infrastructure/MCP adapters (each surfaced as a UI tile with an honest live status badge). Of those 22 plus 3 adapters that ship without a UI tile:
+15 Connectors = 7 external SaaS connectors + 8 infrastructure/MCP adapters (each surfaced as a UI tile with an honest live status badge). Every connector has a real runtime path — there are no placeholder tiles. (+ 3 adapters — Gmail, Google Calendar, CRM fallback — ship without a UI tile.)
 
 - **9 production-ready** — Slack, WhatsApp, Gmail, Google Calendar, PostgreSQL, Puppeteer, Filesystem, Fetch, Memory
 - **4 beta** — GitHub, Notion, Brave Search, Sequential Thinking
 - **4 partial** — Google Drive (auto-sync ingestion only), HubSpot, Salesforce, CRM fallback
-- **8 placeholder** — Linear, Stripe, Airtable, ClickUp, SendGrid, Discord, Supabase, Sentry
 
 Per-connector runtime path + notes: [`docs/integration-maturity-matrix.md`](docs/integration-maturity-matrix.md).
 

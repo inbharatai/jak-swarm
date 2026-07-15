@@ -150,7 +150,7 @@ if (landingAgentBadgeMatch) {
 
 // ─── Connector count ────────────────────────────────────────────────────────
 
-// Matrix defines a specific count: 8 production-ready + 4 beta + 3 partial + 9 placeholder = 24
+// Matrix maturity breakdown (no placeholders): 9 production-ready + 5 beta + 4 partial = 18 (15 tiles + 3 tile-less adapters)
 // minus the 3 adapters not surfaced as UI tiles (Gmail, Google Calendar, CRM fallback) = 21.
 // Extract the registry claim and assert it matches the matrix summary.
 const landingConnectorMatch = productTruth.match(
@@ -330,22 +330,18 @@ const matrixCounts = {
   partial: matrix.match(/\*\*partial\*\*:.*\((\d+)\)/)?.[1],
   placeholder: matrix.match(/\*\*placeholder\*\*:.*\((\d+)\)/)?.[1],
 };
-// ─── F2: placeholder connectors must not be marked production-ready ──────
-// A connector with no runtime adapter (UI tile only) must stay labelled
-// `placeholder` in the maturity matrix. Silently upgrading one to
-// production-ready/beta/partial without wiring a real adapter is the
-// 'placeholder-counted-as-ready' drift this gate catches.
-const PLACEHOLDER_CONNECTORS = ['Linear', 'Stripe', 'Airtable', 'ClickUp', 'SendGrid', 'Discord', 'Supabase', 'Sentry'];
-for (const name of PLACEHOLDER_CONNECTORS) {
-  const m = matrix.match(new RegExp(`\\| ${name} \\| ([a-z-]+) \\|`));
-  if (m && m[1] !== 'placeholder') {
-    mismatches.push({
-      claim: `${name} connector is a placeholder (no runtime adapter) and must not be marked ${m[1]} in the maturity matrix`,
-      expected: 'placeholder',
-      actual: m[1],
-      source: 'docs/integration-maturity-matrix.md',
-    });
-  }
+// ─── F2: no placeholder connectors ─────────────────────────────────────────
+// Every connector ships with a real runtime path; a matrix row labelled
+// 'placeholder' is a false connector (UI tile with no adapter). This gate
+// catches any placeholder row re-appearing.
+const placeholderRows = [...matrix.matchAll(/^\| ([^|]+?) \| placeholder \|/gm)].map((m) => m[1].trim());
+for (const name of placeholderRows) {
+  mismatches.push({
+    claim: name + ' is labelled placeholder — connectors must have a real runtime path (wire it or remove it)',
+    expected: 'no placeholder rows',
+    actual: 'placeholder',
+    source: 'docs/integration-maturity-matrix.md',
+  });
 }
 
 // ─── No-longer-current claims: flag prohibited strings ─────────────────────

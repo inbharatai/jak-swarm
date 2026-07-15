@@ -12,7 +12,7 @@
  * accurately supports the landing page.
  *
  * The truth-check `pnpm check:truth` already enforces COUNT consistency
- * (122 tools, 38 agents, 22 connectors). This test enforces SHAPE +
+ * (122 tools, 38 agents, 15 connectors). This test enforces SHAPE +
  * IMPLEMENTATION consistency for the qualitative claims.
  */
 
@@ -375,14 +375,14 @@ describe('Landing — top-line counts', () => {
     const truth = read('apps/web/src/lib/product-truth.ts');
     expect(truth).toMatch(/value:\s*38,\s*label:\s*'Agents'/);
     expect(truth).toMatch(/value:\s*122,\s*label:\s*'Classified Tools'/);
-    expect(truth).toMatch(/value:\s*22,\s*label:\s*'Connectors'/);
+    expect(truth).toMatch(/value:\s*15,\s*label:\s*'Connectors'/);
   });
 
   it('PremiumCTA stat strip matches the truth registry', () => {
     const cta = read('apps/web/src/components/landing/PremiumCTA.tsx');
     expect(cta).toMatch(/value:\s*'?38'?,\s*label:\s*'(?:Agents|Specialist Agents)'/);
     expect(cta).toMatch(/value:\s*'?122'?,\s*label:\s*'(?:Tools|Classified Tools)'/);
-    expect(cta).toMatch(/value:\s*'?20\+'?,\s*label:\s*'?Connectors'?/);
+    expect(cta).toMatch(/value:\s*'?15'?,\s*label:\s*'?Connectors'?/);
     expect(cta).toMatch(/value:\s*'?MIT'?/);
   });
 
@@ -390,10 +390,10 @@ describe('Landing — top-line counts', () => {
     const readme = read('README.md');
     expect(readme).toMatch(/AI_Agents-38/);
     expect(readme).toMatch(/Classified_Tools-122/);
-    // 22 is the CI-enforced canonical connector count: 13 INTEGRATIONS_CORE
-    // SaaS tiles + 9 INTEGRATIONS_INFRA adapter tiles (see scripts/check-docs-truth.ts
-    // and docs/integration-maturity-matrix.md). Not 21 (MCP providers only) or 23.
-    expect(readme).toMatch(/Connectors-22/);
+    // 15 is the CI-enforced canonical connector count: 7 INTEGRATIONS_CORE
+    // SaaS tiles + 8 INTEGRATIONS_INFRA adapter tiles (see scripts/check-docs-truth.ts
+    // and docs/integration-maturity-matrix.md). No placeholder tiles.
+    expect(readme).toMatch(/Connectors-15/);
     expect(readme).toMatch(/JAK_Shield-Defensive_Only/);
   });
 
