@@ -49,3 +49,39 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   for (let i = 0; i < a.length; i++) dot += (a[i] ?? 0) * (b[i] ?? 0);
   return dot; // already L2-normalized -> dot is cosine
 }
+import { config } from '../../config.js';
+
+/** Real OpenAI text-embedding provider (1536-dim). Errors degrade to null
+ * (the vector channel is skipped -> lexical+graph). */
+export class OpenAIEmbeddingProvider implements EmbeddingProvider {
+  readonly kind = 'openai-text-embedding-3-small';
+  constructor(private readonly apiKey: string, private readonly model = 'text-embedding-3-small') {}
+  async embed(text: string): Promise<number[] | null> {
+    if (!this.apiKey || !text.trim()) return null;
+    try {
+      const res = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ model: this.model, input: text.slice(0, 8000) }),
+      });
+      if (!res.ok) return null;
+      const json = await res.json() as { data?: Array<{ embedding?: number[] }> };
+      return json.data?.[0]?.embedding ?? null;
+    } catch { return null; }
+  }
+}
+
+/** Resolve the brain embedding provider from env. OFF by default so the running
+ *  app degrades to lexical+graph unless explicitly enabled:
+ *    COMPANY_BRAIN_EMBEDDINGS=1 + OPENAI_API_KEY -> real OpenAI embeddings
+ *    COMPANY_BRAIN_EMBEDDINGS=deterministic      -> bag-of-words (dev/test, no key)
+ *  Returns undefined (lexical-only) otherwise. */
+export function resolveBrainEmbeddingProvider(): EmbeddingProvider | undefined {
+  const flag = (process.env['COMPANY_BRAIN_EMBEDDINGS'] ?? '').trim().toLowerCase();
+  if (flag === 'deterministic') return new DeterministicEmbeddingProvider();
+  if (flag === '1' || flag === 'true') {
+    const key = config.openaiApiKey;
+    return key ? new OpenAIEmbeddingProvider(key) : undefined;
+  }
+  return undefined;
+}

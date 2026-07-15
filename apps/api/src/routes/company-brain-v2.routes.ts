@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CompanyOperatingLayerService } from '../services/company-brain/company-operating-layer.service.js';
+import { resolveBrainEmbeddingProvider } from '../services/company-brain/company-brain-embeddings.js';
 import { CompanyBrainV2Service } from '../services/company-brain/company-brain-v2.service.js';
 import { CompanyBrainWorker, backfillCompanyBrainJobs } from '../services/company-brain/company-brain-worker.service.js';
 import { ok } from '../types.js';
@@ -9,7 +10,7 @@ import { createCompanyBrainProcessor } from './company-brain-v2.processing.js';
 
 const brainRoutes: FastifyPluginAsync = async (fastify) => {
   const legacy = new CompanyOperatingLayerService(fastify.db, fastify.log);
-  const brain = new CompanyBrainV2Service(fastify.db, fastify.log);
+  const brain = new CompanyBrainV2Service(fastify.db, fastify.log, { embeddingProvider: resolveBrainEmbeddingProvider() });
   const processor = createCompanyBrainProcessor(fastify.db, legacy, brain, fastify.log);
   const write = fastify.requireRole ? [fastify.requireRole(...writeRoles)] : [];
   const review = fastify.requireRole ? [fastify.requireRole(...reviewRoles)] : [];

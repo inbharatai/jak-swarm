@@ -347,9 +347,10 @@ async function buildApp() {
     const { CompanyProfileService } = await import('./services/company-brain/company-profile.service.js');
     const { WorkflowTemplateService } = await import('./services/company-brain/workflow-template.service.js');
     const { CompanyBrainV2Service } = await import('./services/company-brain/company-brain-v2.service.js');
+    const { resolveBrainEmbeddingProvider } = await import('./services/company-brain/company-brain-embeddings.js');
     const { createCompanyContextProvider } = await import('./services/company-brain/company-context-provider.factory.js');
     const profileSvc = new CompanyProfileService(fastify.db, fastify.log);
-    const brainSvc = new CompanyBrainV2Service(fastify.db, fastify.log);
+    const brainSvc = new CompanyBrainV2Service(fastify.db, fastify.log, { embeddingProvider: resolveBrainEmbeddingProvider() });
 
     // Probe Graph V2 availability so startup emits honest telemetry: is the
     // governed brain actually queryable, or is migration 118 not deployed yet?
