@@ -381,7 +381,7 @@
 | B4 Ingest→Brain enqueue | `LIVE_RUNTIME_WIRED` | connector ingest auto-enqueues Company Brain processing (idempotent, fire-and-forget); unit-tested |
 | C1 Provenance states | `LIVE_RUNTIME_WIRED` (gate) / `PARTIAL` (state enum) | provenance gate drops source-less V2 entities from agent context (hasEntityProvenance, unit-tested); artifact state enum (human_approved/evidence_backed/expired) still open |
 | C2 Stable identifiers | `ROADMAP` | no `CompanyEntityIdentifier`; `properties::TEXT ILIKE '%...%'` |
-| C3 Retrieval | `LIVE_RUNTIME_WIRED` | alias+ILIKE+ts_rank+graph + temporal recency + entity confidence signals (compositeEntityScore), RRF primitive exported; vector/embedding half still open |
+| C3 Retrieval | `LIVE_RUNTIME_WIRED` | alias+ILIKE+ts_rank+graph + temporal recency + entity confidence + vector cosine channel (pgvector, separate company_entity_embeddings table) fused into compositeEntityScore; pluggable EmbeddingProvider (deterministic test/offline provider + real-provider hook); integration-tested. Real embeddings API provider wired into the running service = roadmap |
 | C4 Typed claims + policy | `LIVE_RUNTIME_WIRED` (policy) / `PARTIAL` (typed value) | per-predicate activation policy (CLAIM_ACTIVATION_POLICY + claimActivationThreshold) raises the bar for high-stakes predicates (deadline/owner/revenue); typed value discriminator still open |
 | C5 Source authority | `UNIT_PROVEN` | global hardcoded constants; not per-tenant/per-predicate |
 | C6 Accuracy benchmark | `LIVE_RUNTIME_WIRED` | pure entity-resolver + deterministic trap corpus (name collision, source scoping, cross-tenant, missed-merge) scored by precision/recall/F1/false-merge/missed-merge; CI-gated (F1=1.000) |

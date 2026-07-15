@@ -198,6 +198,35 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
       }
     }
 
+    // (d) C3: vector similarity channel (cosine over the `embedding` pgvector
+    // column), fused into the additive score. Only when an embedding provider
+    // is configured; best-effort (missing table -> skip). Degrades to
+    // lexical+graph when embeddings are off. Runs BEFORE the empty-guard so a
+    // vector-only match (no lexical/alias/keyword hit) is not dropped.
+    if (this.embeddingProvider) {
+      const qvec = await this.embeddingProvider.embed(task);
+      if (qvec && qvec.length > 0) {
+        const literal = `[${qvec.map((v) => Number(v.toFixed(6))).join(',')}]`;
+        try {
+          const vecRows = await this.query<CompanyEntityV2Row & { sim: number }>(
+            `SELECT e.*, 1 - (emb."embedding" <=> $2::vector) AS sim
+               FROM "company_graph_entities" e
+               JOIN "company_entity_embeddings" emb ON emb."entityId" = e."id"
+              WHERE e."tenantId" = $1 AND e."deletedAt" IS NULL
+              ORDER BY emb."embedding" <=> $2::vector
+              LIMIT 30`,
+            input.tenantId,
+            literal,
+          );
+          addCandidates(vecRows, {});
+          for (const r of vecRows) {
+            const c = byId.get(r.id);
+            if (c) c.signal.vectorSimilarity = Math.max(c.signal.vectorSimilarity ?? 0, clamp01(r.sim));
+          }
+        } catch { /* embeddings table not migrated -> skip vector channel */ }
+      }
+    }
+
     if (byId.size === 0) {
       // No relevant result → empty governed context. Never inject recency.
       return empty({ restricted: 0, expired: 0, irrelevant: 0 });
@@ -209,7 +238,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
     // selected separately after expansion so they are never miscounted as
     // irrelevant and never used as expansion seeds themselves.
     const directSelected = [...byId.values()]
-      .filter((c) => c.signal.exactAlias || c.signal.identifier || c.signal.keywordRank > 0)
+      .filter((c) => c.signal.exactAlias || c.signal.identifier || c.signal.keywordRank > 0 || (c.signal.vectorSimilarity ?? 0) > 0)
       .sort((a, b) => compositeEntityScore(b.signal) - compositeEntityScore(a.signal))
       .slice(0, 20);
 

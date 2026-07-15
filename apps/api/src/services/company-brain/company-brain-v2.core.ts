@@ -742,6 +742,8 @@ export const RETRIEVAL_WEIGHTS = {
   identifier: 0.95,
   keyword: 0.6,
   graphNeighbor: 0.25,
+  // C3: vector similarity channel (cosine over the embedding column).
+  vector: 0.70,
   // C3: temporal + confidence signals (small boosts so a recent high-confidence
   // entity edges out an old low-confidence one among ties).
   recency: 0.10,
@@ -759,6 +761,8 @@ export interface RelevanceSignal {
   recency?: number;
   /** C3: entity extraction confidence in [0,1]. */
   confidence?: number;
+  /** C3: vector cosine similarity in [0,1] from the embedding channel. */
+  vectorSimilarity?: number;
 }
 
 export function compositeEntityScore(signal: RelevanceSignal): number {
@@ -767,6 +771,7 @@ export function compositeEntityScore(signal: RelevanceSignal): number {
   if (signal.identifier) score += RETRIEVAL_WEIGHTS.identifier;
   if (signal.keywordRank > 0) score += RETRIEVAL_WEIGHTS.keyword * Math.min(1, signal.keywordRank);
   if (signal.graphNeighbor) score += RETRIEVAL_WEIGHTS.graphNeighbor;
+  if (signal.vectorSimilarity) score += RETRIEVAL_WEIGHTS.vector * clamp01(signal.vectorSimilarity);
   if (signal.recency) score += RETRIEVAL_WEIGHTS.recency * clamp01(signal.recency);
   if (signal.confidence) score += RETRIEVAL_WEIGHTS.confidence * clamp01(signal.confidence);
   return Math.min(1, score);

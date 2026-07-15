@@ -200,6 +200,7 @@ export abstract class CompanyBrainEntityStore extends CompanyBrainArtifactStore 
     for (const entity of entities) {
       // C2: index this entity's stable identifiers BEFORE resolving.
       await this.upsertEntityIdentifiers(input.tenantId, entity);
+      await this.maybeEmbedEntity(entity);
       const resolution = await this.resolveEntity(input.tenantId, entity);
       let canonical = entity;
       if (resolution.autoMergeTarget) {
@@ -385,6 +386,26 @@ export abstract class CompanyBrainEntityStore extends CompanyBrainArtifactStore 
        ON CONFLICT ("tenantId","kind","normalizedValue","source") DO NOTHING`,
       ...params,
     ).catch(() => { /* table not migrated yet -- non-fatal */ });
+  }
+
+  /**
+   * C3: embed the entity (title + summary) into the `embedding` pgvector column
+   * for the vector retrieval channel. Only when an embedding provider is
+   * configured; best-effort (a missing column / provider error is non-fatal --
+   * retrieval degrades to lexical+graph).
+   */
+  protected async maybeEmbedEntity(entity: CompanyEntityV2Row): Promise<void> {
+    if (!this.embeddingProvider) return;
+    const vec = await this.embeddingProvider.embed(`${entity.title}\n${entity.summary}`);
+    if (!vec || vec.length === 0) return;
+    const literal = `[${vec.map((v) => Number(v.toFixed(6))).join(',')}]`;
+    await this.execute(
+      `INSERT INTO "company_entity_embeddings" ("entityId","tenantId","embedding") VALUES ($1,$2,$3::vector)
+       ON CONFLICT ("entityId") DO UPDATE SET "embedding" = EXCLUDED."embedding", "updatedAt" = CURRENT_TIMESTAMP`,
+      entity.id,
+      entity.tenantId,
+      literal,
+    ).catch(() => { /* embeddings table not migrated / provider error -- non-fatal */ });
   }
 
   protected async resolveEntity(

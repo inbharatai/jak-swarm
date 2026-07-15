@@ -23,10 +23,15 @@ export abstract class CompanyBrainArtifactStore {
     matchingEvidence?: Record<string, unknown>;
   }): Promise<CompanyEntityV2Row>;
 
+  protected readonly embeddingProvider?: import('./company-brain-embeddings.js').EmbeddingProvider;
+
   constructor(
     protected readonly db: PrismaClient,
     protected readonly log?: FastifyBaseLogger,
-  ) {}
+    opts?: { embeddingProvider?: import('./company-brain-embeddings.js').EmbeddingProvider },
+  ) {
+    this.embeddingProvider = opts?.embeddingProvider;
+  }
 
   /**
    * Run a SELECT against the current graph tx runner when one is active
