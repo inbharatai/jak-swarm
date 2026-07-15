@@ -60,8 +60,21 @@ export class OpenAIEmbeddingService implements EmbeddingService {
 
 // ─── Local Implementation (transformers.js) ─────────────────────────────────
 
-export class LocalEmbeddingService implements EmbeddingService {
-  readonly dimensions = 384;
+/**
+ * Pad/truncate an embedding to the storage dimension (1536) so the local
+ * 384-dim fallback is dimension-compatible with the `vector(1536)` column.
+ * Padding with zeros PRESERVES cosine similarity: for two padded vectors the
+ * zero tail contributes 0 to both the dot product and the norms, so
+ * cosine(paddedA, paddedB) == cosine(a, b). This fixes the silent ingest
+ * failure that happened when the local fallback (384-dim) was written into a
+ * vector(1536) column (Postgres dimension-mismatch error).
+ */
+export function padEmbedding(v: number[], targetDim = 1536): number[] {
+  if (v.length >= targetDim) return v.slice(0, targetDim);
+  return [...v, ...new Array(targetDim - v.length).fill(0)];
+}
+class LocalEmbeddingService implements EmbeddingService {
+  readonly dimensions = 1536; // storage dim (padded from the 384-dim model) to match vector(1536)
   readonly provider = 'local';
   private pipeline: unknown = null;
   private loadPromise: Promise<void> | null = null;
@@ -94,7 +107,7 @@ export class LocalEmbeddingService implements EmbeddingService {
     ) => Promise<{ tolist: () => number[][] }>;
 
     const output = await extractor(text, { pooling: 'mean', normalize: true });
-    return output.tolist()[0]!;
+    return padEmbedding(output.tolist()[0]!);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
