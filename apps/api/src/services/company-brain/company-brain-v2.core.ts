@@ -246,6 +246,23 @@ export function tokenSimilarity(left: string, right: string): number {
   return union === 0 ? 0 : intersection / union;
 }
 
+/**
+ * Provenance gate (truth-doc C1): a V2 entity may only influence a workflow
+ * if it has at least one source artifact (evidence it was extracted FROM).
+ * An entity with no sourceArtifactIds AND no primaryArtifactId is source-less
+ * -- an orphan with no evidence -- and must NOT enter agent context. This is
+ * distinct from the access filter (which restricts by visibility): the
+ * provenance gate drops orphans before access is even considered. Pure.
+ */
+export function hasEntityProvenance(entity: {
+  sourceArtifactIds: unknown;
+  primaryArtifactId?: string | null;
+}): boolean {
+  if (jsonStringArray(entity.sourceArtifactIds).length > 0) return true;
+  const primary = typeof entity.primaryArtifactId === 'string' ? entity.primaryArtifactId.trim() : '';
+  return primary.length > 0;
+}
+
 export function sourceAuthorityScore(artifact: Pick<CompanyArtifactV2Row, 'sourceType' | 'artifactType' | 'title' | 'metadata'>): number {
   const metadata = jsonObject(artifact.metadata);
   const signed = metadata['signed'] === true || metadata['signatureVerified'] === true;
@@ -579,6 +596,8 @@ export interface ContextRetrievalMeta {
   strategyVersion: string;
   candidateCount: number;
   selectedCount: number;
+  /** Entities dropped by the C1 provenance gate (source-less orphans). */
+  provenanceDrops?: number;
   latencyMs: number;
 }
 

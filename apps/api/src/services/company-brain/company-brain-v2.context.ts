@@ -3,6 +3,7 @@ import {
   ARTIFACT_WITH_POLICY_SELECT,
   buildContextText,
   canAgentAccessArtifact,
+  hasEntityProvenance,
   compositeEntityScore,
   contextPackageId,
   COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION,
@@ -227,7 +228,11 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
       .filter((c) => !directIds.has(c.row.id) && c.signal.graphNeighbor)
       .sort((a, b) => compositeEntityScore(b.signal) - compositeEntityScore(a.signal))
       .slice(0, Math.max(0, 30 - directSelected.length));
-    const selected = [...directSelected, ...neighborSelected];
+    const selectedRaw = [...directSelected, ...neighborSelected];
+    // C1 provenance gate: drop source-less orphans before access filtering so no
+    // claim with no evidence can influence a workflow (truth-doc C1).
+    const selected = selectedRaw.filter((c) => hasEntityProvenance(c.row));
+    const provenanceDrops = selectedRaw.length - selected.length;
 
     const candidateCount = byId.size;
     const irrelevantCount = Math.max(0, candidateCount - selected.length);
@@ -367,7 +372,7 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
       edges,
       evidence,
       omissions,
-      retrieval: { strategyVersion: COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION, candidateCount, selectedCount, latencyMs: Date.now() - started },
+      retrieval: { strategyVersion: COMPANY_BRAIN_RETRIEVAL_STRATEGY_VERSION, candidateCount, selectedCount, provenanceDrops, latencyMs: Date.now() - started },
       generatedAt,
       contextText,
       omittedCount: omissions.restricted + omissions.expired + omissions.irrelevant,
