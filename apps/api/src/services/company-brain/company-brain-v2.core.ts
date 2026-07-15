@@ -464,12 +464,43 @@ export function identifiersConflict(
   return anyClash && !anyShared;
 }
 
+/** Per-predicate auto-activation bar (truth-doc C4). */
+export interface ClaimActivationPolicy {
+  minAuthority: number;
+  minConfidence: number;
+}
+
+// The universal default -- the historical single threshold. Per-predicate
+// overrides below raise the bar for high-stakes claims (a wrong deadline,
+// owner, or financial figure is costly) so they never auto-activate on weak
+// evidence. Low-stakes predicates keep the default (no relaxation below it,
+// to avoid a flood of auto-active noise). Tenant overrides are a future hook.
+export const DEFAULT_CLAIM_ACTIVATION: ClaimActivationPolicy = { minAuthority: 0.82, minConfidence: 0.75 };
+
+export const CLAIM_ACTIVATION_POLICY: Record<string, ClaimActivationPolicy> = {
+  // High-stakes temporal / ownership claims.
+  due_at: { minAuthority: 0.85, minConfidence: 0.82 },
+  deadline: { minAuthority: 0.85, minConfidence: 0.82 },
+  owner: { minAuthority: 0.85, minConfidence: 0.80 },
+  assigns: { minAuthority: 0.85, minConfidence: 0.80 },
+  // Financial figures -- never auto-activate on weak evidence.
+  revenue: { minAuthority: 0.88, minConfidence: 0.85 },
+  mrr: { minAuthority: 0.88, minConfidence: 0.85 },
+  arr: { minAuthority: 0.88, minConfidence: 0.85 },
+};
+
+/** Returns the activation policy for a predicate (default if no override). Pure. */
+export function claimActivationThreshold(predicate: string): ClaimActivationPolicy {
+  return CLAIM_ACTIVATION_POLICY[predicate] ?? DEFAULT_CLAIM_ACTIVATION;
+}
+
 export function decideClaimTransition(
-  candidate: Pick<ClaimCandidate, 'confidence' | 'authorityScore' | 'validFrom'>,
+  candidate: Pick<ClaimCandidate, 'predicate' | 'confidence' | 'authorityScore' | 'validFrom'>,
   existing?: Pick<CompanyClaimRow, 'id' | 'status' | 'authorityScore' | 'validFrom' | 'normalizedObject'>,
   sameValue = false,
 ): ClaimTransition {
-  const candidateTrusted = candidate.authorityScore >= 0.82 && candidate.confidence >= 0.75;
+  const policy = claimActivationThreshold(candidate.predicate);
+  const candidateTrusted = candidate.authorityScore >= policy.minAuthority && candidate.confidence >= policy.minConfidence;
   if (!existing) {
     return candidateTrusted
       ? { candidateStatus: 'active', requiresReview: false, reason: 'High-authority evidence established the first active claim.' }

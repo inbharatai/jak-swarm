@@ -59,6 +59,7 @@ export abstract class CompanyBrainClaimStore extends CompanyBrainEntityStore {
         existing.id,
       );
       const transition = decideClaimTransition({
+        predicate: candidate.predicate,
         confidence: nextConfidence,
         authorityScore: nextAuthority,
         validFrom: candidate.validFrom ?? existing.validFrom,
