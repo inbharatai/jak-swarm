@@ -394,7 +394,7 @@
 | F1 Browser E2E CI | `ROADMAP` | not in CI at all |
 | F2 Connector contract tests | `PARTIAL` | no mock-server suite; Serper+Slack subsets only |
 | F3 Live paid-provider tests | `ROADMAP` | env-blocked, not scheduled |
-| G1 Truth checker | `LIVE_RUNTIME_WIRED` / `PARTIAL` | numeric/phrase drift only; no callership/contract/canary/path checks |
+| G1 Truth checker | `LIVE_RUNTIME_WIRED` | numeric/phrase drift + placeholder-counted-as-ready guard (F2: a no-adapter connector must stay `placeholder` in the maturity matrix; teeth-verified); callership/contract/canary checks still open |
 
 ---
 
