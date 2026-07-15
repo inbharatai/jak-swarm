@@ -379,10 +379,10 @@
 | B2 Drive ingestion | `LIVE_RUNTIME_WIRED` | paginated across nextPageToken (cap 500); exports Docs/Sheets/text content; unit-tested |
 | B3 GitHub ingestion | `LIVE_RUNTIME_WIRED` / `PARTIAL` | event stream + repositories (paginated via Link header); issues/PRs/reviews/commits still open |
 | B4 Ingest→Brain enqueue | `LIVE_RUNTIME_WIRED` | connector ingest auto-enqueues Company Brain processing (idempotent, fire-and-forget); unit-tested |
-| C1 Provenance states | `PARTIAL` | no `human_approved`/`evidence_backed`/`expired` artifact state; source-less V2 entity can enter context |
+| C1 Provenance states | `LIVE_RUNTIME_WIRED` (gate) / `PARTIAL` (state enum) | provenance gate drops source-less V2 entities from agent context (hasEntityProvenance, unit-tested); artifact state enum (human_approved/evidence_backed/expired) still open |
 | C2 Stable identifiers | `ROADMAP` | no `CompanyEntityIdentifier`; `properties::TEXT ILIKE '%...%'` |
 | C3 Retrieval | `LIVE_RUNTIME_WIRED` / `PARTIAL` | alias+ILIKE+ts_rank+graph, additive weighted; no vector/temporal/authority/confidence |
-| C4 Typed claims + policy | `PARTIAL` | untyped JSONB; one universal threshold; no per-predicate policy |
+| C4 Typed claims + policy | `LIVE_RUNTIME_WIRED` (policy) / `PARTIAL` (typed value) | per-predicate activation policy (CLAIM_ACTIVATION_POLICY + claimActivationThreshold) raises the bar for high-stakes predicates (deadline/owner/revenue); typed value discriminator still open |
 | C5 Source authority | `UNIT_PROVEN` | global hardcoded constants; not per-tenant/per-predicate |
 | C6 Accuracy benchmark | `LIVE_RUNTIME_WIRED` | pure entity-resolver + deterministic trap corpus (name collision, source scoping, cross-tenant, missed-merge) scored by precision/recall/F1/false-merge/missed-merge; CI-gated (F1=1.000) |
 | D1 Artifact harvesting | `LIVE_RUNTIME_WIRED` / `PARTIAL` | pure `harvestRunEvidence` helper harvests best-effort artifact ids from `taskResults`; full worker artifact emission still open |
