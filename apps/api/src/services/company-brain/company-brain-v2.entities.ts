@@ -198,6 +198,8 @@ export abstract class CompanyBrainEntityStore extends CompanyBrainArtifactStore 
     const titleToCanonical = new Map<string, CompanyEntityV2Row>();
 
     for (const entity of entities) {
+      // C2: index this entity's stable identifiers BEFORE resolving.
+      await this.upsertEntityIdentifiers(input.tenantId, entity);
       const resolution = await this.resolveEntity(input.tenantId, entity);
       let canonical = entity;
       if (resolution.autoMergeTarget) {
@@ -362,6 +364,29 @@ export abstract class CompanyBrainEntityStore extends CompanyBrainArtifactStore 
    * same-named entity in a DIFFERENT tenant is never matched (cross-tenant
    * isolation enforced at the SQL boundary, never by post-filtering).
    */
+  /**
+   * C2: index this entity's stable identifiers (email/github/domain/url/...)
+   * into `company_entity_identifiers` so retrieval + resolution can do an
+   * EXACT indexed lookup instead of a fuzzy `properties::TEXT ILIKE`. Idempotent
+   * (ON CONFLICT DO NOTHING); best-effort (a missing table is non-fatal -- the
+   * ILIKE fallback still covers un-indexed entities).
+   */
+  protected async upsertEntityIdentifiers(tenantId: string, entity: CompanyEntityV2Row): Promise<void> {
+    const ids = extractStableIdentifiers(entity.properties);
+    if (ids.length === 0) return;
+    const placeholders = ids.map((_, i) => '($' + (i * 5 + 1) + ',$' + (i * 5 + 2) + ',$' + (i * 5 + 3) + ',$' + (i * 5 + 4) + ',$' + (i * 5 + 5) + ')').join(',');
+    const params: unknown[] = [];
+    for (const id of ids) {
+      params.push(randomUUID(), tenantId, entity.id, id.key, id.value);
+    }
+    await this.execute(
+      `INSERT INTO "company_entity_identifiers" ("id","tenantId","entityId","kind","normalizedValue")
+       VALUES ${placeholders}
+       ON CONFLICT ("tenantId","kind","normalizedValue","source") DO NOTHING`,
+      ...params,
+    ).catch(() => { /* table not migrated yet -- non-fatal */ });
+  }
+
   protected async resolveEntity(
     tenantId: string,
     entity: CompanyEntityV2Row,

@@ -55,6 +55,7 @@ model Tenant {
   companyProfile             CompanyProfile?
   companyArtifacts           CompanyArtifact[]
   companyGraphEntities       CompanyGraphEntity[]
+  companyEntityIdentifiers CompanyEntityIdentifier[]
   executionDriftFindings     ExecutionDriftFinding[]
   agentExecutableSpecs       AgentExecutableSpec[]
   companyConnectorSyncStates CompanyConnectorSyncState[]
@@ -2083,11 +2084,35 @@ model CompanyGraphEntity {
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   primaryArtifact CompanyArtifact? @relation("CompanyEntityPrimaryArtifact", fields: [primaryArtifactId], references: [id], onDelete: SetNull)
+  identifiers   CompanyEntityIdentifier[]
 
   @@index([tenantId, entityType, status, updatedAt])
   @@index([tenantId, ownerName])
   @@index([tenantId, priority])
   @@map("company_graph_entities")
+}
+
+// C2: indexed stable-identifier lookup for entity resolution + retrieval.
+// Replaces the fuzzy `properties::TEXT ILIKE` candidate fetch with an exact
+// join. `source` is non-nullable (default "none") so the unique constraint
+// treats email/github (source="none") and external_id (source="salesforce")
+// distinctly -- two entities sharing an email collapse to one row.
+model CompanyEntityIdentifier {
+  id              String   @id @default(cuid())
+  tenantId        String
+  entityId        String
+  kind            String // email | github | domain | url | handle | linkedin | crmid | externalid | ...
+  normalizedValue String
+  source          String   @default("none") // source system for external_id disambiguation
+  createdAt       DateTime @default(now())
+
+  entity CompanyGraphEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind, normalizedValue, source])
+  @@index([tenantId, entityId])
+  @@index([tenantId, kind, normalizedValue])
+  @@map("company_entity_identifiers")
 }
 
 // ExecutionDriftFinding — deterministic closed-loop finding produced by

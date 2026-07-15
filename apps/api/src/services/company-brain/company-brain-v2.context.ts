@@ -135,7 +135,27 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
       addCandidates(aliasRows, { exactAlias: true });
     }
 
-    // (b) stable-identifier match against entity properties (email/domain/crm-id/url …)
+    // (b1) C2: EXACT indexed email lookup -- an email matches the entity that
+    // owns it, not any entity whose properties merely contain the email as a
+    // substring. Additive to the ILIKE fallback below; best-effort (missing
+    // table -> ILIKE still covers it).
+    if (ids.emails.length > 0) {
+      try {
+        const exactEmailRows = await this.query<CompanyEntityV2Row>(
+          `SELECT e.* FROM "company_graph_entities" e
+             JOIN "company_entity_identifiers" i ON i."entityId" = e."id" AND i."tenantId" = e."tenantId"
+            WHERE e."tenantId" = $1 AND e."deletedAt" IS NULL
+              AND i."kind" = 'email' AND i."normalizedValue" = ANY($2::TEXT[])
+            LIMIT 50`,
+          input.tenantId,
+          ids.emails,
+        );
+        addCandidates(exactEmailRows, { identifier: true });
+      } catch { /* company_entity_identifiers not migrated -> ILIKE fallback */ }
+    }
+
+    // (b2) fuzzy identifier substring match (emails / urls / ids) -- ILIKE
+    // safety net so un-indexed entities are still retrievable.
     if (ids.emails.length > 0 || ids.urls.length > 0 || ids.ids.length > 0) {
       const patterns = uniqueStrings([
         ...ids.emails.map((e) => `%${e}%`),
@@ -143,10 +163,10 @@ export abstract class CompanyBrainContextStore extends CompanyBrainReviewStore {
         ...ids.ids.map((s) => `%${s}%`),
       ]);
       const idRows = await this.query<CompanyEntityV2Row>(
-        `SELECT * FROM "company_graph_entities"
-          WHERE "tenantId" = $1 AND "deletedAt" IS NULL
-            AND "properties"::TEXT ILIKE ANY($2::TEXT[])
-          LIMIT 50`,
+        `SELECT * FROM "company_graph_entities"` +
+          ` WHERE "tenantId" = $1 AND "deletedAt" IS NULL` +
+          `   AND "properties"::TEXT ILIKE ANY($2::TEXT[])` +
+          ` LIMIT 50`,
         input.tenantId,
         patterns,
       );
