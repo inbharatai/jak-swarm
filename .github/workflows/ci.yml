@@ -324,10 +324,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit production dependencies (fail on high/critical)
-        # --prod limits the scan to what ships to users; dev-only tooling (eslint,
-        # vitest, etc.) is intentionally excluded so a vulnerability in, say, a
-        # test helper can't block a release.
-        run: pnpm audit --audit-level=high --prod
+        # scripts/audit-prod-deps.cjs replaces pnpm audit --audit-level=high --prod,
+        # which broke when npm retired the /audits endpoint (410). It builds the prod
+        # closure via pnpm list -r --prod, queries the supported bulk advisory
+        # endpoint, and fails only on high/critical CVEs in production dependencies
+        # (dev-only tooling like eslint/vitest is excluded, as --prod intended).
+        run: node scripts/audit-prod-deps.cjs
 
   # ---------------------------------------------------------------------------
   # SBOM generation — emits a CycloneDX software bill of materials for every
