@@ -10,7 +10,7 @@
 [![Connectors](https://img.shields.io/badge/Connectors-22-blue?style=for-the-badge&logo=zapier&logoColor=white)](#connectors--honest-maturity)
 [![Audit Pack](https://img.shields.io/badge/Audit_Pack-SOC2_%7C_HIPAA_%7C_ISO27001-orange?style=for-the-badge&logo=shieldsdotio&logoColor=white)](docs/audit-compliance-agent-pack.md)
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=for-the-badge&logo=semver&logoColor=white)](docs/beta-release.md)
-[![Tests](https://img.shields.io/badge/Tests-3157_blocking_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
+[![Tests](https://img.shields.io/badge/Tests-2800%2B_unit_CI-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](#-tech-stack)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
@@ -74,16 +74,18 @@ The Hyperagent is the self-healing + self-learning layer on top of the swarm run
 
 **Governed self-learning.** A config-lifecycle gate (`DRAFT → PROPOSED → SHADOW → CANARY ramp → PROMOTED`, human-operated, no skip) wraps any autonomy-policy or repair-budget change. Promotion requires a measured mutual-information learning signal and a human `TENANT_ADMIN` approval. The agent may not self-promote.
 
+**Enabling it.** An operator turns the Hyperagent ON per tenant via `PUT /hyperagent/config` (TENANT_ADMIN+), which sets `hyperAgentEnabled` + `hyperAgentMode` (OFF/OBSERVE/ASSISTED/AUTONOMOUS_SAFE) + `autonomyLevel` (L0-L5) + repair budgets. It is OFF by default; default workflows are byte-for-byte unchanged unless a tenant opts in. The swarm reads this config on every run, so the switch is live.
+
 | Component | Honest status |
 |---|---|
 | Pure-core spec executor (`spec-executor.ts`) | Shipped. Harvests artifacts with provenance; classifies failures; replans. Integration-proven with a deterministic stub `runPlan`. |
 | Live runtime seam (`spec-executor-runtime.ts`) | **D1/D2 WIRED.** Harvests per-task failure classes (`failureClassByTask`) from `state.failureDiagnoses` and best-effort artifact ids workers emit into `taskResults` via a pure `harvestRunEvidence` helper, spread into `FinishedRun`. Integration-graph-proven at the live LangGraph level, **not production-proven.** Full worker artifact emission + the live LLM canary remain open. |
-| `executeApprovedSpec` closed loop | REVIEWER-gated API route + service exist. The live LangGraph + LLM round-trip is env-blocked. |
+| `executeApprovedSpec` closed loop | REVIEWER-gated API route + service exist; runs against a real LLM when provider keys are set (verified end-to-end). The 1%-traffic production canary is the named stop. |
 | AuditLog per-tenant HMAC row-chain | Shipped. |
 | `ShieldMcpClient` (Ed25519 signed decisions) | Live-instantiated behind `SHIELD_MCP_CANARY=1` — **observational canary: records signed decisions to the audit chain, does NOT gate execution.** |
 | Self-learning in live graph | Wired behind `hyperAgentEnabled` (default **false**). 110 references; default workflows are byte-for-byte unchanged unless a tenant opts in. |
 
-**What is still env-blocked, not fake-passed:** the live 12-step E2E + Cloud Run deploy gate that would prove measured learning impact in production; the live launch of `executeApprovedSpec` in prod; the Brain/Shield canaries against live traffic; audit-chain + merge atomicity against managed Postgres. The full wired-vs-pure-core breakdown is in `docs/hyperagent-current-state-audit.md`, and the executable canary runbook is `docs/production-canary-plan.md`.
+**What is still not production-proven:** the 1%-traffic, 7-day learning canary against managed Postgres + real LLM that would prove measured learning impact in production; the Brain/Shield canaries against live traffic; audit-chain + merge atomicity against managed Postgres. The closed loop itself (`executeApprovedSpec`, the self-healing seam) runs against a real LLM when provider keys are set and is verified end-to-end; the production *canary* (sustained traffic, managed Postgres) is the named stop. The full wired-vs-pure-core breakdown is in `docs/hyperagent-current-state-audit.md`, and the executable canary runbook is `docs/production-canary-plan.md`.
 
 Code: `packages/swarm/src/hyperagent/` · dashboard at `/hyperagent` (Control Centre: overview, runs, learnings, optimizations, experiments, governance, agent-fleet, autonomy, shield).
 
@@ -226,7 +228,7 @@ JAK runs on Google's Agent Development Kit and Gemini, with OpenAI as an alterna
 - **Cloud Run** — the verified public deployment is the Cloud Run API (`jak-swarm-api`, `asia-south1`). A live Agent Engine gateway is also deployed (`projects/565531938617/locations/asia-south1/reasoningEngines/1509110495448137728`) as an additional path; Cloud Run remains primary.
 - **Agent Engine + GEPA** — the gateway agent uses `GOOGLE_SEARCH` + 5 FunctionTool wrappers calling `/workflows`, `/memory`, `/approvals`; the GEPA-optimized Candidate 1 prompt (safety refusal + `search_knowledge` fallback) is adopted. Benchmark: Gemini Flash 2.5, 4/4 pass, p50 7.6s, p95 9.0s. Results in `qa/benchmark-optimization-before-after.md`.
 
-Canary flags (all default-off): `hyperAgentEnabled`, `JAK_ADK_MODE`, `BRAIN_MCP_SERVER=1`, `SHIELD_MCP_CANARY=1`, `BENCHMARKS_PERSISTED`.
+Canary flags (all default-off): `hyperAgentEnabled` (set per-tenant via `PUT /hyperagent/config`), `COMPANY_BRAIN_EMBEDDINGS=1` (vector retrieval), `JAK_ADK_MODE`, `BRAIN_MCP_SERVER=1`, `SHIELD_MCP_CANARY=1`, `BENCHMARKS_PERSISTED`.
 
 ---
 
@@ -248,7 +250,7 @@ Canary flags (all default-off): `hyperAgentEnabled`, `JAK_ADK_MODE`, `BRAIN_MCP_
 | Browser Automation | Playwright |
 | Email / Calendar | imapflow + nodemailer (IMAP/SMTP) · tsdav (CalDAV) |
 | External Integrations | Model Context Protocol (MCP) |
-| Testing | Vitest (3,157 blocking CI tests: 2,734 unit + 423 integration) |
+| Testing | Vitest (2,800+ unit + integration; testcontainers for real-Postgres paths) |
 | Schema Validation | Zod |
 
 ### Security risk lattice
@@ -267,7 +269,7 @@ AES-256-GCM field-level encryption; JWT auth with per-tenant isolation at middle
 ### Development
 
 ```bash
-pnpm test                  # run all tests (3157 blocking CI)
+pnpm test                  # run all tests (unit + integration; 2,800+ unit)
 pnpm typecheck             # strict type checking, zero errors
 pnpm lint                  # eslint . --max-warnings=0
 pnpm check:truth           # verify tool classifications + landing claims
@@ -303,7 +305,7 @@ Adding a new agent or tool: see [`AGENTS.md`](AGENTS.md) and the "Adding a New T
 ## ❓ Common Questions
 
 **Is JAK Swarm production-ready?**
-Not yet. JAK is a working beta build (0.1.0-beta.0). For self-hosted validation and design-partner use: yes. For paying enterprise customers expecting an SLA: no. The named blockers: (1) a third-party security audit / SOC 2 attestation is not yet complete (controls are seeded, not yet attested by a third party); (2) Terms of Service, Privacy Policy, and DPA have not been lawyer-reviewed; (3) the Hyperagent live seam returns empty artifacts until wired and the live canary has not run against managed Postgres + real LLM keys. The integration hardening milestone is merged to main; the live production canary is a named stop awaiting owner credentials. See `docs/beta-release.md` and `docs/production-canary-plan.md`.
+Not yet. JAK is a working beta build (0.1.0-beta.0). For self-hosted validation and design-partner use: yes. For paying enterprise customers expecting an SLA: no. The named blockers: (1) a third-party security audit / SOC 2 attestation is not yet complete (controls are seeded, not yet attested by a third party); (2) Terms of Service, Privacy Policy, and DPA have not been lawyer-reviewed; (3) the Hyperagent live seam is D1/D2-wired (harvests per-task failure classes + best-effort artifact ids) and verified end-to-end against real Postgres + a real LLM; the 1%-traffic production canary against managed Postgres remains the named stop. The integration hardening milestone is merged to main; the live production canary is a named stop awaiting owner credentials. See `docs/beta-release.md` and `docs/production-canary-plan.md`.
 
 **Does JAK have SOC 2 / HIPAA / ISO 27001 certification?**
 No. 182 controls are seeded across the three frameworks (108 operationally backed, 74 require reviewer attestation). Certification is third-party and not yet pursued.
