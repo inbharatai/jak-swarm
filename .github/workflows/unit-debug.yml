@@ -1,0 +1,64 @@
+name: Unit debug
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-debug:
+    if: github.event.pull_request.head.ref == 'codex/clean-multiplayer-positioning'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: jakswarm
+          POSTGRES_USER: jakswarm
+          POSTGRES_PASSWORD: jakswarm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jakswarm -d jakswarm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v6
+      - run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --reporter=silent
+      - run: pnpm --filter @jak-swarm/db exec prisma generate
+      - run: pnpm --filter @jak-swarm/db db:migrate:deploy
+        env:
+          DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+      - name: Run unit suite and capture output
+        id: test
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+          AUTH_SECRET: ci-test-secret-change-me
+          DATABASE_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          DIRECT_URL: postgresql://jakswarm:jakswarm@localhost:5432/jakswarm
+          REDIS_URL: redis://localhost:6379
+        run: |
+          set -o pipefail
+          pnpm --filter @jak-swarm/tests exec vitest run unit integration/circuit-breaker.test.ts integration/truth-claims.test.ts --exclude "**/*behavioral*.test.ts" --exclude "**/role-world-class-upgrades.test.ts" --reporter=verbose 2>&1 | tee unit-debug.log
+      - name: Upload unit log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-debug-${{ github.sha }}
+          path: unit-debug.log
+          retention-days: 2
+      - name: Enforce result
+        if: steps.test.outcome == 'failure'
+        run: exit 1
