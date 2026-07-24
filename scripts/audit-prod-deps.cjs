@@ -6,6 +6,12 @@
  * In addition to the console result, this writes a compact JSON report so a
  * failed CI run has an inspectable artifact instead of burying the advisory
  * names at the end of a long setup log.
+ *
+ * Documented temporary exceptions are read from
+ * package.json#pnpm.auditConfig.ignoreGhsas. They remain visible in the report
+ * and console; they simply do not fail the build. This matches the repository's
+ * existing security policy and prevents the custom audit client from silently
+ * ignoring the configured exception list.
  */
 const { execSync } = require('child_process');
 const https = require('https');
@@ -15,6 +21,28 @@ const BULK = 'https://registry.npmjs.org/-/npm/v1/security/advisories/bulk';
 const REPORT_PATH = process.env.AUDIT_REPORT_PATH || 'audit-prod-deps-report.json';
 const FAIL_LEVELS = new Set(['high', 'critical']);
 const SKIP = new Set(['jak-swarm', '@jak-swarm/api', '@jak-swarm/web', '@jak-swarm/swarm', '@jak-swarm/shared', '@jak-swarm/db', '@jak-swarm/tools', '@jak-swarm/agents', '@jak-swarm/security', '@jak-swarm/skills', '@jak-swarm/verification', '@jak-swarm/voice', '@jak-swarm/client', '@jak-swarm/industry-packs', '@jak-swarm/adk', '@jak-swarm/whatsapp-client', '@jak-swarm/tests']);
+
+function loadIgnoredGhsas() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    const values = pkg?.pnpm?.auditConfig?.ignoreGhsas;
+    return new Set(Array.isArray(values) ? values.filter((value) => typeof value === 'string') : []);
+  } catch (error) {
+    console.error('[audit] failed to read package.json audit exceptions:', error.message);
+    return new Set();
+  }
+}
+
+const IGNORED_GHSAS = loadIgnoredGhsas();
+
+function ghsaFromAdvisory(advisory) {
+  const candidates = [advisory?.url, advisory?.github_advisory_url, advisory?.id, advisory?.ghsa_id];
+  for (const candidate of candidates) {
+    const match = String(candidate || '').match(/GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return null;
+}
 
 function writeReport(report) {
   try {
@@ -74,6 +102,7 @@ function postBulk(payload) {
   console.log('[audit] prod closure:', names.length, 'packages,', versionCount, 'versions');
 
   const hits = [];
+  const ignored = [];
   const BATCH = 100;
   for (let i = 0; i < names.length; i += BATCH) {
     const payload = {};
@@ -89,29 +118,36 @@ function postBulk(payload) {
     for (const [name, advisories] of Object.entries(response)) {
       if (!Array.isArray(advisories)) continue;
       for (const advisory of advisories) {
-        if (FAIL_LEVELS.has(String(advisory.severity).toLowerCase())) {
-          hits.push({
-            name,
-            severity: advisory.severity,
-            title: advisory.title,
-            url: advisory.url,
-            vulnerable_versions: advisory.vulnerable_versions,
-          });
-        }
+        if (!FAIL_LEVELS.has(String(advisory.severity).toLowerCase())) continue;
+        const ghsa = ghsaFromAdvisory(advisory);
+        const finding = {
+          name,
+          ghsa,
+          severity: advisory.severity,
+          title: advisory.title,
+          url: advisory.url,
+          vulnerable_versions: advisory.vulnerable_versions,
+        };
+        if (ghsa && IGNORED_GHSAS.has(ghsa)) ignored.push(finding);
+        else hits.push(finding);
       }
     }
   }
 
+  for (const finding of ignored) {
+    console.warn('[audit] TEMPORARY EXCEPTION — ' + finding.name + ' [' + finding.severity + '] ' + (finding.ghsa || 'unknown-GHSA') + ' ' + finding.title);
+  }
+
   if (hits.length === 0) {
-    writeReport({ status: 'ok', packageCount: names.length, versionCount, findings: [] });
-    console.log('[audit] OK — no high/critical advisories in production dependencies');
+    writeReport({ status: 'ok', packageCount: names.length, versionCount, findings: [], ignoredFindings: ignored });
+    console.log('[audit] OK — no unexcepted high/critical advisories in production dependencies');
     process.exit(0);
   }
 
-  writeReport({ status: 'failed', packageCount: names.length, versionCount, findings: hits });
-  console.error('[audit] FAIL — ' + hits.length + ' high/critical production advisory/advisories:');
+  writeReport({ status: 'failed', packageCount: names.length, versionCount, findings: hits, ignoredFindings: ignored });
+  console.error('[audit] FAIL — ' + hits.length + ' unexcepted high/critical production advisory/advisories:');
   for (const hit of hits) {
-    console.error('  - ' + hit.name + ' [' + hit.severity + '] ' + hit.title + ' (' + hit.vulnerable_versions + ') ' + hit.url);
+    console.error('  - ' + hit.name + ' [' + hit.severity + '] ' + (hit.ghsa || '') + ' ' + hit.title + ' (' + hit.vulnerable_versions + ') ' + hit.url);
   }
   process.exit(1);
 })();
