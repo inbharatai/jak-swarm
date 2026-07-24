@@ -2,9 +2,9 @@
 
 # JAK Swarm
 
-### Multiplayer AI for human-agent teams
+### Company Brain + Hyperagent for evidence-grounded company execution
 
-**One live workspace where people and AI agents can watch, redirect, hand off, approve, and replay long-running work together.**
+**JAK builds cited understanding from company evidence, turns execution gaps into approved plans, and runs those plans through governed agents that can verify outcomes and repair eligible failures.**
 
 [![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=flat-square)](docs/beta-release.md)
 [![AI Agents](https://img.shields.io/badge/AI_Agents-38-2563eb?style=flat-square)](AGENTS.md)
@@ -12,7 +12,7 @@
 [![Connectors](https://img.shields.io/badge/Connectors-15-0284c7?style=flat-square)](docs/integration-maturity-matrix.md)
 [![License](https://img.shields.io/badge/license-MIT-f59e0b?style=flat-square)](LICENSE)
 
-[Quick start](#quick-start) · [Multiplayer docs](docs/multiplayer-ai.md) · [Architecture](ARCHITECTURE.md) · [Security](SECURITY.md) · [Beta truth](docs/beta-release.md)
+[Quick start](#quick-start) · [Architecture](ARCHITECTURE.md) · [Hyperagent audit](docs/hyperagent-current-state-audit.md) · [Security](SECURITY.md) · [Beta status](docs/beta-release.md)
 
 </div>
 
@@ -20,131 +20,155 @@
 
 ## What JAK Swarm is
 
-JAK Swarm is a **working beta build** for shared human-agent workflow execution.
+JAK Swarm is a **working beta** built around two core engines:
 
-A team can enter the same workflow session, see the task graph, follow agent activity, redirect individual tasks, assign work to a person, approve external actions, and inspect the complete execution history. The collaboration layer sits on a durable multi-agent runtime rather than a collection of isolated chat transcripts.
+1. **Company Brain** turns company evidence into a cited, permission-filtered graph of artifacts, entities, claims, relationships, conflicts, and execution drift.
+2. **Hyperagent** turns approved Company Brain specifications into governed execution, measures the result, diagnoses failures, repairs eligible work, and promotes learning only through explicit policy and human-controlled gates.
+
+The specialist-agent runtime, tools, connectors, JAK Shield controls, and multiplayer workspace support those two engines. They are not the primary product thesis.
 
 ```text
-Goal
-  → shared plan and task graph
-  → specialist agents + human teammates
-  → comments, redirects, handoffs, and approvals
-  → verification and bounded repair
-  → artifacts + replayable audit history
+Company evidence
+  → Company Brain
+  → cited context + drift findings
+  → reviewer-approved executable specification
+  → Hyperagent + specialist-agent runtime
+  → verification, acceptance measurement, repair, outcomes, and audit history
 ```
 
-JAK is not a generic chat UI, a character-level collaborative document editor, or a claim of fully autonomous enterprise operations.
+JAK is not a generic chatbot, a claim of unrestricted autonomous company operation, or a finished enterprise product.
 
-## Multiplayer workflow execution
+## Company Brain
 
-The current implementation includes:
+Company Brain is designed to provide **source-backed organisational context**, not untraceable chatbot memory.
 
-| Capability | Current implementation |
+### What is implemented
+
+| Area | Current implementation |
 |---|---|
-| Shared participants | `OWNER`, `EDITOR`, `REVIEWER`, and `VIEWER` roles on each workflow |
-| Presence | Heartbeat-based online state and active-task visibility |
-| Task control | Short control leases prevent two teammates from redirecting the same task simultaneously |
-| Human handoff | A workflow task can be assigned to a person, pause the run, accept the submitted result, and continue dependent work |
-| Safe redirection | A paused task can be revised, plan-versioned, and resumed without silently rewriting history |
-| Shared timeline | Joins, comments, handoffs, redirects, approvals, and runtime events are persisted and streamed |
-| Replay | Participants, events, traces, approvals, human tasks, artifacts, and audit records can be exported together |
+| Evidence store | Tenant-scoped artifacts with source type, original body, source URL, timestamps, body hash, metadata, and audit records |
+| Graph model | Entities, aliases, stable identifiers, typed claims, claim evidence, relationships, conflicts, review records, and provenance |
+| Retrieval | Exact aliases, indexed identifiers, PostgreSQL full-text search, graph-neighbour expansion, recency and confidence scoring, plus optional pgvector similarity |
+| Context safety | Source-less entities are removed before context construction; visible context is filtered by tenant, artifact visibility, retention, and allowed agent role |
+| Drift detection | Deterministic checks for defined patterns such as customer pain without matching work, decisions without tasks, unsupported execution, and stale high-priority work |
+| Executable specs | Evidence-grounded specifications containing an objective, approach, acceptance criteria, test plan, agent task plan, and approval gates |
+| Review and execution | Reviewer decisions are persisted; approved specifications can be materialised into a workflow, executed, paused for approval, resumed, measured, and linked to persisted outcomes |
+| Product surfaces | `/company`, `/company/graph`, Company Brain routes, background processing jobs, and optional `brain_*` MCP tools |
 
-Open the shared control room at:
+### Automatic ingestion currently supported
 
-```text
-/workflows/<workflowId>/session
-```
+Scheduled Company Brain sync is implemented for **GitHub, Gmail, and Google Drive**. The interval is configurable and defaults to five minutes.
 
-Implementation details and API routes: [`docs/multiplayer-ai.md`](docs/multiplayer-ai.md).
+- **Gmail:** fetches up to 25 recent messages per sync using the full message payload; stores headers, decoded body text, recipients, labels, thread ID, and attachment metadata. Attachment file contents are not downloaded.
+- **Google Drive:** paginates up to 500 files per sync. Google Docs, Sheets, plain text, and JSON can be exported as text; Slides, binary files, and unsupported formats remain metadata-only.
+- **GitHub:** ingests up to 50 repositories, recent issues and pull requests for the five most recently updated repositories, and up to 50 recent user events. It does not yet index complete repository source trees, every discussion, review, workflow run, or historical event.
 
-## Platform foundations
+Connector ingestion automatically enqueues Company Brain processing. Per-tenant/provider sync claiming is atomic so concurrent manual and scheduled runs do not intentionally process the same cursor window.
 
-### Company Brain
+Other connectors may be usable by agents, but they do not automatically become Company Brain evidence unless a specific ingestion path or manual upload is used.
 
-Company Brain converts company material into evidence-backed context:
+### Retrieval and evidence boundaries
 
-```text
-artifacts → entities → typed claims → drift findings → executable specs → approved work
-```
+The live retrieval path combines lexical, identifier, graph, temporal, and confidence signals. Vector retrieval is **optional**, not assumed: it is enabled only when the Company Brain embedding provider is configured. The current real embedding path uses OpenAI; without it, retrieval continues with lexical and graph signals.
 
-It stores provenance, detects execution drift, and generates reviewer-gated specifications. GitHub, Gmail, and Google Drive support scheduled ingestion; other connectors are setup-dependent or on-demand. See [`docs/current-runtime-truth.md`](docs/current-runtime-truth.md).
+Current access filtering is useful but not equivalent to complete source-system ACL parity. It enforces tenant boundaries, provenance, visibility, retention, and agent-role rules. User-, department-, project-, region-, and source-ACL-level policy coverage is not yet complete.
 
-### Hyperagent
+Some Company Brain extraction and specification-generation paths currently require configured OpenAI credentials. JAK does not silently substitute fabricated template output when the model path is unavailable.
 
-Hyperagent is a governed repair and learning layer. It classifies failures, isolates likely faults, proposes bounded plan changes, and selectively re-executes eligible work.
+## Hyperagent
 
-It is **default-off and integration-proven, not production-proven**. Destructive, permission, and approval-timeout failures are not automatically retried. See [`docs/hyperagent-current-state-audit.md`](docs/hyperagent-current-state-audit.md).
+Hyperagent is the governed reasoning, repair, and learning layer above the workflow runtime.
+
+### What is implemented
+
+- A deterministic failure taxonomy and persisted diagnoses.
+- Bounded output correction for eligible malformed-output failures.
+- Counterfactual fault isolation and dependency-aware plan repair.
+- Symbolic validation before a proposed plan change is applied.
+- Autonomy-controlled selective re-execution.
+- Approved-spec execution with dependency and cycle validation.
+- Acceptance measurement with `MET`, `UNMET`, and `UNVERIFIABLE` outcomes.
+- PostgreSQL-backed checkpoints for approval interruption and resume.
+- Persisted plan versions, workflow outcomes, execution attempts, artifacts, and learning records.
+- A governed configuration lifecycle for proposed changes: `DRAFT → PROPOSED → SHADOW → CANARY → PROMOTED`, with operator-controlled advance and rollback.
+
+Hyperagent is **off by default**. A tenant administrator can configure it through `PUT /hyperagent/config` using modes `OFF`, `OBSERVE`, `ASSISTED`, or `AUTONOMOUS_SAFE`, together with autonomy levels and repair budgets. `OBSERVE` is read-only; enabling higher modes changes live workflow behaviour.
+
+The live runtime harvests per-task failure classes and best-effort artifact IDs when workers emit them. Artifact emission is not yet complete across every worker, and runtime metrics are still narrower than a full production observability system.
+
+Hyperagent is live-wired and integration-tested, including real Postgres coverage and selected real-model validation. It has **not** completed the sustained managed-Postgres, real-traffic production canary required for an unqualified production claim. The agent cannot promote its own configuration changes without the configured lifecycle and human operator controls.
+
+## Supporting layers
+
+### Specialist-agent runtime
+
+The current registries contain **38 specialist agents** and **122 classified tools**. Workflows use planning, risk classification, dependency-aware execution, verification, approval gates, durable state, and audit records. Counts are checked by repository truth gates rather than maintained only as marketing text.
+
+### Multiplayer control room
+
+The multiplayer layer is the human control surface around Company Brain and Hyperagent execution. It supports workflow participants, presence, task-control leases, comments, human handoffs, safe task redirection, approval visibility, and replay export.
+
+See [`docs/multiplayer-ai.md`](docs/multiplayer-ai.md).
+
+### Connectors
+
+The public product registry currently shows **15 connectors with real runtime paths**, plus several adapters that do not have dedicated UI tiles. Maturity varies; not every connector has equal depth, automatic Brain ingestion, or production validation.
+
+See [`docs/integration-maturity-matrix.md`](docs/integration-maturity-matrix.md).
 
 ### JAK Shield
 
-The enforced runtime path uses the embedded defensive security package for guardrails, risk classification, PII handling, approval policy, and audit logging. The separate external JAK Shield MCP gateway remains a distinct project and is not represented as universally gating every JAK Swarm action today.
+The enforced in-process path uses `packages/security` for prompt-injection checks, PII handling, risk classification, RBAC, approvals, autonomy policy, and audit logging. The separate external JAK Shield MCP project is not represented as universally gating every JAK Swarm action. Its signed-decision integration remains limited and observational where enabled.
 
 See [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) and [`SECURITY.md`](SECURITY.md).
 
-## Verified product surface
-
-The current registry contains **38 specialist agents** and **122 classified tools**. The repository truth gates also track:
-
-- **15 connectors** surfaced through real runtime paths; maturity varies by connector.
-- Approval-gated external actions and manual-only critical actions.
-- PostgreSQL-backed workflow state, checkpointing, task assignments, and audit records.
-- Company Brain, Hyperagent, audit/compliance, browser automation, and self-hosted deployment paths.
-
-Counts are checked in CI against the code registry and integration matrix rather than maintained only as marketing text.
-
 ## Honest beta status
 
-JAK Swarm is suitable for local evaluation, self-hosted validation, and controlled design-partner pilots.
+JAK Swarm is appropriate for local evaluation, self-hosted validation, controlled pilots, and design-partner testing.
 
-It is **not yet enterprise-SLA ready**. Named boundaries include:
+It is **not yet enterprise-SLA ready**. Important boundaries include:
 
-- no completed third-party security audit or compliance certification;
-- legal documents are not represented as lawyer-reviewed enterprise agreements;
-- Hyperagent still requires sustained production canary evidence;
-- connector maturity is uneven;
-- multiplayer execution is not a CRDT document editor or offline collaborative system;
-- production deployment still requires correct infrastructure, credentials, monitoring, and operator review.
+- no completed third-party security audit, penetration test, or compliance certification;
+- no claim that legal documents are lawyer-reviewed enterprise agreements;
+- Company Brain automatic ingestion currently covers three providers and has explicit per-provider limits;
+- access control does not yet reproduce every source system's user and document ACL;
+- Hyperagent is default-off and still needs sustained production-canary evidence;
+- connector maturity and provider behaviour vary and depend on valid credentials and permissions;
+- external model calls require the relevant provider credentials and may incur provider costs;
+- production operation requires migrations, queues, monitoring, backups, incident procedures, and human review.
 
-The authoritative readiness checklist and **post-build production hardening roadmap** are in [`docs/beta-release.md`](docs/beta-release.md).
-
-## FAQ
-
-### Is JAK Swarm production-ready?
-
-For paying enterprise customers expecting an SLA: **NO, not yet**. JAK has not completed a third-party security audit, SOC 2 or ISO 27001 attestation, and its Terms of Service, Privacy Policy, and DPA are not represented as lawyer-reviewed enterprise agreements. Use beta, design-partner, or self-hosted-validation language until those gates are closed.
+Use **beta**, **design partner**, or **self-hosted validation** language. Do not claim production SLA, certification, complete compliance, or unrestricted autonomous operation.
 
 ## Architecture
 
 ```text
 Next.js dashboard
-  ├─ shared workflow session
-  ├─ Company Brain
+  ├─ Company Brain and graph review
   ├─ Hyperagent control centre
-  ├─ approvals, inbox, audit, and artifacts
-  └─ administration
+  ├─ multiplayer workflow sessions
+  ├─ approvals, inbox, artifacts, and audit
+  └─ tenant administration
 
 Fastify API
-  ├─ workflow collaboration service
-  ├─ task-assignment bridge
-  ├─ durable queue and coordination signals
-  ├─ Company Brain services
-  ├─ approvals and audit services
-  └─ connector and tool routes
+  ├─ Company Brain ingestion, processing, retrieval, drift, and spec services
+  ├─ Hyperagent configuration, execution, outcome, and learning services
+  ├─ workflow collaboration and human-task bridge
+  ├─ connector, tool, approval, and audit routes
+  └─ queue, scheduler, and coordination services
 
-Swarm runtime
-  ├─ Commander
+LangGraph runtime
   ├─ Guardrail
-  ├─ Planner
-  ├─ Router
-  ├─ dependency-aware workers
-  ├─ Verifier
-  └─ bounded Replanner / Hyperagent
+  ├─ Planner and Router
+  ├─ specialist workers
+  ├─ Verifier and Validator
+  ├─ approval interrupt/resume
+  └─ Hyperagent diagnosis, repair, and learning nodes
 
 PostgreSQL
-  ├─ workflows and checkpoints
-  ├─ participants and session events
-  ├─ assignments and approvals
-  ├─ traces and artifacts
+  ├─ Company Brain artifacts, graph, claims, evidence, reviews, and jobs
+  ├─ workflows and LangGraph checkpoints
+  ├─ Hyperagent diagnoses, plans, outcomes, executions, and learnings
+  ├─ participants, task assignments, approvals, traces, and artifacts
   └─ tenant-scoped audit history
 ```
 
@@ -156,9 +180,10 @@ Full architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 - Node.js 20+
 - pnpm 9+
-- PostgreSQL 15+; pgvector recommended
-- Redis optional for distributed scheduling and locks
-- credentials for any external model or connector you enable
+- PostgreSQL 15+ with pgvector recommended
+- Redis for distributed scheduling, coordination, and queue-backed deployments
+- Supabase configuration for the current authentication and storage surfaces
+- credentials for each external model or connector you enable
 
 ### Install
 
@@ -169,37 +194,17 @@ pnpm install
 cp .env.example .env
 ```
 
-At minimum, configure the database and authentication secrets. **API keys are required** for external model and connector providers you enable; add an OpenAI or Gemini key for the model provider you intend to run.
+Configure the database, authentication, Supabase, signing, and any provider credentials you intend to use. See [`docs/environment-setup.md`](docs/environment-setup.md).
 
 ```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
-AUTH_SECRET=replace-with-a-random-secret
-EVIDENCE_SIGNING_SECRET=replace-with-a-separate-random-secret
-
-OPENAI_API_KEY=optional
-GEMINI_API_KEY=optional
-
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+pnpm db:generate
+pnpm db:migrate
 ```
 
-Full environment reference: [`docs/environment-setup.md`](docs/environment-setup.md).
-
-### Database
+Run the API and web application in separate terminals:
 
 ```bash
-pnpm --filter @jak-swarm/db db:migrate
-pnpm --filter @jak-swarm/db db:seed       # optional sample data
-pnpm seed:compliance                      # optional compliance controls
-```
-
-### Run
-
-```bash
-# Terminal 1
 pnpm --filter @jak-swarm/api dev
-
-# Terminal 2
 pnpm --filter @jak-swarm/web dev
 ```
 
@@ -214,43 +219,25 @@ pnpm test
 pnpm check:truth
 ```
 
-The collaboration integration suite uses real PostgreSQL through Testcontainers and covers participant persistence, exclusive task control, ordered session events, versioned redirection, and human-result injection into workflow state.
+Integration tests use PostgreSQL Testcontainers for database-backed behaviour. Live-provider and browser workflows require their own environment, credentials, and services; passing unit and integration tests is not the same as proving a hosted production deployment.
 
-## Technology
-
-| Layer | Technology |
-|---|---|
-| Monorepo | pnpm workspaces + Turborepo |
-| Frontend | Next.js 16, React 19, Tailwind CSS |
-| API | Fastify + TypeScript |
-| Database | PostgreSQL, Prisma, pgvector |
-| Durable workflows | LangGraph state graph + PostgreSQL checkpoints |
-| Alternate orchestration | Google ADK behind configuration |
-| Validation | Zod |
-| Testing | Vitest + Testcontainers |
-| Browser automation | Playwright |
-| Integrations | MCP and provider-specific connectors |
-
-## Documentation
+## Main documentation
 
 | Document | Purpose |
 |---|---|
-| [`docs/multiplayer-ai.md`](docs/multiplayer-ai.md) | Shared-session model, routes, handoffs, redirection, and replay |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture and runtime design |
-| [`AGENTS.md`](AGENTS.md) | Agent roles and contracts |
-| [`SECURITY.md`](SECURITY.md) | Security policy and reporting |
-| [`docs/current-runtime-truth.md`](docs/current-runtime-truth.md) | What is actually wired today |
-| [`docs/integration-maturity-matrix.md`](docs/integration-maturity-matrix.md) | Connector maturity and runtime paths |
-| [`docs/hyperagent-current-state-audit.md`](docs/hyperagent-current-state-audit.md) | Hyperagent implementation boundaries |
-| [`docs/beta-release.md`](docs/beta-release.md) | Beta scope and production-readiness checklist |
-| [`docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md`](docs/DEPLOYMENT_GOOGLE_CLOUD_RUN.md) | Cloud Run deployment guide |
-| [`docs/railway-deployment.md`](docs/railway-deployment.md) | Railway deployment guide |
+| [`docs/hyperagent-current-state-audit.md`](docs/hyperagent-current-state-audit.md) | Hyperagent implementation history, resolved findings, and remaining boundaries |
+| [`docs/production-canary-plan.md`](docs/production-canary-plan.md) | Required production-canary procedure |
+| [`docs/multiplayer-ai.md`](docs/multiplayer-ai.md) | Human collaboration, handoff, redirection, and replay |
+| [`docs/integration-maturity-matrix.md`](docs/integration-maturity-matrix.md) | Connector paths and maturity |
+| [`docs/beta-release.md`](docs/beta-release.md) | Beta scope and release boundaries |
+| [`SECURITY.md`](SECURITY.md) | Security policy and vulnerability reporting |
 
 ## Security and responsible use
 
-JAK Swarm is designed for defensive, permissioned business automation. High-risk external actions require approval, and critical manual-only operations remain human controlled.
+JAK Swarm is intended for defensive, permissioned business automation. High-risk external actions require approval, and critical manual-only operations remain human controlled.
 
-Report vulnerabilities through [`SECURITY.md`](SECURITY.md). Do not use the project for malware, phishing, credential theft, exploit generation, unauthorized access, or other offensive activity.
+Do not use the project for malware, phishing, credential theft, exploit generation, unauthorised access, or other offensive activity. Report vulnerabilities through [`SECURITY.md`](SECURITY.md).
 
 ## License
 
