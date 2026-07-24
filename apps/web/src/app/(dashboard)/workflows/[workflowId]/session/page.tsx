@@ -75,6 +75,7 @@ export default function WorkflowSessionPage() {
   const workflowId = params.workflowId;
   const [comment, setComment] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [controlledTaskId, setControlledTaskId] = useState('');
   const [redirectInstruction, setRedirectInstruction] = useState('');
   const [redirectReason, setRedirectReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -101,6 +102,8 @@ export default function WorkflowSessionPage() {
   const events = eventsQuery.data?.events ?? [];
   const tasks = useMemo(() => planTasks(workflowQuery.data), [workflowQuery.data]);
 
+  // Join once for the lifetime of this page. Task selection must not make the
+  // user leave and rejoin the session (that used to create noisy timeline rows).
   useEffect(() => {
     if (!workflowId) return;
     let active = true;
@@ -114,19 +117,35 @@ export default function WorkflowSessionPage() {
     };
     void join();
 
-    const timer = window.setInterval(() => {
-      void apiDataFetch(`/workflows/${workflowId}/participants/heartbeat`, {
-        method: 'POST',
-        body: { activeTaskId: selectedTaskId || null },
-      }).catch(() => undefined);
-    }, 15_000);
-
     return () => {
       active = false;
-      window.clearInterval(timer);
       void apiDataFetch(`/workflows/${workflowId}/participants/me`, { method: 'DELETE' }).catch(() => undefined);
     };
-  }, [workflowId, selectedTaskId]);
+  }, [workflowId]);
+
+  // Presence heartbeat is independent from joining. If this user owns a task
+  // control lease, renew it every 15 seconds; otherwise only publish the task
+  // they are looking at for presence UI.
+  useEffect(() => {
+    if (!workflowId) return;
+    const heartbeat = async () => {
+      try {
+        await apiDataFetch(`/workflows/${workflowId}/participants/heartbeat`, {
+          method: 'POST',
+          body: {
+            activeTaskId: controlledTaskId || selectedTaskId || null,
+            claimControl: Boolean(controlledTaskId),
+            leaseSeconds: 60,
+          },
+        });
+      } catch {
+        if (controlledTaskId) setControlledTaskId('');
+      }
+    };
+    void heartbeat();
+    const timer = window.setInterval(() => void heartbeat(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [workflowId, selectedTaskId, controlledTaskId]);
 
   const submitComment = async () => {
     if (!comment.trim()) return;
@@ -152,8 +171,10 @@ export default function WorkflowSessionPage() {
     setError(null);
     setNotice(null);
     try {
-      await workflowApi.pause(workflowId);
-      await waitForPaused(workflowId);
+      if (workflowQuery.data?.status !== 'PAUSED') {
+        await workflowApi.pause(workflowId);
+        await waitForPaused(workflowId);
+      }
       await apiDataFetch(`/workflows/${workflowId}/tasks/${selectedTaskId}/redirect`, {
         method: 'POST',
         body: {
@@ -183,10 +204,31 @@ export default function WorkflowSessionPage() {
         method: 'POST',
         body: { activeTaskId: selectedTaskId, claimControl: true, leaseSeconds: 60 },
       });
-      setNotice('You control this task for 60 seconds. Heartbeats keep the lease active.');
+      setControlledTaskId(selectedTaskId);
+      setNotice('You control this task. The lease renews while this session stays open.');
       await participantsQuery.mutate();
     } catch (claimError) {
+      setControlledTaskId('');
       setError(getErrorMessage(claimError));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const setTaskSelection = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    if (controlledTaskId && controlledTaskId !== taskId) setControlledTaskId('');
+  };
+
+  const setWorkflowPaused = async (paused: boolean) => {
+    setBusy(paused ? 'pause' : 'resume');
+    setError(null);
+    try {
+      if (paused) await workflowApi.pause(workflowId);
+      else await workflowApi.unpause(workflowId);
+      await workflowQuery.mutate();
+    } catch (controlError) {
+      setError(getErrorMessage(controlError));
     } finally {
       setBusy(null);
     }
@@ -222,15 +264,17 @@ export default function WorkflowSessionPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void workflowApi.pause(workflowId).then(() => workflowQuery.mutate())}
-            className="rounded-lg border border-amber-400/30 px-3 py-2 text-sm text-amber-200 hover:bg-amber-400/10"
+            onClick={() => void setWorkflowPaused(true)}
+            disabled={busy === 'pause' || workflowQuery.data?.status === 'PAUSED'}
+            className="rounded-lg border border-amber-400/30 px-3 py-2 text-sm text-amber-200 hover:bg-amber-400/10 disabled:opacity-40"
           >
             Pause
           </button>
           <button
             type="button"
-            onClick={() => void workflowApi.unpause(workflowId).then(() => workflowQuery.mutate())}
-            className="rounded-lg border border-emerald-400/30 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-400/10"
+            onClick={() => void setWorkflowPaused(false)}
+            disabled={busy === 'resume' || workflowQuery.data?.status !== 'PAUSED'}
+            className="rounded-lg border border-emerald-400/30 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-400/10 disabled:opacity-40"
           >
             Resume
           </button>
@@ -320,7 +364,7 @@ export default function WorkflowSessionPage() {
             <h2 className="font-semibold text-white">Task control</h2>
             <select
               value={selectedTaskId}
-              onChange={(event) => setSelectedTaskId(event.target.value)}
+              onChange={(event) => setTaskSelection(event.target.value)}
               className="mt-3 w-full rounded-lg border border-white/10 bg-black/50 p-2.5 text-sm text-white"
             >
               <option value="">Select a task</option>
@@ -332,10 +376,10 @@ export default function WorkflowSessionPage() {
             <button
               type="button"
               onClick={() => void claimControl()}
-              disabled={!selectedTaskId || busy === 'control'}
+              disabled={!selectedTaskId || busy === 'control' || controlledTaskId === selectedTaskId}
               className="mt-3 w-full rounded-lg border border-sky-400/30 px-3 py-2 text-sm text-sky-200 disabled:opacity-40"
             >
-              Claim task control
+              {controlledTaskId === selectedTaskId ? 'You control this task' : 'Claim task control'}
             </button>
           </section>
 
