@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Syne, JetBrains_Mono } from 'next/font/google';
+import { JetBrains_Mono, Syne } from 'next/font/google';
 import { ThemeProvider } from '@/lib/theme';
 import { AppShell } from '@/components/layout/AppShell';
 import { ToastProvider } from '@/components/ui/toast';
@@ -18,11 +18,23 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+const title = 'JAK Swarm — Multiplayer AI for Human-Agent Teams';
+const description = 'A multiplayer workspace where teams and AI agents share the same live workflow session. Watch, redirect, hand off, approve, and replay long-running work backed by 38 specialist agents and 122 classified tools.';
+
 export const metadata: Metadata = {
-  title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
-  description:
-    'The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Build, operate, and verify autonomous workflows on infrastructure you control. 38 specialist agents, 122 classified tools, 22 integrations. Open-source core, MIT licensed.',
-  keywords: ['autonomous AI', 'AI agents', 'multi-agent platform', 'agent control plane', 'approval gates', 'workflow automation', 'autonomous work', 'AI orchestration', 'risk intelligence', 'open source AI'],
+  title,
+  description,
+  keywords: [
+    'multiplayer AI',
+    'human agent collaboration',
+    'AI agents',
+    'shared agent workspace',
+    'multi-agent workflows',
+    'approval gates',
+    'agent orchestration',
+    'workflow replay',
+    'open source AI',
+  ],
   authors: [{ name: 'JAK Swarm' }],
   manifest: '/manifest.json',
   appleWebApp: {
@@ -31,16 +43,12 @@ export const metadata: Metadata = {
     title: 'JAK Swarm',
   },
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-    ],
-    apple: [
-      { url: '/icons/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
-    ],
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icons/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' }],
   },
   openGraph: {
-    title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
-    description: 'One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
+    title,
+    description,
     type: 'website',
     siteName: 'JAK Swarm',
     images: [
@@ -48,15 +56,15 @@ export const metadata: Metadata = {
         url: '/og-image.svg',
         width: 1200,
         height: 630,
-        alt: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
+        alt: 'JAK Swarm — Multiplayer AI for Human-Agent Teams',
         type: 'image/svg+xml',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'JAK Swarm — The Trusted Control Plane for Autonomous Work',
-    description: 'One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action.',
+    title,
+    description,
     images: ['/og-image.svg'],
   },
   other: {
@@ -65,42 +73,18 @@ export const metadata: Metadata = {
     'mobile-web-app-capable': 'yes',
   },
   metadataBase: new URL('https://jakswarm.com'),
-  alternates: {
-    canonical: '/',
-  },
+  alternates: { canonical: '/' },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${syne.variable} ${jetbrainsMono.variable}`}>
       <head>
         <meta name="theme-color" content="#09090b" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        {/*
-          A.3 — the render-blocking Fontshare <link> for Satoshi lived here.
-          It was the single biggest landing First-Contentful-Paint blocker
-          (a synchronous cross-origin stylesheet fetch before any paint).
-          Satoshi is not self-hosted in public/fonts, so font-sans now falls
-          back to the OS UI stack (see tailwind.config.ts). No external
-          render-blocking CSS remains; Syne + JetBrains_Mono are still
-          optimized via next/font/google below.
-        */}
       </head>
       <body>
-        {/* Service-worker registration is co-located inside `AppShell`
-            (a Client Component) via useEffect. Next.js 16 + App Router
-            emits a "Encountered a script tag while rendering" warning
-            for ANY `<script>` element in render output, including
-            `next/script`. useEffect renders zero DOM markup. */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-        >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ToastProvider>
             <AppShell>{children}</AppShell>
           </ToastProvider>

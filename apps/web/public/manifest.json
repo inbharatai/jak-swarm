@@ -1,7 +1,7 @@
 {
-  "name": "JAK Swarm — The Trusted Control Plane for Autonomous Work",
+  "name": "JAK Swarm — Multiplayer AI for Human-Agent Teams",
   "short_name": "JAK Swarm",
-  "description": "The trusted control plane for autonomous work. One platform that plans, executes, verifies, and recovers — with human approvals on every high-risk action. Open-source core, self-hostable.",
+  "description": "A multiplayer workspace where teams and AI agents share the same live workflow session. Watch, redirect, hand off, approve, and replay agent work.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

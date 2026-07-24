@@ -1,232 +1,99 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { JakLogo, ArrowRightIcon, CheckIcon, GitHubIcon } from '@/components/landing/LandingSvg';
+import { ArrowRightIcon, CheckIcon, GitHubIcon, JakLogo } from '@/components/landing/LandingSvg';
+import MultiplayerPreview from '@/components/landing/MultiplayerPreview';
 import LandingRedirectClient from '@/components/landing/LandingRedirectClient';
 import LandingNavClient from '@/components/landing/LandingNavClient';
 
-// A.4 — the hero cockpit is above-fold (LCP), so it stays a direct import and
-// server-renders immediately. The below-fold framer-motion-heavy sections are
-// code-split via next/dynamic (ssr:true default → still pre-rendered into the
-// static HTML for SEO, but each section's JS lands in its own chunk and loads
-// after hydration). Skeletons flash only during client-side navigation.
-const EngineDuo = dynamic(() => import('@/components/landing/EngineDuo'));
-const PainSection = dynamic(() => import('@/components/landing/PainSection'), { loading: () => <SectionSkeleton /> });
+const MultiplayerSection = dynamic(() => import('@/components/landing/MultiplayerSection'), { loading: () => <SectionSkeleton /> });
+const EngineDuo = dynamic(() => import('@/components/landing/EngineDuo'), { loading: () => <SectionSkeleton /> });
 const CompanyBrain = dynamic(() => import('@/components/landing/CompanyBrain'), { loading: () => <SectionSkeleton /> });
 const Hyperagent = dynamic(() => import('@/components/landing/Hyperagent'), { loading: () => <SectionSkeleton /> });
 const HowItWorks = dynamic(() => import('@/components/landing/HowItWorks'), { loading: () => <SectionSkeleton /> });
 const ProductCockpit = dynamic(() => import('@/components/landing/ProductCockpit'), { loading: () => <SectionSkeleton /> });
 const ShowTheWork = dynamic(() => import('@/components/landing/ShowTheWork'), { loading: () => <SectionSkeleton /> });
+const PainSection = dynamic(() => import('@/components/landing/PainSection'), { loading: () => <SectionSkeleton /> });
 const TrustLayer = dynamic(() => import('@/components/landing/TrustLayer'), { loading: () => <SectionSkeleton /> });
 const JAKShield = dynamic(() => import('@/components/landing/JAKShield'), { loading: () => <SectionSkeleton /> });
 const PremiumCTA = dynamic(() => import('@/components/landing/PremiumCTA'), { loading: () => <SectionSkeleton /> });
 
 function SectionSkeleton() {
-  return (
-    <div
-      className="mx-auto my-12 max-w-5xl h-64 rounded-2xl border border-white/5 bg-white/[0.02] animate-pulse"
-      aria-hidden="true"
-    />
-  );
+  return <div className="mx-auto my-16 h-64 max-w-5xl animate-pulse rounded-2xl border border-white/5 bg-white/[0.02]" aria-hidden="true" />;
 }
 
-/* ─── Data ────────────────────────────────────────────────────────────────── */
-
-// Pricing copy is agent-first across every tier so public messaging matches
-// the specialist agent routing policy.
 const PRICING = [
   {
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Run JAK on your own machine, forever.',
-    features: [
-      '200 credits / month',
-      '30 credits / day',
-      '5 core agents',
-      '1 vibe coding project',
-      'Bring-your-own API key',
-      'Community support',
-    ],
+    description: 'A hosted starter plan for trying the core runtime.',
+    features: ['200 credits / month', '30 credits / day', '1 concurrent workflow', 'Core agents', '1 vibe coding project', 'Tier 1 model access'],
     cta: 'Start Free',
     href: '/register',
     highlighted: false,
-    accent: '',
   },
   {
     name: 'Pro',
     price: '$29',
     period: '/mo',
-    description: 'Hosted agent runtime, managed execution, approvals built in.',
-    features: [
-      '3,000 credits / month',
-      '200 credits / day',
-      'All 38 specialist agents',
-      '5 vibe coding projects',
-      'Managed agent runtime (all models)',
-      '500 premium credits',
-      'Email support',
-    ],
-    cta: 'Go Pro',
+    description: 'Higher limits and the complete specialist-agent roster.',
+    features: ['3,000 credits / month', '200 credits / day', '3 concurrent workflows', 'All 38 specialist agents', '5 vibe coding projects', '500 premium credits'],
+    cta: 'Start Pro',
     href: '/register',
     highlighted: true,
-    accent: 'emerald',
   },
   {
     name: 'Team',
     price: '$99',
     period: '/mo',
-    description: 'Higher limits and priority model access for teams.',
-    features: [
-      '15,000 credits / month',
-      '600 credits / day',
-      'All agents + custom skills',
-      'Unlimited projects',
-      '3,000 premium credits',
-      'Managed agent runtime',
-      'Priority support',
-    ],
+    description: 'Shared execution capacity for growing teams.',
+    features: ['15,000 credits / month', '600 credits / day', '10 concurrent workflows', 'All 38 specialist agents', 'Unlimited vibe coding projects', '3,000 premium credits', 'Bring your own provider keys'],
     cta: 'Start Team',
     href: '/register',
     highlighted: false,
-    accent: '',
   },
   {
     name: 'Enterprise',
     price: '$249',
     period: '/mo',
-    description: 'SSO, audit exports, and dedicated deployment.',
-    features: [
-      '50,000 credits / month',
-      '2,000 credits / day',
-      '15,000 premium credits',
-      'SSO + RBAC + audit logs',
-      'Custom integrations',
-      'Managed agent runtime',
-      'Dedicated support',
-    ],
+    description: 'The highest hosted limits, with enterprise deployment discussions handled directly.',
+    features: ['50,000 credits / month', '2,000 credits / day', '50 concurrent workflows', 'All 38 specialist agents', 'Unlimited vibe coding projects', '15,000 premium credits', 'Bring your own provider keys'],
     cta: 'Contact Us',
     href: 'mailto:contact@inbharat.ai',
     highlighted: false,
-    accent: 'amber',
   },
-];
-
-/* ─── Page ────────────────────────────────────────────────────────────────── */
+] as const;
 
 export default function HomePage() {
   return (
     <>
       <style>{`
+        @keyframes hero-enter {
+          from { opacity: 0; transform: translateY(24px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @keyframes gradient-shift {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-15px) translateX(5px); }
-          66% { transform: translateY(8px) translateX(-3px); }
+        .landing-hero {
+          background: linear-gradient(135deg, #09090b, #071712, #09090b, #171207);
+          background-size: 320% 320%;
+          animation: gradient-shift 18s ease infinite;
         }
-        @keyframes float-medium {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(52, 211, 153, 0.2), 0 0 60px rgba(52, 211, 153, 0.05); }
-          50% { box-shadow: 0 0 30px rgba(52, 211, 153, 0.4), 0 0 80px rgba(52, 211, 153, 0.1); }
-        }
-        @keyframes dash-flow {
-          to { stroke-dashoffset: -20; }
-        }
-        @keyframes flow-travel {
-          0% { left: -5%; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { left: 100%; opacity: 0; }
-        }
-        @keyframes flow-pulse {
-          0% { opacity: 0.3; transform: scale(0.95); }
-          50% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0.3; transform: scale(0.95); }
-        }
-        @keyframes hero-mesh {
-          0% { transform: translate(0, 0) rotate(0deg); }
-          33% { transform: translate(30px, -20px) rotate(120deg); }
-          66% { transform: translate(-20px, 15px) rotate(240deg); }
-          100% { transform: translate(0, 0) rotate(360deg); }
-        }
-        @keyframes border-rotate {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        /* A.4 — hero entrance is now pure CSS (no client useState/useEffect).
-           The 0.1s delay matches the previous setTimeout(…, 100). Reduced
-           motion renders the hero static. */
-        @keyframes hero-enter {
-          from { opacity: 0; transform: translateY(40px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .hero-enter {
-          animation: hero-enter 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
-        }
-        .landing-root .landing-gradient-text {
-          /* Descender protection for gradient-clipped text (g, j, p, q, y).
-             0.22em > 0.12em because the hero H1 + final CTA hit text-6xl/7xl
-             where 0.12em was insufficient — "operating" + "control plane for"
-             both showed visible shear at the baseline. */
-          display: inline-block;
-          padding-bottom: 0.22em;
-          line-height: 1.2;
-          overflow: visible;
-        }
-        /* Display-font safety net: every H1/H2/H3 that uses Syne (font-display)
-           gets a bottom pad and a 1.18 minimum line-height so descenders
-           (g, j, p, q, y) never shear on the tightly-set landing headlines.
-           Tailwind's default text-3xl/text-5xl line-height is ~1.0-1.1, which
-           historically clipped letters like "g" in "operating" and "p" in
-           "snapshots". Override only inside .landing-root so app-shell
-           headings are not affected. */
+        .hero-enter { animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
         .landing-root h1.font-display,
         .landing-root h2.font-display,
-        .landing-root h3.font-display {
-          line-height: 1.18;
-          padding-bottom: 0.08em;
-        }
-        .gradient-bg {
-          background: linear-gradient(135deg, #09090b, #0a1a15, #09090b, #1a150a);
-          background-size: 400% 400%;
-          animation: gradient-shift 15s ease infinite;
-        }
-        .fade-section {
-          opacity: 0;
-          transform: translateY(40px);
-          transition: opacity 0.8s ease, transform 0.8s ease;
-        }
-        .fade-section.visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
-        .hero-mesh-blob {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(80px);
-          pointer-events: none;
-          animation: hero-mesh 20s ease-in-out infinite;
-        }
+        .landing-root h3.font-display { line-height: 1.16; padding-bottom: 0.05em; }
         @media (prefers-reduced-motion: reduce) {
-          .gradient-bg { animation: none; }
-          .hero-mesh-blob { animation: none; }
-          .fade-section { opacity: 1; transform: none; transition: none; }
-          .hero-enter { animation: none; opacity: 1; transform: none; }
+          .landing-hero { animation: none; }
+          .hero-enter { animation: none; }
         }
       `}</style>
 
-      {/* Skip to main content - Accessibility */}
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      {/* JSON-LD Structured Data for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -234,7 +101,7 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'SoftwareApplication',
             name: 'JAK Swarm',
-            description: 'Two engines — a Company Brain and a Hyperagent — that turn company evidence into approved, self-healing agent work. 38 specialist agents, 122 classified tools, human approvals on every high-risk action.',
+            description: 'A multiplayer workspace where teams and AI agents share the same live workflow session. People can watch, redirect, hand off, approve, and replay long-running agent work.',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',
             offers: [
@@ -244,470 +111,201 @@ export default function HomePage() {
               { '@type': 'Offer', price: '249', priceCurrency: 'USD', name: 'Enterprise' },
             ],
             featureList: [
-              'Company Brain — evidence graph, drift detection, executable specs',
-              'Hyperagent — self-healing re-plan loop and governed self-learning',
+              'Shared human-agent workflow sessions',
+              'Presence and task-control leases',
+              'Human-to-agent task handoffs',
+              'Safe task redirection and plan versioning',
+              'Approval-gated external actions',
+              'Replayable workflow history',
+              'Company Brain evidence graph',
+              'Hyperagent governed repair loop',
               '38 specialist agents',
               '122 classified tools',
               '15 connectors',
-              'Human approval gates',
-              'Audit trail',
-              'Audit-ready SOC 2 evidence',
             ],
           }),
         }}
       />
 
-      {/* A.4 — auth-redirect safety net (client island, renders nothing). */}
       <LandingRedirectClient />
 
-      <main id="main-content" className="landing-root min-h-screen bg-[#09090b] text-white overflow-x-hidden font-sans">
-        {/* ── Nav (client island — mobile hamburger toggle) ──────────────── */}
+      <main id="main-content" className="landing-root min-h-screen overflow-x-hidden bg-[#09090b] font-sans text-white">
         <LandingNavClient />
 
-        {/* ── 1. Hero ─────────────────────────────────────────────────────────
-             Beta-first framing, truth-locked to the current product:
-             company evidence -> drift detection -> executable specs ->
-             approval-gated agent execution. */}
-        <section className="relative min-h-[88vh] flex items-center gradient-bg px-4 pt-24 pb-20 sm:px-6 lg:px-8 grain-overlay overflow-hidden">
-          <div className="hero-mesh-blob h-[22rem] w-[22rem] sm:h-[37.5rem] sm:w-[37.5rem]" style={{ top: '10%', left: '-10%', background: 'radial-gradient(circle, rgba(52,211,153,0.13) 0%, transparent 70%)' }} />
-          <div className="hero-mesh-blob right-8 h-56 w-56 sm:-right-[5%] sm:h-[30rem] sm:w-[30rem]" style={{ top: '35%', background: 'radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 70%)', animationDelay: '-7s' }} />
-
-          <div className="hero-enter relative mx-auto max-w-4xl w-full z-10 text-center">
-            {/* JAK Shield stays visible, but the category lead is now the
-                 closed-loop company operating layer the product is building. */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
-              <a
-                href="#jak-shield"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-rose-400/40 bg-rose-400/[0.08] text-rose-200 hover:bg-rose-400/15 hover:text-white transition-colors text-[11px] font-semibold tracking-[0.16em] uppercase font-sans"
-                aria-label="JAK Shield — security and trust layer"
-              >
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6Z" />
-                </svg>
-                Protected by JAK Shield
-              </a>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-sky-400/35 bg-sky-400/[0.08] text-sky-200 text-[11px] font-semibold tracking-[0.16em] uppercase font-sans">
-                Beta 0.1.0-beta.0
-              </span>
-              <span className="max-w-full text-center text-[11px] font-semibold text-emerald-300/90 tracking-[0.16em] uppercase font-sans break-words">
-                &middot; Closed-loop company operating layer
-              </span>
+        <section className="landing-hero relative overflow-hidden px-4 pb-24 pt-32 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(52,211,153,0.13),transparent_34%),radial-gradient(circle_at_82%_35%,rgba(251,191,36,0.09),transparent_30%)]" aria-hidden="true" />
+          <div className="hero-enter relative z-10 mx-auto max-w-6xl text-center">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">Multiplayer AI beta</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-300">0.1.0-beta.0</span>
+              <a href="#jak-shield" className="rounded-full border border-rose-300/25 bg-rose-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-200 hover:bg-rose-300/15">Governed by JAK Shield</a>
             </div>
 
-            <h1 className="mb-6 pb-3 mx-auto text-4xl font-display font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.15]">
-              <span className="block text-white">Turn company context</span>
-              <span className="block mt-2 text-white">into approved</span>
-              <span className="block mt-2 gradient-text landing-gradient-text">agent work.</span>
+            <h1 className="mx-auto mt-8 max-w-5xl text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl">
+              One live workspace for
+              <span className="block bg-gradient-to-r from-emerald-300 via-sky-300 to-amber-300 bg-clip-text text-transparent">humans and AI agents.</span>
             </h1>
 
-            <p className="mb-6 max-w-3xl mx-auto text-base text-slate-300 sm:text-lg leading-relaxed font-sans">
-              JAK captures evidence from docs, tickets, code, meetings, and customer feedback; maps decisions, tasks, risks, owners, deadlines, and code changes; detects execution drift; generates specs; then routes work through specialist agents with permissions, approvals, sandboxing, risk scoring, defensive security review, and tamper-evident audit trails.
+            <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-zinc-300 sm:text-xl sm:leading-8">
+              JAK Swarm lets a team join the same task graph, watch agent work as it happens, redirect individual tasks, hand work to a person, approve risky actions, and replay the complete workflow history.
             </p>
 
-            {/* Capability strip. Leads with the two flagship engines (Company
-                 Brain + Hyperagent) alongside JAK Shield and the approval +
-                 audit surfaces. Every term maps to real product code. */}
-            <div className="mb-10 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
-              {[
-                'Company Brain',
-                'Hyperagent',
-                'JAK Shield',
-                'Approvals',
-                'Audit Trail',
-              ].map((pillar) => (
-                <span
-                  key={pillar}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-mono uppercase tracking-wider text-slate-300"
-                >
-                  <span className="w-1 h-1 rounded-full bg-rose-400" aria-hidden="true" />
-                  {pillar}
-                </span>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              {['Shared sessions', 'Live presence', 'Human handoffs', 'Task redirection', 'Approval gates', 'Replay'].map((item) => (
+                <span key={item} className="rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-zinc-300">{item}</span>
               ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/trial"
-                className="group relative inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl px-8 py-4 text-base font-semibold text-[#09090b] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
-                style={{
-                  background: 'linear-gradient(135deg, #34d399, #fbbf24)',
-                  boxShadow: '0 0 30px rgba(52,211,153,0.3), 0 10px 40px rgba(52,211,153,0.15)',
-                  touchAction: 'manipulation',
-                }}
-                data-cta="hero-trial"
-              >
-                Start 30-Day Free Trial
-                <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link href="/trial" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-amber-300 px-7 py-3.5 text-sm font-bold text-zinc-950 transition-transform hover:-translate-y-0.5 sm:w-auto">
+                Start controlled beta
+                <ArrowRightIcon className="h-4 w-4" />
               </Link>
-              <div className="grid w-full sm:w-auto grid-cols-1 sm:grid-cols-2 gap-3">
-                <a
-                  href="https://github.com/inbharatai/jak-swarm"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/35 bg-emerald-400/10 px-6 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-emerald-400/15 hover:border-emerald-200/50 focus-visible:ring-2 focus-visible:ring-emerald-300/70"
-                  aria-label="View JAK Swarm repository on GitHub"
-                >
-                  <GitHubIcon className="h-5 w-5" />
-                  JAK Swarm Repo
-                </a>
-                <a
-                  href="https://github.com/inbharatai/jak-shield"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/10 px-6 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-sky-400/15 hover:border-sky-200/50 focus-visible:ring-2 focus-visible:ring-sky-300/70"
-                  aria-label="View JAK Shield repository on GitHub"
-                >
-                  <GitHubIcon className="h-5 w-5" />
-                  JAK Shield Repo
-                </a>
-              </div>
+              <a href="#multiplayer" className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/[0.07] sm:w-auto">
+                See how multiplayer works
+              </a>
+              <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-7 py-3.5 text-sm font-semibold text-zinc-300 hover:border-white/25 hover:text-white sm:w-auto">
+                <GitHubIcon className="h-4 w-4" />
+                GitHub
+              </a>
             </div>
-            <p className="mt-3 text-[11px] text-slate-400 font-mono text-center">
-              Open-source repos: JAK Swarm (control plane) + JAK Shield (trust layer)
-            </p>
 
-            {/* Trial trust line — every claim here is real and grep-able:
-                 - 30 days  : Subscription.trialEndsAt = trialStartedAt + 30 days
-                              (apps/api/src/services/trial/usage-counter.service.ts:startTrial)
-                 - Daily caps: dailyAgentRunsCap=20, dailyApprovalsCap=5,
-                              dailyToolMinutesCap=120, dailyTokensCap=200_000
-                              (packages/db/prisma/migrations/106_team_and_trial)
-                 - No credit card: trial signup at /trial collects email only
-                              (apps/api/src/routes/trial.routes.ts) */}
-            <p className="mt-5 text-xs text-slate-400 font-sans">
-              Controlled beta · free for 30 days · daily caps to protect your budget · no credit card required
-            </p>
+            <p className="mt-4 text-xs text-zinc-500">30-day controlled beta · daily safety caps · no credit card required</p>
 
-            {/* The hero's primary visual: JAK's two flagship engines side by
-                side. Replaces the old single-pane cockpit typing demo so the
-                first viewport shows the actual IP — Company Brain and the
-                Hyperagent — each linked to its full section below. */}
-            <div className="mt-12 sm:mt-16">
-              <EngineDuo />
-              <p className="mt-4 text-[11px] sm:text-xs text-slate-500 font-mono tabular-nums">
-                Two engines — one closed loop. Explore each below.
-              </p>
+            <div className="mt-14">
+              <MultiplayerPreview />
             </div>
           </div>
         </section>
 
-        {/* ── 2. Company Brain — Engine 01: evidence -> graph -> drift -> specs.
-             The first flagship engine, branded and linked to /company. Now
-             the first content section after the hero — the engines lead. */}
+        <MultiplayerSection />
+
+        <section className="border-y border-white/5 bg-white/[0.015] px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto mb-12 max-w-3xl text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Platform foundations</p>
+              <h2 className="mt-4 text-3xl font-display font-bold sm:text-5xl">The collaboration layer sits on real execution infrastructure.</h2>
+              <p className="mt-5 text-base leading-7 text-zinc-400">Company Brain grounds work in company evidence. Hyperagent repairs bounded failures. The workflow runtime handles routing, checkpoints, approvals, verification, and audit history.</p>
+            </div>
+            <EngineDuo />
+          </div>
+        </section>
+
         <CompanyBrain />
-
-        {/* ── 3b. Hyperagent — Engine 02: self-healing re-plan + governed
-             self-learning. Honest: integration-proven, default-off, not
-             production-proven. Linked to /hyperagent. */}
         <Hyperagent />
-
-        {/* ── 4. How It Works — 7-step pipeline (Command → Plan → Route →
-             Execute → Approve → Verify → Deliver). Replaces the prior
-             5-icon strip; native section anchor #how-it-works. */}
         <HowItWorks />
-
-        {/* ── 5. Product Cockpit — premium dashboard mockup. Left rail =
-             user command + recent runs · Center = live agent graph ·
-             Right = approval card + output preview · Bottom = audit
-             timeline. Mirrors the actual cockpit at /workspace. */}
         <ProductCockpit />
-
-        {/* ── 6. Outcomes (4 product-proof cards) ──────────────────────── */}
         <ShowTheWork />
-
-        {/* ── 6b. Pain framing — why fragmented context breaks execution.
-             Moved below the engines + outcomes so the page leads with what
-             JAK *is* (the two engines + proof) before the why-it-matters
-             framing. Kept (not deleted): the e2e QA gate expects this
-             section's aria-label + "Scattered context creates drift" copy. */}
         <PainSection />
-
-        {/* ── 7. Trust Layer — 6 grep-able guarantees ──────────────────── */}
         <TrustLayer />
-
-        {/* ── 7b. JAK Shield — security/trust layer brand. Each feature
-             card carries `data-evidence-path` pointing at a real file
-             so the truth-check CI gate can verify nothing is hallucinated. */}
         <JAKShield />
 
-        {/* ── 8. Audit & Compliance Pack — sits after the Trust Layer.
-             Most visitors are solo founders / small teams who don't
-             need SOC 2 yet; the pack is reframed as a *trust signal*
-             available when they need it, not the headline pitch. */}
-        <section
-          id="audit"
-          className="relative overflow-hidden px-4 py-24 sm:px-6 lg:px-8"
-          style={{ background: 'linear-gradient(180deg, transparent, rgba(251,146,60,0.04), transparent)' }}
-        >
-          <div className="mx-auto max-w-5xl relative z-10">
-            <div className="text-center mb-10">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-400 mb-3 font-sans">
-                When you need audit-grade
-              </p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">
-                Enterprise-grade auditability when you need it.
-              </h2>
-              <p className="mt-4 text-base sm:text-lg text-slate-300 font-sans max-w-2xl mx-auto leading-relaxed">
-                You don&rsquo;t need to think about SOC 2 on day one. Every workflow JAK runs is already tamper-evident, signed, and replayable &mdash; so when an enterprise customer asks, the evidence is already there.
-              </p>
-            </div>
-
-            <div
-              className="rounded-3xl p-5 sm:p-12 glass-card"
-              style={{ borderTop: '3px solid #fb923c' }}
-            >
-              <div className="grid gap-8 md:grid-cols-2 md:items-center">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {[
-                      // Counts match packages/db/prisma/seed-data/compliance-frameworks.ts.
-                      // The truth-check CI gate (scripts/check-docs-truth.ts) cross-verifies
-                      // these numbers against the seeded arrays. Don't drift.
-                      { label: 'SOC 2 Type 2', count: 63, color: '#fb923c' },
-                      { label: 'HIPAA Security Rule', count: 37, color: '#f472b6' },
-                      { label: 'ISO/IEC 27001:2022', count: 82, color: '#c084fc' },
-                    ].map((fw) => (
-                      <span
-                        key={fw.label}
-                        className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium font-sans"
-                        style={{
-                          background: `${fw.color}12`,
-                          border: `1px solid ${fw.color}30`,
-                          color: '#fafafa',
-                        }}
-                      >
-                        <span className="font-mono tabular-nums" style={{ color: fw.color }}>
-                          {fw.count}
-                        </span>
-                        <span className="min-w-0 break-words">{fw.label}</span>
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="text-slate-300 font-sans mb-6 text-sm leading-relaxed">
-                    <span className="text-white font-semibold">182 controls</span> seeded across three frameworks &mdash; <span className="text-white">108 are operationally backed</span> (evidence pulled from system activity) and <span className="text-white">74 require reviewer attestation</span>. LLM-driven control testing, reviewer-gated workpaper PDFs, HMAC-signed final evidence packs.
-                  </p>
-
-                  <Link
-                    href="/audit/runs"
-                    className="inline-flex w-full sm:w-auto max-w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-[#09090b] transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-orange-400"
-                    style={{
-                      background: 'linear-gradient(135deg, #fb923c, #f472b6)',
-                      touchAction: 'manipulation',
-                    }}
-                  >
-                    Open Audit Workspace
-                    <ArrowRightIcon className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                <ul className="space-y-3 text-sm font-sans">
-                  {[
-                    'Reviewer-gated workpaper PDFs — download blocked until approved',
-                    'Final-pack signing refuses if any workpaper is unapproved (FinalPackGateError)',
-                    'External Auditor Portal — invite-token-only, engagement-scoped, fully audited',
-                    'HMAC-SHA256 evidence bundles verify byte-for-byte',
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-3 text-slate-200">
-                      <CheckIcon className="h-5 w-5 shrink-0 text-orange-400 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+        <section id="audit" className="relative px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-orange-300/15 bg-orange-300/[0.035] p-6 sm:p-10">
+            <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-300">Auditability</p>
+                <h2 className="mt-4 text-3xl font-display font-bold sm:text-5xl">Evidence is collected while the work happens.</h2>
+                <p className="mt-5 text-base leading-7 text-zinc-300">JAK records approvals, traces, artifacts, human interventions, and signed evidence bundles. The compliance pack seeds 182 controls across SOC 2, HIPAA, and ISO 27001; this is operational tooling, not third-party certification.</p>
+                <Link href="/audit/runs" className="mt-7 inline-flex items-center gap-2 rounded-xl border border-orange-300/25 bg-orange-300/10 px-5 py-3 text-sm font-semibold text-orange-100 hover:bg-orange-300/15">
+                  Open audit workspace
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Link>
               </div>
+              <ul className="space-y-3 text-sm text-zinc-300">
+                {[
+                  '63 SOC 2 controls seeded',
+                  '37 HIPAA Security Rule controls seeded',
+                  '82 ISO/IEC 27001:2022 controls seeded',
+                  'Reviewer-gated workpapers and signed evidence packs',
+                  'No claim of certification or third-party attestation',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 rounded-xl border border-white/8 bg-black/15 p-3">
+                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-orange-300" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
 
-        {/* ── 8. Pricing — height-aligned 4-tier grid. Pro stands out via
-             border + glow + badge, NOT via scale (scale-105 made it
-             awkwardly larger AND mis-aligned the column heights). All
-             cards use `flex flex-col h-full` + `mt-auto` on the CTA so
-             every card is the same height regardless of feature count. */}
-        <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(180deg, transparent, rgba(52,211,153,0.02), transparent)' }}>
-          <div className="mx-auto max-w-6xl relative z-10">
-            <div className="text-center mb-16">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-3 font-sans">Pricing</p>
-              <h2 className="text-3xl font-display font-bold sm:text-5xl tracking-tight">Transparent pricing. Open-source core.</h2>
-              <p className="mt-4 text-slate-300 max-w-xl mx-auto font-sans">Run JAK free on your own infrastructure, forever. Upgrade when you want hosted agent ops, higher limits, and SLA.</p>
+        <section id="pricing" className="border-y border-white/5 bg-white/[0.015] px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Hosted beta pricing</p>
+              <h2 className="mt-4 text-3xl font-display font-bold sm:text-5xl">Clear limits, without invented extras.</h2>
+              <p className="mt-5 text-base leading-7 text-zinc-400">The open-source core remains MIT licensed and self-hostable. The plans below reflect the current hosted credit, concurrency, model-tier, and project configuration.</p>
             </div>
 
-            <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
+            <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {PRICING.map((tier) => (
-                <div
-                  key={tier.name}
-                  className="relative rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full min-w-0"
-                  style={{
-                    background: tier.highlighted
-                      ? 'linear-gradient(165deg, rgba(52,211,153,0.16), rgba(251,191,36,0.08) 60%, rgba(52,211,153,0.04))'
-                      : tier.accent === 'amber'
-                      ? 'linear-gradient(165deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02))'
-                      : 'rgba(255,255,255,0.025)',
-                    border: tier.highlighted
-                      ? '1.5px solid rgba(52,211,153,0.55)'
-                      : tier.accent === 'amber'
-                      ? '1px solid rgba(251,191,36,0.25)'
-                      : '1px solid rgba(255,255,255,0.07)',
-                    boxShadow: tier.highlighted
-                      ? '0 0 0 1px rgba(52,211,153,0.15), 0 0 50px rgba(52,211,153,0.18), 0 20px 60px -10px rgba(52,211,153,0.1)'
-                      : 'none',
-                  }}
-                >
-                  {tier.highlighted && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-                      <span
-                        className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#09090b] whitespace-nowrap"
-                        style={{
-                          background: 'linear-gradient(135deg, #34d399, #fbbf24)',
-                          boxShadow: '0 4px 14px rgba(52,211,153,0.35)',
-                        }}
-                      >
-                        Most Popular
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="mb-6">
-                    <h3 className="text-base font-display font-semibold mb-2 text-white tracking-tight">{tier.name}</h3>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-display font-bold text-white tabular-nums">{tier.price}</span>
-                      {tier.period && <span className="text-slate-500 font-sans text-sm">{tier.period}</span>}
-                    </div>
-                    <p className="mt-3 text-[13px] text-slate-300 font-sans leading-relaxed min-h-[2.6rem]">{tier.description}</p>
+                <article key={tier.name} className={`flex h-full flex-col rounded-2xl border p-6 ${tier.highlighted ? 'border-emerald-300/40 bg-emerald-300/[0.06] shadow-xl shadow-emerald-950/20' : 'border-white/10 bg-white/[0.025]'}`}>
+                  {tier.highlighted ? <span className="mb-4 w-fit rounded-full bg-emerald-300 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-950">Most popular</span> : null}
+                  <h3 className="text-lg font-display font-semibold">{tier.name}</h3>
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-4xl font-display font-bold">{tier.price}</span>
+                    <span className="text-sm text-zinc-500">{tier.period}</span>
                   </div>
-
-                  <ul className="space-y-2.5 mb-7">
+                  <p className="mt-3 min-h-16 text-sm leading-6 text-zinc-400">{tier.description}</p>
+                  <ul className="mt-5 space-y-2.5 text-sm text-zinc-300">
                     {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5 text-[13px] font-sans">
-                        <CheckIcon
-                          className={`h-4 w-4 shrink-0 mt-0.5 ${tier.highlighted ? 'text-emerald-300' : 'text-emerald-400/80'}`}
-                        />
-                        <span className="text-slate-200 leading-snug">{feature}</span>
+                      <li key={feature} className="flex items-start gap-2.5">
+                        <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
-
-                  {/* CTA pinned to bottom so heights align across tiers regardless
-                      of feature-count differences. */}
-                  <div className="mt-auto">
+                  <div className="mt-auto pt-7">
                     {tier.href.startsWith('mailto:') ? (
-                      <a
-                        href={tier.href}
-                        className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 hover:bg-amber-500/15 focus-visible:ring-2 focus-visible:ring-amber-400"
-                        style={{
-                          background: 'rgba(251,191,36,0.1)',
-                          border: '1px solid rgba(251,191,36,0.25)',
-                          color: '#fbbf24',
-                          touchAction: 'manipulation',
-                        }}
-                      >
-                        {tier.cta}
-                      </a>
+                      <a href={tier.href} className="block rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-center text-sm font-semibold text-amber-100 hover:bg-amber-300/15">{tier.cta}</a>
                     ) : (
-                      <Link
-                        href={tier.href}
-                        className="block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                        style={{
-                          background: tier.highlighted ? 'linear-gradient(135deg, #34d399, #fbbf24)' : 'rgba(255,255,255,0.04)',
-                          border: tier.highlighted ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                          color: tier.highlighted ? '#09090b' : '#fff',
-                          touchAction: 'manipulation',
-                        }}
-                      >
-                        {tier.cta}
-                      </Link>
+                      <Link href={tier.href} className={`block rounded-xl px-4 py-3 text-center text-sm font-semibold ${tier.highlighted ? 'bg-gradient-to-r from-emerald-300 to-amber-300 text-zinc-950' : 'border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.07]'}`}>{tier.cta}</Link>
                     )}
                   </div>
-                </div>
+                </article>
               ))}
             </div>
+            <p className="mt-6 text-center text-xs text-zinc-600">Beta plan limits may change before general availability.</p>
           </div>
         </section>
 
-        {/* ── 9. Final CTA ─────────────────────────────────────────────── */}
         <PremiumCTA />
 
-        {/* ── 9. Footer ────────────────────────────────────────────────────── */}
-        <div className="h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" aria-hidden="true" />
-        <footer className="border-t border-white/5 px-4 py-16 sm:px-6 lg:px-8" role="contentinfo">
-          <div className="mx-auto max-w-7xl">
-            <div className="grid gap-12 md:grid-cols-4">
-              {/* Logo column */}
-              <div className="md:col-span-1">
-                <div className="flex items-center gap-2 mb-4">
-                  <JakLogo size={28} />
-                  <span className="text-base font-display font-bold tracking-tight">JAK Swarm</span>
-                </div>
-                <p className="text-sm text-slate-500 leading-relaxed font-sans">
-                  Closed-loop company operating layer for product and engineering teams. JAK turns evidence into specs, routes approved work to agents, and keeps an audit trail. Open-source core, self-hostable, MIT licensed.
-                </p>
+        <footer className="border-t border-white/5 px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
+            <div>
+              <div className="flex items-center gap-2">
+                <JakLogo size={28} />
+                <span className="font-display font-bold">JAK Swarm</span>
               </div>
-
-              {/* Product */}
-              <div>
-                <h4 className="text-sm font-display font-semibold text-white mb-4">Product</h4>
-                <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
-                  <li><a href="#company-os" className="hover:text-white focus-visible:text-white transition-colors">Company OS</a></li>
-                  <li><a href="#outcomes" className="hover:text-white focus-visible:text-white transition-colors">Proof</a></li>
-                  <li><a href="#how-it-works" className="hover:text-white focus-visible:text-white transition-colors">How It Works</a></li>
-                  <li><a href="#audit" className="hover:text-white focus-visible:text-white transition-colors">Audit &amp; Compliance</a></li>
-                  <li><a href="#pricing" className="hover:text-white focus-visible:text-white transition-colors">Pricing</a></li>
-                  <li><a href="https://github.com/inbharatai/jak-swarm/tree/main/docs" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Documentation</a></li>
-                </ul>
-              </div>
-
-              {/* Company */}
-              <div>
-                <h4 className="text-sm font-display font-semibold text-white mb-4">Company</h4>
-                <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
-                  <li><a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">About</a></li>
-                  <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Architecture</a></li>
-                  <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/AGENTS.md" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors">Agent Docs</a></li>
-                  <li><a href="mailto:contact@inbharat.ai" className="hover:text-white focus-visible:text-white transition-colors">Contact</a></li>
-                </ul>
-              </div>
-
-              {/* Social */}
-              <div>
-                <h4 className="text-sm font-display font-semibold text-white mb-4">Connect</h4>
-                <ul className="space-y-2.5 text-sm text-slate-500 font-sans">
-                  <li>
-                    <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Swarm on GitHub">
-                      <GitHubIcon className="h-4 w-4" />
-                      GitHub · JAK Swarm
-                    </a>
-                  </li>
-                  <li>
-                    <a href="https://github.com/inbharatai/jak-shield" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Shield on GitHub">
-                      <GitHubIcon className="h-4 w-4" />
-                      GitHub · JAK Shield
-                    </a>
-                  </li>
-                  <li>
-                    <a href="https://twitter.com/inbharatai" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Swarm on X / Twitter">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                      X / Twitter
-                    </a>
-                  </li>
-                  <li>
-                    <a href="https://linkedin.com/company/inbharatai" target="_blank" rel="noopener noreferrer" className="hover:text-white focus-visible:text-white transition-colors inline-flex items-center gap-2" aria-label="JAK Swarm on LinkedIn">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                      LinkedIn
-                    </a>
-                  </li>
-                </ul>
-              </div>
+              <p className="mt-4 max-w-md text-sm leading-6 text-zinc-500">A multiplayer workspace for human and AI teams, backed by durable workflows, evidence-grounded company context, approval gates, repair logic, and replayable execution history.</p>
+              <p className="mt-3 text-xs text-zinc-600">Working beta · self-hostable · MIT licensed · not yet enterprise-SLA ready</p>
             </div>
-
-            {/* Bottom bar */}
-            <div className="mt-12 pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <span className="text-sm text-slate-600 font-sans">&copy; {new Date().getFullYear()} InBharat AI. All rights reserved.</span>
-              <div className="flex items-center gap-4 text-sm text-slate-600 font-sans">
-                <a href="/terms" className="hover:text-white transition-colors">Terms</a>
-                <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
-                <span>Built with purpose.</span>
-              </div>
+            <div>
+              <h4 className="text-sm font-semibold text-white">Product</h4>
+              <ul className="mt-4 space-y-2.5 text-sm text-zinc-500">
+                <li><a href="#multiplayer" className="hover:text-white">Multiplayer AI</a></li>
+                <li><a href="#company-os" className="hover:text-white">Company Brain</a></li>
+                <li><a href="#hyperagent" className="hover:text-white">Hyperagent</a></li>
+                <li><a href="#trust" className="hover:text-white">Trust</a></li>
+                <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
+              </ul>
             </div>
+            <div>
+              <h4 className="text-sm font-semibold text-white">Resources</h4>
+              <ul className="mt-4 space-y-2.5 text-sm text-zinc-500">
+                <li><a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-white"><GitHubIcon className="h-4 w-4" />GitHub</a></li>
+                <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/docs/multiplayer-ai.md" target="_blank" rel="noopener noreferrer" className="hover:text-white">Multiplayer documentation</a></li>
+                <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer" className="hover:text-white">Architecture</a></li>
+                <li><a href="https://github.com/inbharatai/jak-swarm/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" className="hover:text-white">Security</a></li>
+                <li><a href="mailto:contact@inbharat.ai" className="hover:text-white">Contact</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mx-auto mt-10 flex max-w-7xl flex-col gap-2 border-t border-white/5 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+            <span>© {new Date().getFullYear()} JAK Swarm / InBharat AI</span>
+            <span>Humans stay in control of high-risk actions.</span>
           </div>
         </footer>
       </main>
