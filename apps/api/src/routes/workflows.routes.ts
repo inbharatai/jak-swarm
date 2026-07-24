@@ -10,6 +10,7 @@ import workflowControlRoutes from './workflows/workflow-control.routes.js';
 import workflowQueryRoutes from './workflows/workflow-query.routes.js';
 import workflowStreamRoutes from './workflows/workflow-stream.routes.js';
 import conversationRoutes from './workflows/conversation.routes.js';
+import workflowCollaborationRoutes from './workflow-collaboration.routes.js';
 
 export const createWorkflowBodySchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
@@ -213,6 +214,7 @@ const workflowsRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(workflowQueryRoutes);
   await fastify.register(workflowStreamRoutes);
   await fastify.register(conversationRoutes);
+  await fastify.register(workflowCollaborationRoutes);
 };
 
 export default workflowsRoutes;

@@ -1,0 +1,42 @@
+name: Dependency Audit Report
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: dependency-audit-report-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Production dependency advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --reporter=silent
+
+      - name: Audit production dependencies
+        id: audit
+        continue-on-error: true
+        run: node scripts/audit-prod-deps.cjs
+
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-audit-${{ github.sha }}
+          path: audit-prod-deps-report.json
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Enforce dependency audit result
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

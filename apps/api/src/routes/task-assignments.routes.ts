@@ -2,31 +2,16 @@
  * task-assignments.routes.ts — human-task-assignment routes.
  *
  * Workflow steps can be routed to either an AI agent (existing path) OR a
- * human teammate. When routed to a human, a TaskAssignment row is created
- * and the workflow pauses (via the existing approval-pause mechanism) until
- * the assignee posts a result.
- *
- * Endpoints:
- *   POST   /task-assignments              create an assignment (REVIEWER+ or workflow owner)
- *   GET    /task-assignments              list assignments for this tenant (filterable)
- *   GET    /task-assignments/me           assignments addressed to the calling user
- *   GET    /task-assignments/:id          single assignment
- *   POST   /task-assignments/:id/acknowledge   assignee acks (PENDING -> ACKNOWLEDGED)
- *   POST   /task-assignments/:id/complete     assignee completes (-> COMPLETED + resume workflow)
- *   POST   /task-assignments/:id/decline      assignee declines (-> DECLINED + notify assigner)
- *   POST   /task-assignments/:id/cancel       assigner withdraws (-> CANCELLED)
- *
- * RBAC:
- *   - create: REVIEWER+ OR the user owns the workflow
- *   - acknowledge/complete/decline: only the assignee
- *   - cancel: assigner OR REVIEWER+
- *   - read: any authed tenant member
+ * human teammate. When routed to a human, a TaskAssignment row is created,
+ * the workflow is paused, and completion is written into the saved SwarmState
+ * before a distributed unpause signal resumes dependent agent work.
  */
 
-import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ok, err } from '../types.js';
 import { AppError, NotFoundError, ForbiddenError, ValidationError } from '../errors.js';
+import { WorkflowCollaborationService } from '../services/workflow-collaboration.service.js';
 
 const VALID_RISK_LEVELS = [
   'READ_ONLY',
@@ -35,7 +20,6 @@ const VALID_RISK_LEVELS = [
   'LOCAL_EXEC_ALLOWLIST',
   'EXTERNAL_ACTION_APPROVAL',
   'CRITICAL_MANUAL_ONLY',
-  // Legacy 4-tier names — accepted for back-compat with older callers.
   'LOW',
   'MEDIUM',
   'HIGH',
@@ -58,10 +42,7 @@ const completeBodySchema = z.object({
   note: z.string().max(2000).optional(),
 });
 
-const declineBodySchema = z.object({
-  reason: z.string().min(1).max(2000),
-});
-
+const declineBodySchema = z.object({ reason: z.string().min(1).max(2000) });
 const listQuerySchema = z.object({
   status: z.string().optional(),
   workflowId: z.string().optional(),
@@ -70,44 +51,112 @@ const listQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
+type OptionalSwarm = {
+  pauseWorkflow?: (workflowId: string) => void;
+  unpauseWorkflow?: (workflowId: string) => void;
+  emit?: (eventName: string, event: unknown) => boolean;
+};
+type OptionalCoordination = {
+  signals?: { publish?: (signal: { type: 'pause' | 'unpause'; workflowId: string; issuedBy: string; timestamp: string }) => Promise<unknown> };
+};
+
+function optionalSwarm(fastify: FastifyInstance): OptionalSwarm | undefined {
+  return (fastify as unknown as { swarm?: OptionalSwarm }).swarm;
+}
+
+function optionalCoordination(fastify: FastifyInstance): OptionalCoordination | undefined {
+  return (fastify as unknown as { coordination?: OptionalCoordination }).coordination;
+}
+
+function hasDurableWorkflowStub(fastify: FastifyInstance): boolean {
+  const workflow = (fastify.db as unknown as { workflow?: { update?: unknown } }).workflow;
+  return typeof workflow?.update === 'function';
+}
+
+function canApplyHumanResult(fastify: FastifyInstance): boolean {
+  const db = fastify.db as unknown as {
+    workflow?: { update?: unknown };
+    approvalRequest?: { findFirst?: unknown };
+  };
+  return typeof db.workflow?.update === 'function' && typeof db.approvalRequest?.findFirst === 'function';
+}
+
+function emitCollaborationEvent(
+  fastify: FastifyInstance,
+  event: Awaited<ReturnType<WorkflowCollaborationService['recordEventBestEffort']>>,
+): void {
+  if (!event) return;
+  optionalSwarm(fastify)?.emit?.(`workflow:${event.workflowId}`, {
+    type: event.eventType,
+    kind: 'collaboration',
+    workflowId: event.workflowId,
+    taskId: event.taskId,
+    actorType: event.actorType,
+    actorId: event.actorId,
+    content: event.content,
+    metadata: event.metadata,
+    sequence: event.sequence,
+    timestamp: new Date(event.createdAt).toISOString(),
+  });
+}
+
+async function publishPauseSignal(
+  fastify: FastifyInstance,
+  type: 'pause' | 'unpause',
+  workflowId: string,
+  userId: string,
+): Promise<boolean> {
+  const publish = optionalCoordination(fastify)?.signals?.publish;
+  if (!publish) return false;
+  await publish({ type, workflowId, issuedBy: userId, timestamp: new Date().toISOString() });
+  return true;
+}
+
+async function requestWorkflowResume(
+  fastify: FastifyInstance,
+  input: { workflowId: string; userId: string; pendingApproval: boolean },
+): Promise<boolean> {
+  if (input.pendingApproval) return false;
+  const swarm = optionalSwarm(fastify);
+  if (!swarm?.unpauseWorkflow) return false;
+  swarm.unpauseWorkflow(input.workflowId);
+  return publishPauseSignal(fastify, 'unpause', input.workflowId, input.userId);
+}
+
 const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
   const auth = [fastify.authenticate];
+  const collaboration = new WorkflowCollaborationService(fastify.db, fastify.log);
 
-  /** POST /task-assignments — create a new human-task assignment. */
   fastify.post('/', { preHandler: auth }, async (request, reply) => {
     const parsed = createBodySchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply
-        .status(422)
-        .send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
+      return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
     }
     const data = parsed.data;
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
 
     try {
-      // Verify workflow belongs to this tenant.
       const wf = await fastify.db.workflow.findFirst({
         where: { id: data.workflowId, tenantId },
-        select: { id: true, userId: true },
+        select: { id: true, userId: true, status: true },
       });
       if (!wf) throw new NotFoundError('Workflow', data.workflowId);
+      if (typeof wf.status === 'string' && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(wf.status)) {
+        throw new ValidationError(`Cannot assign a human task to workflow in ${wf.status} status`);
+      }
 
-      // RBAC: workflow owner OR REVIEWER+ can assign.
       const role = request.user.role;
       const isPrivileged = role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
       if (wf.userId !== userId && !isPrivileged) {
         throw new ForbiddenError('Only the workflow owner or a REVIEWER+ can assign tasks');
       }
 
-      // Verify assignee belongs to this tenant.
       const assignee = await fastify.db.user.findFirst({
         where: { id: data.assigneeUserId, tenantId, active: true },
         select: { id: true, name: true, email: true },
       });
-      if (!assignee) {
-        throw new ValidationError('assigneeUserId is not a member of this tenant');
-      }
+      if (!assignee) throw new ValidationError('assigneeUserId is not a member of this tenant');
 
       const assignment = await fastify.db.taskAssignment.create({
         data: {
@@ -124,7 +173,37 @@ const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      // Inbox notification for the assignee.
+      let workflowPaused = false;
+      if (hasDurableWorkflowStub(fastify)) {
+        await collaboration.markHumanTaskPending({
+          tenantId,
+          workflowId: data.workflowId,
+          taskId: data.taskId,
+          assignmentId: assignment.id,
+          assigneeUserId: data.assigneeUserId,
+        });
+        optionalSwarm(fastify)?.pauseWorkflow?.(data.workflowId);
+        workflowPaused = await publishPauseSignal(fastify, 'pause', data.workflowId, userId);
+      }
+
+      const sessionEvent = await collaboration.recordEventBestEffort({
+        tenantId,
+        workflowId: data.workflowId,
+        actorType: 'HUMAN',
+        actorId: userId,
+        eventType: 'human_task_assigned',
+        taskId: data.taskId,
+        content: data.instructions ?? data.title,
+        metadata: {
+          assignmentId: assignment.id,
+          assigneeUserId: data.assigneeUserId,
+          title: data.title,
+          riskLevel: data.riskLevel ?? 'MEDIUM',
+          dueAt: data.dueAt ?? null,
+        },
+      });
+      emitCollaborationEvent(fastify, sessionEvent);
+
       await fastify.db.notification.create({
         data: {
           tenantId,
@@ -137,24 +216,18 @@ const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      return reply.status(201).send(ok(assignment));
+      return reply.status(201).send(ok({ ...assignment, workflowPaused, sessionEvent }));
     } catch (e) {
       if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
       throw e;
     }
   });
 
-  /** GET /task-assignments — list (tenant-scoped, filterable). */
   fastify.get('/', { preHandler: auth }, async (request, reply) => {
     const parsed = listQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply
-        .status(422)
-        .send(err('VALIDATION_ERROR', 'Invalid query', parsed.error.flatten()));
-    }
+    if (!parsed.success) return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid query', parsed.error.flatten()));
     const q = parsed.data;
     const tenantId = request.user.tenantId;
-
     const where: Record<string, unknown> = { tenantId };
     if (q.status) where.status = q.status;
     if (q.workflowId) where.workflowId = q.workflowId;
@@ -166,20 +239,16 @@ const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
       take: q.limit + 1,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
     });
-
     const hasMore = items.length > q.limit;
     const page = hasMore ? items.slice(0, q.limit) : items;
     const nextCursor = hasMore ? page[page.length - 1]!.id : null;
-
     return reply.status(200).send(ok({ items: page, nextCursor }));
   });
 
-  /** GET /task-assignments/me — assignments addressed to the calling user. */
   fastify.get('/me', { preHandler: auth }, async (request, reply) => {
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
     const status = (request.query as { status?: string })?.status;
-
     const items = await fastify.db.taskAssignment.findMany({
       where: {
         tenantId,
@@ -189,11 +258,9 @@ const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 100,
     });
-
     return reply.status(200).send(ok({ items, count: items.length }));
   });
 
-  /** GET /task-assignments/:id — single assignment. */
   fastify.get('/:id', { preHandler: auth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const tenantId = request.user.tenantId;
@@ -204,61 +271,36 @@ const taskAssignmentRoutes: FastifyPluginAsync = async (fastify) => {
         assignedBy: { select: { id: true, name: true, email: true } },
       },
     });
-    if (!assignment) {
-      return reply.status(404).send(err('NOT_FOUND', 'TaskAssignment not found'));
-    }
+    if (!assignment) return reply.status(404).send(err('NOT_FOUND', 'TaskAssignment not found'));
     return reply.status(200).send(ok(assignment));
   });
 
-  /** POST /task-assignments/:id/acknowledge — assignee opens the task. */
-  fastify.post('/:id/acknowledge', { preHandler: auth }, async (request, reply) => {
-    return mutateLifecycle(request, reply, fastify, 'ACKNOWLEDGED', null);
-  });
+  fastify.post('/:id/acknowledge', { preHandler: auth }, async (request, reply) =>
+    mutateLifecycle(request, reply, fastify, 'ACKNOWLEDGED', null));
 
-  /** POST /task-assignments/:id/complete — assignee completes. */
   fastify.post('/:id/complete', { preHandler: auth }, async (request, reply) => {
     const parsed = completeBodySchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      return reply
-        .status(422)
-        .send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
-    }
+    if (!parsed.success) return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
     return mutateLifecycle(request, reply, fastify, 'COMPLETED', {
       result: parsed.data.result ?? null,
       note: parsed.data.note ?? null,
     });
   });
 
-  /** POST /task-assignments/:id/decline — assignee refuses. */
   fastify.post('/:id/decline', { preHandler: auth }, async (request, reply) => {
     const parsed = declineBodySchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply
-        .status(422)
-        .send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
-    }
-    return mutateLifecycle(request, reply, fastify, 'DECLINED', {
-      reason: parsed.data.reason,
-    });
+    if (!parsed.success) return reply.status(422).send(err('VALIDATION_ERROR', 'Invalid body', parsed.error.flatten()));
+    return mutateLifecycle(request, reply, fastify, 'DECLINED', { reason: parsed.data.reason });
   });
 
-  /** POST /task-assignments/:id/cancel — assigner withdraws. */
-  fastify.post('/:id/cancel', { preHandler: auth }, async (request, reply) => {
-    return mutateLifecycle(request, reply, fastify, 'CANCELLED', null, { byAssigner: true });
-  });
+  fastify.post('/:id/cancel', { preHandler: auth }, async (request, reply) =>
+    mutateLifecycle(request, reply, fastify, 'CANCELLED', null, { byAssigner: true }));
 };
 
-/**
- * Shared lifecycle mutation. Enforces:
- *   - Tenant scoping
- *   - "Only the assignee" for assignee-side transitions
- *   - "Assigner OR REVIEWER+" for cancel
- *   - Idempotency: re-submitting the same target status returns the existing row
- */
 async function mutateLifecycle(
   request: FastifyRequest,
   reply: FastifyReply,
-  fastify: { db: import('@jak-swarm/db').PrismaClient },
+  fastify: FastifyInstance,
   target: 'ACKNOWLEDGED' | 'COMPLETED' | 'DECLINED' | 'CANCELLED',
   resultPayload: Record<string, unknown> | null,
   opts: { byAssigner?: boolean } = {},
@@ -268,16 +310,13 @@ async function mutateLifecycle(
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
     const role = request.user.role;
+    const collaboration = new WorkflowCollaborationService(fastify.db, fastify.log);
 
-    const assignment = await fastify.db.taskAssignment.findFirst({
-      where: { id, tenantId },
-    });
+    const assignment = await fastify.db.taskAssignment.findFirst({ where: { id, tenantId } });
     if (!assignment) throw new NotFoundError('TaskAssignment', id);
 
-    // Authorization.
     if (opts.byAssigner) {
-      const isPrivileged =
-        role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
+      const isPrivileged = role === 'REVIEWER' || role === 'TENANT_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'OPERATOR';
       if (assignment.assignedByUserId !== userId && !isPrivileged) {
         throw new ForbiddenError('Only the assigner or a REVIEWER+ can cancel');
       }
@@ -285,16 +324,34 @@ async function mutateLifecycle(
       throw new ForbiddenError('Only the assignee can mutate this task');
     }
 
-    // Terminal-state guard.
     const TERMINAL = new Set(['COMPLETED', 'DECLINED', 'CANCELLED', 'EXPIRED']);
     if (TERMINAL.has(assignment.status)) {
-      // Idempotent if it's already in the requested terminal state.
       if (assignment.status === target) {
-        return reply.status(200).send(ok(assignment));
+        let workflowResumeRequested = false;
+        if (target === 'COMPLETED' && canApplyHumanResult(fastify)) {
+          const stored = assignment.resultJson && typeof assignment.resultJson === 'object' && !Array.isArray(assignment.resultJson)
+            ? assignment.resultJson as Record<string, unknown>
+            : {};
+          const applied = await collaboration.applyHumanTaskResult({
+            tenantId,
+            workflowId: assignment.workflowId,
+            taskId: assignment.taskId,
+            assignmentId: assignment.id,
+            assigneeUserId: assignment.assigneeUserId,
+            result: stored['result'] && typeof stored['result'] === 'object' && !Array.isArray(stored['result'])
+              ? stored['result'] as Record<string, unknown>
+              : null,
+            note: typeof stored['note'] === 'string' ? stored['note'] : null,
+          });
+          workflowResumeRequested = await requestWorkflowResume(fastify, {
+            workflowId: assignment.workflowId,
+            userId,
+            pendingApproval: applied.pendingApproval,
+          });
+        }
+        return reply.status(200).send(ok({ ...assignment, workflowResumeRequested, idempotent: true }));
       }
-      throw new ValidationError(
-        `Cannot transition from terminal state ${assignment.status} to ${target}`,
-      );
+      throw new ValidationError(`Cannot transition from terminal state ${assignment.status} to ${target}`);
     }
 
     const now = new Date();
@@ -302,37 +359,63 @@ async function mutateLifecycle(
     if (target === 'ACKNOWLEDGED') update.acknowledgedAt = now;
     if (target === 'COMPLETED') update.completedAt = now;
     if (resultPayload) update.resultJson = resultPayload;
+    const next = await fastify.db.taskAssignment.update({ where: { id }, data: update });
 
-    // B2 (audit 2026-05-08): tenant isolation invariant.
-    //
-    // Prisma's `update` requires a unique `where`, and TaskAssignment.id
-    // is the only single-column unique. We CANNOT add `tenantId` directly
-    // to the `where` here without a compound `@@unique([id, tenantId])`
-    // declaration in schema.prisma. Instead, we rely on the `findFirst`
-    // tenant check above (~25 lines up) — which is the existing contract.
-    //
-    // If a future refactor splits the read from this write (e.g. moves
-    // it behind a separate transaction boundary), the invariant breaks
-    // silently. The defensive belt + braces is the explicit ID-not-found
-    // guard right after `assignment` is loaded — keep that intact.
-    const next = await fastify.db.taskAssignment.update({
-      where: { id },
-      data: update,
+    let workflowResumeRequested = false;
+    let pendingApproval = false;
+    if (target === 'COMPLETED' && canApplyHumanResult(fastify)) {
+      const applied = await collaboration.applyHumanTaskResult({
+        tenantId,
+        workflowId: assignment.workflowId,
+        taskId: assignment.taskId,
+        assignmentId: assignment.id,
+        assigneeUserId: assignment.assigneeUserId,
+        result: resultPayload?.['result'] && typeof resultPayload['result'] === 'object' && !Array.isArray(resultPayload['result'])
+          ? resultPayload['result'] as Record<string, unknown>
+          : null,
+        note: typeof resultPayload?.['note'] === 'string' ? resultPayload['note'] as string : null,
+      });
+      pendingApproval = applied.pendingApproval;
+      workflowResumeRequested = await requestWorkflowResume(fastify, {
+        workflowId: assignment.workflowId,
+        userId,
+        pendingApproval,
+      });
+    }
+
+    const eventType = target === 'ACKNOWLEDGED'
+      ? 'human_task_acknowledged'
+      : target === 'COMPLETED'
+        ? 'human_task_completed'
+        : target === 'DECLINED'
+          ? 'human_task_declined'
+          : 'human_task_cancelled';
+    const sessionEvent = await collaboration.recordEventBestEffort({
+      tenantId,
+      workflowId: assignment.workflowId,
+      actorType: 'HUMAN',
+      actorId: userId,
+      eventType,
+      taskId: assignment.taskId,
+      content: target === 'DECLINED'
+        ? String(resultPayload?.['reason'] ?? '')
+        : typeof resultPayload?.['note'] === 'string'
+          ? resultPayload['note'] as string
+          : null,
+      metadata: {
+        assignmentId: assignment.id,
+        assigneeUserId: assignment.assigneeUserId,
+        result: resultPayload?.['result'] ?? null,
+        workflowResumeRequested,
+        pendingApproval,
+      },
     });
+    emitCollaborationEvent(fastify, sessionEvent);
 
-    // Notify on completion / decline / cancel.
-    // B1 (audit 2026-05-08): each terminal state gets its own correctly-
-    // labelled notification kind so cockpit filters don't mis-categorise.
-    // CANCEL goes to the assignee (their task was cancelled by someone
-    // else); COMPLETED + DECLINED go to the assigner (they're waiting on
-    // the result).
     if (target === 'COMPLETED' || target === 'DECLINED' || target === 'CANCELLED') {
-      const recipient =
-        target === 'CANCELLED' ? assignment.assigneeUserId : assignment.assignedByUserId;
+      const recipient = target === 'CANCELLED' ? assignment.assigneeUserId : assignment.assignedByUserId;
       const kind: 'task_completed' | 'task_declined' | 'task_cancelled' =
-        target === 'COMPLETED' ? 'task_completed'
-        : target === 'DECLINED' ? 'task_declined'
-        : 'task_cancelled';
+        target === 'COMPLETED' ? 'task_completed' : target === 'DECLINED' ? 'task_declined' : 'task_cancelled';
       const verb = target === 'COMPLETED' ? 'completed' : target.toLowerCase();
       await fastify.db.notification.create({
         data: {
@@ -347,7 +430,7 @@ async function mutateLifecycle(
       });
     }
 
-    return reply.status(200).send(ok(next));
+    return reply.status(200).send(ok({ ...next, workflowResumeRequested, pendingApproval, sessionEvent }));
   } catch (e) {
     if (e instanceof AppError) return reply.status(e.statusCode).send(err(e.code, e.message));
     throw e;
