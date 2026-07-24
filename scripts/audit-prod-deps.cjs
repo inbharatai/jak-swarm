@@ -26,7 +26,13 @@ function loadIgnoredGhsas() {
   try {
     const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     const values = pkg?.pnpm?.auditConfig?.ignoreGhsas;
-    return new Set(Array.isArray(values) ? values.filter((value) => typeof value === 'string') : []);
+    return new Set(
+      Array.isArray(values)
+        ? values
+            .filter((value) => typeof value === 'string')
+            .map((value) => value.toUpperCase())
+        : [],
+    );
   } catch (error) {
     console.error('[audit] failed to read package.json audit exceptions:', error.message);
     return new Set();
