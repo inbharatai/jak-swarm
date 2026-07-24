@@ -115,7 +115,7 @@ describe('Landing — multiplayer implementation claims', () => {
     expect(assignments).toContain('applyHumanTaskResult');
     expect(assignments).toContain('human_task_completed');
     expect(assignments).toContain('requestWorkflowResume');
-    expect(assignments).toContain("type: 'unpause'");
+    expect(assignments).toContain("publishPauseSignal(fastify, 'unpause'");
   });
 
   it('the public copy keeps the beta boundary explicit', () => {
