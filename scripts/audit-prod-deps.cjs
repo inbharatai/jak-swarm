@@ -3,26 +3,26 @@
  * audit-prod-deps.cjs — registry-independent high/critical CVE gate (replaces
  * `pnpm audit --audit-level=high --prod`).
  *
- * Why: the npm registry retired /-/npm/v1/security/audits (410 Gone), so
- * `pnpm audit` fails across ALL pnpm versions until pnpm ships bulk-endpoint
- * support. This script keeps the same gate semantics (fail on high/critical in
- * PRODUCTION deps) by:
- *   1. using `pnpm list -r --prod --depth Infinity --json` for the exact prod
- *      dependency closure (dev-only tooling like vite/vitest is excluded, as
- *      `--prod` intended);
- *   2. querying the SUPPORTED npm bulk advisory endpoint
- *      (/-/npm/v1/security/advisories/bulk) for those (name, version) pairs;
- *   3. failing CI only on high/critical advisories.
- *
- * Run after `pnpm install --frozen-lockfile` (so the closure is resolvable).
+ * In addition to the console result, this writes a compact JSON report so a
+ * failed CI run has an inspectable artifact instead of burying the advisory
+ * names at the end of a long setup log.
  */
 const { execSync } = require('child_process');
 const https = require('https');
+const fs = require('fs');
 
 const BULK = 'https://registry.npmjs.org/-/npm/v1/security/advisories/bulk';
+const REPORT_PATH = process.env.AUDIT_REPORT_PATH || 'audit-prod-deps-report.json';
 const FAIL_LEVELS = new Set(['high', 'critical']);
-// Workspace-local packages (private, not on the npm registry) — skip auditing.
 const SKIP = new Set(['jak-swarm', '@jak-swarm/api', '@jak-swarm/web', '@jak-swarm/swarm', '@jak-swarm/shared', '@jak-swarm/db', '@jak-swarm/tools', '@jak-swarm/agents', '@jak-swarm/security', '@jak-swarm/skills', '@jak-swarm/verification', '@jak-swarm/voice', '@jak-swarm/client', '@jak-swarm/industry-packs', '@jak-swarm/adk', '@jak-swarm/whatsapp-client', '@jak-swarm/tests']);
+
+function writeReport(report) {
+  try {
+    fs.writeFileSync(REPORT_PATH, JSON.stringify({ generatedAt: new Date().toISOString(), ...report }, null, 2) + '\n');
+  } catch (error) {
+    console.error('[audit] failed to write report:', error.message);
+  }
+}
 
 function baseVersion(v) {
   if (typeof v !== 'string') return null;
@@ -60,36 +60,58 @@ function postBulk(payload) {
   let raw;
   try {
     raw = execSync('pnpm list -r --prod --depth Infinity --json', { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  } catch (e) {
-    console.error('[audit] pnpm list failed:', e.message);
+  } catch (error) {
+    writeReport({ status: 'error', stage: 'pnpm-list', error: error.message });
+    console.error('[audit] pnpm list failed:', error.message);
     process.exit(2);
   }
+
   const projects = JSON.parse(raw);
   const closure = new Map();
-  for (const p of projects) collect(p.dependencies || {}, closure);
+  for (const project of projects) collect(project.dependencies || {}, closure);
   const names = [...closure.keys()];
-  console.log('[audit] prod closure:', names.length, 'packages,', [...closure.values()].reduce((a, s) => a + s.size, 0), 'versions');
+  const versionCount = [...closure.values()].reduce((sum, versions) => sum + versions.size, 0);
+  console.log('[audit] prod closure:', names.length, 'packages,', versionCount, 'versions');
+
   const hits = [];
   const BATCH = 100;
   for (let i = 0; i < names.length; i += BATCH) {
     const payload = {};
-    for (const n of names.slice(i, i + BATCH)) payload[n] = [...closure.get(n)];
-    let resp;
-    try { resp = await postBulk(payload); } catch (e) { console.error('[audit] bulk request failed:', e.message); process.exit(2); }
-    for (const [name, advisories] of Object.entries(resp)) {
+    for (const name of names.slice(i, i + BATCH)) payload[name] = [...closure.get(name)];
+    let response;
+    try {
+      response = await postBulk(payload);
+    } catch (error) {
+      writeReport({ status: 'error', stage: 'bulk-advisory-request', packageCount: names.length, versionCount, error: error.message });
+      console.error('[audit] bulk request failed:', error.message);
+      process.exit(2);
+    }
+    for (const [name, advisories] of Object.entries(response)) {
       if (!Array.isArray(advisories)) continue;
-      for (const adv of advisories) {
-        if (FAIL_LEVELS.has(String(adv.severity).toLowerCase())) {
-          hits.push({ name, severity: adv.severity, title: adv.title, url: adv.url, vulnerable_versions: adv.vulnerable_versions });
+      for (const advisory of advisories) {
+        if (FAIL_LEVELS.has(String(advisory.severity).toLowerCase())) {
+          hits.push({
+            name,
+            severity: advisory.severity,
+            title: advisory.title,
+            url: advisory.url,
+            vulnerable_versions: advisory.vulnerable_versions,
+          });
         }
       }
     }
   }
+
   if (hits.length === 0) {
+    writeReport({ status: 'ok', packageCount: names.length, versionCount, findings: [] });
     console.log('[audit] OK — no high/critical advisories in production dependencies');
     process.exit(0);
   }
+
+  writeReport({ status: 'failed', packageCount: names.length, versionCount, findings: hits });
   console.error('[audit] FAIL — ' + hits.length + ' high/critical production advisory/advisories:');
-  for (const h of hits) console.error('  - ' + h.name + ' [' + h.severity + '] ' + h.title + ' (' + h.vulnerable_versions + ') ' + h.url);
+  for (const hit of hits) {
+    console.error('  - ' + hit.name + ' [' + hit.severity + '] ' + hit.title + ' (' + hit.vulnerable_versions + ') ' + hit.url);
+  }
   process.exit(1);
 })();
