@@ -6,7 +6,7 @@
 
 **One live workspace where people and AI agents can watch, redirect, hand off, approve, and replay long-running work together.**
 
-[![Release](https://img.shields.io/badge/release-0.1.0--beta.0-0ea5e9?style=flat-square)](docs/beta-release.md)
+[![Release](https://img.shields.io/badge/Release-Beta_0.1.0--beta.0-0ea5e9?style=flat-square)](docs/beta-release.md)
 [![AI Agents](https://img.shields.io/badge/AI_Agents-38-2563eb?style=flat-square)](AGENTS.md)
 [![Classified Tools](https://img.shields.io/badge/Classified_Tools-122-16a34a?style=flat-square)](docs/current-runtime-truth.md)
 [![Connectors](https://img.shields.io/badge/Connectors-15-0284c7?style=flat-square)](docs/integration-maturity-matrix.md)
@@ -20,7 +20,7 @@
 
 ## What JAK Swarm is
 
-JAK Swarm is a working beta for **shared human-agent workflow execution**.
+JAK Swarm is a **working beta build** for shared human-agent workflow execution.
 
 A team can enter the same workflow session, see the task graph, follow agent activity, redirect individual tasks, assign work to a person, approve external actions, and inspect the complete execution history. The collaboration layer sits on a durable multi-agent runtime rather than a collection of isolated chat transcripts.
 
@@ -83,11 +83,9 @@ See [`docs/jak-shield-manifest.md`](docs/jak-shield-manifest.md) and [`SECURITY.
 
 ## Verified product surface
 
-The repository truth gates currently track:
+The current registry contains **38 specialist agents** and **122 classified tools**. The repository truth gates also track:
 
-- **38 AI Agents** across orchestration, executive, coding, operations, and worker roles.
-- **122 Classified Tools**, each labeled by risk and maturity.
-- **15 Connectors** surfaced through real runtime paths; maturity varies by connector.
+- **15 connectors** surfaced through real runtime paths; maturity varies by connector.
 - Approval-gated external actions and manual-only critical actions.
 - PostgreSQL-backed workflow state, checkpointing, task assignments, and audit records.
 - Company Brain, Hyperagent, audit/compliance, browser automation, and self-hosted deployment paths.
@@ -107,7 +105,13 @@ It is **not yet enterprise-SLA ready**. Named boundaries include:
 - multiplayer execution is not a CRDT document editor or offline collaborative system;
 - production deployment still requires correct infrastructure, credentials, monitoring, and operator review.
 
-The authoritative readiness checklist is [`docs/beta-release.md`](docs/beta-release.md).
+The authoritative readiness checklist and **post-build production hardening roadmap** are in [`docs/beta-release.md`](docs/beta-release.md).
+
+## FAQ
+
+### Is JAK Swarm production-ready?
+
+For paying enterprise customers expecting an SLA: **NO, not yet**. JAK has not completed a third-party security audit, SOC 2 or ISO 27001 attestation, and its Terms of Service, Privacy Policy, and DPA are not represented as lawyer-reviewed enterprise agreements. Use beta, design-partner, or self-hosted-validation language until those gates are closed.
 
 ## Architecture
 
@@ -165,7 +169,7 @@ pnpm install
 cp .env.example .env
 ```
 
-At minimum, configure the database and authentication secrets. Add an OpenAI or Gemini key for the model provider you intend to run.
+At minimum, configure the database and authentication secrets. **API keys are required** for external model and connector providers you enable; add an OpenAI or Gemini key for the model provider you intend to run.
 
 ```bash
 DATABASE_URL=postgresql://user:pass@localhost:5432/jak_swarm
