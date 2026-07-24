@@ -20,7 +20,7 @@
 
 ## What JAK Swarm is
 
-JAK Swarm is a **working beta** built around two core engines:
+JAK Swarm is a **working beta build** built around two core engines:
 
 1. **Company Brain** turns company evidence into a cited, permission-filtered graph of artifacts, entities, claims, relationships, conflicts, and execution drift.
 2. **Hyperagent** turns approved Company Brain specifications into governed execution, measures the result, diagnoses failures, repairs eligible work, and promotes learning only through explicit policy and human-controlled gates.
@@ -134,10 +134,18 @@ It is **not yet enterprise-SLA ready**. Important boundaries include:
 - access control does not yet reproduce every source system's user and document ACL;
 - Hyperagent is default-off and still needs sustained production-canary evidence;
 - connector maturity and provider behaviour vary and depend on valid credentials and permissions;
-- external model calls require the relevant provider credentials and may incur provider costs;
+- API keys are required for the external model and connector providers that use them, and provider usage may incur costs;
 - production operation requires migrations, queues, monitoring, backups, incident procedures, and human review.
 
 Use **beta**, **design partner**, or **self-hosted validation** language. Do not claim production SLA, certification, complete compliance, or unrestricted autonomous operation.
+
+The remaining operational work is tracked in [`docs/beta-release.md`](docs/beta-release.md) and the **post-build production hardening roadmap**.
+
+## FAQ
+
+### Is JAK Swarm production-ready?
+
+For paying enterprise customers expecting an SLA: **NO, not yet.** JAK has not completed a third-party security audit, SOC 2 or ISO 27001 attestation, or lawyer-reviewed Terms of Service, Privacy Policy, and DPA. It should be evaluated as a beta, design-partner, or self-hosted-validation product until those gates and the production canary are closed.
 
 ## Architecture
 
