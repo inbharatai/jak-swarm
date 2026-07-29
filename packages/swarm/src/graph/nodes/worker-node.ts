@@ -1,4 +1,4 @@
-import { WorkflowStatus, TaskStatus } from '@jak-swarm/shared';
+import { WorkflowStatus, TaskStatus, HyperAgentMode } from '@jak-swarm/shared';
 import { AgentContext, getReflectionMode, ToolApprovalRequiredError } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
@@ -16,6 +16,70 @@ import {
 } from '../../context/context-summarizer.js';
 import { defaultRepairService } from '../../recovery/repair-service.js';
 import { getLifecycleEmitter } from '../../workflow-runtime/lifecycle-registry.js';
+
+// ─── Accuracy pass — calibrated abstention (design 3) ──────────────────────
+//
+// Uncertainty markers a worker emits when it is guessing rather than grounded.
+// Conservative: a single strong marker (an explicit low-confidence declaration
+// or "cannot determine") is required — hedging language alone ("might",
+// "probably") is NOT an abstain signal, or every cautious answer would abstain.
+const STRONG_UNCERTAINTY_PATTERNS: RegExp[] = [
+  /\b(?:i (?:cannot|can't|am unable to) (?:determine|verify|confirm|answer|conclude))\b/i,
+  /\b(?:insufficient|not enough|lacking)\s+(?:evidence|data|information|context)\s+to\b/i,
+  /\b(?:i don't (?:have|know)|do not have)\s+(?:enough|sufficient|the)\s+(?:evidence|data|information|context)\b/i,
+  /\b(?:cannot be determined|cannot be verified|impossible to (?:verify|confirm|determine))\b/i,
+  /\b(?:no (?:reliable|credible|available) (?:evidence|data|source)s?\s+(?:to|for|supporting))\b/i,
+];
+
+/** A worker may attach an explicit self-confidence to its output. */
+function explicitConfidence(output: unknown): number | undefined {
+  if (output && typeof output === 'object') {
+    const c = (output as Record<string, unknown>).confidence;
+    if (typeof c === 'number' && Number.isFinite(c)) return c;
+  }
+  return undefined;
+}
+
+/**
+ * Decide whether a produced output should be an abstention rather than a
+ * guessed answer. Returns the abstention detail, or undefined to keep the
+ * completion. Pure w.r.t. the output text + explicit confidence.
+ *
+ * Fires only on STRONG signals: an explicit confidence below the threshold,
+ * or a strong uncertainty declaration in the text. Hedging alone never
+ * triggers abstention — the goal is to catch "the worker is shipping a guess
+ * it cannot stand behind", not to penalise measured language.
+ */
+export function detectAbstention(output: unknown): { reason: string; confidence?: number; partialEvidence?: string } | undefined {
+  const confidence = explicitConfidence(output);
+  if (confidence !== undefined && confidence < 0.4) {
+    return {
+      reason: `Worker self-reported confidence ${confidence.toFixed(2)} is below the abstain threshold (0.40).`,
+      confidence,
+    };
+  }
+  const text = typeof output === 'string' ? output : JSON.stringify(output ?? '');
+  const marker = STRONG_UNCERTAINTY_PATTERNS.find((p) => p.test(text));
+  if (marker) {
+    // Pull the matching sentence as the human-readable reason.
+    const sentence = text.split(/(?<=[.!?])\s+|\n+/).find((s) => marker.test(s))?.trim().slice(0, 240);
+    return {
+      reason: sentence ?? 'Worker declared it could not produce a grounded answer.',
+      ...(confidence !== undefined ? { confidence } : {}),
+    };
+  }
+  return undefined;
+}
+
+/** True only when calibrated abstention is active for this run: HyperAgent
+ *  enabled AND not OBSERVE (read-only). Default workflows (HyperAgent OFF)
+ *  never abstain — byte-for-byte unchanged behaviour, matching the posture of
+ *  every other HyperAgent seam. */
+function abstentionActive(state: SwarmState): boolean {
+  const enabled = state.hyperAgentEnabled === true;
+  const mode = state.hyperAgentMode ?? HyperAgentMode.OFF;
+  return enabled && mode !== HyperAgentMode.OFF && mode !== HyperAgentMode.OBSERVE;
+}
 
 // ─── Public browser types + plan builder (preserved from pre-P5b worker-node.ts) ─
 //
@@ -335,6 +399,27 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
 
   const traces = context.getTraces();
 
+  // Accuracy pass — calibrated abstention. When the HyperAgent is active
+  // (enabled, not OBSERVE) and the worker produced an output carrying a strong
+  // uncertainty signal, the worker ABSTAINS rather than ship a guess: the task
+  // records TaskStatus.ABSTAINED with the reason + partial evidence, and the
+  // outcome evaluator triages it to TASK_ABSTAINED (honest, never a failure,
+  // never a silent pass). Fires after self-correction so the detector reads the
+  // FINAL output. HyperAgent-gated: default workflows never abstain.
+  let abstained: { reason: string; confidence?: number; partialEvidence?: string } | undefined;
+  if (!taskFailed && !awaitingApproval && abstentionActive(state)) {
+    abstained = detectAbstention(output);
+    if (abstained) {
+      output = {
+        abstained: true,
+        taskId: task.id,
+        reason: abstained.reason,
+        ...(abstained.confidence !== undefined ? { confidence: abstained.confidence } : {}),
+        ...(abstained.partialEvidence ? { partialEvidence: abstained.partialEvidence } : {}),
+      };
+    }
+  }
+
   const updatedPlan = state.plan
     ? {
         ...state.plan,
@@ -346,13 +431,18 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
                   ? TaskStatus.AWAITING_APPROVAL
                   : taskFailed
                     ? TaskStatus.FAILED
-                    : TaskStatus.COMPLETED,
+                    : abstained
+                      ? TaskStatus.ABSTAINED
+                      : TaskStatus.COMPLETED,
                 completedAt: awaitingApproval ? undefined : new Date(),
                 error: awaitingApproval
                   ? `Tool approval required: ${String((output as Record<string, unknown>)['reason'] ?? 'unknown tool')}`
                   : taskFailed
                     ? String((output as Record<string, unknown>)['error'] ?? 'Unknown worker error')
-                    : undefined,
+                    : abstained
+                      ? `Abstained: ${abstained.reason}`
+                      : undefined,
+                ...(abstained ? { abstention: abstained } : {}),
               }
             : t,
         ),
@@ -365,13 +455,15 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       taskId: task.id,
       ...(task.name ? { taskName: task.name } : {}),
       agentRole: task.agentRole,
-      success: !taskFailed && !awaitingApproval,
+      success: !taskFailed && !awaitingApproval && !abstained,
       durationMs: Date.now() - workerStartedAt,
       ...(awaitingApproval
         ? { awaitingApproval: true, toolName: String((output as Record<string, unknown>)['toolName'] ?? '') }
         : taskFailed
           ? { error: String((output as Record<string, unknown>)['error'] ?? 'Worker failed') }
-          : {}),
+          : abstained
+            ? { abstained: true, reason: abstained.reason }
+            : {}),
       timestamp: new Date().toISOString(),
     });
   }
@@ -390,6 +482,8 @@ export async function workerNode(state: SwarmState): Promise<Partial<SwarmState>
       ? `Tool approval required: ${String((output as Record<string, unknown>)['reason'] ?? 'unknown tool')}`
       : taskFailed
         ? String((output as Record<string, unknown>)['error'] ?? 'Worker failed')
-        : undefined,
+        : abstained
+          ? `Abstained: ${abstained.reason}`
+          : undefined,
   };
 }

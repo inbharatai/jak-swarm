@@ -24,6 +24,7 @@ import { AuditAction, AuditLogger, type AuditPrismaClient } from '@jak-swarm/sec
 import {
   executeApprovedSpec,
   runPlanViaLangGraph,
+  compileSpecCriteria,
   type CheckpointPrismaClient,
   type ExecuteSpecResult,
   type RunPlanInput,
@@ -1171,6 +1172,31 @@ export class CompanyOperatingLayerService {
       ctx,
     );
 
+    // Accuracy pass — structured-criteria compiler. The LLM generator emits
+    // prose acceptanceCriteria (Zod: string[]), which the acceptance checker
+    // honestly marks wired=false forever → the closed loop could never reach
+    // MET, only UNVERIFIABLE. Here we deterministically compile the prose into
+    // wired structured criteria bound to the generated task plan. The compiler
+    // NEVER invents a binding: unresolvable prose is preserved as an explicit
+    // CUSTOM criterion (honestly unwired) and the compile report is recorded
+    // on the spec so the reviewer can see exactly which criteria will be
+    // machine-measurable after the run. This is the same "LLM proposes,
+    // deterministic code disposes" posture as the failure diagnostician.
+    const planTasks: SpecTaskDescriptor[] = generated.agentTaskPlan.map((t) => ({
+      id: t.id,
+      name: t.title,
+      description: t.description,
+      agentRole: t.agentRole as SpecTaskDescriptor['agentRole'],
+      toolsRequired: [],
+      riskLevel: t.riskLevel as SpecTaskDescriptor['riskLevel'],
+      dependsOn: t.dependsOn,
+      requiresApproval: t.requiresApproval,
+    }));
+    const compileResult = compileSpecCriteria(
+      generated.acceptanceCriteria,
+      { tasks: planTasks },
+    );
+
     const row = await this.db.agentExecutableSpec.create({
       data: {
         tenantId: input.tenantId,
@@ -1180,7 +1206,7 @@ export class CompanyOperatingLayerService {
         objective: generated.objective,
         contextSummary: generated.contextSummary,
         proposedApproach: generated.proposedApproach,
-        acceptanceCriteria: generated.acceptanceCriteria,
+        acceptanceCriteria: compileResult.criteria as unknown as object[],
         testPlan: generated.testPlan,
         agentTaskPlan: generated.agentTaskPlan,
         approvalGates: generated.approvalGates,
@@ -1201,6 +1227,11 @@ export class CompanyOperatingLayerService {
         driftFindingId: row.driftFindingId,
         evidenceEntityCount: entities.length,
         evidenceArtifactCount: artifacts.length,
+        // Accuracy pass — how many prose criteria the compiler wired to
+        // deterministic evidence vs left honestly CUSTOM/unbound.
+        criteriaCompiled: compileResult.report.compiled.length,
+        criteriaUnbound: compileResult.report.unbound.length,
+        criteriaCoverage: compileResult.report.coverage,
       },
     }).catch(() => {});
 

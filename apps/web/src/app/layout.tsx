@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-const title = 'JAK Swarm — Multiplayer AI for Human-Agent Teams';
+const title = 'JAK Swarm — Company Brain + Hyperagent for Evidence-Grounded Execution';
 const description = 'A multiplayer workspace where teams and AI agents share the same live workflow session. Watch, redirect, hand off, approve, and replay long-running work backed by 38 specialist agents and 122 classified tools.';
 
 export const metadata: Metadata = {
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
         url: '/og-image.svg',
         width: 1200,
         height: 630,
-        alt: 'JAK Swarm — Multiplayer AI for Human-Agent Teams',
+        alt: 'JAK Swarm — Company Brain + Hyperagent for Evidence-Grounded Execution',
         type: 'image/svg+xml',
       },
     ],

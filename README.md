@@ -73,7 +73,7 @@ The live retrieval path combines lexical, identifier, graph, temporal, and confi
 
 Current access filtering is useful but not equivalent to complete source-system ACL parity. It enforces tenant boundaries, provenance, visibility, retention, and agent-role rules. User-, department-, project-, region-, and source-ACL-level policy coverage is not yet complete.
 
-Some Company Brain extraction and specification-generation paths currently require configured OpenAI credentials. JAK does not silently substitute fabricated template output when the model path is unavailable.
+Some Company Brain extraction and specification-generation paths currently require configured OpenAI credentials. JAK does not silently substitute fabricated template output when the model path is unavailable. When a spec is generated, its prose acceptance criteria are compiled into wired structured criteria against the generated task plan (see **Accuracy machinery** under Hyperagent) — criteria that cannot be deterministically bound remain `CUSTOM` and the compile report is recorded so a reviewer sees exactly what will be machine-measurable after a run.
 
 ## Hyperagent
 
@@ -91,6 +91,19 @@ Hyperagent is the governed reasoning, repair, and learning layer above the workf
 - PostgreSQL-backed checkpoints for approval interruption and resume.
 - Persisted plan versions, workflow outcomes, execution attempts, artifacts, and learning records.
 - A governed configuration lifecycle for proposed changes: `DRAFT → PROPOSED → SHADOW → CANARY → PROMOTED`, with operator-controlled advance and rollback.
+
+### Accuracy machinery
+
+Four mechanisms make the Hyperagent's answers and executions *measurably* more accurate, each extending the existing honest seams rather than adding a new engine:
+
+| Mechanism | What it does | Honest boundary |
+|---|---|---|
+| **Structured-criteria compiler** | Converts the spec generator's prose acceptance criteria into wired, deterministically-validated structured criteria bound to the task plan. Unresolvable prose stays `CUSTOM`/unwired with a recorded reason. | Never invents a binding — a criterion that cannot be resolved against the plan stays `UNVERIFIABLE`, not faked `MET`. |
+| **Citation-coverage gate** | Scores a worker's output prose against the Brain claims it was served, emitting a `citation_coverage` metric the acceptance checker binds via `METRIC_THRESHOLD`. Unsupported claims surface verbatim for diagnosis. | Lexical (token-containment) matching, not an embedding judge — heavy paraphrase is honestly flagged for review; an empty served-claim set is not measurable and stays unwired. |
+| **Calibrated abstention** | A worker may decline rather than guess (`TaskStatus.ABSTAINED` → `TASK_ABSTAINED`). Abstentions carry reason + partial evidence to the user ("I don't know — here's what I do know"), fail completion/verification criteria deterministically, and feed chronic-abstainer routing in the learning extractor. | Abstention is honest, never a pass: a run of all-abstains is `UNVERIFIABLE`, and no LLM layer converts an abstain into a completion. |
+| **Rubric quality floor** | A deterministic floor (`packages/verification/rubric`) scores instruction-following (sub-ask engagement, task-term completeness), citation presence, and format conformity, capping the verifier's composite confidence. | Escalate-only: the floor can lower confidence and surface actionable issues, but never raises it and never blocks a pass on its own; an LLM judge cannot rescue a structural floor failure. |
+
+All four are deterministic-first and pure where the verdict must be reproducible, matching the existing acceptance-checker / outcome-evaluator / failure-diagnostician posture.
 
 Hyperagent is **off by default**. A tenant administrator can configure it through `PUT /hyperagent/config` using modes `OFF`, `OBSERVE`, `ASSISTED`, or `AUTONOMOUS_SAFE`, together with autonomy levels and repair budgets. `OBSERVE` is read-only; enabling higher modes changes live workflow behaviour.
 

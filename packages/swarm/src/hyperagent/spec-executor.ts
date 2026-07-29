@@ -374,6 +374,7 @@ function emptyOutcomeEvaluation(workflowId: string, tenantId: string): OutcomeEv
     taskFailed: 0,
     taskBlocked: 0,
     taskSkipped: 0,
+    taskAbstained: 0,
     taskOutcomes: [],
     acceptanceResults: [],
     totalCostUsd: 0,

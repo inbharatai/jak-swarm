@@ -32,6 +32,14 @@ export enum TaskVerdict {
   TASK_FAILED = 'TASK_FAILED',
   TASK_BLOCKED = 'TASK_BLOCKED',
   TASK_SKIPPED = 'TASK_SKIPPED',
+  /**
+   * The worker declined to produce an answer it could not stand behind
+   * (calibrated abstention). Abstention is HONEST behaviour — it is not a
+   * failure and must not feed the failure statistics; but it also never
+   * satisfies a completion/verification acceptance criterion. A run whose
+   * tasks abstain is PARTIAL/UNVERIFIABLE, never silently SUCCESS.
+   */
+  TASK_ABSTAINED = 'TASK_ABSTAINED',
 }
 
 export interface TaskOutcome {
@@ -45,6 +53,19 @@ export interface TaskOutcome {
   /** Failure class from the deterministic classifier, when the task failed. */
   failureClass?: FailureClass;
   error?: string;
+  /**
+   * Calibrated abstention detail (Phase accuracy pass). Present when
+   * `verdict === TASK_ABSTAINED`: the worker's own explanation of why it
+   * declined, its self-reported confidence, and any partial evidence it did
+   * gather. Surfaced to the user ("I don't know — here's what I do know")
+   * and to the learning extractor (chronic-abstainer routing). Never
+   * populated for PASS/FAIL verdicts.
+   */
+  abstention?: {
+    reason: string;
+    confidence?: number;
+    partialEvidence?: string;
+  };
   /**
    * Agent role that executed the task (Phase 5 self-learning). Carried from
    * WorkflowTask.agentRole so the learning extractor can dimension WORKFLOW
@@ -134,6 +155,9 @@ export interface OutcomeEvaluation {
   taskFailed: number;
   taskBlocked: number;
   taskSkipped: number;
+  /** Tasks that abstained (calibrated decline). Not failures — tracked separately
+   *  so the learning extractor + UI never count honest abstention as failure. */
+  taskAbstained?: number;
   taskOutcomes: TaskOutcome[];
   acceptanceResults: AcceptanceCriterionResult[];
   totalCostUsd: number;

@@ -101,7 +101,7 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'SoftwareApplication',
             name: 'JAK Swarm',
-            description: 'A multiplayer workspace where teams and AI agents share the same live workflow session. People can watch, redirect, hand off, approve, and replay long-running agent work.',
+            description: 'JAK Swarm pairs Company Brain — a cited, permission-filtered graph of company evidence — with Hyperagent, a governed execution layer that runs approved plans, measures outcomes, and repairs bounded failures. Humans join the same live workflow session to watch, redirect, hand off, approve, and replay agent work.',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',
             offers: [
@@ -111,14 +111,13 @@ export default function HomePage() {
               { '@type': 'Offer', price: '249', priceCurrency: 'USD', name: 'Enterprise' },
             ],
             featureList: [
+              'Company Brain cited evidence graph',
+              'Hyperagent governed repair and learning loop',
+              'Reviewer-approved executable specifications',
+              'Tri-state acceptance measurement (MET / UNMET / UNVERIFIABLE)',
               'Shared human-agent workflow sessions',
-              'Presence and task-control leases',
-              'Human-to-agent task handoffs',
-              'Safe task redirection and plan versioning',
               'Approval-gated external actions',
               'Replayable workflow history',
-              'Company Brain evidence graph',
-              'Hyperagent governed repair loop',
               '38 specialist agents',
               '122 classified tools',
               '15 connectors',
@@ -136,22 +135,22 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(52,211,153,0.13),transparent_34%),radial-gradient(circle_at_82%_35%,rgba(251,191,36,0.09),transparent_30%)]" aria-hidden="true" />
           <div className="hero-enter relative z-10 mx-auto max-w-6xl text-center">
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">Multiplayer AI beta</span>
+              <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">Evidence-grounded AI beta</span>
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-300">0.1.0-beta.0</span>
               <a href="#jak-shield" className="rounded-full border border-rose-300/25 bg-rose-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-200 hover:bg-rose-300/15">Governed by JAK Shield</a>
             </div>
 
             <h1 className="mx-auto mt-8 max-w-5xl text-4xl font-display font-bold tracking-tight sm:text-6xl lg:text-7xl">
-              One live workspace for
-              <span className="block bg-gradient-to-r from-emerald-300 via-sky-300 to-amber-300 bg-clip-text text-transparent">humans and AI agents.</span>
+              Company Brain + Hyperagent
+              <span className="block bg-gradient-to-r from-emerald-300 via-sky-300 to-amber-300 bg-clip-text text-transparent">for evidence-grounded execution.</span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-zinc-300 sm:text-xl sm:leading-8">
-              JAK Swarm lets a team join the same task graph, watch agent work as it happens, redirect individual tasks, hand work to a person, approve risky actions, and replay the complete workflow history.
+              JAK Swarm builds cited understanding from your company&rsquo;s evidence, turns execution gaps into approved plans, and runs those plans through governed agents that verify outcomes and repair bounded failures — with humans in the loop at every risky step.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-              {['Shared sessions', 'Live presence', 'Human handoffs', 'Task redirection', 'Approval gates', 'Replay'].map((item) => (
+              {['Company Brain evidence graph', 'Hyperagent repair loop', '38 specialist agents', '122 classified tools', '15 connectors', 'Multiplayer control room'].map((item) => (
                 <span key={item} className="rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-zinc-300">{item}</span>
               ))}
             </div>
@@ -161,8 +160,8 @@ export default function HomePage() {
                 Start controlled beta
                 <ArrowRightIcon className="h-4 w-4" />
               </Link>
-              <a href="#multiplayer" className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/[0.07] sm:w-auto">
-                See how multiplayer works
+              <a href="#engines" className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/[0.07] sm:w-auto">
+                See the two engines
               </a>
               <a href="https://github.com/inbharatai/jak-swarm" target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-7 py-3.5 text-sm font-semibold text-zinc-300 hover:border-white/25 hover:text-white sm:w-auto">
                 <GitHubIcon className="h-4 w-4" />
@@ -178,18 +177,18 @@ export default function HomePage() {
           </div>
         </section>
 
-        <MultiplayerSection />
-
-        <section className="border-y border-white/5 bg-white/[0.015] px-4 py-20 sm:px-6 lg:px-8">
+        <section id="engines" className="border-b border-white/5 bg-white/[0.015] px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-12 max-w-3xl text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Platform foundations</p>
-              <h2 className="mt-4 text-3xl font-display font-bold sm:text-5xl">The collaboration layer sits on real execution infrastructure.</h2>
-              <p className="mt-5 text-base leading-7 text-zinc-400">Company Brain grounds work in company evidence. Hyperagent repairs bounded failures. The workflow runtime handles routing, checkpoints, approvals, verification, and audit history.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">The two engines</p>
+              <h2 className="mt-4 text-3xl font-display font-bold sm:text-5xl">Cited understanding in. Governed execution out.</h2>
+              <p className="mt-5 text-base leading-7 text-zinc-400">Company Brain turns company evidence into a cited, permission-filtered graph of artifacts, claims, and execution drift. Hyperagent turns approved specifications into governed execution — measuring outcomes, diagnosing failures, and repairing bounded work. Multiplayer, connectors, and the specialist-agent runtime support these two engines.</p>
             </div>
             <EngineDuo />
           </div>
         </section>
+
+        <MultiplayerSection />
 
         <CompanyBrain />
         <Hyperagent />

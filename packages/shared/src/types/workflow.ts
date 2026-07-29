@@ -28,6 +28,13 @@ export enum TaskStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
   SKIPPED = 'SKIPPED',
+  /**
+   * The worker declined to answer rather than guess (calibrated abstention).
+   * A terminal worker decision — not a failure — that the outcome evaluator
+   * triages to TASK_ABSTAINED. Workers set this when their confidence is too
+   * low to stand behind an answer.
+   */
+  ABSTAINED = 'ABSTAINED',
 }
 
 export interface WorkflowTask {
@@ -44,6 +51,17 @@ export interface WorkflowTask {
   maxRetries: number;
   result?: unknown;
   error?: string;
+  /**
+   * Calibrated abstention detail, set when `status === ABSTAINED`: why the
+   * worker declined, its self-reported confidence, and partial evidence it
+   * did gather. Carried through to the outcome evaluator's TASK_ABSTAINED
+   * triage and the user-facing "I don't know" rendering.
+   */
+  abstention?: {
+    reason: string;
+    confidence?: number;
+    partialEvidence?: string;
+  };
   startedAt?: Date;
   completedAt?: Date;
 }

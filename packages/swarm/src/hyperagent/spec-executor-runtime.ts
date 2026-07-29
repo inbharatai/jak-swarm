@@ -43,6 +43,65 @@ import {
   type CheckpointPrismaClient,
 } from '../workflow-runtime/index.js';
 import type { RunPlanInput, FinishedRun } from './spec-executor.js';
+import {
+  measureCitationCoverage,
+  coverageMetrics,
+  type ServedClaim,
+} from './citation-coverage.js';
+
+/**
+ * Accuracy pass — fold the run's quality + grounding metrics into the
+ * harvested RunEvidence.metrics. Two channels, both honest:
+ *
+ *   - quality_score: taken from the verifier results' rubric quality floor
+ *     (result.qualityScore), averaged across verified tasks. When no task
+ *     carried a quality score, the metric is omitted (unmeasured, never faked).
+ *
+ *   - citation_coverage: measured from the worker's final text output against
+ *     the Brain claims served into the task context (state.servedClaims, when
+ *     the context provider emitted them). When no claims were served the
+ *     report is not measurable and coverageMetrics emits nothing — so a
+ *     METRIC_THRESHOLD criterion on citation_coverage stays honestly
+ *     "metric not reported" rather than reading a vacuous score.
+ *
+ * Pure + deterministic given the terminal state.
+ */
+export function harvestAccuracyMetrics(state: SwarmState): Record<string, number> {
+  const out: Record<string, number> = {};
+
+  // quality_score — mean of verifier quality floors across tasks that have one.
+  const qualityScores = Object.values(state.verificationResults ?? {})
+    .map((r) => (r as { qualityScore?: number }).qualityScore)
+    .filter((q): q is number => typeof q === 'number' && Number.isFinite(q));
+  if (qualityScores.length > 0) {
+    out.quality_score = qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length;
+  }
+
+  // citation_coverage — only when the state records served claims + a final
+  // text output to measure. Reads are defensive: absent either, the report is
+  // not measurable and nothing is emitted.
+  const servedClaims = (state as { servedClaims?: ServedClaim[] }).servedClaims;
+  const finalOutput = (state as { finalOutputText?: string }).finalOutputText
+    ?? lastTextTaskResult(state);
+  if (Array.isArray(servedClaims) && typeof finalOutput === 'string' && finalOutput.trim().length > 0) {
+    const report = measureCitationCoverage({ outputText: finalOutput, servedClaims });
+    Object.assign(out, coverageMetrics(report));
+  }
+
+  return out;
+}
+
+/** Best-effort: the last string task result, when the state does not carry an
+ *  explicit finalOutputText. Returns undefined when no string result exists. */
+function lastTextTaskResult(state: SwarmState): string | undefined {
+  const results = (state as { taskResults?: Record<string, unknown> }).taskResults ?? {};
+  const ids = Object.keys(results).filter((k) => !k.endsWith('_status'));
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const v = results[ids[i]!];
+    if (typeof v === 'string' && v.trim().length > 0) return v;
+  }
+  return undefined;
+}
 
 /** Deps the production run seam needs (the Postgres checkpointer + cancel/pause
  *  flags, same shape as `BuildLangGraphParams` minus the HyperAgent half). */
@@ -169,7 +228,7 @@ export async function runPlanViaLangGraph(
         completedTaskIds: state.completedTaskIds,
         blocked: state.blocked,
         ...harvestRunEvidence(state),
-        metrics: { accumulatedCostUsd: state.accumulatedCostUsd ?? 0 },
+        metrics: { accumulatedCostUsd: state.accumulatedCostUsd ?? 0, ...harvestAccuracyMetrics(state) },
         accumulatedCostUsd: state.accumulatedCostUsd,
         awaitingApproval: true,
         ...(approvalRequestId ? { approvalRequestId } : {}),
@@ -192,8 +251,10 @@ export async function runPlanViaLangGraph(
     // terminal state via the pure harvestRunEvidence helper. When the graph
     // emits none, this is [] / undefined (unchanged behaviour).
     ...harvestRunEvidence(finalState),
-    // The one metric SwarmState tracks; richer metrics are a separate wiring.
-    metrics: { accumulatedCostUsd: finalState.accumulatedCostUsd ?? 0 },
+    // The one metric SwarmState tracks (cost) plus the accuracy pass's
+    // quality + grounding metrics (quality_score, citation_coverage), each
+    // omitted when unmeasured — never faked.
+    metrics: { accumulatedCostUsd: finalState.accumulatedCostUsd ?? 0, ...harvestAccuracyMetrics(finalState) },
     accumulatedCostUsd: finalState.accumulatedCostUsd,
     startedAt: now,
     completedAt: new Date(),

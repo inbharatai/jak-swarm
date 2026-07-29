@@ -27,6 +27,9 @@ function task(overrides: Partial<WorkflowTask> & { id: string }): WorkflowTask {
     dependsOn: overrides.dependsOn ?? [],
     retryable: overrides.retryable ?? true,
     maxRetries: overrides.maxRetries ?? 2,
+    ...(overrides.abstention ? { abstention: overrides.abstention } : {}),
+    ...(overrides.error ? { error: overrides.error } : {}),
+    ...(overrides.result !== undefined ? { result: overrides.result } : {}),
   };
 }
 
@@ -126,6 +129,68 @@ describe('outcome-evaluator — verdict logic', () => {
     expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_SUCCESS);
     expect(r.taskSkipped).toBe(1);
     expect(r.taskTotal).toBe(2);
+  });
+
+  // ─── Accuracy pass: calibrated abstention ────────────────────────────────
+
+  it('ABSTAINED status → TASK_ABSTAINED with the abstention detail carried', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([
+        task({ id: 'a' }),
+        task({
+          id: 'b',
+          status: TaskStatus.ABSTAINED,
+          abstention: { reason: 'insufficient evidence to answer confidently', confidence: 0.3, partialEvidence: 'found 2 of 5 sources' },
+        }),
+      ]),
+      verificationResults: { a: vPass() },
+    }));
+    const abstained = r.taskOutcomes.find((o) => o.taskId === 'b');
+    expect(abstained?.verdict).toBe(TaskVerdict.TASK_ABSTAINED);
+    expect(abstained?.abstention?.reason).toBe('insufficient evidence to answer confidently');
+    expect(abstained?.failureClass).toBeUndefined(); // abstention is NOT a failure
+    expect(r.taskAbstained).toBe(1);
+  });
+
+  it('pass + abstain → OUTCOME_PARTIAL (honest gaps, not failure, not success)', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a' }), task({ id: 'b', status: TaskStatus.ABSTAINED })]),
+      verificationResults: { a: vPass() },
+    }));
+    expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_PARTIAL);
+    expect(r.taskPassed).toBe(1);
+    expect(r.taskFailed).toBe(0); // abstention never counts as failure
+    expect(r.taskAbstained).toBe(1);
+    expect(r.summary).toContain('abstained');
+  });
+
+  it('all tasks abstain → OUTCOME_BLOCKED (no verified progress, no false FAILED signal)', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([
+        task({ id: 'a', status: TaskStatus.ABSTAINED }),
+        task({ id: 'b', status: TaskStatus.ABSTAINED }),
+      ]),
+    }));
+    expect(r.verdict).toBe(OutcomeVerdict.OUTCOME_BLOCKED);
+    expect(r.taskFailed).toBe(0);
+    expect(r.taskAbstained).toBe(2);
+    expect(r.summary).toContain('abstained');
+  });
+
+  it('an abstained task fails a TASK_COMPLETED acceptance criterion (wired, unsatisfied)', () => {
+    const r = evaluateOutcome(baseInput({
+      plan: plan([task({ id: 'a', status: TaskStatus.ABSTAINED })]),
+      acceptanceCriteria: [{
+        id: 'c1',
+        description: 'task a completes',
+        kind: AcceptanceCriterionKind.TASK_COMPLETED,
+        taskId: 'a',
+      }],
+      acceptanceEvidence: { taskOutcomes: [], artifacts: [], metrics: {} },
+    }));
+    const result = r.acceptanceResults[0];
+    expect(result?.wired).toBe(true);
+    expect(result?.satisfied).toBe(false);
   });
 
   it('incomplete task at run end with no block → TASK_FAILED', () => {

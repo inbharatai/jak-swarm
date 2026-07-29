@@ -264,6 +264,40 @@ export type {
 export { runPlanViaLangGraph } from './hyperagent/spec-executor-runtime.js';
 export type { RunPlanViaLangGraphDeps } from './hyperagent/spec-executor-runtime.js';
 
+// ─── HyperAgent accuracy pass — criteria compiler + citation coverage ─────
+// `compileSpecCriteria` converts prose/CUSTOM acceptance criteria into wired
+// structured criteria validated against the spec's task plan (never invents a
+// binding — unresolvable prose stays CUSTOM/unwired). `measureCitationCoverage`
+// scores a worker's output prose against the Brain claims it was served and
+// emits the `citation_coverage` harvested metric the acceptance checker binds.
+export {
+  compileCriteria,
+  compileSpecCriteria,
+  resolveTaskId,
+  validateProposal,
+} from './hyperagent/criteria-compiler.js';
+export type {
+  CompiledCriterion,
+  UnboundCriterion,
+  CompileCriteriaResult,
+  CompileCriteriaInput,
+  CriterionProposal,
+  CriterionBindingSource,
+} from './hyperagent/criteria-compiler.js';
+export {
+  measureCitationCoverage,
+  coverageMetrics,
+  splitSentences,
+  SUPPORT_THRESHOLD,
+  CITATION_COVERAGE_METRIC,
+  CITATION_FORM_DENSITY_METRIC,
+} from './hyperagent/citation-coverage.js';
+export type {
+  ServedClaim,
+  OutputClaim,
+  CitationCoverageReport,
+} from './hyperagent/citation-coverage.js';
+
 // ─── HyperAgent Phase 9 — versioned config lifecycle (pure core) ──────────
 // The bounded state machine + evidence-gated advancement. The LIVE caller is
 // `apps/api/src/services/company-brain/config-lifecycle.service.ts`; these

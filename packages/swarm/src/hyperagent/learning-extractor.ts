@@ -205,6 +205,36 @@ export function extractLearnings(input: ExtractLearningsInput): LearningCandidat
       });
     }
 
+    // ABSTAINED task → a KNOWLEDGE learning that this config declined. This is
+    // NOT a failure observation (contingency is untouched — abstention carries
+    // no a/b signal, so the information-theoretic gate never reads honest
+    // abstention as config failure). The config key IS dimensioned so a
+    // chronic-abstainer pattern is recallable: a planner/recall layer can see
+    // that this agent+tool config repeatedly declines this task type and
+    // route a more capable config instead. Single-observation confidence is
+    // the worker's own abstention confidence, capped so one abstain never
+    // promotes on its own.
+    if (task.verdict === TaskVerdict.TASK_ABSTAINED) {
+      candidates.push({
+        key: configKey(task),
+        kind: LearningKind.KNOWLEDGE,
+        source: LearningSource.OUTCOME,
+        value: {
+          taskType: task.taskId.split('_')[0],
+          abstained: true,
+          abstentionReason: task.abstention?.reason,
+          abstentionConfidence: task.abstention?.confidence,
+        },
+        summary: `Config for task type '${task.taskId.split('_')[0]}' abstained (${task.abstention?.reason ?? 'no reason recorded'}). Recall for chronic-abstainer routing.`,
+        tags: [...taskTags(task), 'abstain'],
+        taskVerdict: task.verdict,
+        // Neutral contingency — abstention is neither a present-success (a)
+        // nor a present-failure (b) observation for this config.
+        contingency: { a: 0, b: 0, c: 0, d: 0 },
+        confidence: Math.min(0.6, task.abstention?.confidence ?? 0.5),
+      });
+    }
+
     // BLOCKED task → a KNOWLEDGE learning that this task shape was blocked.
     if (task.verdict === TaskVerdict.TASK_BLOCKED) {
       candidates.push({

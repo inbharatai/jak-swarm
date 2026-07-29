@@ -21,6 +21,15 @@ import { crossEvidenceAnalyzer } from './analyzers/cross-evidence.js';
 import { calculateRiskScore, generateActions, generateSummary } from './scoring/risk-scorer.js';
 import { generateId } from '@jak-swarm/shared';
 
+// Rubric layer (accuracy pass) — deterministic output-quality floor.
+export {
+  scoreRubricFloor,
+  subAsks,
+  type RubricTaskContext,
+  type RubricDimension,
+  type RubricFloorResult,
+} from './rubric/floor-rules.js';
+
 // ─── Analyzer Registry ──────────────────────────────────────────────────────
 
 const ANALYZERS: Record<string, Analyzer> = {

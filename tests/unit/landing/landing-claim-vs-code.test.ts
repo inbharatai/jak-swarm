@@ -30,31 +30,45 @@ function evidencePaths(rel: string): string[] {
   return Array.from(read(rel).matchAll(/evidencePath:\s*'([^']+)'/g)).map((match) => match[1]!);
 }
 
-describe('Landing — multiplayer category and hero', () => {
-  it('leads with the shared human-agent workspace', () => {
+describe('Landing — engines-first positioning and hero', () => {
+  it('leads with Company Brain + Hyperagent as the product thesis', () => {
     const page = read('apps/web/src/app/page.tsx');
-    expect(page).toContain('One live workspace for');
-    expect(page).toContain('humans and AI agents');
-    for (const term of ['watch', 'redirect', 'hand work to a person', 'approve', 'replay', 'task graph']) {
+    expect(page).toContain('Company Brain + Hyperagent');
+    expect(page).toContain('evidence-grounded execution');
+    // The hero must name both engines and their closed loop (evidence →
+    // approved plan → governed execution → measured/repaired outcome).
+    for (const term of ['Company Brain', 'Hyperagent', 'evidence', 'approved', 'governed', 'verify', 'repair']) {
       expect(page.toLowerCase()).toContain(term.toLowerCase());
     }
-    expect(page).toContain('<MultiplayerPreview />');
-    expect(page).toContain('<MultiplayerSection />');
+    // The engine duo surfaces in the first section after the hero, and the
+    // detailed engine sections render below it.
+    expect(page).toContain('<EngineDuo />');
+    expect(page).toContain('id="engines"');
+    expect(page).toContain('<CompanyBrain />');
+    expect(page).toContain('<Hyperagent />');
   });
 
-  it('navigation leads with Multiplayer and keeps the defensive trust layer visible', () => {
+  it('navigation leads with the two engines and keeps multiplayer + trust visible', () => {
     const nav = read('apps/web/src/components/landing/LandingNavClient.tsx');
-    expect(nav).toContain("href: '#multiplayer'");
+    expect(nav).toContain("href: '#engines'");
+    expect(nav).toContain("label: 'Company Brain'");
+    expect(nav).toContain("label: 'Hyperagent'");
     expect(nav).toContain("label: 'Multiplayer'");
     expect(nav).toContain('href="#jak-shield"');
     expect(nav).toContain('JAK Shield');
   });
 
-  it('metadata, manifest, and social card use the same category', () => {
-    expect(read('apps/web/src/app/layout.tsx')).toMatch(/Multiplayer AI for Human-Agent Teams/);
-    expect(read('apps/web/public/manifest.json')).toMatch(/Multiplayer AI for Human-Agent Teams/);
-    expect(read('apps/web/public/og-image.svg')).toMatch(/MULTIPLAYER AI/);
-    expect(read('apps/web/public/og-image.svg')).toMatch(/humans and AI agents/);
+  it('metadata, manifest, and social card use the same engines-first positioning', () => {
+    expect(read('apps/web/src/app/layout.tsx')).toMatch(/Company Brain \+ Hyperagent for Evidence-Grounded Execution/);
+    expect(read('apps/web/public/manifest.json')).toMatch(/Company Brain \+ Hyperagent for Evidence-Grounded Execution/);
+    expect(read('apps/web/public/og-image.svg')).toMatch(/COMPANY BRAIN \+ HYPERAGENT/);
+    expect(read('apps/web/public/og-image.svg')).toMatch(/Evidence-grounded/);
+  });
+
+  it('multiplayer remains a supporting layer, not the hero', () => {
+    const page = read('apps/web/src/app/page.tsx');
+    expect(page).toContain('<MultiplayerPreview />');
+    expect(page).toContain('<MultiplayerSection />');
   });
 });
 

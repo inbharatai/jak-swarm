@@ -9,6 +9,7 @@ import {
 } from '@jak-swarm/shared';
 import { VerifierAgent, AgentContext } from '@jak-swarm/agents';
 import { evaluateForConfig } from '@jak-swarm/security';
+import { scoreRubricFloor } from '@jak-swarm/verification';
 import type { VerifierInput, VerificationResult } from '@jak-swarm/agents';
 import type { SwarmState } from '../../state/swarm-state.js';
 import { getCurrentTask } from '../../state/swarm-state.js';
@@ -193,6 +194,62 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
     };
   }
 
+  // Accuracy pass — calibrated abstention short-circuit. When the worker
+  // abstained (output.abstained === true, HyperAgent-gated in worker-node),
+  // the verifier must NOT verify the abstention as if it were a completion:
+  // an abstain is an honest decline, so we record a non-pass / non-retry
+  // result, set the task to ABSTAINED (not FAILED), and route FORWARD without
+  // burning a same-input retry (re-running would just produce another guess).
+  // The outcome evaluator triages TASK_ABSTAINED — never a failure, never a
+  // silent pass; acceptance criteria see it as a wired-unsatisfied task.
+  const outputRecord = taskOutput && typeof taskOutput === 'object'
+    ? (taskOutput as Record<string, unknown>)
+    : undefined;
+  if (outputRecord?.abstained === true) {
+    const reason = typeof outputRecord.reason === 'string' ? outputRecord.reason : 'worker abstained';
+    const abstainResult: VerificationResult = {
+      passed: false,
+      issues: [`Worker abstained rather than produce an ungrounded answer: ${reason}`],
+      confidence: typeof outputRecord.confidence === 'number' ? (outputRecord.confidence as number) : 0.3,
+      needsRetry: false,
+      retryReason: 'Abstention is terminal — re-running would produce another guess, not evidence.',
+    };
+    const abstainedPlan = state.plan
+      ? {
+          ...state.plan,
+          tasks: state.plan.tasks.map((t) =>
+            t.id === task.id
+              ? {
+                  ...t,
+                  status: TaskStatus.ABSTAINED,
+                  error: `Abstained: ${reason}`,
+                  abstention: {
+                    reason,
+                    ...(typeof outputRecord.confidence === 'number' ? { confidence: outputRecord.confidence as number } : {}),
+                    ...(typeof outputRecord.partialEvidence === 'string' ? { partialEvidence: outputRecord.partialEvidence as string } : {}),
+                  },
+                }
+              : t,
+          ),
+        }
+      : state.plan;
+    emitVerificationCompleted(state.workflowId, task, {
+      passed: false, confidence: abstainResult.confidence, issues: abstainResult.issues,
+    });
+    return {
+      verificationResults: { [task.id]: abstainResult },
+      plan: abstainedPlan,
+      // Neither completed nor failed — abstained. afterVerifier advances to
+      // the next task (needsRetry=false) and the outcome evaluator reads
+      // TaskStatus.ABSTAINED off the plan.
+      taskResults: {
+        [`${task.id}_status`]: TaskStatus.ABSTAINED,
+      },
+      status: WorkflowStatus.VERIFYING,
+      error: `Task '${task.name}' abstained: ${reason}`,
+    };
+  }
+
   const agent = new VerifierAgent();
 
   const context = new AgentContext({
@@ -212,6 +269,35 @@ export async function verifierNode(state: SwarmState): Promise<Partial<SwarmStat
 
   const result = await agent.execute(verifierInput, context) as VerificationResult;
   const traces = context.getTraces();
+
+  // Accuracy pass — deterministic rubric quality floor. The floor scores
+  // instruction-following (sub-ask engagement + task-term completeness),
+  // citation presence, and format conformity at zero LLM cost, and CAPS the
+  // composite verification confidence at its score. Posture mirrors the
+  // citation-density gate: the floor never flips a pass to a fail on its own
+  // (quality below par is a confidence signal + reviewable issues, not a
+  // blocking verdict) and it can never RAISE the verifier's confidence — a
+  // fluent-sounding LLM verdict cannot paper over an output that structurally
+  // failed to do what the task asked. `evidenceServed` is inferred from a
+  // citation density having been computed (grounded role), so the citation
+  // dimension only bites when evidence was actually available to cite.
+  const outputForFloor =
+    typeof taskOutput === 'string' ? taskOutput : JSON.stringify(taskOutput ?? '');
+  const floor = scoreRubricFloor(outputForFloor, {
+    taskName: task.name,
+    taskDescription: task.description,
+    evidenceServed: result.citationDensity !== undefined,
+  });
+  if (floor.floorScore < 1) {
+    result.confidence = Math.min(result.confidence, floor.floorScore);
+    result.issues = [...result.issues, ...floor.issues];
+    result.qualityScore = floor.floorScore;
+    result.qualityDimensions = floor.dimensions.map((d) => ({
+      name: d.name,
+      score: d.score,
+      note: d.note,
+    }));
+  }
 
   // Same-input (R1/R2) retry budget — single source of truth: `taskRetryCount`
   // on state, incremented by wrapVerifierNode when afterVerifier routes back to

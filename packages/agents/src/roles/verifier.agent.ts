@@ -19,6 +19,15 @@ export interface VerificationResult {
   citationDensity?: number;
   /** Uncited claim sentences that triggered a grounding failure. */
   uncitedClaims?: string[];
+  /**
+   * Accuracy pass — deterministic rubric quality-floor composite (0..1).
+   * Present when the floor found any sub-perfect dimension. The composite
+   * `confidence` is already capped at this score; this field exposes the
+   * floor value itself for observability + acceptance metrics.
+   */
+  qualityScore?: number;
+  /** Per-dimension rubric floor breakdown (audit/review surface). */
+  qualityDimensions?: Array<{ name: string; score: number; note: string }>;
 }
 
 // ─── Source-grounded output contract (Sprint 2.4 / Item F) ─────────────

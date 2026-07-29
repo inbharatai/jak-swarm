@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { ArrowRightIcon, JakLogo } from './LandingSvg';
 
 const links = [
-  { href: '#multiplayer', label: 'Multiplayer' },
+  { href: '#engines', label: 'Engines' },
   { href: '#company-os', label: 'Company Brain' },
   { href: '#hyperagent', label: 'Hyperagent' },
+  { href: '#multiplayer', label: 'Multiplayer' },
   { href: '#trust', label: 'Trust' },
   { href: '#pricing', label: 'Pricing' },
 ] as const;

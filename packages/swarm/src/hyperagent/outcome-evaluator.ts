@@ -80,6 +80,9 @@ export interface OutcomeEvaluatorInput {
  *
  * Rules (documented so Phase 4's rewiring can revise them deliberately):
  *   - SKIPPED                 → TASK_SKIPPED
+ *   - ABSTAINED               → TASK_ABSTAINED (honest decline, NOT a failure —
+ *                              never feeds failure statistics; carries the
+ *                              worker's abstention detail through)
  *   - FAILED                  → TASK_FAILED
  *   - AWAITING_APPROVAL       → TASK_BLOCKED (halted for a human)
  *   - COMPLETED + verifier    → passed ? TASK_PASSED : TASK_FAILED
@@ -115,6 +118,23 @@ function triageTask(
   switch (task.status) {
     case TaskStatus.SKIPPED:
       return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_SKIPPED, verified: false, agentRole, primaryTool, toolSet, industry, riskLevel };
+    case TaskStatus.ABSTAINED:
+      // Calibrated abstention: an honest decline, not a failure. No
+      // failureClass is attached (the learning extractor must not count this
+      // as a failure observation); the worker's abstention detail carries the
+      // reason + partial evidence for the user-facing "I don't know" surface.
+      return {
+        taskId: task.id,
+        taskName: task.name,
+        verdict: TaskVerdict.TASK_ABSTAINED,
+        verified: false,
+        abstention: task.abstention ?? { reason: task.error ?? 'worker abstained without recording a reason' },
+        agentRole,
+        primaryTool,
+        toolSet,
+        industry,
+        riskLevel,
+      };
     case TaskStatus.FAILED:
       return { taskId: task.id, taskName: task.name, verdict: TaskVerdict.TASK_FAILED, verified: false, failureClass, error, agentRole, primaryTool, toolSet, industry, riskLevel };
     case TaskStatus.AWAITING_APPROVAL:
@@ -194,6 +214,7 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
   const taskFailed = taskOutcomes.filter((o) => o.verdict === TaskVerdict.TASK_FAILED).length;
   const taskBlocked = taskOutcomes.filter((o) => o.verdict === TaskVerdict.TASK_BLOCKED).length;
   const taskSkipped = taskOutcomes.filter((o) => o.verdict === TaskVerdict.TASK_SKIPPED).length;
+  const taskAbstained = taskOutcomes.filter((o) => o.verdict === TaskVerdict.TASK_ABSTAINED).length;
   const taskTotal = input.plan.tasks.length;
   const activeTotal = taskTotal - taskSkipped;
 
@@ -207,9 +228,19 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
     // BLOCKED so the learning extractor doesn't ingest a false FAILED signal
     // for a run that simply made no progress.
     verdict = OutcomeVerdict.OUTCOME_BLOCKED;
+  } else if (taskAbstained === activeTotal) {
+    // EVERY active task abstained. Abstention is honest, so this is not
+    // FAILED — but the run produced no answers, so it is not SUCCESS either.
+    // BLOCKED is the honest label: the run could not make verified progress,
+    // and (like the all-skipped case above) the learning extractor must not
+    // ingest a false FAILED signal for a run that simply declined to guess.
+    verdict = OutcomeVerdict.OUTCOME_BLOCKED;
   } else if (activeTotal > 0 && taskPassed === activeTotal && taskFailed === 0) {
     verdict = OutcomeVerdict.OUTCOME_SUCCESS;
-  } else if (taskPassed > 0) {
+  } else if (taskPassed > 0 || taskAbstained > 0) {
+    // Some answers passed and/or some tasks abstained (without failing) —
+    // partial progress with honest gaps. (Abstentions never count toward the
+    // pass numerator, so SUCCESS above already excluded them.)
     verdict = OutcomeVerdict.OUTCOME_PARTIAL;
   } else {
     verdict = OutcomeVerdict.OUTCOME_FAILED;
@@ -238,7 +269,7 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
     ? Math.max(0, completedMs - startedMs)
     : 0;
 
-  const summary = buildSummary(verdict, taskPassed, taskFailed, taskBlocked, taskSkipped, activeTotal);
+  const summary = buildSummary(verdict, taskPassed, taskFailed, taskBlocked, taskSkipped, taskAbstained, activeTotal);
 
   return {
     workflowId: input.workflowId,
@@ -249,6 +280,7 @@ export function evaluateOutcome(input: OutcomeEvaluatorInput): OutcomeEvaluation
     taskFailed,
     taskBlocked,
     taskSkipped,
+    taskAbstained,
     taskOutcomes,
     acceptanceResults,
     totalCostUsd: input.accumulatedCostUsd ?? 0,
@@ -265,14 +297,18 @@ function buildSummary(
   failed: number,
   blocked: number,
   skipped: number,
+  abstained: number,
   activeTotal: number,
 ): string {
-  const counts = `passed=${passed} failed=${failed} blocked=${blocked} skipped=${skipped} (active=${activeTotal})`;
+  const counts = `passed=${passed} failed=${failed} blocked=${blocked} skipped=${skipped} abstained=${abstained} (active=${activeTotal})`;
+  const abstainNote = abstained > 0 ? ` ${abstained} task(s) abstained rather than guess.` : '';
   switch (verdict) {
     case OutcomeVerdict.OUTCOME_SUCCESS: return `All ${activeTotal} active task(s) verified-passed. ${counts}`;
-    case OutcomeVerdict.OUTCOME_PARTIAL: return `Partial: ${passed}/${activeTotal} active task(s) passed. ${counts}`;
+    case OutcomeVerdict.OUTCOME_PARTIAL: return `Partial: ${passed}/${activeTotal} active task(s) passed.${abstainNote} ${counts}`;
     case OutcomeVerdict.OUTCOME_FAILED: return `Failed: 0/${activeTotal} active task(s) passed. ${counts}`;
-    case OutcomeVerdict.OUTCOME_BLOCKED: return `Blocked by guardrail/policy/approval. ${counts}`;
+    case OutcomeVerdict.OUTCOME_BLOCKED: return abstained > 0 && abstained === activeTotal
+      ? `All ${activeTotal} active task(s) abstained — no verified progress. ${counts}`
+      : `Blocked by guardrail/policy/approval. ${counts}`;
     default: return `Unknown verdict. ${counts}`;
   }
 }

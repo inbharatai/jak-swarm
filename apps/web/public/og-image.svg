@@ -26,12 +26,12 @@
     <rect width="1044" height="482" rx="34" fill="#0d0d10" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.09"/>
 
     <text x="56" y="88" font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="34" fill="#ffffff">JAK Swarm</text>
-    <text x="56" y="132" font-family="system-ui,-apple-system,sans-serif" font-weight="600" font-size="18" letter-spacing="3" fill="#7dd3fc">MULTIPLAYER AI</text>
+    <text x="56" y="132" font-family="system-ui,-apple-system,sans-serif" font-weight="600" font-size="18" letter-spacing="3" fill="#7dd3fc">COMPANY BRAIN + HYPERAGENT</text>
 
-    <text x="56" y="222" font-family="system-ui,-apple-system,sans-serif" font-weight="850" font-size="58" letter-spacing="-2" fill="#ffffff">One live workspace for</text>
-    <text x="56" y="288" font-family="system-ui,-apple-system,sans-serif" font-weight="850" font-size="58" letter-spacing="-2" fill="url(#title)">humans and AI agents.</text>
+    <text x="56" y="222" font-family="system-ui,-apple-system,sans-serif" font-weight="850" font-size="52" letter-spacing="-2" fill="#ffffff">Evidence-grounded</text>
+    <text x="56" y="288" font-family="system-ui,-apple-system,sans-serif" font-weight="850" font-size="52" letter-spacing="-2" fill="url(#title)">governed execution.</text>
 
-    <text x="56" y="346" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="24" fill="#a1a1aa">Watch · Redirect · Hand off · Approve · Replay</text>
+    <text x="56" y="346" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="24" fill="#a1a1aa">Cited evidence · Approved plans · Verified outcomes · Human-gated repair</text>
 
     <g transform="translate(56 392)">
       <rect width="174" height="46" rx="23" fill="#34d399" fill-opacity="0.1" stroke="#34d399" stroke-opacity="0.28"/>
@@ -46,22 +46,22 @@
 
     <g transform="translate(766 92)">
       <rect width="214" height="286" rx="24" fill="#09090b" stroke="#ffffff" stroke-opacity="0.1"/>
-      <text x="22" y="40" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#71717a">SHARED SESSION</text>
+      <text x="22" y="40" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#71717a">EVIDENCE GRAPH</text>
       <circle cx="36" cy="76" r="13" fill="#34d399"/>
       <circle cx="68" cy="76" r="13" fill="#fde68a"/>
       <circle cx="100" cy="76" r="13" fill="#7dd3fc"/>
-      <text x="124" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#a1a1aa">3 people live</text>
+      <text x="124" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#a1a1aa">cited claims</text>
 
       <rect x="20" y="112" width="174" height="46" rx="12" fill="#7dd3fc" fill-opacity="0.08" stroke="#7dd3fc" stroke-opacity="0.22"/>
-      <text x="34" y="132" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" fill="#ffffff">Research Agent</text>
-      <text x="34" y="149" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7dd3fc">Redirected by Marketing</text>
+      <text x="34" y="132" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" fill="#ffffff">Approved spec</text>
+      <text x="34" y="149" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7dd3fc">execution measured</text>
 
       <rect x="20" y="170" width="174" height="46" rx="12" fill="#fbbf24" fill-opacity="0.08" stroke="#fbbf24" stroke-opacity="0.22"/>
-      <text x="34" y="190" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" fill="#ffffff">Human review</text>
-      <text x="34" y="207" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#fde68a">Workflow paused safely</text>
+      <text x="34" y="190" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13" fill="#ffffff">Bounded repair</text>
+      <text x="34" y="207" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#fde68a">human-gated learning</text>
 
       <rect x="20" y="228" width="174" height="36" rx="12" fill="#34d399" fill-opacity="0.08" stroke="#34d399" stroke-opacity="0.22"/>
-      <text x="107" y="251" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="12" fill="#a7f3d0">Replayable history</text>
+      <text x="107" y="251" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="12" fill="#a7f3d0">Tri-state acceptance</text>
     </g>
   </g>
 </svg>

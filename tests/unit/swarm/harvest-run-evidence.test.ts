@@ -14,6 +14,7 @@ import { createInitialSwarmState } from '../../../packages/swarm/src/state/swarm
 import type { SwarmState } from '../../../packages/swarm/src/state/swarm-state.js';
 import type { FailureDiagnosis } from '../../../packages/shared/src/index.js';
 import { harvestRunEvidence } from '../../../packages/swarm/src/hyperagent/spec-executor-runtime.js';
+import { harvestAccuracyMetrics } from '../../../packages/swarm/src/hyperagent/spec-executor-runtime.js';
 
 function baseState(over: Partial<SwarmState> = {}): SwarmState {
   const base = createInitialSwarmState({
@@ -99,5 +100,40 @@ describe('harvestRunEvidence (Hyperagent D1/D2 live-seam harvester)', () => {
     const out = harvestRunEvidence(state);
     expect(out.artifacts).toEqual(['art-1']);
     expect(out.failureClassByTask).toEqual({ t1: FailureClass.POLICY_BLOCK });
+  });
+});
+
+describe('harvestAccuracyMetrics (accuracy pass)', () => {
+  it('emits nothing for a bare state (no quality scores, no served claims)', () => {
+    expect(harvestAccuracyMetrics(baseState())).toEqual({});
+  });
+
+  it('emits the mean quality_score across verified tasks', () => {
+    const state = baseState({
+      verificationResults: {
+        t1: { passed: true, issues: [], confidence: 0.9, needsRetry: false, qualityScore: 0.8 },
+        t2: { passed: true, issues: [], confidence: 0.7, needsRetry: false, qualityScore: 0.6 },
+        t3: { passed: true, issues: [], confidence: 0.95, needsRetry: false },
+      },
+    } as unknown as Partial<SwarmState>);
+    const m = harvestAccuracyMetrics(state);
+    expect(m.quality_score).toBeCloseTo(0.7);
+  });
+
+  it('emits citation_coverage only when served claims + a text output exist', () => {
+    const state = baseState({
+      taskResults: { t1: 'Churn increased 18% in Q2 2026.' },
+      servedClaims: [
+        { id: 'c1', text: 'Customer churn increased 18% in Q2 2026 driven by onboarding drop-off.' },
+      ],
+    } as unknown as Partial<SwarmState>);
+    const m = harvestAccuracyMetrics(state);
+    expect(m.citation_coverage).toBe(1);
+  });
+
+  it('omits citation_coverage when no claims were served (never fakes grounded)', () => {
+    const state = baseState({ taskResults: { t1: 'Churn increased 18%.' } });
+    const m = harvestAccuracyMetrics(state);
+    expect(m.citation_coverage).toBeUndefined();
   });
 });
