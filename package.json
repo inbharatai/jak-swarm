@@ -59,13 +59,13 @@
       "protobufjs": ">=8.4.1",
       "langsmith": "0.7.1",
       "music-metadata": ">=11.12.3",
-      "@fastify/static": "9.1.1",
+      "@fastify/static": "10.1.2",
       "@hono/node-server": "1.19.13",
       "axios": "1.18.1",
       "minimatch@3.1.5>brace-expansion": "1.1.16",
       "minimatch@5.1.9>brace-expansion": "2.1.2",
       "minimatch@9.0.9>brace-expansion": "2.1.2",
-      "minimatch@10.2.5>brace-expansion": "5.0.7",
+      "minimatch@10.2.5>brace-expansion": "5.0.8",
       "dompurify": "3.4.0",
       "fast-jwt": "6.2.4",
       "fast-uri": "3.1.4",
@@ -95,7 +95,8 @@
         "GHSA-r6q2-hw4h-h46w",
         "GHSA-hmw2-7cc7-3qxx",
         "GHSA-3qcw-2rhx-2726",
-        "GHSA-c96f-x56v-gq3h"
+        "GHSA-c96f-x56v-gq3h",
+        "GHSA-mh99-v99m-4gvg"
       ]
     }
   }
