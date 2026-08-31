@@ -23,7 +23,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "imapflow": "^1.4.7",
     "node-ical": "^0.26.1",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.0.6",
     "openai": "^4.73.0",
     "pdf-parse": "^2.4.5",
     "playwright": "^1.61.1",
