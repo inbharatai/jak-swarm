@@ -31,7 +31,7 @@
     "@vitest/coverage-v8": "2.1.9",
     "cheerio": "^1.0.0",
     "exceljs": "^4.4.0",
-    "mammoth": "^1.8.0",
+    "mammoth": "^1.13.0",
     "sharp": "^0.35.3",
     "tesseract.js": "^5.1.0",
     "testcontainers": "^10.13.0",
